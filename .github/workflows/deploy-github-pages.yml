@@ -7,6 +7,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
@@ -23,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -37,6 +38,14 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: Prepare GitHub Pages artifact
+        working-directory: web/dist
+        run: |
+          # Skip Jekyll processing; required for Vite asset paths
+          touch .nojekyll
+          # SPA fallback for client-side routes on GitHub Pages
+          cp index.html 404.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -54,3 +63,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 600000
+          error_count: 10
+          reporting_interval: 10000
