@@ -42,60 +42,58 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat >> ~/.ssh/config <<EOF
+          Host cpanel-prod
+            HostName ${SSH_HOST}
+            Port ${SSH_PORT}
+            User ${{ secrets.PROD_SFTP_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking yes
+            RequestTTY no
+            LogLevel ERROR
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy SPA (web/dist → public_html)
         env:
-          SSH_USER: ${{ secrets.PROD_SFTP_USER }}
-          SSH_HOST: ${{ secrets.PROD_SFTP_HOST }}
-          SSH_PORT: ${{ secrets.PROD_SFTP_PORT }}
           REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
         run: |
-          RSYNC_SSH="ssh -p ${SSH_PORT} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes"
-          rsync -avz --delete \
-            -e "$RSYNC_SSH" \
-            web/dist/ \
-            "${SSH_USER}@${SSH_HOST}:${REMOTE_ROOT}/"
+          set -euo pipefail
+          # cPanel SSH often lacks rsync or prints shell banners; tar over SSH is reliable.
+          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}'"
+          tar -C web/dist -czf - . | ssh -T cpanel-prod "cd '${REMOTE_ROOT}' && tar -xzf -"
 
       - name: Deploy API (server-php → public_html/api)
         env:
-          SSH_USER: ${{ secrets.PROD_SFTP_USER }}
-          SSH_HOST: ${{ secrets.PROD_SFTP_HOST }}
-          SSH_PORT: ${{ secrets.PROD_SFTP_PORT }}
           REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
         run: |
-          RSYNC_SSH="ssh -p ${SSH_PORT} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes"
-          rsync -avz \
-            -e "$RSYNC_SSH" \
-            --exclude='.env' \
-            --exclude='.git/' \
-            --exclude='vendor/' \
-            --exclude='writable/logs/*' \
-            --exclude='writable/cache/*' \
-            --exclude='writable/session/*' \
-            --exclude='writable/uploads/*' \
-            server-php/ \
-            "${SSH_USER}@${SSH_HOST}:${REMOTE_ROOT}/api/"
+          set -euo pipefail
+          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}/api'"
+          tar -C server-php \
+            --exclude='./.env' \
+            --exclude='./.git' \
+            --exclude='./vendor' \
+            --exclude='./writable/logs' \
+            --exclude='./writable/cache' \
+            --exclude='./writable/session' \
+            --exclude='./writable/uploads' \
+            -czf - . | ssh -T cpanel-prod "cd '${REMOTE_ROOT}/api' && tar -xzf -"
 
       - name: Install PHP dependencies and run migrations
         env:
-          SSH_USER: ${{ secrets.PROD_SFTP_USER }}
-          SSH_HOST: ${{ secrets.PROD_SFTP_HOST }}
-          SSH_PORT: ${{ secrets.PROD_SFTP_PORT }}
           REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
         run: |
-          ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
-            "${SSH_USER}@${SSH_HOST}" \
-            "set -e
-             cd '${REMOTE_ROOT}/api'
-             if command -v composer >/dev/null 2>&1; then
-               composer install --no-dev --optimize-autoloader --no-interaction
-             elif [ -f composer.phar ]; then
-               php composer.phar install --no-dev --optimize-autoloader --no-interaction
-             else
-               echo 'composer not found on server — install dependencies manually once.'
-               exit 1
-             fi
-             php spark migrate --no-interaction"
+          ssh -T cpanel-prod "BASH_ENV=; ENV=; set -e
+            cd '${REMOTE_ROOT}/api'
+            if command -v composer >/dev/null 2>&1; then
+              composer install --no-dev --optimize-autoloader --no-interaction
+            elif [ -f composer.phar ]; then
+              php composer.phar install --no-dev --optimize-autoloader --no-interaction
+            else
+              echo 'composer not found on server — install dependencies manually once.'
+              exit 1
+            fi
+            php spark migrate --no-interaction"
 
       - name: Verify API health
         env:
