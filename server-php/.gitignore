@@ -1,0 +1,16 @@
+/vendor/
+/writable/cache/*
+!/writable/cache/.gitkeep
+/writable/logs/*
+!/writable/logs/.gitkeep
+/writable/session/*
+!/writable/session/.gitkeep
+/writable/uploads/*
+!/writable/uploads/.gitkeep
+/writable/debugbar/*
+/writable/migrations.lock
+.env
+.env.*
+!.env.example
+.phpunit.result.cache
+.phpcs-cache

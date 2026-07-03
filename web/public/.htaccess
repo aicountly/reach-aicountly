@@ -1,0 +1,17 @@
+RewriteEngine On
+RewriteBase /
+
+# Skip API — those requests go to /api/.htaccess (CI4 front controller)
+RewriteRule ^api/ - [L]
+
+# SPA fallback — every unmatched URL is served by index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]
+
+# Long-cache the hashed asset bundle
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|gif|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
