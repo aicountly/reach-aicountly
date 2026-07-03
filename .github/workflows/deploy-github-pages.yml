@@ -2,16 +2,17 @@ name: Deploy to GitHub Pages
 
 on:
   push:
+    branches: [main, master]
 
 permissions:
   contents: read
   pages: write
   id-token: write
-  actions: read
 
+# Do not cancel in-progress Pages deploys — avoids "Deployment failed" races.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -33,7 +34,6 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_APP_NAME: ${{ secrets.VITE_APP_NAME }}
-          # Project Pages URL: https://<org>.github.io/<repo>/
           VITE_BASE: /${{ github.event.repository.name }}/
         run: |
           npm ci
@@ -42,10 +42,11 @@ jobs:
       - name: Prepare GitHub Pages artifact
         working-directory: web/dist
         run: |
-          # Skip Jekyll processing; required for Vite asset paths
           touch .nojekyll
-          # SPA fallback for client-side routes on GitHub Pages
           cp index.html 404.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -62,8 +63,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          timeout: 600000
-          error_count: 10
-          reporting_interval: 10000
+        uses: actions/deploy-pages@v5
