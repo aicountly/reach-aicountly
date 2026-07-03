@@ -2,6 +2,11 @@ name: Deploy Production via SSH
 
 on:
   workflow_dispatch:
+    inputs:
+      remote_root_override:
+        description: 'Optional document root path override (blank = PROD_SFTP_REMOTE_ROOT secret)'
+        required: false
+        type: string
 
 concurrency:
   group: deploy-production
@@ -11,6 +16,9 @@ jobs:
   deploy:
     name: Build and deploy to cPanel
     runs-on: ubuntu-latest
+
+    env:
+      REMOTE_ROOT: ${{ inputs.remote_root_override || secrets.PROD_SFTP_REMOTE_ROOT }}
 
     steps:
       - name: Checkout
@@ -31,6 +39,8 @@ jobs:
         run: |
           npm ci
           npm run build
+          test -f dist/index.html
+          echo "Built $(find dist -type f | wc -l) files in web/dist"
 
       - name: Configure SSH
         env:
@@ -54,34 +64,61 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy SPA (web/dist → public_html)
-        env:
-          REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
-        run: |
-          set -euo pipefail
-          # cPanel SSH often lacks rsync or prints shell banners; tar over SSH is reliable.
-          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}'"
-          tar -C web/dist -czf - . | ssh -T cpanel-prod "cd '${REMOTE_ROOT}' && tar -xzf -"
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y lftp
 
-      - name: Deploy API (server-php → public_html/api)
-        env:
-          REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
+      - name: Verify remote document root
         run: |
           set -euo pipefail
-          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}/api'"
-          tar -C server-php \
-            --exclude='./.env' \
-            --exclude='./.git' \
-            --exclude='./vendor' \
-            --exclude='./writable/logs' \
-            --exclude='./writable/cache' \
-            --exclude='./writable/session' \
-            --exclude='./writable/uploads' \
-            -czf - . | ssh -T cpanel-prod "cd '${REMOTE_ROOT}/api' && tar -xzf -"
+          echo "Document root target: ${REMOTE_ROOT}"
+          ssh -T cpanel-prod "set -e
+            echo \"SSH login directory: \$(pwd)\"
+            echo \"Home: \${HOME:-unknown}\"
+            mkdir -p '${REMOTE_ROOT}'
+            mkdir -p '${REMOTE_ROOT}/api'
+            echo \"Listing ${REMOTE_ROOT}:\"
+            ls -la '${REMOTE_ROOT}' | head -25"
+
+      - name: Deploy SPA (web/dist → document root)
+        run: |
+          set -euo pipefail
+          # SFTP mirror — works on cPanel. Never use --delete here (would remove api/).
+          lftp -e "
+            set sftp:connect-program \"ssh -F $HOME/.ssh/config -a -x cpanel-prod\";
+            open sftp://${{ secrets.PROD_SFTP_HOST }};
+            mkdir -p ${REMOTE_ROOT};
+            cd ${REMOTE_ROOT};
+            lcd web/dist;
+            mirror -R --verbose --parallel=4 . .;
+            bye
+          "
+          ssh -T cpanel-prod "test -f '${REMOTE_ROOT}/index.html'"
+          echo "index.html confirmed on server"
+
+      - name: Deploy API (server-php → document root/api)
+        run: |
+          set -euo pipefail
+          lftp -e "
+            set sftp:connect-program \"ssh -F $HOME/.ssh/config -a -x cpanel-prod\";
+            open sftp://${{ secrets.PROD_SFTP_HOST }};
+            mkdir -p ${REMOTE_ROOT}/api;
+            cd ${REMOTE_ROOT}/api;
+            lcd server-php;
+            mirror -R --verbose --parallel=4 \
+              --exclude-glob .git/ \
+              --exclude-glob vendor/ \
+              --exclude-glob .env \
+              --exclude-glob writable/logs/ \
+              --exclude-glob writable/cache/ \
+              --exclude-glob writable/session/ \
+              --exclude-glob writable/uploads/ \
+              . .;
+            bye
+          "
+          ssh -T cpanel-prod "test -f '${REMOTE_ROOT}/api/index.php'"
+          echo "api/index.php confirmed on server"
 
       - name: Install PHP dependencies and run migrations
-        env:
-          REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
         run: |
           ssh -T cpanel-prod "BASH_ENV=; ENV=; set -e
             cd '${REMOTE_ROOT}/api'
@@ -95,13 +132,29 @@ jobs:
             fi
             php spark migrate --no-interaction"
 
-      - name: Verify API health
+      - name: Verify site and API
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
+          set -euo pipefail
+          SITE_URL="${VITE_API_URL%/}"
+          SITE_URL="${SITE_URL%/api/v1}"
+          SITE_URL="${SITE_URL%/api}"
+          echo "Checking homepage: ${SITE_URL}/"
+          HOME_BODY="$(curl -fsS --retry 3 --retry-delay 5 "${SITE_URL}/")"
+          echo "$HOME_BODY" | grep -qi 'Index of /' && {
+            echo 'ERROR: Site still shows Apache directory listing.'
+            echo 'Fix PROD_SFTP_REMOTE_ROOT to match cPanel → Domains → Document Root for reach.aicountly.org'
+            exit 1
+          }
+          echo "$HOME_BODY" | grep -qi '<html' || {
+            echo 'ERROR: Homepage did not return HTML.'
+            exit 1
+          }
+          echo 'Homepage OK'
           BASE="${VITE_API_URL%/}"
           BASE="${BASE%/v1}"
           HEALTH_URL="${BASE}/health"
-          echo "Checking ${HEALTH_URL}"
+          echo "Checking API: ${HEALTH_URL}"
           curl -fsS --retry 3 --retry-delay 5 "$HEALTH_URL" | head -c 500
           echo ""
