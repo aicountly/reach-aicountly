@@ -1,6 +1,11 @@
 RewriteEngine On
 RewriteBase /api/
 
+# cPanel: ensure PHP 8.1+ for CodeIgniter 4.6 (adjust ea-php82 if your host uses 8.2)
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php81 .php .php8 .phtml
+</IfModule>
+
 # Pass Authorization header to PHP (required for JWT on Apache/CGI/FPM)
 RewriteCond %{HTTP:Authorization} .
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
