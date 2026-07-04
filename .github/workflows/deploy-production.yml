@@ -2,11 +2,6 @@ name: Deploy Production via SSH
 
 on:
   workflow_dispatch:
-    inputs:
-      remote_root_override:
-        description: 'Optional document root path override (blank = PROD_SFTP_REMOTE_ROOT secret)'
-        required: false
-        type: string
 
 concurrency:
   group: deploy-production
@@ -19,7 +14,7 @@ jobs:
     timeout-minutes: 30
 
     env:
-      REMOTE_ROOT: ${{ inputs.remote_root_override || secrets.PROD_SFTP_REMOTE_ROOT }}
+      REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
 
     steps:
       - name: Checkout
