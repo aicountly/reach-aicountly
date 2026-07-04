@@ -1,182 +1,200 @@
 name: Deploy Production via SSH
 
-# Secrets: PROD_SFTP_HOST, PROD_SFTP_PORT, PROD_SFTP_USER, PROD_SSH_PRIVATE_KEY,
-#          PROD_SFTP_REMOTE_ROOT (public_html), VITE_API_URL, VITE_APP_NAME
+# Manual only — Actions → Deploy Production via SSH → Run workflow.
+# Matches engage-aicountly production deploy pattern.
 #
-#   web/dist/      →  public_html/
-#   server-php/    →  public_html/api/   (.env on server is never uploaded)
+#   web/dist/      →  $PROD_SFTP_REMOTE_ROOT/       (public_html)
+#   server-php/    →  $PROD_SFTP_REMOTE_ROOT/api/  (never overwrites api/.env)
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: deploy-production
+  group: reach-production
   cancel-in-progress: true
+
+env:
+  PROD_SFTP_HOST: ${{ secrets.PROD_SFTP_HOST }}
+  PROD_SFTP_PORT: ${{ secrets.PROD_SFTP_PORT }}
+  PROD_SFTP_USER: ${{ secrets.PROD_SFTP_USER }}
+  PROD_SFTP_REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
+  SSH_OPTS: -T -o BatchMode=yes -o LogLevel=ERROR -o RequestTTY=no
+  SCP_OPTS: -o BatchMode=yes -o LogLevel=ERROR -o RequestTTY=no
+  RSYNC_PATH: env -i PATH=/usr/bin:/bin:/usr/local/bin:/usr/local/cpanel/3rdparty/bin rsync
 
 jobs:
   deploy:
-    name: Build and deploy to cPanel
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: web
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate secrets
-        env:
-          PUBLIC_HTML: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
-          SFTP_HOST: ${{ secrets.PROD_SFTP_HOST }}
-          SFTP_USER: ${{ secrets.PROD_SFTP_USER }}
-          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          for var in PUBLIC_HTML SFTP_HOST SFTP_USER SSH_KEY; do
-            eval "v=\${$var:-}"
-            [ -n "$v" ] || { echo "ERROR: $var missing (check GitHub secrets)"; exit 1; }
-          done
-          echo "Deploy: web/dist → ${PUBLIC_HTML}/ | server-php → ${PUBLIC_HTML}/api/"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          tools: composer:v2
-          coverage: none
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build frontend
-        working-directory: web
+      - name: Create web .env for production build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_APP_NAME: ${{ secrets.VITE_APP_NAME }}
+          VITE_API_URL_SECRET: ${{ secrets.VITE_API_URL }}
+          VITE_APP_NAME_SECRET: ${{ secrets.VITE_APP_NAME }}
         run: |
-          API_URL="${VITE_API_URL:-https://reach.aicountly.org/api}"
+          API_URL="${VITE_API_URL_SECRET:-https://reach.aicountly.org/api}"
           API_URL="${API_URL%/}"
           API_URL="${API_URL%/v1}"
-          export VITE_API_URL="$API_URL"
-          npm ci
-          npm run build
+          APP_NAME="${VITE_APP_NAME_SECRET:-Reach}"
+          printf 'VITE_API_URL=%s\nVITE_APP_NAME=%s\n' "$API_URL" "$APP_NAME" > .env
+          echo "Frontend build: VITE_API_URL=${API_URL}"
 
-      - name: Install API dependencies (CI)
+      - name: Build for production
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -d dist || (echo "dist missing — build failed" && exit 1)
+          test -f dist/index.html
+          echo "Build ready: $(find dist -type f | wc -l) files in dist"
+
+      - name: Install server-php Composer dependencies (production)
         working-directory: server-php
-        run: composer install --no-dev --optimize-autoloader --no-interaction
-
-      - name: Stage API bundle
         run: |
-          set -euo pipefail
-          rm -rf staging/api
-          mkdir -p staging/api
-          rsync -a \
-            --exclude='.env' \
-            --exclude='.git/' \
-            --exclude='writable/logs/*' \
-            --exclude='writable/cache/*' \
-            --exclude='writable/session/*' \
-            --exclude='writable/uploads/*' \
-            server-php/ staging/api/
-          echo "API files: $(find staging/api -type f | wc -l) (vendor: $(find staging/api/vendor -type f 2>/dev/null | wc -l))"
+          composer install --no-dev --no-interaction --no-progress --optimize-autoloader --prefer-dist
+          test -d vendor/codeigniter4/framework || (echo "CI4 framework missing after install" && exit 1)
 
-      - name: Resolve SFTP document root
-        id: paths
-        env:
-          PUBLIC_HTML: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        working-directory: .
         run: |
-          set -euo pipefail
+          if [ -z "${PROD_SFTP_HOST:-}" ] || [ -z "${PROD_SFTP_PORT:-}" ]; then
+            echo "::error::Set PROD_SFTP_HOST and PROD_SFTP_PORT in GitHub secrets."
+            exit 1
+          fi
+          if [ -z "${PROD_SFTP_REMOTE_ROOT:-}" ]; then
+            echo "::error::Set PROD_SFTP_REMOTE_ROOT to public_html in GitHub secrets."
+            exit 1
+          fi
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.PROD_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.PROD_SFTP_PORT }}" -H "${{ secrets.PROD_SFTP_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-          MARKER="reach-probe-$(date +%s).txt"
-          echo ok > "$MARKER"
-          DEPLOY_BASE=""
-          for CAND in "${PUBLIC_HTML}" "public_html" "."; do
-            CAND="${CAND%/}"
-            [ -z "$CAND" ] && continue
-            scp -P "${{ secrets.PROD_SFTP_PORT }}" -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
-              "$MARKER" "${{ secrets.PROD_SFTP_USER }}@${{ secrets.PROD_SFTP_HOST }}:${CAND}/" 2>/dev/null || continue
-            if curl -sS "https://reach.aicountly.org/${MARKER}" 2>/dev/null | grep -q ok; then
-              DEPLOY_BASE="$CAND"
-              echo "Document root: ${DEPLOY_BASE}"
-              break
-            fi
-          done
-          rm -f "$MARKER"
-          [ -n "$DEPLOY_BASE" ] || { echo "ERROR: cannot resolve SFTP document root"; exit 1; }
-
-          if [ "$DEPLOY_BASE" = "." ]; then
-            echo "spa_target=." >> "$GITHUB_OUTPUT"
-            echo "api_target=api" >> "$GITHUB_OUTPUT"
-          else
-            echo "spa_target=${DEPLOY_BASE}" >> "$GITHUB_OUTPUT"
-            echo "api_target=${DEPLOY_BASE}/api" >> "$GITHUB_OUTPUT"
+          chmod 700 ~/.ssh
+          if ! ssh-keyscan -T 15 -p "$PROD_SFTP_PORT" "$PROD_SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+            printf 'Host %s\n Port %s\n StrictHostKeyChecking accept-new\n' "$PROD_SFTP_HOST" "$PROD_SFTP_PORT" >> ~/.ssh/config
+            chmod 600 ~/.ssh/config
           fi
 
-      - name: Deploy SPA — web/dist → document root
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.PROD_SFTP_HOST }}
-          username: ${{ secrets.PROD_SFTP_USER }}
-          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.PROD_SFTP_PORT }}
-          source: "web/dist/*,web/dist/.htaccess"
-          target: ${{ steps.paths.outputs.spa_target }}
-          overwrite: true
+      - name: Verify SSH and remote rsync
+        working-directory: .
+        run: |
+          REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
+          SSH_CMD=(ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}")
 
-      - name: Deploy API — full tree via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
-        with:
-          server: ${{ secrets.PROD_SFTP_HOST }}
-          port: ${{ secrets.PROD_SFTP_PORT }}
-          username: ${{ secrets.PROD_SFTP_USER }}
-          sshPrivateKey: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-          localPath: ./staging/api/
-          remotePath: ${{ steps.paths.outputs.api_target }}/
-          sftpOnly: true
+          echo "Testing SSH login..."
+          "${SSH_CMD[@]}" "echo SSH_OK"
 
-      - name: Verify site and API
+          echo "Remote rsync:"
+          "${SSH_CMD[@]}" "command -v rsync && rsync --version | head -1" || {
+            echo "::error::rsync not available. Enable SSH/rsync in cPanel or contact hosting support."
+            exit 1
+          }
+
+          echo "Ensuring remote paths: ${REMOTE_ROOT}/ and ${REMOTE_ROOT}/api/"
+          "${SSH_CMD[@]}" "mkdir -p \"${REMOTE_ROOT}\" \"${REMOTE_ROOT}/api\""
+
+      - name: Fix API files misplaced in document root
+        working-directory: .
+        continue-on-error: true
+        run: |
+          REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
+          scp -P "$PROD_SFTP_PORT" ${SCP_OPTS} scripts/cpanel-fix-api-in-root.sh \
+            "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/cpanel-fix-api-in-root.sh"
+          ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
+            "bash '${REMOTE_ROOT}/cpanel-fix-api-in-root.sh' '${REMOTE_ROOT}' && rm -f '${REMOTE_ROOT}/cpanel-fix-api-in-root.sh'"
+
+      - name: Deploy dist → public_html
+        run: |
+          REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
+          RSYNC_RSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS}"
+          rsync -avz --delete \
+            --rsync-path="${RSYNC_PATH}" \
+            --exclude 'api/' \
+            --exclude 'php.ini' \
+            --exclude 'api.tgz' \
+            --exclude 'app/' \
+            --exclude 'composer.json' \
+            --exclude 'composer.lock' \
+            --exclude 'spark' \
+            --exclude 'vendor/' \
+            --exclude 'writable/' \
+            -e "$RSYNC_RSH" \
+            dist/ \
+            "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/"
+
+      - name: Stamp API revision
+        working-directory: .
+        run: echo "${{ github.sha }}" > server-php/REVISION
+
+      - name: Deploy server-php → public_html/api
+        working-directory: .
+        run: |
+          REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
+          RSYNC_RSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS}"
+          rsync -avz --delete \
+            --rsync-path="${RSYNC_PATH}" \
+            --filter='merge scripts/cpanel-rsync-api.filters' \
+            -e "$RSYNC_RSH" \
+            server-php/ \
+            "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/"
+
+      - name: Post-deploy api setup (preserve .env)
+        working-directory: .
+        run: |
+          REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
+          scp -P "$PROD_SFTP_PORT" ${SCP_OPTS} scripts/cpanel-post-deploy-api.sh \
+            "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh"
+          ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
+            "chmod +x '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' && \
+             bash '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' '${REMOTE_ROOT}/api'"
+
+      - name: Verify files on remote server
+        working-directory: .
+        run: |
+          REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
+          ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" "
+            echo '---- public_html ----'
+            ls -lah '${REMOTE_ROOT}/'
+            echo '---- api ----'
+            ls -lah '${REMOTE_ROOT}/api/' || true
+            test -f '${REMOTE_ROOT}/index.html' && echo 'OK: index.html in public_html'
+            test -f '${REMOTE_ROOT}/api/index.php' && echo 'OK: api/index.php'
+            test -f '${REMOTE_ROOT}/api/.env' && echo 'OK: api/.env exists' || echo 'MISSING: api/.env'
+          "
+
+      - name: Verify site and API over HTTP
+        working-directory: .
         run: |
           set -euo pipefail
           SITE="https://reach.aicountly.org"
-
-          HOME_CODE=$(curl -sS -o /tmp/home.html -w '%{http_code}' "${SITE}/")
-          echo "Homepage HTTP ${HOME_CODE}"
-          grep -qi '<html' /tmp/home.html || { echo "ERROR: homepage not HTML"; exit 1; }
-
-          HEALTH_CODE=$(curl -sS -o /tmp/health.json -w '%{http_code}' "${SITE}/api/health")
-          HEALTH_BODY=$(cat /tmp/health.json)
-          echo "API health HTTP ${HEALTH_CODE}"
-          echo "$HEALTH_BODY" | head -c 400
+          curl -sS "${SITE}/" | grep -qi '<html'
+          echo "Homepage OK"
+          BODY=$(curl -sS "${SITE}/api/health")
+          echo "$BODY" | head -c 400
           echo ""
-
-          echo "$HEALTH_BODY" | grep -q 'aicountly-reach-api' || {
-            echo "ERROR: /api/health did not return API JSON."
+          echo "$BODY" | grep -q 'aicountly-reach-api' || {
+            echo "::error::/api/health did not return Reach API JSON"
             exit 1
           }
-
-          if [ "$HEALTH_CODE" = "503" ]; then
-            echo "$HEALTH_BODY" | grep -q 'Composer dependencies missing' && {
-              echo "ERROR: vendor/ missing on server — SFTP upload incomplete."
-              exit 1
-            }
-            echo "WARNING: API returned 503 but JSON present (check api/.env, PHP version, DB)."
-          fi
-
-          LOGIN_CODE=$(curl -sS -o /tmp/login.json -w '%{http_code}' \
-            -X POST "${SITE}/api/v1/auth/login" \
-            -H 'Content-Type: application/json' \
-            -d '{"email":"probe@example.com","password":"x"}')
-          echo "Login HTTP ${LOGIN_CODE}"
-          grep -q '"error"\|"ok"\|aicountly-reach-api' /tmp/login.json || {
-            echo "ERROR: login returned HTML"
-            cat /tmp/login.json | head -c 200
-            exit 1
-          }
-          echo "Deploy verification passed"
+          echo "API health OK"
