@@ -1,4 +1,7 @@
-const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+// Base URL without trailing slash or /v1 — services append paths like v1/auth/login.
+const API_URL = (import.meta.env.VITE_API_URL || '/api')
+  .replace(/\/$/, '')
+  .replace(/\/v1$/, '');
 
 /**
  * Uniform request. Backend responds with { ok, data } or { ok:false, error, details? }.
