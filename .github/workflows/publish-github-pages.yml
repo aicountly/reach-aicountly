@@ -1,20 +1,21 @@
-name: Deploy to GitHub Pages
+name: Publish GitHub Pages (gh-pages branch)
 
 on:
   push:
     branches: [main, master]
+  workflow_dispatch:
 
-# Pushes built files to the gh-pages branch (avoids flaky deploy-pages API).
+# Does NOT use actions/deploy-pages — pushes static files to the gh-pages branch.
 permissions:
   contents: write
 
 concurrency:
-  group: pages
+  group: publish-gh-pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Build and publish GitHub Pages
+  publish:
+    name: Build and push to gh-pages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -43,10 +44,16 @@ jobs:
           touch .nojekyll
           cp index.html 404.html
 
-      - name: Publish to gh-pages branch
+      - name: Push to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./web/dist
           enable_jekyll: false
           force_orphan: true
+
+      - name: Done
+        run: |
+          echo "Published to gh-pages branch."
+          echo "Site URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          echo "Ensure repo Settings → Pages → Source = Deploy from branch → gh-pages / (root)"
