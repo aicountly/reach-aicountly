@@ -3,7 +3,10 @@ name: Deploy Production via SSH
 # cPanel layout (PROD_SFTP_REMOTE_ROOT = public_html):
 #   web/dist/      →  public_html/          (SPA)
 #   server-php/    →  public_html/api/      (CodeIgniter API)
-# Production api/.env is never overwritten by this workflow.
+#
+# SFTP-only hosts (no shell): files are uploaded via scp; composer runs in CI.
+# Production api/.env is never uploaded. Run migrate/seed once via cPanel Terminal:
+#   cd ~/public_html/api && php spark migrate && php spark db:seed InitialReachSeeder
 
 on:
   workflow_dispatch:
@@ -44,6 +47,13 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: none
+
       - name: Build frontend
         working-directory: web
         env:
@@ -58,7 +68,28 @@ jobs:
           npm ci
           npm run build
           test -f dist/index.html
-          echo "Built $(find dist -type f | wc -l) files in web/dist"
+
+      - name: Install API dependencies (CI)
+        working-directory: server-php
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Stage API upload bundle
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/reach-api
+          mkdir -p /tmp/reach-api
+          rsync -a \
+            --exclude='.env' \
+            --exclude='.git/' \
+            --exclude='writable/logs/*' \
+            --exclude='writable/cache/*' \
+            --exclude='writable/session/*' \
+            --exclude='writable/uploads/*' \
+            server-php/ /tmp/reach-api/
+          test -f /tmp/reach-api/index.php
+          test -f /tmp/reach-api/.htaccess
+          test -d /tmp/reach-api/vendor
+          echo "API bundle ready ($(find /tmp/reach-api -type f | wc -l) files)"
 
       - name: Configure SSH
         env:
@@ -80,19 +111,9 @@ jobs:
             RequestTTY no
             BatchMode yes
             ConnectTimeout 30
-            ServerAliveInterval 15
-            ServerAliveCountMax 4
             LogLevel ERROR
           EOF
           chmod 600 ~/.ssh/config
-
-      - name: Prepare public_html on server
-        run: |
-          set -euo pipefail
-          ssh -T cpanel-prod "set -e
-            echo \"SSH pwd: \$(pwd)\"
-            mkdir -p '${PUBLIC_HTML}/api/writable/'{logs,cache,session,uploads}
-            ls -la '${PUBLIC_HTML}' | head -15"
 
       - name: Deploy SPA — web/dist → public_html
         run: |
@@ -100,88 +121,31 @@ jobs:
           echo "Uploading web/dist/* → ${PUBLIC_HTML}/"
           timeout 600 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
             web/dist/. "cpanel-prod:${PUBLIC_HTML}/"
-          ssh -T cpanel-prod "test -f '${PUBLIC_HTML}/index.html'"
-          echo "Confirmed ${PUBLIC_HTML}/index.html"
 
       - name: Deploy API — server-php → public_html/api
         run: |
           set -euo pipefail
-          echo "Packaging server-php/ (excluding .env, vendor, writable data)..."
-          tar -C server-php \
-            --exclude='./.env' \
-            --exclude='./.git' \
-            --exclude='./vendor' \
-            --exclude='./writable/logs' \
-            --exclude='./writable/cache' \
-            --exclude='./writable/session' \
-            --exclude='./writable/uploads' \
-            -czf api.tgz .
-          timeout 600 scp -F "$HOME/.ssh/config" -o BatchMode=yes \
-            api.tgz "cpanel-prod:${PUBLIC_HTML}/api.tgz"
-          echo "Extracting into ${PUBLIC_HTML}/api/ ..."
-          ssh -T cpanel-prod "set -e
-            cd '${PUBLIC_HTML}'
-            test -f api.tgz
-            rm -rf api.staging
-            mkdir -p api.staging/writable/logs api.staging/writable/cache api.staging/writable/session api.staging/writable/uploads
-            if tar -xzf api.tgz -C api.staging; then
-              echo 'Extracted with tar -xzf'
-            elif gzip -dc api.tgz | tar -xf - -C api.staging; then
-              echo 'Extracted with gzip | tar'
-            else
-              echo 'ERROR: Could not extract api.tgz on server'
-              exit 1
-            fi
-            rm -rf api
-            mv api.staging api
-            rm -f api.tgz
-            test -f api/index.php
-            test -f api/.htaccess
-            echo '${PUBLIC_HTML}/api/ contents:'
-            ls -la api | head -20"
-          echo "Confirmed ${PUBLIC_HTML}/api/index.php (api/.env on server is untouched)"
+          echo "Uploading server-php/* → ${PUBLIC_HTML}/api/"
+          timeout 900 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
+            /tmp/reach-api/. "cpanel-prod:${PUBLIC_HTML}/api/"
 
-      - name: Verify API reachable over HTTP
+      - name: Verify site and API over HTTP
         run: |
           set -euo pipefail
-          API_HEALTH="https://${SITE_HOST}/api/health"
-          echo "HTTP check: ${API_HEALTH}"
-          BODY="$(curl -sS --retry 5 --retry-delay 4 "$API_HEALTH")"
+          echo "Checking homepage..."
+          curl -fsS "https://${SITE_HOST}/" | grep -qi '<html'
+          echo "Homepage OK"
+          echo "Checking API health..."
+          BODY="$(curl -sS --retry 5 --retry-delay 4 "https://${SITE_HOST}/api/health")"
           echo "$BODY" | head -c 400
           echo ""
           echo "$BODY" | grep -q 'aicountly-reach-api' || {
-            echo "ERROR: /api/health did not return API JSON."
-            ssh -T cpanel-prod "ls -la '${PUBLIC_HTML}/api' 2>/dev/null | head -10 || echo 'missing api folder'"
+            echo "ERROR: /api/health returned HTML — api/ folder missing or not extracted in public_html."
+            echo "In cPanel File Manager confirm public_html/api/index.php exists."
             exit 1
           }
-          echo "API HTTP check OK"
-
-      - name: Install PHP dependencies, migrate, and seed superadmin
-        timeout-minutes: 15
-        run: |
-          set -euo pipefail
-          timeout 840 ssh -T cpanel-prod bash <<REMOTE
-          set -e
-          cd '${PUBLIC_HTML}/api'
-          if command -v composer >/dev/null 2>&1; then
-            composer install --no-dev --optimize-autoloader --no-interaction
-          elif [ -f composer.phar ]; then
-            php composer.phar install --no-dev --optimize-autoloader --no-interaction
-          else
-            echo 'composer not found on server — install dependencies manually once.'
-            exit 1
-          fi
-          php spark migrate --no-interaction
-          php spark db:seed InitialReachSeeder --no-interaction
-          REMOTE
-
-      - name: Verify site, API, and login endpoint
-        run: |
-          set -euo pipefail
-          curl -fsS "https://${SITE_HOST}/" | grep -qi '<html'
-          echo "Homepage OK"
-          curl -fsS "https://${SITE_HOST}/api/health" | grep -q 'aicountly-reach-api'
           echo "API health OK"
+          echo "Checking login route..."
           LOGIN_CODE="$(curl -sS -o /tmp/login.json -w '%{http_code}' \
             -X POST "https://${SITE_HOST}/api/v1/auth/login" \
             -H 'Content-Type: application/json' \
