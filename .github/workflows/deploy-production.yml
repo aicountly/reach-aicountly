@@ -77,8 +77,8 @@ jobs:
           MARKER="reach-root-$(date +%s).txt"
           echo "$MARKER" > "$MARKER"
           DETECTED=""
-          CANDIDATES=". public_html"
-          if [ -n "${REMOTE_ROOT}" ] && [ "${REMOTE_ROOT}" != "." ] && [ "${REMOTE_ROOT}" != "auto" ]; then
+          CANDIDATES="public_html ."
+          if [ -n "${REMOTE_ROOT}" ] && [ "${REMOTE_ROOT}" != "." ] && [ "${REMOTE_ROOT}" != "auto" ] && [ "${REMOTE_ROOT}" != "public_html" ]; then
             CANDIDATES="$CANDIDATES ${REMOTE_ROOT}"
           fi
           for TARGET in $CANDIDATES; do
@@ -96,7 +96,7 @@ jobs:
           rm -f "$MARKER"
           if [ -z "$DETECTED" ]; then
             echo "ERROR: Could not detect document root over HTTP."
-            echo "Set PROD_SFTP_REMOTE_ROOT to '.' or the exact cPanel Document Root path."
+            echo "Set PROD_SFTP_REMOTE_ROOT to public_html (cPanel document root for this account)."
             exit 1
           fi
           echo "DEPLOY_ROOT=${DETECTED}" >> "$GITHUB_ENV"
@@ -125,13 +125,27 @@ jobs:
             -czf api.tgz .
           timeout 600 scp -F "$HOME/.ssh/config" -o BatchMode=yes \
             api.tgz "cpanel-prod:${DEPLOY_ROOT}/api.tgz"
+          echo "Extracting api.tgz into ${DEPLOY_ROOT}/api/ ..."
           ssh -T cpanel-prod "set -e
-            mkdir -p '${DEPLOY_ROOT}/api/writable/'{logs,cache,session,uploads}
-            tar -xzf '${DEPLOY_ROOT}/api.tgz' -C '${DEPLOY_ROOT}/api'
-            rm -f '${DEPLOY_ROOT}/api.tgz'
-            test -f '${DEPLOY_ROOT}/api/index.php'
-            test -f '${DEPLOY_ROOT}/api/.htaccess'
-            ls -la '${DEPLOY_ROOT}/api' | head -15"
+            cd '${DEPLOY_ROOT}'
+            test -f api.tgz
+            rm -rf api.staging
+            mkdir -p api.staging/writable/logs api.staging/writable/cache api.staging/writable/session api.staging/writable/uploads
+            if tar -xzf api.tgz -C api.staging; then
+              echo 'Extracted with tar -xzf'
+            elif gzip -dc api.tgz | tar -xf - -C api.staging; then
+              echo 'Extracted with gzip | tar'
+            else
+              echo 'ERROR: Could not extract api.tgz on server (tar/gzip missing?)'
+              exit 1
+            fi
+            rm -rf api
+            mv api.staging api
+            rm -f api.tgz
+            test -f api/index.php || { echo 'ERROR: api/index.php missing after extract'; exit 1; }
+            test -f api/.htaccess || { echo 'ERROR: api/.htaccess missing after extract'; exit 1; }
+            echo 'api/ contents:'
+            ls -la api | head -20"
           echo "api/ deployed to ${DEPLOY_ROOT}/api"
 
       - name: Verify API reachable over HTTP
@@ -151,13 +165,8 @@ jobs:
 
       - name: Install PHP dependencies, migrate, and seed superadmin
         timeout-minutes: 15
-        env:
-          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
-          SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
-          escaped_email=$(printf '%s' "$SUPER_ADMIN_EMAIL" | sed "s/'/'\"'\"'/g")
-          escaped_pass=$(printf '%s' "$SUPER_ADMIN_PASSWORD" | sed "s/'/'\"'\"'/g")
           timeout 840 ssh -T cpanel-prod bash <<REMOTE
           set -e
           cd '${DEPLOY_ROOT}/api'
@@ -170,14 +179,7 @@ jobs:
             exit 1
           fi
           php spark migrate --no-interaction
-          if [ -n '${escaped_email}' ] && [ -n '${escaped_pass}' ]; then
-            export SUPER_ADMIN_EMAIL='${escaped_email}'
-            export SUPER_ADMIN_PASSWORD='${escaped_pass}'
-            export SUPER_ADMIN_NAME='Reach Superadmin'
-            php spark db:seed InitialReachSeeder --no-interaction
-          else
-            echo 'SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD secrets not set — skipping seed.'
-          fi
+          php spark db:seed InitialReachSeeder --no-interaction
           REMOTE
 
       - name: Verify site, API, and login endpoint
