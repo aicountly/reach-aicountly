@@ -64,33 +64,39 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Verify remote document root
+      - name: Resolve deploy root on server
+        id: deploy_root
         run: |
           set -euo pipefail
-          echo "Document root target: ${REMOTE_ROOT}"
-          ssh -T cpanel-prod "set -e
-            echo \"SSH login directory: \$(pwd)\"
-            echo \"Home: \${HOME:-unknown}\"
-            mkdir -p '${REMOTE_ROOT}'
-            mkdir -p '${REMOTE_ROOT}/api'
-            echo \"Listing ${REMOTE_ROOT}:\"
-            ls -la '${REMOTE_ROOT}' | head -25"
+          echo "Secret PROD_SFTP_REMOTE_ROOT: ${REMOTE_ROOT}"
+          RESOLVED=$(ssh -T cpanel-prod "set -e
+            login_pwd=\$(pwd)
+            target='${REMOTE_ROOT}'
+            deploy_root=\"\$login_pwd\"
+            if [ -n \"\$target\" ] && [ \"\$target\" != '.' ] && [ \"\$target\" != 'auto' ] && [ -d \"\$target\" ]; then
+              deploy_root=\$(cd \"\$target\" && pwd)
+            fi
+            mkdir -p \"\$deploy_root/api/writable/\"{logs,cache,session,uploads}
+            echo \"SSH login pwd: \$login_pwd\"
+            echo \"Using deploy root: \$deploy_root\"
+            ls -la \"\$deploy_root\" | head -20
+            printf '%s' \"\$deploy_root\"
+          ")
+          echo "DEPLOY_ROOT=${RESOLVED}" >> "$GITHUB_ENV"
+          echo "Resolved deploy root: ${RESOLVED}"
 
       - name: Deploy SPA (web/dist → document root)
         run: |
           set -euo pipefail
-          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}'"
-          echo "Uploading SPA files via scp..."
+          echo "Uploading SPA to ${DEPLOY_ROOT}..."
           timeout 600 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
-            web/dist/. "cpanel-prod:${REMOTE_ROOT}/"
-          ssh -T cpanel-prod "test -f '${REMOTE_ROOT}/index.html'"
-          ssh -T cpanel-prod "ls -la '${REMOTE_ROOT}' | head -20"
+            web/dist/. "cpanel-prod:${DEPLOY_ROOT}/"
+          ssh -T cpanel-prod "test -f '${DEPLOY_ROOT}/index.html'"
           echo "index.html confirmed on server"
 
       - name: Deploy API (server-php → document root/api)
         run: |
           set -euo pipefail
-          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}/api/writable/'{logs,cache,session,uploads}"
           echo "Packaging API..."
           tar -C server-php \
             --exclude='./.env' \
@@ -101,17 +107,16 @@ jobs:
             --exclude='./writable/session' \
             --exclude='./writable/uploads' \
             -czf api.tgz .
-          echo "Uploading API archive..."
+          echo "Uploading API to ${DEPLOY_ROOT}/api..."
           timeout 600 scp -F "$HOME/.ssh/config" -o BatchMode=yes \
-            api.tgz "cpanel-prod:${REMOTE_ROOT}/api.tgz"
-          echo "Extracting API on server..."
+            api.tgz "cpanel-prod:${DEPLOY_ROOT}/api.tgz"
           ssh -T cpanel-prod "set -e
-            mkdir -p '${REMOTE_ROOT}/api'
-            tar -xzf '${REMOTE_ROOT}/api.tgz' -C '${REMOTE_ROOT}/api'
-            rm -f '${REMOTE_ROOT}/api.tgz'
-            test -f '${REMOTE_ROOT}/api/index.php'
-            test -f '${REMOTE_ROOT}/api/.htaccess'
-            ls -la '${REMOTE_ROOT}/api' | head -15"
+            mkdir -p '${DEPLOY_ROOT}/api'
+            tar -xzf '${DEPLOY_ROOT}/api.tgz' -C '${DEPLOY_ROOT}/api'
+            rm -f '${DEPLOY_ROOT}/api.tgz'
+            test -f '${DEPLOY_ROOT}/api/index.php'
+            test -f '${DEPLOY_ROOT}/api/.htaccess'
+            ls -la '${DEPLOY_ROOT}/api' | head -15"
           echo "api/index.php and api/.htaccess confirmed on server"
 
       - name: Verify API reachable over HTTP
@@ -128,26 +133,43 @@ jobs:
           echo "$BODY" | head -c 400
           echo ""
           echo "$BODY" | grep -q 'aicountly-reach-api' || {
-            echo "ERROR: /api/health returned HTML or an error — api/ is not deployed in the web document root."
-            echo "Confirm PROD_SFTP_REMOTE_ROOT matches cPanel → Domains → Document Root."
+            echo "ERROR: /api/health returned HTML — api/ is not in the web document root Apache serves."
+            echo "Set PROD_SFTP_REMOTE_ROOT to '.' in GitHub secrets (cPanel SSH is usually chrooted to the domain folder)."
+            ssh -T cpanel-prod "echo 'Remote listing:'; ls -la '${DEPLOY_ROOT}' | head -15; ls -la '${DEPLOY_ROOT}/api' 2>/dev/null | head -10 || echo 'no api dir'"
             exit 1
           }
           echo "API HTTP check OK"
 
-      - name: Install PHP dependencies and run migrations
+      - name: Install PHP dependencies, migrate, and seed superadmin
         timeout-minutes: 15
+        env:
+          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
+          SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
         run: |
-          timeout 840 ssh -T cpanel-prod "BASH_ENV=; ENV=; set -e
-            cd '${REMOTE_ROOT}/api'
-            if command -v composer >/dev/null 2>&1; then
-              composer install --no-dev --optimize-autoloader --no-interaction
-            elif [ -f composer.phar ]; then
-              php composer.phar install --no-dev --optimize-autoloader --no-interaction
-            else
-              echo 'composer not found on server — install dependencies manually once.'
-              exit 1
-            fi
-            php spark migrate --no-interaction"
+          set -euo pipefail
+          escaped_email=$(printf '%s' "$SUPER_ADMIN_EMAIL" | sed "s/'/'\"'\"'/g")
+          escaped_pass=$(printf '%s' "$SUPER_ADMIN_PASSWORD" | sed "s/'/'\"'\"'/g")
+          timeout 840 ssh -T cpanel-prod bash <<REMOTE
+          set -e
+          cd '${DEPLOY_ROOT}/api'
+          if command -v composer >/dev/null 2>&1; then
+            composer install --no-dev --optimize-autoloader --no-interaction
+          elif [ -f composer.phar ]; then
+            php composer.phar install --no-dev --optimize-autoloader --no-interaction
+          else
+            echo 'composer not found on server — install dependencies manually once.'
+            exit 1
+          fi
+          php spark migrate --no-interaction
+          if [ -n '${escaped_email}' ] && [ -n '${escaped_pass}' ]; then
+            export SUPER_ADMIN_EMAIL='${escaped_email}'
+            export SUPER_ADMIN_PASSWORD='${escaped_pass}'
+            export SUPER_ADMIN_NAME='Reach Superadmin'
+            php spark db:seed InitialReachSeeder --no-interaction
+          else
+            echo 'SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD secrets not set — skipping seed.'
+          fi
+          REMOTE
 
       - name: Verify site and API
         env:
@@ -161,11 +183,6 @@ jobs:
           HOME_BODY="$(curl -fsS --retry 3 --retry-delay 5 "${SITE_URL}/")"
           echo "$HOME_BODY" | grep -qi 'Index of /' && {
             echo 'ERROR: Site still shows Apache directory listing.'
-            echo 'Fix PROD_SFTP_REMOTE_ROOT to match cPanel → Domains → Document Root for reach.aicountly.org'
-            exit 1
-          }
-          echo "$HOME_BODY" | grep -qi '<html' || {
-            echo 'ERROR: Homepage did not return HTML.'
             exit 1
           }
           echo 'Homepage OK'

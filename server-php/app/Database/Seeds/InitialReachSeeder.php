@@ -43,7 +43,14 @@ class InitialReachSeeder extends Seeder
             $users = $this->db->table('reach_users');
             $existing = $users->where('email', $email)->get()->getRow();
             if ($existing) {
-                CLI::write("Superadmin already exists: {$email}", 'yellow');
+                $users->where('id', $existing->id)->update([
+                    'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+                    'name'          => $name,
+                    'role_id'       => $roleId,
+                    'is_active'     => true,
+                    'updated_at'    => $now,
+                ]);
+                CLI::write("Updated superadmin credentials: {$email}", 'green');
             } else {
                 $users->insert([
                     'email'         => $email,
