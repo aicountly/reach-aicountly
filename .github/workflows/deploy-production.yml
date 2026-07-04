@@ -1,5 +1,10 @@
 name: Deploy Production via SSH
 
+# cPanel layout (PROD_SFTP_REMOTE_ROOT = public_html):
+#   web/dist/      →  public_html/          (SPA)
+#   server-php/    →  public_html/api/      (CodeIgniter API)
+# Production api/.env is never overwritten by this workflow.
+
 on:
   workflow_dispatch:
 
@@ -14,12 +19,23 @@ jobs:
     timeout-minutes: 30
 
     env:
-      REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
+      PUBLIC_HTML: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
       SITE_HOST: reach.aicountly.org
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate deploy paths
+        run: |
+          set -euo pipefail
+          if [ -z "${PUBLIC_HTML}" ]; then
+            echo "ERROR: PROD_SFTP_REMOTE_ROOT secret is not set."
+            echo "Set it to public_html (cPanel document root for reach.aicountly.org)."
+            exit 1
+          fi
+          echo "SPA target:  ${PUBLIC_HTML}/           (from web/dist/)"
+          echo "API target:  ${PUBLIC_HTML}/api/       (from server-php/)"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -34,7 +50,6 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_APP_NAME: ${{ secrets.VITE_APP_NAME }}
         run: |
-          # Normalize — services append v1/... paths; base must not end with /v1
           API_URL="${VITE_API_URL:-https://reach.aicountly.org/api}"
           API_URL="${API_URL%/}"
           API_URL="${API_URL%/v1}"
@@ -71,49 +86,27 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Detect web document root
+      - name: Prepare public_html on server
         run: |
           set -euo pipefail
-          MARKER="reach-root-$(date +%s).txt"
-          echo "$MARKER" > "$MARKER"
-          DETECTED=""
-          CANDIDATES="public_html ."
-          if [ -n "${REMOTE_ROOT}" ] && [ "${REMOTE_ROOT}" != "." ] && [ "${REMOTE_ROOT}" != "auto" ] && [ "${REMOTE_ROOT}" != "public_html" ]; then
-            CANDIDATES="$CANDIDATES ${REMOTE_ROOT}"
-          fi
-          for TARGET in $CANDIDATES; do
-            echo "Probing deploy target: ${TARGET}"
-            ssh -T cpanel-prod "mkdir -p '${TARGET}'" 2>/dev/null || true
-            scp -F "$HOME/.ssh/config" -o BatchMode=yes "$MARKER" "cpanel-prod:${TARGET}/" 2>/dev/null || continue
-            if curl -fsS "https://${SITE_HOST}/${MARKER}" 2>/dev/null | grep -q "$MARKER"; then
-              DETECTED="$TARGET"
-              echo "Document root confirmed: ${TARGET}"
-              ssh -T cpanel-prod "rm -f '${TARGET}/${MARKER}'" || true
-              break
-            fi
-            ssh -T cpanel-prod "rm -f '${TARGET}/${MARKER}'" 2>/dev/null || true
-          done
-          rm -f "$MARKER"
-          if [ -z "$DETECTED" ]; then
-            echo "ERROR: Could not detect document root over HTTP."
-            echo "Set PROD_SFTP_REMOTE_ROOT to public_html (cPanel document root for this account)."
-            exit 1
-          fi
-          echo "DEPLOY_ROOT=${DETECTED}" >> "$GITHUB_ENV"
-          ssh -T cpanel-prod "echo 'SSH pwd:' \$(pwd); ls -la '${DETECTED}' | head -15"
+          ssh -T cpanel-prod "set -e
+            echo \"SSH pwd: \$(pwd)\"
+            mkdir -p '${PUBLIC_HTML}/api/writable/'{logs,cache,session,uploads}
+            ls -la '${PUBLIC_HTML}' | head -15"
 
-      - name: Deploy SPA (web/dist → document root)
+      - name: Deploy SPA — web/dist → public_html
         run: |
           set -euo pipefail
-          echo "Uploading SPA to ${DEPLOY_ROOT}..."
+          echo "Uploading web/dist/* → ${PUBLIC_HTML}/"
           timeout 600 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
-            web/dist/. "cpanel-prod:${DEPLOY_ROOT}/"
-          ssh -T cpanel-prod "test -f '${DEPLOY_ROOT}/index.html'"
-          echo "index.html confirmed on server"
+            web/dist/. "cpanel-prod:${PUBLIC_HTML}/"
+          ssh -T cpanel-prod "test -f '${PUBLIC_HTML}/index.html'"
+          echo "Confirmed ${PUBLIC_HTML}/index.html"
 
-      - name: Deploy API (server-php → document root/api)
+      - name: Deploy API — server-php → public_html/api
         run: |
           set -euo pipefail
+          echo "Packaging server-php/ (excluding .env, vendor, writable data)..."
           tar -C server-php \
             --exclude='./.env' \
             --exclude='./.git' \
@@ -124,10 +117,10 @@ jobs:
             --exclude='./writable/uploads' \
             -czf api.tgz .
           timeout 600 scp -F "$HOME/.ssh/config" -o BatchMode=yes \
-            api.tgz "cpanel-prod:${DEPLOY_ROOT}/api.tgz"
-          echo "Extracting api.tgz into ${DEPLOY_ROOT}/api/ ..."
+            api.tgz "cpanel-prod:${PUBLIC_HTML}/api.tgz"
+          echo "Extracting into ${PUBLIC_HTML}/api/ ..."
           ssh -T cpanel-prod "set -e
-            cd '${DEPLOY_ROOT}'
+            cd '${PUBLIC_HTML}'
             test -f api.tgz
             rm -rf api.staging
             mkdir -p api.staging/writable/logs api.staging/writable/cache api.staging/writable/session api.staging/writable/uploads
@@ -136,17 +129,17 @@ jobs:
             elif gzip -dc api.tgz | tar -xf - -C api.staging; then
               echo 'Extracted with gzip | tar'
             else
-              echo 'ERROR: Could not extract api.tgz on server (tar/gzip missing?)'
+              echo 'ERROR: Could not extract api.tgz on server'
               exit 1
             fi
             rm -rf api
             mv api.staging api
             rm -f api.tgz
-            test -f api/index.php || { echo 'ERROR: api/index.php missing after extract'; exit 1; }
-            test -f api/.htaccess || { echo 'ERROR: api/.htaccess missing after extract'; exit 1; }
-            echo 'api/ contents:'
+            test -f api/index.php
+            test -f api/.htaccess
+            echo '${PUBLIC_HTML}/api/ contents:'
             ls -la api | head -20"
-          echo "api/ deployed to ${DEPLOY_ROOT}/api"
+          echo "Confirmed ${PUBLIC_HTML}/api/index.php (api/.env on server is untouched)"
 
       - name: Verify API reachable over HTTP
         run: |
@@ -158,7 +151,7 @@ jobs:
           echo ""
           echo "$BODY" | grep -q 'aicountly-reach-api' || {
             echo "ERROR: /api/health did not return API JSON."
-            ssh -T cpanel-prod "ls -la '${DEPLOY_ROOT}/api' 2>/dev/null | head -10 || echo 'missing api dir'"
+            ssh -T cpanel-prod "ls -la '${PUBLIC_HTML}/api' 2>/dev/null | head -10 || echo 'missing api folder'"
             exit 1
           }
           echo "API HTTP check OK"
@@ -169,7 +162,7 @@ jobs:
           set -euo pipefail
           timeout 840 ssh -T cpanel-prod bash <<REMOTE
           set -e
-          cd '${DEPLOY_ROOT}/api'
+          cd '${PUBLIC_HTML}/api'
           if command -v composer >/dev/null 2>&1; then
             composer install --no-dev --optimize-autoloader --no-interaction
           elif [ -f composer.phar ]; then
@@ -185,21 +178,16 @@ jobs:
       - name: Verify site, API, and login endpoint
         run: |
           set -euo pipefail
-          echo "Checking homepage..."
           curl -fsS "https://${SITE_HOST}/" | grep -qi '<html'
           echo "Homepage OK"
-          echo "Checking API health..."
           curl -fsS "https://${SITE_HOST}/api/health" | grep -q 'aicountly-reach-api'
           echo "API health OK"
-          echo "Checking login route (expect 401/422 JSON, not HTML)..."
           LOGIN_CODE="$(curl -sS -o /tmp/login.json -w '%{http_code}' \
             -X POST "https://${SITE_HOST}/api/v1/auth/login" \
             -H 'Content-Type: application/json' \
             -d '{"email":"probe@example.com","password":"probe"}')"
-          head -c 200 /tmp/login.json
-          echo ""
-          grep -q 'aicountly-reach-api\|"ok"' /tmp/login.json || grep -q '"error"' /tmp/login.json || {
-            echo "ERROR: Login endpoint returned HTML instead of JSON (HTTP ${LOGIN_CODE})."
+          grep -q '"error"\|"ok"\|aicountly-reach-api' /tmp/login.json || {
+            echo "ERROR: Login endpoint returned HTML (HTTP ${LOGIN_CODE})."
             exit 1
           }
           echo "Login route OK (HTTP ${LOGIN_CODE})"
