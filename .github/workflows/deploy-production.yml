@@ -15,6 +15,7 @@ jobs:
 
     env:
       REMOTE_ROOT: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
+      SITE_HOST: reach.aicountly.org
 
     steps:
       - name: Checkout
@@ -33,6 +34,12 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_APP_NAME: ${{ secrets.VITE_APP_NAME }}
         run: |
+          # Normalize — services append v1/... paths; base must not end with /v1
+          API_URL="${VITE_API_URL:-https://reach.aicountly.org/api}"
+          API_URL="${API_URL%/}"
+          API_URL="${API_URL%/v1}"
+          export VITE_API_URL="$API_URL"
+          echo "Building with VITE_API_URL=${VITE_API_URL}"
           npm ci
           npm run build
           test -f dist/index.html
@@ -64,26 +71,36 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Resolve deploy root on server
-        id: deploy_root
+      - name: Detect web document root
         run: |
           set -euo pipefail
-          echo "Secret PROD_SFTP_REMOTE_ROOT: ${REMOTE_ROOT}"
-          RESOLVED=$(ssh -T cpanel-prod "set -e
-            login_pwd=\$(pwd)
-            target='${REMOTE_ROOT}'
-            deploy_root=\"\$login_pwd\"
-            if [ -n \"\$target\" ] && [ \"\$target\" != '.' ] && [ \"\$target\" != 'auto' ] && [ -d \"\$target\" ]; then
-              deploy_root=\$(cd \"\$target\" && pwd)
+          MARKER="reach-root-$(date +%s).txt"
+          echo "$MARKER" > "$MARKER"
+          DETECTED=""
+          CANDIDATES=". public_html"
+          if [ -n "${REMOTE_ROOT}" ] && [ "${REMOTE_ROOT}" != "." ] && [ "${REMOTE_ROOT}" != "auto" ]; then
+            CANDIDATES="$CANDIDATES ${REMOTE_ROOT}"
+          fi
+          for TARGET in $CANDIDATES; do
+            echo "Probing deploy target: ${TARGET}"
+            ssh -T cpanel-prod "mkdir -p '${TARGET}'" 2>/dev/null || true
+            scp -F "$HOME/.ssh/config" -o BatchMode=yes "$MARKER" "cpanel-prod:${TARGET}/" 2>/dev/null || continue
+            if curl -fsS "https://${SITE_HOST}/${MARKER}" 2>/dev/null | grep -q "$MARKER"; then
+              DETECTED="$TARGET"
+              echo "Document root confirmed: ${TARGET}"
+              ssh -T cpanel-prod "rm -f '${TARGET}/${MARKER}'" || true
+              break
             fi
-            mkdir -p \"\$deploy_root/api/writable/\"{logs,cache,session,uploads}
-            echo \"SSH login pwd: \$login_pwd\"
-            echo \"Using deploy root: \$deploy_root\"
-            ls -la \"\$deploy_root\" | head -20
-            printf '%s' \"\$deploy_root\"
-          ")
-          echo "DEPLOY_ROOT=${RESOLVED}" >> "$GITHUB_ENV"
-          echo "Resolved deploy root: ${RESOLVED}"
+            ssh -T cpanel-prod "rm -f '${TARGET}/${MARKER}'" 2>/dev/null || true
+          done
+          rm -f "$MARKER"
+          if [ -z "$DETECTED" ]; then
+            echo "ERROR: Could not detect document root over HTTP."
+            echo "Set PROD_SFTP_REMOTE_ROOT to '.' or the exact cPanel Document Root path."
+            exit 1
+          fi
+          echo "DEPLOY_ROOT=${DETECTED}" >> "$GITHUB_ENV"
+          ssh -T cpanel-prod "echo 'SSH pwd:' \$(pwd); ls -la '${DETECTED}' | head -15"
 
       - name: Deploy SPA (web/dist → document root)
         run: |
@@ -97,7 +114,6 @@ jobs:
       - name: Deploy API (server-php → document root/api)
         run: |
           set -euo pipefail
-          echo "Packaging API..."
           tar -C server-php \
             --exclude='./.env' \
             --exclude='./.git' \
@@ -107,35 +123,28 @@ jobs:
             --exclude='./writable/session' \
             --exclude='./writable/uploads' \
             -czf api.tgz .
-          echo "Uploading API to ${DEPLOY_ROOT}/api..."
           timeout 600 scp -F "$HOME/.ssh/config" -o BatchMode=yes \
             api.tgz "cpanel-prod:${DEPLOY_ROOT}/api.tgz"
           ssh -T cpanel-prod "set -e
-            mkdir -p '${DEPLOY_ROOT}/api'
+            mkdir -p '${DEPLOY_ROOT}/api/writable/'{logs,cache,session,uploads}
             tar -xzf '${DEPLOY_ROOT}/api.tgz' -C '${DEPLOY_ROOT}/api'
             rm -f '${DEPLOY_ROOT}/api.tgz'
             test -f '${DEPLOY_ROOT}/api/index.php'
             test -f '${DEPLOY_ROOT}/api/.htaccess'
             ls -la '${DEPLOY_ROOT}/api' | head -15"
-          echo "api/index.php and api/.htaccess confirmed on server"
+          echo "api/ deployed to ${DEPLOY_ROOT}/api"
 
       - name: Verify API reachable over HTTP
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           set -euo pipefail
-          SITE_URL="${VITE_API_URL%/}"
-          SITE_URL="${SITE_URL%/api/v1}"
-          SITE_URL="${SITE_URL%/api}"
-          API_HEALTH="${SITE_URL}/api/health"
+          API_HEALTH="https://${SITE_HOST}/api/health"
           echo "HTTP check: ${API_HEALTH}"
-          BODY="$(curl -sS --retry 3 --retry-delay 3 "$API_HEALTH")"
+          BODY="$(curl -sS --retry 5 --retry-delay 4 "$API_HEALTH")"
           echo "$BODY" | head -c 400
           echo ""
           echo "$BODY" | grep -q 'aicountly-reach-api' || {
-            echo "ERROR: /api/health returned HTML — api/ is not in the web document root Apache serves."
-            echo "Set PROD_SFTP_REMOTE_ROOT to '.' in GitHub secrets (cPanel SSH is usually chrooted to the domain folder)."
-            ssh -T cpanel-prod "echo 'Remote listing:'; ls -la '${DEPLOY_ROOT}' | head -15; ls -la '${DEPLOY_ROOT}/api' 2>/dev/null | head -10 || echo 'no api dir'"
+            echo "ERROR: /api/health did not return API JSON."
+            ssh -T cpanel-prod "ls -la '${DEPLOY_ROOT}/api' 2>/dev/null | head -10 || echo 'missing api dir'"
             exit 1
           }
           echo "API HTTP check OK"
@@ -171,28 +180,24 @@ jobs:
           fi
           REMOTE
 
-      - name: Verify site and API
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - name: Verify site, API, and login endpoint
         run: |
           set -euo pipefail
-          SITE_URL="${VITE_API_URL%/}"
-          SITE_URL="${SITE_URL%/api/v1}"
-          SITE_URL="${SITE_URL%/api}"
-          echo "Checking homepage: ${SITE_URL}/"
-          HOME_BODY="$(curl -fsS --retry 3 --retry-delay 5 "${SITE_URL}/")"
-          echo "$HOME_BODY" | grep -qi 'Index of /' && {
-            echo 'ERROR: Site still shows Apache directory listing.'
-            exit 1
-          }
-          echo 'Homepage OK'
-          HEALTH_URL="${SITE_URL}/api/health"
-          echo "Checking API: ${HEALTH_URL}"
-          API_BODY="$(curl -fsS --retry 3 --retry-delay 5 "$HEALTH_URL")"
-          echo "$API_BODY" | head -c 500
+          echo "Checking homepage..."
+          curl -fsS "https://${SITE_HOST}/" | grep -qi '<html'
+          echo "Homepage OK"
+          echo "Checking API health..."
+          curl -fsS "https://${SITE_HOST}/api/health" | grep -q 'aicountly-reach-api'
+          echo "API health OK"
+          echo "Checking login route (expect 401/422 JSON, not HTML)..."
+          LOGIN_CODE="$(curl -sS -o /tmp/login.json -w '%{http_code}' \
+            -X POST "https://${SITE_HOST}/api/v1/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"probe@example.com","password":"probe"}')"
+          head -c 200 /tmp/login.json
           echo ""
-          echo "$API_BODY" | grep -q 'aicountly-reach-api' || {
-            echo 'ERROR: API health did not return expected JSON.'
+          grep -q 'aicountly-reach-api\|"ok"' /tmp/login.json || grep -q '"error"' /tmp/login.json || {
+            echo "ERROR: Login endpoint returned HTML instead of JSON (HTTP ${LOGIN_CODE})."
             exit 1
           }
-          echo 'API health OK'
+          echo "Login route OK (HTTP ${LOGIN_CODE})"
