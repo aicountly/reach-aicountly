@@ -1,12 +1,15 @@
 name: Deploy Production via SSH
 
-# cPanel layout (PROD_SFTP_REMOTE_ROOT = public_html):
-#   web/dist/      →  public_html/          (SPA)
-#   server-php/    →  public_html/api/      (CodeIgniter API)
+# Secrets used (Settings → Secrets → Actions):
+#   PROD_SFTP_HOST, PROD_SFTP_PORT, PROD_SFTP_USER, PROD_SSH_PRIVATE_KEY
+#   PROD_SFTP_REMOTE_ROOT  → usually public_html (or . if SFTP is chrooted to docroot)
+#   VITE_API_URL, VITE_APP_NAME
 #
-# SFTP-only hosts (no shell): files are uploaded via scp; composer runs in CI.
-# Production api/.env is never uploaded. Run migrate/seed once via cPanel Terminal:
-#   cd ~/public_html/api && php spark migrate && php spark db:seed InitialReachSeeder
+# Deploy layout:
+#   web/dist/      →  {REMOTE_ROOT}/           (SPA)
+#   server-php/    →  {REMOTE_ROOT}/api/       (API; .env never uploaded)
+#
+# SFTP-only (no shell): composer runs in CI; vendor/ is uploaded with the API.
 
 on:
   workflow_dispatch:
@@ -19,26 +22,32 @@ jobs:
   deploy:
     name: Build and deploy to cPanel
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      PUBLIC_HTML: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
-      SITE_HOST: reach.aicountly.org
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate deploy paths
+      - name: Validate secrets
+        env:
+          PUBLIC_HTML: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
+          SFTP_HOST: ${{ secrets.PROD_SFTP_HOST }}
+          SFTP_USER: ${{ secrets.PROD_SFTP_USER }}
+          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${PUBLIC_HTML}" ]; then
-            echo "ERROR: PROD_SFTP_REMOTE_ROOT secret is not set."
-            echo "Set it to public_html (cPanel document root for reach.aicountly.org)."
-            exit 1
-          fi
-          echo "SPA target:  ${PUBLIC_HTML}/           (from web/dist/)"
-          echo "API target:  ${PUBLIC_HTML}/api/       (from server-php/)"
+          missing=0
+          for name in PUBLIC_HTML SFTP_HOST SFTP_USER SSH_KEY; do
+            eval "val=\${$name:-}"
+            if [ -z "$val" ]; then
+              echo "ERROR: Missing secret for $name"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "PROD_SFTP_REMOTE_ROOT=${PUBLIC_HTML}"
+          echo "SPA  → ${PUBLIC_HTML}/"
+          echo "API  → ${PUBLIC_HTML}/api/"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,7 +73,6 @@ jobs:
           API_URL="${API_URL%/}"
           API_URL="${API_URL%/v1}"
           export VITE_API_URL="$API_URL"
-          echo "Building with VITE_API_URL=${VITE_API_URL}"
           npm ci
           npm run build
           test -f dist/index.html
@@ -73,11 +81,11 @@ jobs:
         working-directory: server-php
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
-      - name: Stage API upload bundle
+      - name: Stage API bundle
         run: |
           set -euo pipefail
-          rm -rf /tmp/reach-api
-          mkdir -p /tmp/reach-api
+          rm -rf staging/api
+          mkdir -p staging/api
           rsync -a \
             --exclude='.env' \
             --exclude='.git/' \
@@ -85,73 +93,104 @@ jobs:
             --exclude='writable/cache/*' \
             --exclude='writable/session/*' \
             --exclude='writable/uploads/*' \
-            server-php/ /tmp/reach-api/
-          test -f /tmp/reach-api/index.php
-          test -f /tmp/reach-api/.htaccess
-          test -d /tmp/reach-api/vendor
-          echo "API bundle ready ($(find /tmp/reach-api -type f | wc -l) files)"
+            server-php/ staging/api/
+          test -f staging/api/index.php
+          test -d staging/api/vendor
 
-      - name: Configure SSH
+      - name: Resolve SFTP document root (no shell required)
+        id: paths
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ secrets.PROD_SFTP_HOST }}
-          SSH_PORT: ${{ secrets.PROD_SFTP_PORT }}
+          PUBLIC_HTML: ${{ secrets.PROD_SFTP_REMOTE_ROOT }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.PROD_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          cat >> ~/.ssh/config <<EOF
-          Host cpanel-prod
-            HostName ${SSH_HOST}
-            Port ${SSH_PORT}
-            User ${{ secrets.PROD_SFTP_USER }}
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking yes
-            RequestTTY no
-            BatchMode yes
-            ConnectTimeout 30
-            LogLevel ERROR
-          EOF
-          chmod 600 ~/.ssh/config
+          ssh-keyscan -p "${{ secrets.PROD_SFTP_PORT }}" -H "${{ secrets.PROD_SFTP_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy SPA — web/dist → public_html
+          MARKER="reach-probe-$(date +%s).txt"
+          echo ok > "$MARKER"
+          DEPLOY_BASE=""
+
+          # Try secret path first, then common cPanel fallbacks
+          for CAND in "${PUBLIC_HTML}" "public_html" "."; do
+            CAND="${CAND%/}"
+            [ -z "$CAND" ] && continue
+            echo "Probing SFTP path: ${CAND}"
+            REMOTE="${CAND}"
+            [ "$CAND" = "." ] && REMOTE="."
+            if scp -P "${{ secrets.PROD_SFTP_PORT }}" -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              "$MARKER" "${{ secrets.PROD_SFTP_USER }}@${{ secrets.PROD_SFTP_HOST }}:${REMOTE}/" 2>/dev/null; then
+              if curl -fsS "https://reach.aicountly.org/${MARKER}" 2>/dev/null | grep -q ok; then
+                DEPLOY_BASE="$CAND"
+                echo "Resolved document root: ${DEPLOY_BASE}"
+                break
+              fi
+            fi
+          done
+
+          rm -f "$MARKER"
+          if [ -z "$DEPLOY_BASE" ]; then
+            echo "ERROR: Could not upload to a path served by https://reach.aicountly.org/"
+            echo "Set PROD_SFTP_REMOTE_ROOT to public_html or . depending on your cPanel SFTP jail."
+            exit 1
+          fi
+
+          if [ "$DEPLOY_BASE" = "." ]; then
+            SPA_TARGET="."
+            API_TARGET="api"
+          else
+            SPA_TARGET="${DEPLOY_BASE}"
+            API_TARGET="${DEPLOY_BASE}/api"
+          fi
+
+          echo "deploy_base=${DEPLOY_BASE}" >> "$GITHUB_OUTPUT"
+          echo "spa_target=${SPA_TARGET}" >> "$GITHUB_OUTPUT"
+          echo "api_target=${API_TARGET}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy SPA — web/dist → document root
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_SFTP_HOST }}
+          username: ${{ secrets.PROD_SFTP_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PROD_SFTP_PORT }}
+          source: "web/dist/*,web/dist/.htaccess"
+          target: ${{ steps.paths.outputs.spa_target }}
+          overwrite: true
+          rm: false
+
+      - name: Deploy API — server-php → document root/api
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_SFTP_HOST }}
+          username: ${{ secrets.PROD_SFTP_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PROD_SFTP_PORT }}
+          source: "staging/api/*,staging/api/.htaccess"
+          target: ${{ steps.paths.outputs.api_target }}
+          overwrite: true
+          rm: false
+
+      - name: Verify site and API
         run: |
           set -euo pipefail
-          echo "Uploading web/dist/* → ${PUBLIC_HTML}/"
-          timeout 600 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
-            web/dist/. "cpanel-prod:${PUBLIC_HTML}/"
-
-      - name: Deploy API — server-php → public_html/api
-        run: |
-          set -euo pipefail
-          echo "Uploading server-php/* → ${PUBLIC_HTML}/api/"
-          timeout 900 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
-            /tmp/reach-api/. "cpanel-prod:${PUBLIC_HTML}/api/"
-
-      - name: Verify site and API over HTTP
-        run: |
-          set -euo pipefail
-          echo "Checking homepage..."
-          curl -fsS "https://${SITE_HOST}/" | grep -qi '<html'
+          curl -fsS "https://reach.aicountly.org/" | grep -qi '<html'
           echo "Homepage OK"
-          echo "Checking API health..."
-          BODY="$(curl -sS --retry 5 --retry-delay 4 "https://${SITE_HOST}/api/health")"
-          echo "$BODY" | head -c 400
+          BODY="$(curl -sS --retry 5 --retry-delay 4 "https://reach.aicountly.org/api/health")"
+          echo "$BODY" | head -c 300
           echo ""
           echo "$BODY" | grep -q 'aicountly-reach-api' || {
-            echo "ERROR: /api/health returned HTML — api/ folder missing or not extracted in public_html."
-            echo "In cPanel File Manager confirm public_html/api/index.php exists."
+            echo "ERROR: /api/health did not return JSON."
+            echo "Check cPanel File Manager: document root must contain api/index.php"
             exit 1
           }
-          echo "API health OK"
-          echo "Checking login route..."
-          LOGIN_CODE="$(curl -sS -o /tmp/login.json -w '%{http_code}' \
-            -X POST "https://${SITE_HOST}/api/v1/auth/login" \
+          echo "API OK"
+          curl -sS -o /tmp/login.json -X POST "https://reach.aicountly.org/api/v1/auth/login" \
             -H 'Content-Type: application/json' \
-            -d '{"email":"probe@example.com","password":"probe"}')"
-          grep -q '"error"\|"ok"\|aicountly-reach-api' /tmp/login.json || {
-            echo "ERROR: Login endpoint returned HTML (HTTP ${LOGIN_CODE})."
+            -d '{"email":"probe@example.com","password":"x"}'
+          grep -q '"error"\|"ok"' /tmp/login.json || {
+            echo "ERROR: login route returned HTML"
             exit 1
           }
-          echo "Login route OK (HTTP ${LOGIN_CODE})"
+          echo "Login route OK"
