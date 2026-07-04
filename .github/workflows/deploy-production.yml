@@ -16,6 +16,7 @@ jobs:
   deploy:
     name: Build and deploy to cPanel
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       REMOTE_ROOT: ${{ inputs.remote_root_override || secrets.PROD_SFTP_REMOTE_ROOT }}
@@ -60,12 +61,13 @@ jobs:
             IdentityFile ~/.ssh/deploy_key
             StrictHostKeyChecking yes
             RequestTTY no
+            BatchMode yes
+            ConnectTimeout 30
+            ServerAliveInterval 15
+            ServerAliveCountMax 4
             LogLevel ERROR
           EOF
           chmod 600 ~/.ssh/config
-
-      - name: Install lftp
-        run: sudo apt-get update -qq && sudo apt-get install -y lftp
 
       - name: Verify remote document root
         run: |
@@ -82,45 +84,35 @@ jobs:
       - name: Deploy SPA (web/dist → document root)
         run: |
           set -euo pipefail
-          # SFTP mirror — works on cPanel. Never use --delete here (would remove api/).
-          lftp -e "
-            set sftp:connect-program \"ssh -F $HOME/.ssh/config -a -x cpanel-prod\";
-            open sftp://${{ secrets.PROD_SFTP_HOST }};
-            mkdir -p ${REMOTE_ROOT};
-            cd ${REMOTE_ROOT};
-            lcd web/dist;
-            mirror -R --verbose --parallel=4 . .;
-            bye
-          "
+          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}'"
+          echo "Uploading SPA files via scp..."
+          timeout 600 scp -r -F "$HOME/.ssh/config" -o BatchMode=yes \
+            web/dist/. "cpanel-prod:${REMOTE_ROOT}/"
           ssh -T cpanel-prod "test -f '${REMOTE_ROOT}/index.html'"
+          ssh -T cpanel-prod "ls -la '${REMOTE_ROOT}' | head -20"
           echo "index.html confirmed on server"
 
       - name: Deploy API (server-php → document root/api)
         run: |
           set -euo pipefail
-          lftp -e "
-            set sftp:connect-program \"ssh -F $HOME/.ssh/config -a -x cpanel-prod\";
-            open sftp://${{ secrets.PROD_SFTP_HOST }};
-            mkdir -p ${REMOTE_ROOT}/api;
-            cd ${REMOTE_ROOT}/api;
-            lcd server-php;
-            mirror -R --verbose --parallel=4 \
-              --exclude-glob .git/ \
-              --exclude-glob vendor/ \
-              --exclude-glob .env \
-              --exclude-glob writable/logs/ \
-              --exclude-glob writable/cache/ \
-              --exclude-glob writable/session/ \
-              --exclude-glob writable/uploads/ \
-              . .;
-            bye
-          "
+          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}/api'"
+          echo "Uploading API via tar stream..."
+          timeout 900 tar -C server-php \
+            --exclude='./.env' \
+            --exclude='./.git' \
+            --exclude='./vendor' \
+            --exclude='./writable/logs' \
+            --exclude='./writable/cache' \
+            --exclude='./writable/session' \
+            --exclude='./writable/uploads' \
+            -czf - . | ssh -T cpanel-prod "cd '${REMOTE_ROOT}/api' && tar -xzf -"
           ssh -T cpanel-prod "test -f '${REMOTE_ROOT}/api/index.php'"
           echo "api/index.php confirmed on server"
 
       - name: Install PHP dependencies and run migrations
+        timeout-minutes: 15
         run: |
-          ssh -T cpanel-prod "BASH_ENV=; ENV=; set -e
+          timeout 840 ssh -T cpanel-prod "BASH_ENV=; ENV=; set -e
             cd '${REMOTE_ROOT}/api'
             if command -v composer >/dev/null 2>&1; then
               composer install --no-dev --optimize-autoloader --no-interaction
