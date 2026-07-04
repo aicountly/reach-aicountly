@@ -90,9 +90,9 @@ jobs:
       - name: Deploy API (server-php → document root/api)
         run: |
           set -euo pipefail
-          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}/api'"
-          echo "Uploading API via tar stream..."
-          timeout 900 tar -C server-php \
+          ssh -T cpanel-prod "mkdir -p '${REMOTE_ROOT}/api/writable/'{logs,cache,session,uploads}"
+          echo "Packaging API..."
+          tar -C server-php \
             --exclude='./.env' \
             --exclude='./.git' \
             --exclude='./vendor' \
@@ -100,9 +100,39 @@ jobs:
             --exclude='./writable/cache' \
             --exclude='./writable/session' \
             --exclude='./writable/uploads' \
-            -czf - . | ssh -T cpanel-prod "cd '${REMOTE_ROOT}/api' && tar -xzf -"
-          ssh -T cpanel-prod "test -f '${REMOTE_ROOT}/api/index.php'"
-          echo "api/index.php confirmed on server"
+            -czf api.tgz .
+          echo "Uploading API archive..."
+          timeout 600 scp -F "$HOME/.ssh/config" -o BatchMode=yes \
+            api.tgz "cpanel-prod:${REMOTE_ROOT}/api.tgz"
+          echo "Extracting API on server..."
+          ssh -T cpanel-prod "set -e
+            mkdir -p '${REMOTE_ROOT}/api'
+            tar -xzf '${REMOTE_ROOT}/api.tgz' -C '${REMOTE_ROOT}/api'
+            rm -f '${REMOTE_ROOT}/api.tgz'
+            test -f '${REMOTE_ROOT}/api/index.php'
+            test -f '${REMOTE_ROOT}/api/.htaccess'
+            ls -la '${REMOTE_ROOT}/api' | head -15"
+          echo "api/index.php and api/.htaccess confirmed on server"
+
+      - name: Verify API reachable over HTTP
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          set -euo pipefail
+          SITE_URL="${VITE_API_URL%/}"
+          SITE_URL="${SITE_URL%/api/v1}"
+          SITE_URL="${SITE_URL%/api}"
+          API_HEALTH="${SITE_URL}/api/health"
+          echo "HTTP check: ${API_HEALTH}"
+          BODY="$(curl -sS --retry 3 --retry-delay 3 "$API_HEALTH")"
+          echo "$BODY" | head -c 400
+          echo ""
+          echo "$BODY" | grep -q 'aicountly-reach-api' || {
+            echo "ERROR: /api/health returned HTML or an error — api/ is not deployed in the web document root."
+            echo "Confirm PROD_SFTP_REMOTE_ROOT matches cPanel → Domains → Document Root."
+            exit 1
+          }
+          echo "API HTTP check OK"
 
       - name: Install PHP dependencies and run migrations
         timeout-minutes: 15
@@ -139,9 +169,13 @@ jobs:
             exit 1
           }
           echo 'Homepage OK'
-          BASE="${VITE_API_URL%/}"
-          BASE="${BASE%/v1}"
-          HEALTH_URL="${BASE}/health"
+          HEALTH_URL="${SITE_URL}/api/health"
           echo "Checking API: ${HEALTH_URL}"
-          curl -fsS --retry 3 --retry-delay 5 "$HEALTH_URL" | head -c 500
+          API_BODY="$(curl -fsS --retry 3 --retry-delay 5 "$HEALTH_URL")"
+          echo "$API_BODY" | head -c 500
           echo ""
+          echo "$API_BODY" | grep -q 'aicountly-reach-api' || {
+            echo 'ERROR: API health did not return expected JSON.'
+            exit 1
+          }
+          echo 'API health OK'
