@@ -7,6 +7,27 @@ set -euo pipefail
 API_DIR="${1:-.}"
 cd "$API_DIR"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+resolve_php() {
+  local bin ver major
+  for bin in ea-php82 ea-php81 php82 php81 php; do
+    if command -v "$bin" >/dev/null 2>&1; then
+      ver="$("$bin" -r 'echo PHP_MAJOR_VERSION;' 2>/dev/null || echo 0)"
+      major="${ver%%.*}"
+      if [ "${major:-0}" -ge 8 ] 2>/dev/null; then
+        echo "$bin"
+        return 0
+      fi
+    fi
+  done
+  echo "ERROR: PHP 8.1+ CLI required (tried ea-php81, ea-php82, php81, php82, php)" >&2
+  return 1
+}
+
+PHP_BIN="$(resolve_php)"
+echo "Using PHP: ${PHP_BIN} ($("${PHP_BIN}" -v | head -1))"
+
 if [ -f .env ]; then
   echo ".env already exists — leaving server secrets unchanged (deploy will not modify .env)"
 else
@@ -19,65 +40,28 @@ mkdir -p writable/cache writable/session writable/logs writable/uploads
 chmod -R 775 writable/cache writable/session writable/logs writable/uploads 2>/dev/null || \
   chmod -R 777 writable/cache writable/session writable/logs writable/uploads
 
-# CodeIgniter 4 DotEnv rejects unquoted values containing spaces (e.g. SUPER_ADMIN_NAME=Reach Superadmin).
-fix_dotenv_unquoted_spaces() {
-  php <<'PHP'
-<?php
-$path = '.env';
-if (! is_file($path)) {
-    exit(0);
-}
-$lines = file($path, FILE_IGNORE_NEW_LINES);
-if ($lines === false) {
-    fwrite(STDERR, "Could not read .env\n");
-    exit(1);
-}
-$out = [];
-$changed = false;
-foreach ($lines as $line) {
-    $trim = ltrim($line);
-    if ($trim === '' || $trim[0] === '#') {
-        $out[] = $line;
-        continue;
-    }
-    if (! str_contains($line, '=')) {
-        $out[] = $line;
-        continue;
-    }
-    [$key, $val] = explode('=', $line, 2);
-    $val = trim($val);
-    if ($val !== '' && preg_match('/\s/', $val) && ! preg_match('/^["\']/', $val)) {
-        $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $val);
-        $line = $key . '="' . $escaped . '"';
-        $changed = true;
-        fwrite(STDERR, 'Quoted unquoted .env value: ' . trim($key) . "\n");
-    }
-    $out[] = $line;
-}
-if ($changed) {
-    copy($path, $path . '.bak-' . gmdate('YmdHis'));
-    file_put_contents($path, implode("\n", $out) . "\n");
-}
-PHP
-}
-
-fix_dotenv_unquoted_spaces
+echo "---- Checking .env quoting (CI4 requires quotes around values with spaces) ----"
+if [ -f "${SCRIPT_DIR}/cpanel-fix-dotenv-quotes.php" ]; then
+  "${PHP_BIN}" "${SCRIPT_DIR}/cpanel-fix-dotenv-quotes.php" .env
+else
+  echo "WARN: cpanel-fix-dotenv-quotes.php not found beside post-deploy script — skipping auto-quote"
+fi
 
 echo "---- Running database migrations ----"
-CI_ENVIRONMENT=production php spark migrate --no-interaction 2>&1
+CI_ENVIRONMENT=production "${PHP_BIN}" spark migrate --no-interaction 2>&1
 
 MARKER="writable/.reach_seed_complete"
 if [ -f "$MARKER" ]; then
   echo "Seeders already applied — skipping (marker: ${MARKER})"
 else
   echo "---- First deploy: running InitialReachSeeder ----"
-  CI_ENVIRONMENT=production php spark db:seed InitialReachSeeder --no-interaction
+  CI_ENVIRONMENT=production "${PHP_BIN}" spark db:seed InitialReachSeeder --no-interaction
   touch "$MARKER"
   chmod 644 "$MARKER"
   echo "Seeder complete. Marker created — future deploys will skip seeding."
 fi
 
-if php -r 'if (function_exists("opcache_reset")) { opcache_reset(); echo "OPcache reset\n"; }'; then
+if "${PHP_BIN}" -r 'if (function_exists("opcache_reset")) { opcache_reset(); echo "OPcache reset\n"; }'; then
   :
 fi
 

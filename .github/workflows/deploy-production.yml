@@ -163,10 +163,13 @@ jobs:
         working-directory: .
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
-          scp -P "$PROD_SFTP_PORT" ${SCP_OPTS} scripts/cpanel-post-deploy-api.sh \
-            "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh"
+          scp -P "$PROD_SFTP_PORT" ${SCP_OPTS} \
+            scripts/cpanel-post-deploy-api.sh \
+            scripts/cpanel-fix-dotenv-quotes.php \
+            "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/"
           ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
-            "chmod +x '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' && \
+            "sed -i 's/\r$//' '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' && \
+             chmod +x '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' && \
              bash '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' '${REMOTE_ROOT}/api'"
 
       - name: Verify files on remote server
