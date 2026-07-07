@@ -40,10 +40,13 @@ $routes->get('health', static function () {
 $routes->group('v1', static function ($routes) {
 
     // -----------------------------------------------------------------------
-    // Public auth (no JWT). Login validates password + role = super_admin.
+    // Public auth (no JWT). Console SSO is the sole sign-in path.
     // -----------------------------------------------------------------------
-    $routes->post('auth/login',   'Api\\V1\\AuthController::login');
-    $routes->post('auth/refresh', 'Api\\V1\\AuthController::refresh');
+    $routes->post('auth/login',          'Api\\V1\\AuthController::login');
+    $routes->post('auth/refresh',        'Api\\V1\\AuthController::refresh');
+    $routes->get('auth/sso-callback',    'Api\\V1\\AuthController::ssoCallback');
+    $routes->post('auth/controller-sso', 'Api\\V1\\AuthController::controllerSso');
+    $routes->post('auth/console-session', 'Api\\V1\\AuthController::consoleSession');
 
     // -----------------------------------------------------------------------
     // Public lead capture (form/landing/embed). Signed with a rotating token

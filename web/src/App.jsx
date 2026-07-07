@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { ReachLayout } from './components/layout/ReachLayout';
-import { LoginPage } from './pages/LoginPage';
+import ControllerGate from './pages/ControllerGate';
 import { DashboardPage } from './pages/DashboardPage';
 
 import { BlogListPage } from './pages/blog/BlogListPage';
@@ -48,11 +49,31 @@ import { WorkerStatusPage } from './pages/admin/WorkerStatusPage';
 import { LocalBotReportsPage } from './pages/admin/LocalBotReportsPage';
 
 import { ROUTES } from './constants/routes';
+import { Loader } from './components/common/Loader';
 
 export default function App() {
+  const { user, loading, ssoPending } = useAuth();
+
+  if (loading || ssoPending) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+      }}>
+        <Loader label={ssoPending ? 'Signing you in from Console…' : 'Loading Reach Portal…'} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <ControllerGate />;
+  }
+
   return (
     <Routes>
-      <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+      <Route path={ROUTES.LOGIN} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
 
       <Route element={<ProtectedRoute><ReachLayout /></ProtectedRoute>}>
         <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />

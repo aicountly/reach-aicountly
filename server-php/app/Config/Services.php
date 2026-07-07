@@ -5,6 +5,7 @@ namespace Config;
 use App\Libraries\AicountlySitePublisher;
 use App\Libraries\AuditLogger;
 use App\Libraries\ConsoleAuditClient;
+use App\Services\ConsoleIdentityService;
 use App\Libraries\EngageClient;
 use App\Libraries\Jwt;
 use App\Libraries\MarketingBotReporter;
@@ -36,6 +37,14 @@ class Services extends BaseService
             return static::getSharedInstance('consoleAudit') ?? static::consoleAudit(false);
         }
         return new ConsoleAuditClient();
+    }
+
+    public static function consoleIdentity(bool $getShared = true): ConsoleIdentityService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('consoleIdentity') ?? static::consoleIdentity(false);
+        }
+        return new ConsoleIdentityService();
     }
 
     public static function engageClient(bool $getShared = true): EngageClient

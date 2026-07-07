@@ -6,105 +6,26 @@ use App\Controllers\BaseApiController;
 use App\Models\RoleModel;
 use App\Models\SessionModel;
 use App\Models\UserModel;
+use App\Services\ConsoleIdentityService;
+use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
 use RuntimeException;
 use Throwable;
 
 /**
  * Reach portal auth. Superadmin-only — only users with role_slug='super_admin'
- * may sign in. No OAuth, no self-registration (marketing portal is closed).
+ * may sign in. Console SSO is the sole sign-in path (no local credentials).
  */
 class AuthController extends BaseApiController
 {
+    private const REACH_TOKEN_STORAGE_KEY = 'reach_token';
+
     public function login()
     {
-        try {
-            $jwtSecret = (string) env('JWT_SECRET', '');
-            if ($jwtSecret === '' || strlen($jwtSecret) < 32) {
-                return $this->fail(
-                    'Server misconfigured: set JWT_SECRET (32+ chars) in api/.env',
-                    503,
-                );
-            }
-
-            $body  = $this->input();
-            $email = strtolower(trim((string) ($body['email'] ?? '')));
-            $pass  = (string) ($body['password'] ?? '');
-
-            if ($email === '' || $pass === '') {
-                return $this->fail('email and password required.', 400);
-            }
-
-            $users = new UserModel();
-            $user  = $users->findByEmail($email);
-            if (! $user || ($user['is_active'] ?? true) === false) {
-                return $this->fail('Invalid credentials.', 401);
-            }
-
-            $hash = (string) ($user['password_hash'] ?? '');
-            if ($hash === '' || ! password_verify($pass, $hash)) {
-                if ((int) ($user['id'] ?? 0) > 0) {
-                    $users->update((int) $user['id'], [
-                        'failed_attempts' => ((int) ($user['failed_attempts'] ?? 0)) + 1,
-                    ]);
-                }
-                return $this->fail('Invalid credentials.', 401);
-            }
-
-            $role = (new RoleModel())->find((int) ($user['role_id'] ?? 0));
-            $roleSlug = (string) ($role['slug'] ?? '');
-            if ($roleSlug !== 'super_admin') {
-                return $this->fail('Reach is restricted to superadmin users.', 403);
-            }
-
-            try {
-                $token = Services::jwt()->issue(
-                    (int) $user['id'],
-                    (string) $user['email'],
-                    'super_admin',
-                    (string) ($user['name'] ?? ''),
-                );
-            } catch (RuntimeException $e) {
-                return $this->fail($e->getMessage(), 503);
-            }
-
-            $sessions = new SessionModel();
-            $sessions->createFromToken(
-                userId:    (int) $user['id'],
-                token:     $token,
-                ttlSecs:   Services::jwt()->ttlSeconds(),
-                ip:        $this->request->getIPAddress(),
-                userAgent: substr((string) $this->request->getUserAgent(), 0, 510),
-            );
-
-            $users->update((int) $user['id'], [
-                'last_login_at'   => date('Y-m-d H:i:s'),
-                'last_login_ip'   => $this->request->getIPAddress(),
-                'failed_attempts' => 0,
-            ]);
-
-            Services::auditLogger()->log(
-                userId:     (int) $user['id'],
-                action:     'auth.login',
-                entityType: 'user',
-                entityId:   (int) $user['id'],
-                extra:      ['role' => 'super_admin'],
-            );
-
-            return $this->ok([
-                'token'      => $token,
-                'expires_in' => Services::jwt()->ttlSeconds(),
-                'user'       => [
-                    'id'    => (int) $user['id'],
-                    'email' => (string) $user['email'],
-                    'name'  => (string) $user['name'],
-                    'role'  => 'super_admin',
-                ],
-            ]);
-        } catch (Throwable $e) {
-            log_message('error', 'Reach login failed: ' . $e->getMessage());
-            return $this->fail('Login failed. Check writable/logs on the server.', 500);
-        }
+        return $this->fail(
+            'Local login is disabled. Sign in at console.aicountly.org and open Reach from Top Controller Apps.',
+            403,
+        );
     }
 
     public function refresh()
@@ -182,5 +103,301 @@ class AuthController extends BaseApiController
             'name'  => (string) $row['name'],
             'role'  => 'super_admin',
         ]);
+    }
+
+    /**
+     * GET /v1/auth/sso-callback?token= — browser redirect from Console (no SPA JS required).
+     */
+    public function ssoCallback()
+    {
+        try {
+            if ($fail = $this->ensureJwtConfigured()) {
+                return $this->ssoCallbackHtml('Reach Portal is not configured for Console SSO yet.', 503);
+            }
+
+            $token = trim((string) ($this->request->getGet('token') ?? ''));
+            if ($token === '') {
+                return $this->ssoCallbackHtml('Missing SSO token. Open Reach again from Console Top Controller Apps.', 400);
+            }
+
+            $identity = Services::consoleIdentity()->exchangeLaunchToken($token);
+            if ($identity === null) {
+                return $this->ssoCallbackHtml(
+                    'This sign-in link expired. Go back to Console and click Reach again.',
+                    401,
+                );
+            }
+
+            $session = $this->buildSessionFromConsoleIdentity($identity, 'auth.controller_sso_callback');
+            if ($session instanceof ResponseInterface) {
+                $message = 'You do not have access to the Reach controller app.';
+                if (method_exists($session, 'getJSON')) {
+                    $json = $session->getJSON(true);
+                    if (is_array($json) && ! empty($json['error'])) {
+                        $message = (string) $json['error'];
+                    }
+                }
+
+                return $this->ssoCallbackHtml($message, 403);
+            }
+
+            return $this->completeSsoInBrowser((string) $session['token']);
+        } catch (Throwable $e) {
+            log_message('error', 'SSO callback failed: ' . $e->getMessage());
+
+            return $this->ssoCallbackHtml('Console SSO sign-in failed. Try again from Console.', 500);
+        }
+    }
+
+    /**
+     * Exchange a Console controller SSO launch token for a Reach session.
+     */
+    public function controllerSso()
+    {
+        try {
+            if ($fail = $this->ensureJwtConfigured()) {
+                return $fail;
+            }
+
+            $body  = $this->input();
+            $token = trim((string) ($body['token'] ?? ''));
+            if ($token === '') {
+                return $this->fail('token required.', 400);
+            }
+
+            $identity = Services::consoleIdentity()->exchangeLaunchToken($token);
+            if ($identity === null) {
+                return $this->fail('Invalid or expired Console SSO token.', 401);
+            }
+
+            $session = $this->buildSessionFromConsoleIdentity($identity, 'auth.controller_sso_login');
+            if ($session instanceof ResponseInterface) {
+                return $session;
+            }
+
+            return $this->ok($session);
+        } catch (Throwable $e) {
+            log_message('error', 'Controller SSO failed: ' . $e->getMessage());
+
+            return $this->fail('Controller SSO login failed.', 500);
+        }
+    }
+
+    /**
+     * Sign in using the shared Console cookie (direct visit to reach.aicountly.org).
+     */
+    public function consoleSession()
+    {
+        try {
+            if ($fail = $this->ensureJwtConfigured()) {
+                return $fail;
+            }
+
+            $consoleToken = trim((string) ($this->request->getCookie(ConsoleIdentityService::cookieName()) ?? ''));
+            if ($consoleToken === '') {
+                return $this->fail('Sign in to Console first.', 401);
+            }
+
+            $identity = Services::consoleIdentity()->introspectSession($consoleToken);
+            if ($identity === null) {
+                return $this->fail('Console session is invalid or expired. Sign in again at Console.', 401);
+            }
+
+            $session = $this->buildSessionFromConsoleIdentity($identity, 'auth.console_session_login');
+            if ($session instanceof ResponseInterface) {
+                return $session;
+            }
+
+            return $this->ok($session);
+        } catch (Throwable $e) {
+            log_message('error', 'Console session login failed: ' . $e->getMessage());
+
+            return $this->fail('Console session login failed.', 500);
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $identity
+     * @return array<string,mixed>|ResponseInterface
+     */
+    private function buildSessionFromConsoleIdentity(array $identity, string $auditEvent): array|ResponseInterface
+    {
+        $active = (bool) ($identity['active'] ?? false);
+        $global = (bool) ($identity['global_superadmin'] ?? false);
+        if (! $active && ! $global) {
+            return $this->fail('You do not have access to the Reach controller app.', 403);
+        }
+
+        $consoleUser = is_array($identity['user'] ?? null) ? $identity['user'] : [];
+        $email = strtolower(trim((string) ($consoleUser['email'] ?? '')));
+        $name  = trim((string) ($consoleUser['name'] ?? ''));
+        if ($email === '') {
+            return $this->fail('Console identity did not return a user email.', 502);
+        }
+
+        $superAdminRoleId = $this->superAdminRoleId();
+        if ($superAdminRoleId === null) {
+            return $this->fail('Reach super_admin role is not configured.', 503);
+        }
+
+        $users = new UserModel();
+        $user  = $users->findByEmail($email);
+
+        if (! $user) {
+            $userId = $users->insert([
+                'email'         => $email,
+                'name'          => $name !== '' ? $name : $email,
+                'password_hash' => password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT),
+                'role_id'       => $superAdminRoleId,
+                'is_active'     => true,
+            ]);
+
+            if (! $userId) {
+                return $this->fail('Could not provision Reach user from Console identity.', 500);
+            }
+
+            $user = $users->find((int) $userId);
+        } elseif (($user['is_active'] ?? true) === false) {
+            return $this->fail('Reach user account is inactive.', 403);
+        } else {
+            $role = (new RoleModel())->find((int) ($user['role_id'] ?? 0));
+            if (($role['slug'] ?? '') !== 'super_admin') {
+                return $this->fail('Reach is restricted to superadmin users.', 403);
+            }
+        }
+
+        try {
+            $reachToken = Services::jwt()->issue(
+                (int) $user['id'],
+                (string) $user['email'],
+                'super_admin',
+                (string) ($user['name'] ?? ''),
+            );
+        } catch (RuntimeException $e) {
+            return $this->fail($e->getMessage(), 503);
+        }
+
+        (new SessionModel())->createFromToken(
+            userId:    (int) $user['id'],
+            token:     $reachToken,
+            ttlSecs:   Services::jwt()->ttlSeconds(),
+            ip:        $this->request->getIPAddress(),
+            userAgent: substr((string) $this->request->getUserAgent(), 0, 510),
+        );
+
+        $users->update((int) $user['id'], [
+            'last_login_at'   => date('Y-m-d H:i:s'),
+            'last_login_ip'   => $this->request->getIPAddress(),
+            'failed_attempts' => 0,
+        ]);
+
+        Services::auditLogger()->log(
+            userId:     (int) $user['id'],
+            action:     $auditEvent,
+            entityType: 'user',
+            entityId:   (int) $user['id'],
+            extra:      [
+                'role'              => 'super_admin',
+                'console_user_id'   => (int) ($consoleUser['id'] ?? 0),
+                'global_superadmin' => $global,
+            ],
+        );
+
+        return [
+            'token'      => $reachToken,
+            'expires_in' => Services::jwt()->ttlSeconds(),
+            'user'       => [
+                'id'    => (int) $user['id'],
+                'email' => (string) $user['email'],
+                'name'  => (string) $user['name'],
+                'role'  => 'super_admin',
+            ],
+        ];
+    }
+
+    private function completeSsoInBrowser(string $reachToken): ResponseInterface
+    {
+        $tokenJson = json_encode($reachToken, JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+        $storageKey = json_encode(self::REACH_TOKEN_STORAGE_KEY, JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signing in to Reach Portal…</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; color: #334155; }
+  </style>
+</head>
+<body>
+  <p>Signing you in to Reach Portal…</p>
+  <script>
+    try {
+      localStorage.setItem({$storageKey}, {$tokenJson});
+    } catch (e) {}
+    location.replace('/');
+  </script>
+</body>
+</html>
+HTML;
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType('text/html')
+            ->setBody($html);
+    }
+
+    private function ssoCallbackHtml(string $message, int $status = 400): ResponseInterface
+    {
+        $safeMessage = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $consoleUrl  = 'https://console.aicountly.org';
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reach sign-in failed</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 48px auto; padding: 0 16px; color: #334155; }
+    .box { border: 1px solid #fecaca; background: #fef2f2; border-radius: 12px; padding: 16px; }
+    a { color: #047857; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1 style="font-size:18px;margin:0 0 8px;">Reach sign-in failed</h1>
+    <p style="margin:0 0 12px;">{$safeMessage}</p>
+    <p style="margin:0;"><a href="{$consoleUrl}">Return to Console</a></p>
+  </div>
+</body>
+</html>
+HTML;
+
+        return $this->response
+            ->setStatusCode($status)
+            ->setContentType('text/html')
+            ->setBody($html);
+    }
+
+    private function ensureJwtConfigured(): ?ResponseInterface
+    {
+        $jwtSecret = (string) env('JWT_SECRET', '');
+        if ($jwtSecret === '' || strlen($jwtSecret) < 32) {
+            return $this->fail(
+                'Server misconfigured: set JWT_SECRET (32+ chars) in api/.env',
+                503
+            );
+        }
+
+        return null;
+    }
+
+    private function superAdminRoleId(): ?int
+    {
+        $role = (new RoleModel())->findBySlug('super_admin');
+
+        return $role ? (int) $role['id'] : null;
     }
 }

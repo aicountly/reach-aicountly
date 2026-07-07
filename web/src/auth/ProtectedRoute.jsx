@@ -5,8 +5,7 @@ import { Loader } from '../components/common/Loader';
 
 /**
  * Reach is a superadmin-only portal — every route is guarded by role.
- * `super_admin` is the only accepted role. Any other role is bounced to
- * /login (which will show the credentials form).
+ * Unauthenticated users are handled by App-level ControllerGate.
  */
 export function ProtectedRoute({ children }) {
   const { user, loading, isAuthenticated } = useAuth();
@@ -19,10 +18,10 @@ export function ProtectedRoute({ children }) {
     );
   }
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.LOGIN} replace />;
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
   if ((user?.role || '') !== 'super_admin') {
-    return <Navigate to={ROUTES.LOGIN} replace />;
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
   return children;
 }

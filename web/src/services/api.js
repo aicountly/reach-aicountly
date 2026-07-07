@@ -19,7 +19,7 @@ async function request(path, options = {}) {
   let response;
   try {
     response = await fetch(url, {
-      credentials: 'omit',
+      credentials: 'include',
       ...options,
       headers,
     });
@@ -35,11 +35,7 @@ async function request(path, options = {}) {
   }
 
   if (response.status === 401 && token) {
-    // Session expired / revoked — bounce to login.
     localStorage.removeItem('reach_token');
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      window.location.replace('/login');
-    }
   }
 
   if (!response.ok || json?.ok === false) {
@@ -54,8 +50,8 @@ async function request(path, options = {}) {
 
 export const api = {
   get:    (path, params) => request(withQuery(path, params)),
-  post:   (path, body)   => request(path, { method: 'POST',   body: body ? JSON.stringify(body) : null }),
-  put:    (path, body)   => request(path, { method: 'PUT',    body: body ? JSON.stringify(body) : null }),
+  post:   (path, body)   => request(path, { method: 'POST', body: body ? JSON.stringify(body) : null }),
+  put:    (path, body)   => request(path, { method: 'PUT',  body: body ? JSON.stringify(body) : null }),
   delete: (path)         => request(path, { method: 'DELETE' }),
 };
 
