@@ -5,7 +5,9 @@ name: Deploy Production via SSH
 # GitHub secret PROD_SFTP_REMOTE_ROOT = public_html (document root on cPanel).
 #
 #   web/dist/      →  $PROD_SFTP_REMOTE_ROOT/       (public_html)
-#   server-php/    →  $PROD_SFTP_REMOTE_ROOT/api/  (never overwrites api/.env)
+#   server-php/    →  $PROD_SFTP_REMOTE_ROOT/api/
+#
+# api/.env on the server is NEVER uploaded, overwritten, edited, or deleted by this workflow.
 
 on:
   workflow_dispatch:
@@ -168,9 +170,10 @@ jobs:
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
           RSYNC_RSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS}"
-          echo "Syncing server-php/ → ${REMOTE_ROOT}/api/ (CodeIgniter API)"
+          echo "Syncing server-php/ → ${REMOTE_ROOT}/api/ (CodeIgniter API; api/.env never uploaded)"
           rsync -avz --delete \
             --rsync-path="${RSYNC_PATH}" \
+            --exclude '.env' \
             --filter='merge scripts/cpanel-rsync-api.filters' \
             -e "$RSYNC_RSH" \
             server-php/ \
@@ -182,13 +185,12 @@ jobs:
             }
           echo "API deploy OK: api/index.php present"
 
-      - name: Post-deploy api setup (preserve .env)
+      - name: Post-deploy api setup (never modifies api/.env)
         working-directory: .
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
           scp -P "$PROD_SFTP_PORT" ${SCP_OPTS} \
             scripts/cpanel-post-deploy-api.sh \
-            scripts/cpanel-fix-dotenv-quotes.php \
             "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/"
           ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
             "cd '${REMOTE_ROOT}/api' && \

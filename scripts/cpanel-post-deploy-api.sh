@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Post-deploy hook for Reach server-php on cPanel (run via SSH after rsync).
 # Run from public_html/api/ (workflow: cd api && bash ./cpanel-post-deploy-api.sh).
-# Never overwrites or edits an existing .env — server secrets are managed only on the server.
+#
+# PRODUCTION RULE: never upload, overwrite, edit, or chmod api/.env during deploy.
+# Server secrets are managed only on the server (cPanel File Manager / SSH).
 
 set -euo pipefail
 
@@ -11,9 +13,6 @@ if ! cd "$API_DIR"; then
   echo "Ensure PROD_SFTP_REMOTE_ROOT is public_html and api/ exists under it." >&2
   exit 1
 fi
-
-# Use pwd after cd — avoids absolute-path cd failures in chrooted cPanel SSH.
-SCRIPT_DIR="$(pwd)"
 
 resolve_php() {
   local bin ver major
@@ -31,28 +30,47 @@ resolve_php() {
   return 1
 }
 
+# Read-only: CI4 DotEnv rejects unquoted values with spaces — fail with guidance, do not edit .env.
+validate_dotenv_format() {
+  local bad=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%$'\r'}"
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    [[ "$line" != *"="* ]] && continue
+    local val="${line#*=}"
+    val="$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [[ -z "$val" ]] && continue
+    [[ "$val" =~ ^[\"\'] ]] && continue
+    if [[ "$val" =~ [[:space:]] ]]; then
+      echo "ERROR: .env key has unquoted spaces — fix manually on server (deploy will not modify .env):" >&2
+      echo "  ${line%%=*}=***" >&2
+      bad=1
+    fi
+  done < .env
+  if [ "$bad" -ne 0 ]; then
+    echo "Example: SUPER_ADMIN_NAME=\"Reach Superadmin\"" >&2
+    exit 1
+  fi
+}
+
 PHP_BIN="$(resolve_php)"
 echo "Using PHP: ${PHP_BIN} ($("${PHP_BIN}" -v | head -1))"
-echo "API directory: ${SCRIPT_DIR}"
+echo "API directory: $(pwd)"
 
 if [ -f .env ]; then
-  echo ".env already exists — leaving server secrets unchanged (deploy will not modify .env)"
+  echo ".env present — deploy will NOT upload, overwrite, or edit api/.env"
 else
-  echo "ERROR: missing .env in ${SCRIPT_DIR}"
+  echo "ERROR: missing .env in $(pwd)"
   echo "Create public_html/api/.env manually on the server (copy from .env.example) before running production deploy."
   exit 1
 fi
 
+validate_dotenv_format
+
 mkdir -p writable/cache writable/session writable/logs writable/uploads
 chmod -R 775 writable/cache writable/session writable/logs writable/uploads 2>/dev/null || \
   chmod -R 777 writable/cache writable/session writable/logs writable/uploads
-
-echo "---- Checking .env quoting (CI4 requires quotes around values with spaces) ----"
-if [ -f "${SCRIPT_DIR}/cpanel-fix-dotenv-quotes.php" ]; then
-  "${PHP_BIN}" "${SCRIPT_DIR}/cpanel-fix-dotenv-quotes.php" .env
-else
-  echo "WARN: cpanel-fix-dotenv-quotes.php not found beside post-deploy script — skipping auto-quote"
-fi
 
 echo "---- Running database migrations ----"
 CI_ENVIRONMENT=production "${PHP_BIN}" spark migrate --no-interaction 2>&1
@@ -72,5 +90,4 @@ if "${PHP_BIN}" -r 'if (function_exists("opcache_reset")) { opcache_reset(); ech
   :
 fi
 
-chmod 600 .env 2>/dev/null || true
-echo "Post-deploy complete (api/.env content was not modified)."
+echo "Post-deploy complete (api/.env was not modified)."

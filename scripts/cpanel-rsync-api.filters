@@ -1,5 +1,7 @@
 # cPanel api/ rsync filters (use: rsync --filter='merge scripts/cpanel-rsync-api.filters')
 #
+# PRODUCTION RULE: api/.env on the server is never uploaded, overwritten, or deleted by deploy.
+#
 # - .env     do not copy from CI (secrets live only on the server)
 # P .env     never delete the server's .env when using --delete
 #
