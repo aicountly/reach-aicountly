@@ -1,7 +1,8 @@
 name: Deploy Production via SSH
 
 # Manual only — Actions → Deploy Production via SSH → Run workflow.
-# Matches engage-aicountly production deploy pattern.
+#
+# GitHub secret PROD_SFTP_REMOTE_ROOT = public_html (document root on cPanel).
 #
 #   web/dist/      →  $PROD_SFTP_REMOTE_ROOT/       (public_html)
 #   server-php/    →  $PROD_SFTP_REMOTE_ROOT/api/  (never overwrites api/.env)
@@ -65,7 +66,7 @@ jobs:
         run: |
           test -d dist || (echo "dist missing — build failed" && exit 1)
           test -f dist/index.html
-          echo "Build ready: $(find dist -type f | wc -l) files in dist"
+          echo "Build ready: $(find dist -type f | wc -l) files in web/dist"
 
       - name: Install server-php Composer dependencies (production)
         working-directory: server-php
@@ -96,11 +97,15 @@ jobs:
             chmod 600 ~/.ssh/config
           fi
 
-      - name: Verify SSH and remote rsync
+      - name: Verify SSH and remote paths
         working-directory: .
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
           SSH_CMD=(ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}")
+
+          echo "Deploy targets (PROD_SFTP_REMOTE_ROOT = document root):"
+          echo "  web/dist/     →  ${REMOTE_ROOT}/"
+          echo "  server-php/   →  ${REMOTE_ROOT}/api/"
 
           echo "Testing SSH login..."
           "${SSH_CMD[@]}" "echo SSH_OK"
@@ -111,8 +116,11 @@ jobs:
             exit 1
           }
 
-          echo "Ensuring remote paths: ${REMOTE_ROOT}/ and ${REMOTE_ROOT}/api/"
+          echo "Ensuring remote paths exist..."
           "${SSH_CMD[@]}" "mkdir -p \"${REMOTE_ROOT}\" \"${REMOTE_ROOT}/api\""
+
+          echo "Remote pwd and document root check..."
+          "${SSH_CMD[@]}" "pwd; test -d \"${REMOTE_ROOT}\" && echo OK_document_root || echo MISSING_document_root"
 
       - name: Fix API files misplaced in document root
         working-directory: .
@@ -124,10 +132,12 @@ jobs:
           ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
             "bash '${REMOTE_ROOT}/cpanel-fix-api-in-root.sh' '${REMOTE_ROOT}' && rm -f '${REMOTE_ROOT}/cpanel-fix-api-in-root.sh'"
 
-      - name: Deploy dist → public_html
+      - name: Deploy web/dist → public_html
+        working-directory: web
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
           RSYNC_RSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS}"
+          echo "Syncing web/dist/ → ${REMOTE_ROOT}/ (SPA document root)"
           rsync -avz --delete \
             --rsync-path="${RSYNC_PATH}" \
             --exclude 'api/' \
@@ -142,6 +152,12 @@ jobs:
             -e "$RSYNC_RSH" \
             dist/ \
             "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/"
+          ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
+            "test -f '${REMOTE_ROOT}/index.html'" || {
+              echo "::error::index.html missing in document root after SPA deploy"
+              exit 1
+            }
+          echo "SPA deploy OK: index.html present in document root"
 
       - name: Stamp API revision
         working-directory: .
@@ -152,12 +168,19 @@ jobs:
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
           RSYNC_RSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS}"
+          echo "Syncing server-php/ → ${REMOTE_ROOT}/api/ (CodeIgniter API)"
           rsync -avz --delete \
             --rsync-path="${RSYNC_PATH}" \
             --filter='merge scripts/cpanel-rsync-api.filters' \
             -e "$RSYNC_RSH" \
             server-php/ \
             "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/"
+          ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
+            "test -f '${REMOTE_ROOT}/api/index.php' && test -f '${REMOTE_ROOT}/api/.htaccess'" || {
+              echo "::error::api/index.php or api/.htaccess missing after API deploy"
+              exit 1
+            }
+          echo "API deploy OK: api/index.php present"
 
       - name: Post-deploy api setup (preserve .env)
         working-directory: .
@@ -168,20 +191,22 @@ jobs:
             scripts/cpanel-fix-dotenv-quotes.php \
             "${PROD_SFTP_USER}@${PROD_SFTP_HOST}:${REMOTE_ROOT}/api/"
           ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" \
-            "sed -i 's/\r$//' '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' && \
-             chmod +x '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' && \
-             bash '${REMOTE_ROOT}/api/cpanel-post-deploy-api.sh' '${REMOTE_ROOT}/api'"
+            "cd '${REMOTE_ROOT}/api' && \
+             sed -i 's/\r$//' cpanel-post-deploy-api.sh && \
+             chmod +x cpanel-post-deploy-api.sh && \
+             bash ./cpanel-post-deploy-api.sh ."
 
       - name: Verify files on remote server
         working-directory: .
         run: |
           REMOTE_ROOT="${PROD_SFTP_REMOTE_ROOT%/}"
           ssh -p "$PROD_SFTP_PORT" ${SSH_OPTS} "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" "
-            echo '---- public_html ----'
+            echo '---- document root (public_html) ----'
             ls -lah '${REMOTE_ROOT}/'
-            echo '---- api ----'
+            echo '---- api/ ----'
             ls -lah '${REMOTE_ROOT}/api/' || true
-            test -f '${REMOTE_ROOT}/index.html' && echo 'OK: index.html in public_html'
+            test -f '${REMOTE_ROOT}/index.html' && echo 'OK: index.html in document root'
+            test -d '${REMOTE_ROOT}/assets' && echo 'OK: assets/ in document root'
             test -f '${REMOTE_ROOT}/api/index.php' && echo 'OK: api/index.php'
             test -f '${REMOTE_ROOT}/api/.env' && echo 'OK: api/.env exists' || echo 'MISSING: api/.env'
           "

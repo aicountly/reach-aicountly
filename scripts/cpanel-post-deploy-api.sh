@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # Post-deploy hook for Reach server-php on cPanel (run via SSH after rsync).
+# Run from public_html/api/ (workflow: cd api && bash ./cpanel-post-deploy-api.sh).
 # Never overwrites or edits an existing .env — server secrets are managed only on the server.
 
 set -euo pipefail
 
 API_DIR="${1:-.}"
-cd "$API_DIR"
+if ! cd "$API_DIR"; then
+  echo "ERROR: cannot cd to API directory: ${API_DIR}" >&2
+  echo "Ensure PROD_SFTP_REMOTE_ROOT is public_html and api/ exists under it." >&2
+  exit 1
+fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Use pwd after cd — avoids absolute-path cd failures in chrooted cPanel SSH.
+SCRIPT_DIR="$(pwd)"
 
 resolve_php() {
   local bin ver major
@@ -27,12 +33,13 @@ resolve_php() {
 
 PHP_BIN="$(resolve_php)"
 echo "Using PHP: ${PHP_BIN} ($("${PHP_BIN}" -v | head -1))"
+echo "API directory: ${SCRIPT_DIR}"
 
 if [ -f .env ]; then
   echo ".env already exists — leaving server secrets unchanged (deploy will not modify .env)"
 else
-  echo "ERROR: missing .env in ${API_DIR}"
-  echo "Create api/.env manually on the server (copy from .env.example) before running production deploy."
+  echo "ERROR: missing .env in ${SCRIPT_DIR}"
+  echo "Create public_html/api/.env manually on the server (copy from .env.example) before running production deploy."
   exit 1
 fi
 
