@@ -1,4 +1,6 @@
 // Base URL without trailing slash or /v1 — services append paths like v1/auth/login.
+import { redirectToConsoleLogin } from './consoleAuth';
+
 const API_URL = (import.meta.env.VITE_API_URL || '/api')
   .replace(/\/$/, '')
   .replace(/\/v1$/, '');
@@ -36,6 +38,7 @@ async function request(path, options = {}) {
 
   if (response.status === 401 && token) {
     localStorage.removeItem('reach_token');
+    redirectToConsoleLogin();
   }
 
   if (!response.ok || json?.ok === false) {

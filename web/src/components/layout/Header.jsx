@@ -3,14 +3,13 @@ import { LogOut, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { BotModeBadge } from '../bot/BotModeBadge';
 import { ReachLogo } from '../brand/ReachLogo';
-import { ROUTES } from '../../constants/routes';
+import { AppLauncher } from './AppLauncher';
 
 export function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const doLogout = async () => {
     await logout();
-    navigate(ROUTES.LOGIN);
   };
   return (
     <header style={{
@@ -27,6 +26,7 @@ export function Header() {
         </span>
       </div>
       <div className="flex items-center gap-3">
+        <AppLauncher />
         <BotModeBadge />
         <div className="flex items-center gap-2">
           <div style={{
