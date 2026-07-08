@@ -30,7 +30,8 @@ resolve_php() {
   return 1
 }
 
-# Read-only: CI4 DotEnv rejects unquoted values with spaces — fail with guidance, do not edit .env.
+# Read-only: warn if .env lines look like CI4 DotEnv parse failures (never edit .env).
+# Mirrors CI4 unquoted rules: inline " #" comments are stripped before the space check.
 validate_dotenv_format() {
   local bad=0
   while IFS= read -r line || [ -n "$line" ]; do
@@ -38,19 +39,33 @@ validate_dotenv_format() {
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${line//[[:space:]]/}" ]] && continue
     [[ "$line" != *"="* ]] && continue
-    local val="${line#*=}"
+
+    local key val
+    key="${line%%=*}"
+    val="${line#*=}"
     val="$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [[ -z "$val" ]] && continue
-    [[ "$val" =~ ^[\"\'] ]] && continue
+
+    # Quoted values — CI4 parses these separately; skip bash pre-check.
+    if [[ "$val" =~ ^[\"\'] ]]; then
+      continue
+    fi
+
+    # CI4 DotEnv: unquoted inline comments start with space + #
+    if [[ "$val" == *" #"* ]]; then
+      val="${val%% #*}"
+      val="${val%"${val##*[![:space:]]}"}"
+    fi
+
     if [[ "$val" =~ [[:space:]] ]]; then
-      echo "ERROR: .env key has unquoted spaces — fix manually on server (deploy will not modify .env):" >&2
-      echo "  ${line%%=*}=***" >&2
+      echo "WARNING: .env key may need quotes for CI4 (deploy will not modify .env): ${key}=***" >&2
       bad=1
     fi
   done < .env
+
   if [ "$bad" -ne 0 ]; then
-    echo "Example: SUPER_ADMIN_NAME=\"Reach Superadmin\"" >&2
-    exit 1
+    echo "WARNING: unquoted .env values with spaces can break php spark — quote them manually if migrate fails." >&2
+    echo "Example: SUPER_ADMIN_NAME=\"Reach Superadmin\" or CONTROLLER_APP_CODE=reach" >&2
   fi
 }
 
