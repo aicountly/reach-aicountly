@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { authService } from '../services/authService';
 import { clearControllerSsoHash, readControllerSsoToken } from '../services/controllerSso';
-import { redirectToConsoleLogin } from '../services/consoleAuth';
+import { redirectToConsoleLogin, redirectToConsoleLoginAfterSignOut } from '../services/consoleAuth';
 
 const AuthContext = createContext(null);
 
@@ -125,7 +125,7 @@ export function AuthProvider({ children }) {
     }
     localStorage.removeItem(TOKEN_KEY);
     setUser(null);
-    redirectToConsoleLogin();
+    await redirectToConsoleLoginAfterSignOut();
   }, []);
 
   const value = useMemo(() => ({
