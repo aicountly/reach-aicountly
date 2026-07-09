@@ -1,9 +1,12 @@
 <?php
 
-$path = dirname(__DIR__) . '/server-php/app/Libraries/TrafficAnalyticsService.php';
-$c    = file_get_contents($path);
+$flow = shell_exec('git -C "C:/Users/pc/flow-react-app" show 2cb96bc:server-php/app/Libraries/TrafficAnalyticsService.php');
+if (! is_string($flow) || $flow === '') {
+    fwrite(STDERR, "Could not read Flow TrafficAnalyticsService\n");
+    exit(1);
+}
 
-$c = preg_replace("/require_once __DIR__ \. '\/[^']+';\r?\n/", '', $c);
+$c = preg_replace("/require_once __DIR__ \. '\/[^']+';\r?\n/", '', $flow);
 $c = str_replace('DeskTaxonomy::', 'SaasProductTaxonomy::', $c);
 $c = preg_replace('/\(\$_ENV\[([^\]]+)\] \?\? ([^)]+)\)/', '(env($1) ?? $2)', $c);
 $c = str_replace("'Flow portal'", "'Reach portal'", $c);
@@ -41,5 +44,6 @@ $c = str_replace(
     $c
 );
 
-file_put_contents($path, $c);
-echo "Transformed TrafficAnalyticsService.php\n";
+$out = dirname(__DIR__) . '/server-php/app/Libraries/TrafficAnalyticsService.php';
+file_put_contents($out, $c);
+echo "Wrote {$out}\n";
