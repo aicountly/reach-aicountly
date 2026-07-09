@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\TrafficAnalyticsService;
 use App\Models\AnalyticsSnapshotModel;
 use App\Models\BlogPostModel;
 use App\Models\CampaignModel;
@@ -11,6 +12,11 @@ use App\Models\SocialPostModel;
 
 class AnalyticsController extends BaseApiController
 {
+    private function trafficService(): TrafficAnalyticsService
+    {
+        return new TrafficAnalyticsService();
+    }
+
     public function summary()
     {
         $blog     = new BlogPostModel();
@@ -19,13 +25,14 @@ class AnalyticsController extends BaseApiController
         $lead     = new LeadModel();
 
         $since30 = date('Y-m-d H:i:s', strtotime('-30 days'));
+
         return $this->ok([
             'window' => '30d',
             'campaigns_created'   => $campaign->where('created_at >=', $since30)->countAllResults(),
             'posts_planned'       => $social->where('created_at >=', $since30)->countAllResults(),
             'posts_published'     => $social->where('status', 'posted')->where('published_at >=', $since30)->countAllResults(),
             'leads_generated'     => $lead->where('created_at >=', $since30)->countAllResults(),
-            'blog_drafts'         => $blog->whereIn('status', ['draft','seo_review','internal_review'])->countAllResults(),
+            'blog_drafts'         => $blog->whereIn('status', ['draft', 'seo_review', 'internal_review'])->countAllResults(),
             'blog_published'      => $blog->where('status', 'published')->where('published_at >=', $since30)->countAllResults(),
             'approval_pending'    => $blog->where('approval_status', 'pending')->countAllResults(),
             'engagement_imported' => (new AnalyticsSnapshotModel())
@@ -35,37 +42,62 @@ class AnalyticsController extends BaseApiController
         ]);
     }
 
+    public function trafficOverview()
+    {
+        $days   = max(7, min(90, (int) ($this->request->getGet('days') ?? 30)));
+        $stream = (string) ($this->request->getGet('stream') ?? 'all');
+        $result = $this->trafficService()->overview($days, $stream);
+
+        return $this->ok($result['data']);
+    }
+
+    public function trafficSources()
+    {
+        $days   = max(7, min(90, (int) ($this->request->getGet('days') ?? 30)));
+        $stream = (string) ($this->request->getGet('stream') ?? 'all');
+        $result = $this->trafficService()->sources($days, $stream);
+
+        return $this->ok($result['data']);
+    }
+
+    public function trafficLeads()
+    {
+        $days   = max(7, min(90, (int) ($this->request->getGet('days') ?? 30)));
+        $stream = (string) ($this->request->getGet('stream') ?? 'all');
+        $result = $this->trafficService()->leads($days, $stream);
+
+        return $this->ok($result['data']);
+    }
+
+    public function trafficConfigStatus()
+    {
+        return $this->ok($this->trafficService()->configStatus());
+    }
+
+    /** @deprecated Use trafficConfigStatus — kept for older clients */
     public function traffic()
     {
-        // Placeholder traffic panel — real values come from external integrations later.
-        $rows = (new AnalyticsSnapshotModel())
-            ->where('source', 'internal')
-            ->orderBy('captured_at', 'DESC')
-            ->limit(30)
-            ->findAll();
-        return $this->ok(['snapshots' => $rows]);
+        return $this->trafficOverview();
     }
 
     public function providers()
     {
-        $checks = [
-            'ga4'        => (string) env('GA4_MEASUREMENT_ID', '') !== '' && (string) env('GA4_API_SECRET', '') !== '',
-            'gsc'        => (string) env('GSC_SITE_URL', '') !== '',
-            'meta'       => (string) env('META_ACCESS_TOKEN', '') !== '',
-            'linkedin'   => (string) env('LINKEDIN_ANALYTICS_TOKEN', '') !== '',
-            'twitter'    => (string) env('TWITTER_ANALYTICS_TOKEN', '') !== '',
-            'youtube'    => (string) env('YOUTUBE_ANALYTICS_TOKEN', '') !== '',
-            'email'      => (string) env('EMAIL_PROVIDER_API_KEY', '') !== '',
-            'whatsapp'   => (string) env('WHATSAPP_PROVIDER_API_KEY', '') !== '',
-        ];
-        $out = [];
-        foreach ($checks as $provider => $configured) {
+        $config = $this->trafficService()->configStatus();
+        $out    = [];
+
+        foreach ($config['streams'] ?? [] as $stream) {
             $out[] = [
-                'provider'   => $provider,
-                'configured' => $configured,
-                'status'     => $configured ? 'ready' : 'not_configured',
+                'provider'   => (string) ($stream['id'] ?? ''),
+                'label'      => (string) ($stream['label'] ?? ''),
+                'configured' => ($stream['api_ok'] ?? false) === true,
+                'status'     => ($stream['api_ok'] ?? false) === true ? 'ready' : 'not_configured',
             ];
         }
-        return $this->ok(['providers' => $out]);
+
+        return $this->ok([
+            'providers' => $out,
+            'ready'     => (bool) ($config['ready'] ?? false),
+            'checklist' => $config['checklist'] ?? [],
+        ]);
     }
 }

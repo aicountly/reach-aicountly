@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { analyticsService } from '../services/analyticsService';
+import { TrafficAnalyticsSection } from '../components/analytics/TrafficAnalyticsSection';
 import { Card } from '../components/common/Card';
 import { Loader } from '../components/common/Loader';
 import { Alert } from '../components/common/Alert';
-import { StatusBadge } from '../components/common/StatusBadge';
 
 function Tile({ label, value, hint }) {
   return (
@@ -17,16 +17,12 @@ function Tile({ label, value, hint }) {
 
 export function AnalyticsPage() {
   const [summary, setSummary] = useState(null);
-  const [traffic, setTraffic] = useState(null);
-  const [providers, setProviders] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    Promise.all([
-      analyticsService.summary().then(setSummary),
-      analyticsService.traffic().then(setTraffic).catch(() => setTraffic({})),
-      analyticsService.providers().then(setProviders).catch(() => setProviders({})),
-    ]).catch((e) => setError(e.message));
+    analyticsService.summary()
+      .then(setSummary)
+      .catch((e) => setError(e.message));
   }, []);
 
   if (error) return <Alert variant="danger">{error}</Alert>;
@@ -37,7 +33,9 @@ export function AnalyticsPage() {
       <div className="page-header">
         <div>
           <h1>Analytics</h1>
-          <p className="text-sm text-muted">Internal marketing metrics + external integration health.</p>
+          <p className="text-sm text-muted">
+            Internal Reach marketing metrics plus GA4 traffic for AICountly.com and all SaaS products (ported from Flow).
+          </p>
         </div>
       </div>
 
@@ -54,26 +52,7 @@ export function AnalyticsPage() {
         </div>
       </Card>
 
-      <Card title="Traffic snapshots (internal)">
-        {(traffic?.snapshots || []).length === 0 ? (
-          <div className="text-sm text-muted">
-            No traffic snapshots yet. Configure GA4 / Search Console / Meta credentials in <code>.env</code> to import external data.
-          </div>
-        ) : (
-          <pre className="text-xs" style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(traffic.snapshots, null, 2)}</pre>
-        )}
-      </Card>
-
-      <Card title="External providers">
-        <div className="grid grid-2">
-          {(providers?.providers || []).map((p) => (
-            <div key={p.provider} className="flex items-center justify-between" style={{ padding: '0.4rem 0', borderBottom: '1px solid var(--color-border)' }}>
-              <div className="text-sm font-semibold" style={{ textTransform: 'uppercase' }}>{String(p.provider).replace(/_/g,' ')}</div>
-              <StatusBadge status={p.status} />
-            </div>
-          ))}
-        </div>
-      </Card>
+      <TrafficAnalyticsSection />
     </div>
   );
 }

@@ -159,10 +159,14 @@ $routes->group('v1', static function ($routes) {
         $routes->put('creative-briefs/(:num)',    'Api\\V1\\CreativeBriefController::update/$1');
         $routes->delete('creative-briefs/(:num)', 'Api\\V1\\CreativeBriefController::destroy/$1');
 
-        // Analytics
-        $routes->get('analytics/summary', 'Api\\V1\\AnalyticsController::summary');
-        $routes->get('analytics/traffic', 'Api\\V1\\AnalyticsController::traffic');
-        $routes->get('analytics/providers', 'Api\\V1\\AnalyticsController::providers');
+        // Analytics (internal metrics + GA4 traffic — ported from Flow)
+        $routes->get('analytics/summary',                 'Api\\V1\\AnalyticsController::summary');
+        $routes->get('analytics/traffic',                 'Api\\V1\\AnalyticsController::traffic');
+        $routes->get('analytics/traffic/overview',        'Api\\V1\\AnalyticsController::trafficOverview');
+        $routes->get('analytics/traffic/sources',         'Api\\V1\\AnalyticsController::trafficSources');
+        $routes->get('analytics/traffic/leads',           'Api\\V1\\AnalyticsController::trafficLeads');
+        $routes->get('analytics/traffic/config-status',   'Api\\V1\\AnalyticsController::trafficConfigStatus');
+        $routes->get('analytics/providers',               'Api\\V1\\AnalyticsController::providers');
 
         // Leads + Engage push
         $routes->get('leads',           'Api\\V1\\LeadController::index');
