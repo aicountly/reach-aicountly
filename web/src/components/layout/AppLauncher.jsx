@@ -1,7 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ExternalLink, LayoutGrid } from 'lucide-react';
+import {
+  CheckCircle,
+  ExternalLink,
+  Flame,
+  Hammer,
+  LayoutGrid,
+  Megaphone,
+  Shield,
+  Ticket,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import * as controllerAccess from '../../services/controllerAccess';
+
+const ICONS = {
+  'layout-grid': LayoutGrid,
+  shield: Shield,
+  'check-circle': CheckCircle,
+  flame: Flame,
+  users: Users,
+  megaphone: Megaphone,
+  hammer: Hammer,
+  ticket: Ticket,
+};
+
+function AppIcon({ name, size = 18 }) {
+  const Icon = ICONS[name] || LayoutGrid;
+  return <Icon size={size} color="#3b82f6" />;
+}
 
 const styles = {
   wrap: { position: 'relative' },
@@ -217,7 +243,7 @@ export function AppLauncher() {
                       ...(isLocked ? styles.appTileLocked : {}),
                     }}
                   >
-                    <LayoutGrid size={16} color="#3b82f6" />
+                    <AppIcon name={app.icon} />
                     <p style={styles.appName}>
                       {app.name}
                       {!app.is_current && app.base_url ? (
