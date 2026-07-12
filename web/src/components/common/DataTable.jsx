@@ -1,6 +1,6 @@
 import { EmptyState } from './EmptyState';
 
-export function DataTable({ columns, rows, onRowClick, emptyMessage }) {
+export function DataTable({ columns, rows, onRowClick, emptyMessage, expandedRowId, renderExpanded }) {
   if (!rows || rows.length === 0) {
     return <EmptyState message={emptyMessage} />;
   }
@@ -16,15 +16,24 @@ export function DataTable({ columns, rows, onRowClick, emptyMessage }) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr
-              key={row.id ?? i}
-              onClick={() => onRowClick?.(row)}
-              style={onRowClick ? { cursor: 'pointer' } : undefined}
-            >
-              {columns.map((col) => (
-                <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>
-              ))}
-            </tr>
+            <>
+              <tr
+                key={row.id ?? i}
+                onClick={() => onRowClick?.(row)}
+                style={onRowClick ? { cursor: 'pointer' } : undefined}
+              >
+                {columns.map((col) => (
+                  <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>
+                ))}
+              </tr>
+              {renderExpanded && expandedRowId === row.id && (
+                <tr key={`${row.id ?? i}-expanded`}>
+                  <td colSpan={columns.length} style={{ padding: 0, background: '#f9fafb' }}>
+                    {renderExpanded(row)}
+                  </td>
+                </tr>
+              )}
+            </>
           ))}
         </tbody>
       </table>
