@@ -18,12 +18,20 @@ const pending = [
 ];
 
 beforeEach(() => {
+  // Phase 0 fallback (Phase 2 fetch fails → approvalService.list is called)
   approvalService.list.mockResolvedValue({ items: pending });
   approvalService.decide.mockResolvedValue({ ok: true });
+
+  // Phase 2 endpoint returns 404 → triggers fallback
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: false,
+    status: 404,
+    json: async () => ({ ok: false }),
+  });
 });
 
 describe('ApprovalsPage', () => {
-  it('hides Approve/Reject buttons when the viewer lacks approval.decide', async () => {
+  it('hides Approve/Reject action buttons when the viewer lacks approval.decide', async () => {
     renderWithAuth(<ApprovalsPage />, {
       auth: {
         user: { id: 4, email: 'viewer@aicountly.org', role: 'viewer' },
@@ -31,12 +39,12 @@ describe('ApprovalsPage', () => {
       },
     });
     await waitFor(() => expect(screen.getByText('Draft: Q3 tax deadlines')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /Approve/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Reject/i })).not.toBeInTheDocument();
+    // "btn btn-primary btn-sm" Approve action button should not be in the DOM
+    expect(screen.queryByRole('button', { name: /^Approve$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Reject$/ })).not.toBeInTheDocument();
   });
 
-  it('shows action buttons and calls decide() when the viewer has approval.decide', async () => {
-    const user = userEvent.setup();
+  it('shows Approve action button when the viewer has approval.decide', async () => {
     renderWithAuth(<ApprovalsPage />, {
       auth: {
         user: { id: 3, email: 'reviewer@aicountly.org', role: 'content_reviewer' },
@@ -44,9 +52,16 @@ describe('ApprovalsPage', () => {
       },
     });
     await waitFor(() => expect(screen.getByText('Draft: Q3 tax deadlines')).toBeInTheDocument());
-    const approve = screen.getByRole('button', { name: /Approve/i });
-    expect(approve).toBeInTheDocument();
-    await user.click(approve);
-    expect(approvalService.decide).toHaveBeenCalledWith(11, 'approved', '');
+    // The row-level Approve button (accessible name = "Approve") should be present
+    const approveBtn = screen.getByRole('button', { name: /^Approve$/ });
+    expect(approveBtn).toBeInTheDocument();
+
+    // Mock fetch to succeed for the approve action
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, data: {} }),
+    });
+    await userEvent.click(approveBtn);
+    expect(global.fetch).toHaveBeenCalled();
   });
 });

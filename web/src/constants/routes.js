@@ -8,7 +8,7 @@ export const ROUTES = {
   BLOG_EDIT:    '/blog/:id/edit',
   BLOG_DETAIL:  '/blog/:id',
 
-  CONTENT_CALENDAR: '/calendar',
+  CONTENT_CALENDAR_LEGACY: '/calendar',
 
   CAMPAIGN_LIST:   '/campaigns',
   CAMPAIGN_NEW:    '/campaigns/new',
@@ -70,4 +70,18 @@ export const ROUTES = {
   KNOWLEDGE_BRAND_RULES:   '/knowledge/brand-rules',
   KNOWLEDGE_POLICIES:      '/knowledge/content-policies',
   KNOWLEDGE_COMPLETENESS:  '/knowledge/completeness',
+
+  // Phase 2: Unified Content Studio
+  CONTENT:             '/content',
+  CONTENT_NEW:         '/content/new',
+  CONTENT_DETAIL:      '/content/:id',
+  CONTENT_EDIT:        '/content/:id/edit',
+  CONTENT_VERSIONS:    '/content/:id/versions',
+  CONTENT_BRIEF:       '/content/:id/brief',
+  CONTENT_COMMENTS:    '/content/:id/comments',
+  CONTENT_VALIDATIONS: '/content/:id/validations',
+  CONTENT_SCHEDULE:    '/content/:id/schedule',
+  CONTENT_CALENDAR:    '/content/calendar',
+  CONTENT_DAILY_PACK:  '/content/daily-pack',
+  CONTENT_TEMPLATES:   '/content/templates',
 };

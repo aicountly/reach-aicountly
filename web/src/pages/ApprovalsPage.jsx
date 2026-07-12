@@ -206,7 +206,7 @@ export function ApprovalsPage() {
     { key: 'id', label: '#', render: (r) => r.id },
     { key: 'title', label: 'Title', render: (r) => (
       <div>
-        <div style={{ fontWeight: 600, fontSize: 13 }}>{r.title || r.subject_type + ' #' + r.subject_id}</div>
+        <div style={{ fontWeight: 600, fontSize: 13 }}>{r.title || r.summary || r.subject_type + ' #' + r.subject_id}</div>
         {r.content_type && <div style={{ fontSize: 11, color: '#6b7280' }}>{r.content_type?.replace(/_/g, ' ')}</div>}
       </div>
     )},

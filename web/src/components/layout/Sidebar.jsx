@@ -4,7 +4,7 @@ import {
   Share2, ListOrdered, Mail, MessageCircle, TrendingUp, Sparkles,
   Paintbrush, BarChart3, Users, ArrowRightCircle, Bot, ScrollText,
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
-  BookOpen,
+  BookOpen, PenTool, Package,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -18,7 +18,7 @@ const NAV = [
     items: [
       { label: 'Dashboard',         path: ROUTES.DASHBOARD,        icon: LayoutDashboard, end: true, requires: 'dashboard.view' },
       { label: 'Blog Management',   path: ROUTES.BLOG_LIST,        icon: FileText,        countKey: 'blog', requires: 'blog.view' },
-      { label: 'Content Calendar',  path: ROUTES.CONTENT_CALENDAR, icon: CalendarDays,    requires: 'blog.view' },
+      { label: 'Content Calendar',  path: ROUTES.CONTENT_CALENDAR_LEGACY, icon: CalendarDays,    requires: 'blog.view' },
       { label: 'Campaigns',         path: ROUTES.CAMPAIGN_LIST,    icon: Megaphone,       requires: 'campaign.view' },
       { label: 'Landing Pages',     path: ROUTES.LANDING_LIST,     icon: MonitorSmartphone, requires: 'campaign.view' },
       { label: 'Social Planner',    path: ROUTES.SOCIAL_PLANNER,   icon: Share2,          requires: 'social.view' },
@@ -39,6 +39,15 @@ const NAV = [
       { label: 'Bot Queue',         path: ROUTES.BOT_QUEUE,   icon: Bot,        countKey: 'bot_queue_running', requires: 'bot.view' },
       { label: 'Bot Reports',       path: ROUTES.BOT_REPORTS, icon: ScrollText, requires: 'bot.view' },
       { label: 'Console Approvals', path: ROUTES.APPROVALS,   icon: ShieldCheck, countKey: 'approvals', requires: 'approval.view' },
+    ],
+  },
+  {
+    title: 'Content Studio',
+    items: [
+      { label: 'All Content',      path: ROUTES.CONTENT,            icon: PenTool,  end: true, requires: 'content.view' },
+      { label: 'New Content',      path: ROUTES.CONTENT_NEW,        icon: FileText, requires: 'content.create' },
+      { label: 'Daily Pack',       path: ROUTES.CONTENT_DAILY_PACK, icon: Package,  requires: 'daily_pack.view' },
+      { label: 'Calendar',         path: ROUTES.CONTENT_CALENDAR,   icon: CalendarDays, requires: 'content.view' },
     ],
   },
   {

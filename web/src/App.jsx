@@ -66,6 +66,18 @@ import { BrandRulesPage } from './pages/knowledge/BrandRulesPage';
 import { ContentPoliciesPage } from './pages/knowledge/ContentPoliciesPage';
 import { CompletenessPage } from './pages/knowledge/CompletenessPage';
 
+import { ContentLayout }        from './pages/content/ContentLayout';
+import { ContentListPage }      from './pages/content/ContentListPage';
+import { ContentNewPage }       from './pages/content/ContentNewPage';
+import { ContentDetailPage }    from './pages/content/ContentDetailPage';
+import { ContentEditorPage }    from './pages/content/ContentEditorPage';
+import { ContentVersionsPage }  from './pages/content/ContentVersionsPage';
+import { ContentBriefPage }     from './pages/content/ContentBriefPage';
+import { ContentCommentsPage }  from './pages/content/ContentCommentsPage';
+import { ContentValidationsPage } from './pages/content/ContentValidationsPage';
+import { ContentSchedulePage }  from './pages/content/ContentSchedulePage';
+import { DailyPackPage }        from './pages/content/DailyPackPage';
+
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
 
@@ -101,7 +113,7 @@ export default function App() {
         <Route path={ROUTES.BLOG_EDIT}    element={<BlogEditorPage />} />
         <Route path={ROUTES.BLOG_DETAIL}  element={<BlogDetailPage />} />
 
-        <Route path={ROUTES.CONTENT_CALENDAR} element={<ContentCalendarPage />} />
+        <Route path={ROUTES.CONTENT_CALENDAR_LEGACY} element={<ContentCalendarPage />} />
 
         <Route path={ROUTES.CAMPAIGN_LIST}   element={<CampaignListPage />} />
         <Route path={ROUTES.CAMPAIGN_NEW}    element={<CampaignEditorPage />} />
@@ -149,6 +161,21 @@ export default function App() {
           <Route path="brand-rules" element={<BrandRulesPage />} />
           <Route path="content-policies" element={<ContentPoliciesPage />} />
           <Route path="completeness" element={<CompletenessPage />} />
+        </Route>
+
+        {/* Phase 2 — Content Studio */}
+        <Route path="/content" element={<ContentLayout />}>
+          <Route index element={<ContentListPage />} />
+          <Route path="new" element={<ContentNewPage />} />
+          <Route path="daily-pack" element={<DailyPackPage />} />
+          <Route path=":id" element={<ContentDetailPage />} />
+          <Route path=":id/edit" element={<ContentEditorPage />} />
+          <Route path=":id/versions" element={<ContentVersionsPage />} />
+          <Route path=":id/brief" element={<ContentBriefPage />} />
+          <Route path=":id/comments" element={<ContentCommentsPage />} />
+          <Route path=":id/validations" element={<ContentValidationsPage />} />
+          <Route path=":id/schedule" element={<ContentSchedulePage />} />
+          <Route path="calendar" element={<ContentListPage />} />
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
