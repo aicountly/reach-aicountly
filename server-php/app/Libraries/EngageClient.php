@@ -4,6 +4,7 @@ namespace App\Libraries;
 
 use App\Models\EngagePushAttemptModel;
 use App\Models\LeadModel;
+use Config\Services;
 
 /**
  * Push a Reach lead to Engage.
@@ -90,8 +91,26 @@ class EngageClient
             return ['status' => 'retry_scheduled', 'attempt' => $attempt];
         }
 
+        $endpoint = $this->baseUrl . '/internal/reach/leads';
+        $urlCheck = Services::urlPolicy()->validate($endpoint, [
+            'allowedHosts' => array_filter([parse_url($this->baseUrl, PHP_URL_HOST) ?: null]),
+        ]);
+        if (! $urlCheck->allowed) {
+            $attempt = $this->recordAttempt(
+                $leadId,
+                ((int) ($lead['engage_push_attempts'] ?? 0)) + 1,
+                [],
+                null,
+                null,
+                'URL policy rejected Engage endpoint: ' . ($urlCheck->reason ?? 'invalid'),
+                false,
+            );
+            $this->markLeadStatus($leadId, 'failed', $urlCheck->reason ?? 'URL policy rejected endpoint', $lead);
+            return ['status' => 'failed', 'attempt' => $attempt];
+        }
+
         $body = $this->buildBody($lead);
-        $ch   = curl_init($this->baseUrl . '/internal/reach/leads');
+        $ch   = curl_init($endpoint);
         if ($ch === false) {
             $attempt = $this->recordAttempt($leadId, ((int) ($lead['engage_push_attempts'] ?? 0)) + 1, $body, null, null, 'curl_init failed', false);
             $this->markLeadStatus($leadId, 'retry_scheduled', 'curl_init failed', $lead);
@@ -104,12 +123,13 @@ class EngageClient
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 20,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_HTTPHEADER     => [
+            CURLOPT_HTTPHEADER     => array_filter([
                 'Content-Type: application/json',
                 'Accept: application/json',
                 'X-Portal-Token: ' . $this->token,
                 'X-Source: reach.aicountly.org',
-            ],
+                $this->currentRequestId() ? 'X-Request-Id: ' . $this->currentRequestId() : null,
+            ]),
         ]);
 
         $raw    = curl_exec($ch);
@@ -163,6 +183,17 @@ class EngageClient
             $out['engage_lead_code'] = $engageCode;
         }
         return $out;
+    }
+
+    private function currentRequestId(): ?string
+    {
+        try {
+            $req = service('request');
+            $id  = $req->reachRequestId ?? null;
+            return is_string($id) && $id !== '' ? $id : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function buildBody(array $lead): array

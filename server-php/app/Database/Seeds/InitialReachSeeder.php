@@ -11,23 +11,12 @@ class InitialReachSeeder extends Seeder
     {
         $now = date('Y-m-d H:i:s');
 
-        // ---- Role: super_admin (only role Reach exposes) ----
+        // ---- Roles + permissions (Phase 0) ----
+        // Delegates to RolesAndPermissionsSeeder which seeds all six canonical roles
+        // and the non-login system-bot user. Idempotent.
+        $this->call('RolesAndPermissionsSeeder');
         $roles = $this->db->table('reach_roles');
-        $existingRole = $roles->where('slug', 'super_admin')->get()->getRow();
-        if (! $existingRole) {
-            $roles->insert([
-                'slug'        => 'super_admin',
-                'name'        => 'Superadmin',
-                'description' => 'Full access to Reach marketing operations.',
-                'permissions' => json_encode(['*']),
-                'created_at'  => $now,
-                'updated_at'  => $now,
-            ]);
-            $roleId = (int) $this->db->insertID();
-            CLI::write('Seeded role super_admin.', 'green');
-        } else {
-            $roleId = (int) $existingRole->id;
-        }
+        $roleId = (int) ($roles->where('slug', 'super_admin')->get()->getRowArray()['id'] ?? 0);
 
         // ---- Superadmin user (from env; skip silently if incomplete) ----
         $email    = strtolower((string) env('SUPER_ADMIN_EMAIL', ''));

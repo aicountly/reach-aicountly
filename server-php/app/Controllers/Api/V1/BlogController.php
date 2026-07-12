@@ -48,21 +48,22 @@ class BlogController extends BaseApiController
 
     public function store()
     {
-        $body = $this->input();
-        $blog = new BlogPostModel();
-        $slug = $this->uniqueSlug($blog, (string) ($body['slug'] ?? $body['title'] ?? 'untitled'));
+        $body      = $this->input();
+        $sanitizer = Services::htmlSanitizer();
+        $blog      = new BlogPostModel();
+        $slug      = $this->uniqueSlug($blog, (string) ($body['slug'] ?? $body['title'] ?? 'untitled'));
         $row  = [
-            'title'           => (string) ($body['title'] ?? 'Untitled'),
+            'title'           => $sanitizer->purifyText((string) ($body['title'] ?? 'Untitled')),
             'slug'            => $slug,
-            'excerpt'         => $body['excerpt']         ?? null,
-            'content'         => (string) ($body['content'] ?? ''),
+            'excerpt'         => isset($body['excerpt']) ? $sanitizer->purifyText((string) $body['excerpt']) : null,
+            'content'         => $sanitizer->purify((string) ($body['content'] ?? '')),
             'category'        => $body['category']        ?? null,
             'tags'            => isset($body['tags']) ? json_encode($body['tags']) : null,
-            'seo_title'       => $body['seo_title']       ?? null,
-            'seo_description' => $body['seo_description'] ?? null,
+            'seo_title'       => isset($body['seo_title']) ? $sanitizer->purifyText((string) $body['seo_title']) : null,
+            'seo_description' => isset($body['seo_description']) ? $sanitizer->purifyText((string) $body['seo_description']) : null,
             'canonical_url'   => $body['canonical_url']   ?? null,
-            'focus_keyword'   => $body['focus_keyword']   ?? null,
-            'author'          => $body['author']          ?? null,
+            'focus_keyword'   => isset($body['focus_keyword']) ? $sanitizer->purifyText((string) $body['focus_keyword']) : null,
+            'author'          => isset($body['author']) ? $sanitizer->purifyText((string) $body['author']) : null,
             'featured_image'  => $body['featured_image']  ?? null,
             'status'          => in_array($body['status'] ?? 'draft', self::WORKFLOW, true) ? $body['status'] : 'draft',
             'scheduled_at'    => $body['scheduled_at']    ?? null,
@@ -70,6 +71,12 @@ class BlogController extends BaseApiController
             'current_version' => 1,
             'created_by'      => $this->userId(),
         ];
+        if (! empty($row['canonical_url'])) {
+            $result = Services::urlPolicy()->validate((string) $row['canonical_url']);
+            if (! $result->allowed) {
+                return $this->fail('Rejected canonical URL: ' . ($result->reason ?? 'invalid.'), 422, ['rule' => $result->rule]);
+            }
+        }
         $blog->insert($row);
         $id = (int) $blog->db->insertID();
         $this->snapshot($id, 1, 'initial', $row);
@@ -84,12 +91,27 @@ class BlogController extends BaseApiController
         if (! $row) {
             return $this->fail('Blog post not found.', 404);
         }
-        $body   = $this->input();
-        $update = array_intersect_key($body, array_flip([
+        $body      = $this->input();
+        $sanitizer = Services::htmlSanitizer();
+        $update    = array_intersect_key($body, array_flip([
             'title', 'slug', 'excerpt', 'content', 'category', 'tags',
             'seo_title', 'seo_description', 'canonical_url', 'focus_keyword',
             'author', 'featured_image', 'scheduled_at',
         ]));
+        foreach (['title', 'excerpt', 'seo_title', 'seo_description', 'category', 'focus_keyword', 'author'] as $textField) {
+            if (isset($update[$textField])) {
+                $update[$textField] = $sanitizer->purifyText((string) $update[$textField]);
+            }
+        }
+        if (isset($update['content'])) {
+            $update['content'] = $sanitizer->purify((string) $update['content']);
+        }
+        if (isset($update['canonical_url']) && $update['canonical_url'] !== null && $update['canonical_url'] !== '') {
+            $result = Services::urlPolicy()->validate((string) $update['canonical_url']);
+            if (! $result->allowed) {
+                return $this->fail('Rejected canonical URL: ' . ($result->reason ?? 'invalid.'), 422, ['rule' => $result->rule]);
+            }
+        }
         if (isset($update['slug'])) {
             $update['slug'] = $this->uniqueSlug($blog, (string) $update['slug'], $id);
         }
@@ -139,6 +161,30 @@ class BlogController extends BaseApiController
         if (! $row) {
             return $this->fail('Blog post not found.', 404);
         }
+        $body     = $this->input();
+        $override = (bool) ($body['override'] ?? false);
+        $reason   = isset($body['reason']) ? (string) $body['reason'] : null;
+
+        $policy = Services::approvalPolicy();
+        $policyInput = [
+            'id'                 => $id,
+            'subject_type'       => 'blog',
+            'subject_id'         => $id,
+            'created_actor_type' => $row['created_actor_type'] ?? null,
+            'requested_by'       => isset($row['created_by']) ? (int) $row['created_by'] : null,
+        ];
+        $result = $policy->canApprove($policyInput, $this->user() ?? ['id' => $this->userId()], $override, $reason);
+        if (! $result->allowed) {
+            Services::auditLogger()->log(
+                userId: $this->userId(),
+                action: 'approval.policy_denied',
+                entityType: 'blog',
+                entityId: $id,
+                newValue: ['rule' => $result->rule, 'message' => $result->message],
+            );
+            return $this->fail($result->message ?? 'Approval denied by policy.', 403, ['rule' => $result->rule]);
+        }
+
         $blog->update($id, [
             'approval_status' => 'approved',
             'approved_by'     => $this->userId(),
@@ -154,7 +200,16 @@ class BlogController extends BaseApiController
             'decided_by'   => $this->userId(),
             'decided_at'   => date('Y-m-d H:i:s'),
         ]);
-        $this->audit('blog.approve', 'blog', $id, ['status' => $row['status']], ['status' => 'approved']);
+        $auditExtra = ['status' => 'approved'];
+        if ($override) {
+            $auditExtra['override'] = true;
+            $auditExtra['reason']   = $reason;
+        }
+        $this->audit('blog.approve', 'blog', $id, ['status' => $row['status']], $auditExtra, $reason);
+        $this->audit('approval.decided', 'blog', $id, ['status' => $row['status']], $auditExtra, $reason);
+        if ($override) {
+            $this->audit('approval.overridden', 'blog', $id, ['status' => $row['status']], $auditExtra, $reason);
+        }
         return $this->ok($blog->find($id));
     }
 
@@ -194,9 +249,12 @@ class BlogController extends BaseApiController
         if (($row['status'] ?? '') !== 'approved' && ($row['status'] ?? '') !== 'scheduled') {
             return $this->fail('Only approved or scheduled blogs can be published.', 422);
         }
+        $this->audit('publish.attempted', 'blog', $id, ['publishing_status' => $row['publishing_status'] ?? null], [
+            'target' => 'aicountly.com',
+        ]);
         // Placeholder publish. Falls back to pending_publishing if not configured.
         $result = Services::sitePublisher()->publish($row);
-        $this->audit('publish.blog', 'blog', $id, ['publishing_status' => $row['publishing_status']], $result);
+        $this->audit('publish.blog', 'blog', $id, ['publishing_status' => $row['publishing_status'] ?? null], $result);
         return $this->ok($blog->find($id));
     }
 

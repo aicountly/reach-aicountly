@@ -23,11 +23,17 @@ class BotSettingsController extends BaseApiController
         $body    = $this->input();
         $mode    = (string) ($body['mode'] ?? 'confirm');
         $allowed = array_values((array) ($body['allowed_auto_actions'] ?? []));
-        // Only ACTIONS may be marked auto-allowed.
         $allowed = array_values(array_intersect(MarketingBotService::ACTIONS, $allowed));
-        $m = new BotSettingModel();
-        $row = $m->updateMode($mode, $allowed, $this->userId());
-        $this->audit('bot.mode.update', 'bot_settings', (int) ($row['id'] ?? 0), null, $row);
+        $m       = new BotSettingModel();
+        $before  = ['mode' => $m->currentMode(), 'allowed_auto_actions' => $m->currentAllowedAutoActions()];
+        $row     = $m->updateMode($mode, $allowed, $this->userId());
+        $this->audit(
+            'bot.mode_changed',
+            'bot_settings',
+            (int) ($row['id'] ?? 0),
+            $before,
+            ['mode' => $row['mode'], 'allowed_auto_actions' => $row['allowed_auto_actions'] ?? []],
+        );
         return $this->ok([
             'mode'                 => $row['mode'],
             'allowed_auto_actions' => $row['allowed_auto_actions'] ?? [],

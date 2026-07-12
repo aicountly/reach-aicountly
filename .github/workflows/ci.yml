@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!gh-pages'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        env:
+          VITE_API_URL: https://reach.aicountly.org/api
+          VITE_APP_NAME: Reach
+        run: npm run build
+
+  backend:
+    name: Backend (php -l, phpunit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server-php
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: reach_test
+          POSTGRES_PASSWORD: reach_test_password
+          POSTGRES_DB: reach_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U reach_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: pgsql, mbstring, intl, curl, xml, dom, json
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache composer packages
+        uses: actions/cache@v4
+        with:
+          path: server-php/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('server-php/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHP syntax check (php -l sweep)
+        run: |
+          set -e
+          find app -type f -name "*.php" -print0 | xargs -0 -n1 -P4 php -l > /tmp/lint.out 2>&1 || (cat /tmp/lint.out; exit 1)
+          echo "PHP syntax OK"
+
+      - name: Prepare test env
+        run: |
+          cp .env.example .env || true
+          # Provide test-only DB credentials via env for the phpunit `tests` group.
+          echo "TEST_DB_HOST=127.0.0.1"     >> $GITHUB_ENV
+          echo "TEST_DB_PORT=5432"          >> $GITHUB_ENV
+          echo "TEST_DB_NAME=reach_test"    >> $GITHUB_ENV
+          echo "TEST_DB_USER=reach_test"    >> $GITHUB_ENV
+          echo "TEST_DB_PASS=reach_test_password" >> $GITHUB_ENV
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h 127.0.0.1 -p 5432 -U reach_test; then break; fi
+            sleep 1
+          done
+
+      - name: PHPUnit
+        env:
+          database.tests.hostname: 127.0.0.1
+          database.tests.port: '5432'
+          database.tests.database: reach_test
+          database.tests.username: reach_test
+          database.tests.password: reach_test_password
+          database.tests.DBDriver: Postgre
+          JWT_SECRET: ci-jwt-secret-32-chars-of-material-abcdef
+        run: vendor/bin/phpunit --no-coverage

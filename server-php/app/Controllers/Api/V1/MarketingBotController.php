@@ -12,18 +12,48 @@ class MarketingBotController extends BaseApiController
 {
     public function dispatch()
     {
-        $body   = $this->input();
-        $action = (string) ($body['action'] ?? '');
+        $body    = $this->input();
+        $action  = (string) ($body['action'] ?? '');
         $payload = (array) ($body['payload'] ?? []);
         if ($action === '') {
             return $this->fail('action is required.', 422);
         }
+        $requestId = (string) ($this->request->reachRequestId ?? '');
         try {
-            $result = Services::marketingBot()->dispatch($action, $payload, $this->userId());
+            $result = Services::marketingBot()->enqueue(
+                $action,
+                $payload,
+                $this->userId(),
+                $requestId !== '' ? $requestId : null,
+            );
         } catch (\InvalidArgumentException $e) {
             return $this->fail($e->getMessage(), 422);
         }
-        return $this->ok($result);
+
+        Services::auditLogger()->log(
+            userId:       $this->userId(),
+            action:       'bot.dispatched',
+            entityType:   'bot_queue',
+            entityId:     (int) $result['queue_id'],
+            newValue:     ['action' => $action, 'job_id' => (int) $result['job_id']],
+            actorType:    'human',
+            actorService: 'reach:api',
+            requestId:    $requestId !== '' ? $requestId : null,
+            jobId:        (int) $result['job_id'],
+        );
+
+        // Phase 0 async contract — return 202 Accepted with a job reference.
+        return $this->response
+            ->setStatusCode(202)
+            ->setJSON([
+                'ok' => true,
+                'data' => [
+                    'queue_id' => (int) $result['queue_id'],
+                    'job_id'   => (int) $result['job_id'],
+                    'status'   => 'queued',
+                    'mode'     => (string) $result['mode'],
+                ],
+            ]);
     }
 
     public function queue()

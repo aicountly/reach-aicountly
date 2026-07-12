@@ -49,5 +49,8 @@ export const ROUTES = {
   API_HEALTH:  '/admin/api-health',
   CONSOLE_SYNC:'/admin/console-sync',
   WORKER_STATUS:'/admin/worker-status',
+  JOBS: '/admin/jobs',
+  JOB_DETAIL: '/admin/jobs/:id',
   LOCAL_BOT_REPORTS: '/admin/local-bot-reports',
+  FORBIDDEN: '/forbidden',
 };

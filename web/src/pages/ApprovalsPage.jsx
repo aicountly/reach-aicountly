@@ -7,12 +7,15 @@ import { Loader } from '../components/common/Loader';
 import { DataTable } from '../components/common/DataTable';
 import { ApprovalBadge } from '../components/common/ApprovalBadge';
 import { FilterBar } from '../components/common/FilterBar';
+import { usePermission } from '../hooks/usePermission';
 
 export function ApprovalsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('pending');
+  const { has } = usePermission();
+  const canDecide = has('approval.decide');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -37,7 +40,7 @@ export function ApprovalsPage() {
     { key: 'decision', label: 'Decision', render: (r) => <ApprovalBadge status={r.decision === 'pending' ? 'pending' : r.decision} /> },
     { key: 'created_at', label: 'Created', render: (r) => r.created_at ? new Date(r.created_at).toLocaleString() : '—' },
     { key: 'actions', label: '', render: (r) => (
-      r.decision === 'pending' ? (
+      r.decision === 'pending' && canDecide ? (
         <div className="flex gap-2">
           <button className="btn btn-primary btn-sm" onClick={() => decide(r.id, 'approved')}><Check size={13}/> Approve</button>
           <button className="btn btn-danger btn-sm"  onClick={() => decide(r.id, 'rejected')}><X size={13}/> Reject</button>

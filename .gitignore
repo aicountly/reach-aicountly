@@ -20,6 +20,11 @@
 !/server-php/.env.example
 /server-php/.phpunit.result.cache
 /server-php/.phpcs-cache
+/server-php/.phpunit.cache/
+/server-php/writable/.phpunit.cache/
+/server-php/build/
+
+/web/coverage/
 
 .DS_Store
 Thumbs.db

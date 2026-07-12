@@ -5,6 +5,7 @@ namespace App\Controllers\Api\V1;
 use App\Controllers\BaseApiController;
 use App\Models\ApprovalModel;
 use App\Models\CampaignModel;
+use Config\Services;
 
 class CampaignController extends BaseApiController
 {
@@ -40,7 +41,11 @@ class CampaignController extends BaseApiController
     {
         $body = $this->input();
         $m    = new CampaignModel();
-        $row  = $this->normalize($body);
+        try {
+            $row = $this->normalize($body);
+        } catch (\InvalidArgumentException $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
         $row['created_by'] = $this->userId();
         $m->insert($row);
         $id = (int) $m->db->insertID();
@@ -55,7 +60,11 @@ class CampaignController extends BaseApiController
         if (! $row) {
             return $this->fail('Campaign not found.', 404);
         }
-        $update = $this->normalize($this->input(), partial: true);
+        try {
+            $update = $this->normalize($this->input(), partial: true);
+        } catch (\InvalidArgumentException $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
         $m->update($id, $update);
         $this->audit('campaign.update', 'campaign', $id, $row, $update);
         return $this->ok($m->find($id));
@@ -109,6 +118,9 @@ class CampaignController extends BaseApiController
         $status = (string) ($this->input()['status'] ?? '');
         $m->update($id, ['status' => $status]);
         $this->audit('campaign.status', 'campaign', $id, ['status' => $row['status']], ['status' => $status]);
+        if ($status === 'live') {
+            $this->audit('campaign.dispatched', 'campaign', $id, null, ['status' => 'live']);
+        }
         return $this->ok($m->find($id));
     }
 
@@ -121,6 +133,24 @@ class CampaignController extends BaseApiController
             'landing_page_url', 'creative_copy', 'analytics_summary', 'leads_generated', 'bot_generated',
         ];
         $out = array_intersect_key($body, array_flip($allowed));
+
+        $sanitizer = Services::htmlSanitizer();
+        foreach (['name', 'objective', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'] as $textField) {
+            if (isset($out[$textField])) {
+                $out[$textField] = $sanitizer->purifyText((string) $out[$textField]);
+            }
+        }
+        if (isset($out['creative_copy'])) {
+            $out['creative_copy'] = $sanitizer->purify((string) $out['creative_copy']);
+        }
+
+        if (! empty($out['landing_page_url'])) {
+            $result = Services::urlPolicy()->validate((string) $out['landing_page_url']);
+            if (! $result->allowed) {
+                throw new \InvalidArgumentException('Rejected landing_page_url: ' . ($result->reason ?? 'invalid.'));
+            }
+        }
+
         foreach (['target_audience', 'products_promoted', 'channels', 'analytics_summary'] as $jsonField) {
             if (isset($out[$jsonField]) && is_array($out[$jsonField])) {
                 $out[$jsonField] = json_encode($out[$jsonField]);

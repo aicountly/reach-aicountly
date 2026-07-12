@@ -3,7 +3,8 @@ import { authService } from '../services/authService';
 import { clearControllerSsoHash, readControllerSsoToken } from '../services/controllerSso';
 import { redirectToConsoleLogin, redirectToConsoleLoginAfterSignOut } from '../services/consoleAuth';
 
-const AuthContext = createContext(null);
+// eslint-disable-next-line react-refresh/only-export-components
+export const AuthContext = createContext(null);
 
 export const GATE_CONSOLE_REQUIRED = 'console_required';
 export const GATE_NO_ACCESS = 'no_access';
@@ -128,16 +129,35 @@ export function AuthProvider({ children }) {
     await redirectToConsoleLoginAfterSignOut();
   }, []);
 
-  const value = useMemo(() => ({
-    user,
-    loading,
-    ssoPending,
-    gateReason,
-    gateMessage,
-    logout,
-    retryAuth,
-    isAuthenticated: !!user,
-  }), [user, loading, ssoPending, gateReason, gateMessage, logout, retryAuth]);
+  const value = useMemo(() => {
+    // Permissions arrive on the user payload from /v1/me (Phase 0 RBAC).
+    // A wildcard "*" grants everything (super_admin). Legacy responses that
+    // do not include permissions fall back to the historical super_admin gate.
+    const list = Array.isArray(user?.permissions) ? user.permissions : [];
+    const permissions = new Set(list);
+    if (permissions.size === 0 && user?.role === 'super_admin') {
+      permissions.add('*');
+    }
+    const hasPermission = (perm) => {
+      if (!perm) return true;
+      if (permissions.has('*')) return true;
+      if (permissions.has(perm)) return true;
+      const [group] = perm.split('.');
+      return permissions.has(`${group}.*`);
+    };
+    return {
+      user,
+      loading,
+      ssoPending,
+      gateReason,
+      gateMessage,
+      logout,
+      retryAuth,
+      isAuthenticated: !!user,
+      permissions,
+      hasPermission,
+    };
+  }, [user, loading, ssoPending, gateReason, gateMessage, logout, retryAuth]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
