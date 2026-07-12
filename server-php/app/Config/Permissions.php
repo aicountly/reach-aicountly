@@ -134,6 +134,52 @@ final class Permissions
     public const CONTENT_POLICY_MANAGE  = 'content_policy.manage';
     public const CONTENT_POLICY_APPROVE = 'content_policy.approve';
 
+    // ── Phase 2: Unified Content Studio ─────────────────────────────────────
+
+    /** Content items */
+    public const CONTENT_VIEW           = 'content.view';
+    public const CONTENT_CREATE         = 'content.create';
+    public const CONTENT_EDIT           = 'content.edit';
+    public const CONTENT_SUBMIT         = 'content.submit';
+    public const CONTENT_REVIEW         = 'content.review';
+    public const CONTENT_APPROVE        = 'content.approve';
+    public const CONTENT_REJECT         = 'content.reject';
+    public const CONTENT_SCHEDULE_PERM  = 'content.schedule';
+    public const CONTENT_ARCHIVE        = 'content.archive';
+
+    /** Content versions */
+    public const CONTENT_VERSION_VIEW   = 'content_version.view';
+    public const CONTENT_VERSION_CREATE = 'content_version.create';
+
+    /** Content comments */
+    public const CONTENT_COMMENT_VIEW    = 'content_comment.view';
+    public const CONTENT_COMMENT_CREATE  = 'content_comment.create';
+    public const CONTENT_COMMENT_RESOLVE = 'content_comment.resolve';
+    public const CONTENT_COMMENT_DELETE  = 'content_comment.delete';
+
+    /** Content assignments */
+    public const CONTENT_ASSIGNMENT_VIEW   = 'content_assignment.view';
+    public const CONTENT_ASSIGNMENT_MANAGE = 'content_assignment.manage';
+
+    /** Content validations */
+    public const CONTENT_VALIDATION_VIEW   = 'content_validation.view';
+    public const CONTENT_VALIDATION_MANAGE = 'content_validation.manage';
+    public const CONTENT_VALIDATION_WAIVE  = 'content_validation.waive';
+
+    /** Daily marketing packs */
+    public const DAILY_PACK_VIEW   = 'daily_pack.view';
+    public const DAILY_PACK_CREATE = 'daily_pack.create';
+    public const DAILY_PACK_MANAGE = 'daily_pack.manage';
+
+    /** Content schedules */
+    public const CONTENT_SCHEDULE_VIEW   = 'content_schedule.view';
+    public const CONTENT_SCHEDULE_CREATE = 'content_schedule.create';
+    public const CONTENT_SCHEDULE_CANCEL = 'content_schedule.cancel';
+
+    /** Publication targets */
+    public const PUBLICATION_TARGET_VIEW   = 'publication_target.view';
+    public const PUBLICATION_TARGET_MANAGE = 'publication_target.manage';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -183,6 +229,26 @@ final class Permissions
             'claim'          => [self::CLAIM_VIEW, self::CLAIM_MANAGE, self::CLAIM_APPROVE],
             'brand_rules'    => [self::BRAND_RULES_VIEW, self::BRAND_RULES_MANAGE, self::BRAND_RULES_APPROVE],
             'content_policy' => [self::CONTENT_POLICY_VIEW, self::CONTENT_POLICY_MANAGE, self::CONTENT_POLICY_APPROVE],
+            // Phase 2 content studio groups
+            'content'            => [
+                self::CONTENT_VIEW, self::CONTENT_CREATE, self::CONTENT_EDIT,
+                self::CONTENT_SUBMIT, self::CONTENT_REVIEW, self::CONTENT_APPROVE,
+                self::CONTENT_REJECT, self::CONTENT_SCHEDULE_PERM, self::CONTENT_ARCHIVE,
+            ],
+            'content_version'    => [self::CONTENT_VERSION_VIEW, self::CONTENT_VERSION_CREATE],
+            'content_comment'    => [
+                self::CONTENT_COMMENT_VIEW, self::CONTENT_COMMENT_CREATE,
+                self::CONTENT_COMMENT_RESOLVE, self::CONTENT_COMMENT_DELETE,
+            ],
+            'content_assignment' => [self::CONTENT_ASSIGNMENT_VIEW, self::CONTENT_ASSIGNMENT_MANAGE],
+            'content_validation' => [
+                self::CONTENT_VALIDATION_VIEW, self::CONTENT_VALIDATION_MANAGE, self::CONTENT_VALIDATION_WAIVE,
+            ],
+            'daily_pack'         => [self::DAILY_PACK_VIEW, self::DAILY_PACK_CREATE, self::DAILY_PACK_MANAGE],
+            'content_schedule'   => [
+                self::CONTENT_SCHEDULE_VIEW, self::CONTENT_SCHEDULE_CREATE, self::CONTENT_SCHEDULE_CANCEL,
+            ],
+            'publication_target' => [self::PUBLICATION_TARGET_VIEW, self::PUBLICATION_TARGET_MANAGE],
         ];
     }
 

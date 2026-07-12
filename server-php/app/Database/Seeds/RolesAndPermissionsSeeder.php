@@ -47,6 +47,16 @@ class RolesAndPermissionsSeeder extends Seeder
         $brandRulesAll     = Permissions::groups()['brand_rules'];
         $contentPolicyAll  = Permissions::groups()['content_policy'];
 
+        // Phase 2 content studio permission groups
+        $contentAll            = Permissions::groups()['content'];
+        $contentVersionAll     = Permissions::groups()['content_version'];
+        $contentCommentAll     = Permissions::groups()['content_comment'];
+        $contentAssignmentAll  = Permissions::groups()['content_assignment'];
+        $contentValidationAll  = Permissions::groups()['content_validation'];
+        $dailyPackAll          = Permissions::groups()['daily_pack'];
+        $contentScheduleAll    = Permissions::groups()['content_schedule'];
+        $publicationTargetAll  = Permissions::groups()['publication_target'];
+
         $knowledgeViewOnly = [
             Permissions::KNOWLEDGE_VIEW,
             Permissions::PRODUCT_VIEW, Permissions::PERSONA_VIEW,
@@ -54,6 +64,17 @@ class RolesAndPermissionsSeeder extends Seeder
             Permissions::SOURCE_VIEW, Permissions::CITATION_VIEW,
             Permissions::CLAIM_VIEW, Permissions::BRAND_RULES_VIEW,
             Permissions::CONTENT_POLICY_VIEW,
+        ];
+
+        $contentViewOnly = [
+            Permissions::CONTENT_VIEW,
+            Permissions::CONTENT_VERSION_VIEW,
+            Permissions::CONTENT_COMMENT_VIEW,
+            Permissions::CONTENT_ASSIGNMENT_VIEW,
+            Permissions::CONTENT_VALIDATION_VIEW,
+            Permissions::DAILY_PACK_VIEW,
+            Permissions::CONTENT_SCHEDULE_VIEW,
+            Permissions::PUBLICATION_TARGET_VIEW,
         ];
 
         $roles = [
@@ -75,6 +96,9 @@ class RolesAndPermissionsSeeder extends Seeder
                     // Phase 1 knowledge
                     $knowledgeAll, $productAll, $personaAll, $industryAll, $intentAll,
                     $sourceAll, $citationAll, $claimAll, $brandRulesAll, $contentPolicyAll,
+                    // Phase 2 content studio
+                    $contentAll, $contentVersionAll, $contentCommentAll, $contentAssignmentAll,
+                    $contentValidationAll, $dailyPackAll, $contentScheduleAll, $publicationTargetAll,
                 ))),
             ],
             [
@@ -91,6 +115,16 @@ class RolesAndPermissionsSeeder extends Seeder
                     // Phase 1 knowledge — full create/edit/submit; approve own domain
                     $knowledgeAll, $productAll, $personaAll, $industryAll, $intentAll,
                     $sourceAll, $citationAll, $claimAll, $brandRulesAll, $contentPolicyAll,
+                    // Phase 2 content studio — create, edit, submit, schedule, daily pack
+                    [
+                        Permissions::CONTENT_VIEW, Permissions::CONTENT_CREATE,
+                        Permissions::CONTENT_EDIT, Permissions::CONTENT_SUBMIT,
+                        Permissions::CONTENT_SCHEDULE_PERM,
+                    ],
+                    $contentVersionAll, $contentCommentAll, $contentAssignmentAll,
+                    $contentValidationAll,
+                    $dailyPackAll, $contentScheduleAll,
+                    [Permissions::PUBLICATION_TARGET_VIEW],
                 ))),
             ],
             [
@@ -116,6 +150,19 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::CLAIM_VIEW, Permissions::CLAIM_APPROVE,
                     Permissions::BRAND_RULES_VIEW, Permissions::BRAND_RULES_APPROVE,
                     Permissions::CONTENT_POLICY_VIEW, Permissions::CONTENT_POLICY_APPROVE,
+                    // Phase 2 content studio — view + review + approve + waive validations
+                    Permissions::CONTENT_VIEW, Permissions::CONTENT_REVIEW,
+                    Permissions::CONTENT_APPROVE, Permissions::CONTENT_REJECT,
+                    Permissions::CONTENT_ARCHIVE,
+                    Permissions::CONTENT_VERSION_VIEW,
+                    Permissions::CONTENT_COMMENT_VIEW, Permissions::CONTENT_COMMENT_CREATE,
+                    Permissions::CONTENT_COMMENT_RESOLVE,
+                    Permissions::CONTENT_ASSIGNMENT_VIEW,
+                    Permissions::CONTENT_VALIDATION_VIEW, Permissions::CONTENT_VALIDATION_MANAGE,
+                    Permissions::CONTENT_VALIDATION_WAIVE,
+                    Permissions::DAILY_PACK_VIEW,
+                    Permissions::CONTENT_SCHEDULE_VIEW,
+                    Permissions::PUBLICATION_TARGET_VIEW,
                 ]))),
             ],
             [
@@ -129,7 +176,7 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::BLOG_VIEW, Permissions::CAMPAIGN_VIEW,
                     Permissions::SOCIAL_VIEW, Permissions::EMAIL_VIEW,
                     Permissions::WHATSAPP_VIEW, Permissions::LEAD_VIEW,
-                ], $knowledgeViewOnly))),
+                ], $knowledgeViewOnly, $contentViewOnly))),
             ],
             [
                 'slug' => 'viewer',
@@ -144,6 +191,8 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::KNOWLEDGE_VIEW, Permissions::PRODUCT_VIEW,
                     Permissions::PERSONA_VIEW, Permissions::INDUSTRY_VIEW,
                     Permissions::CLAIM_VIEW, Permissions::SOURCE_VIEW,
+                    // Phase 2: viewer can read content items and versions
+                    Permissions::CONTENT_VIEW, Permissions::CONTENT_VERSION_VIEW,
                 ], []))),
             ],
         ];

@@ -139,6 +139,90 @@ class Enums extends BaseConfig
      */
     public array $aliasSource = ['legacy_code', 'user_defined', 'brand'];
 
+    // ── Phase 2: Unified Content Studio enums ────────────────────────────────
+
+    /**
+     * Content types — matches reach_content_items.content_type CHECK.
+     */
+    public array $contentType = [
+        'blog', 'knowledge_base', 'community', 'video', 'social_post',
+        'email', 'whatsapp', 'sms', 'landing_page', 'announcement',
+        'webinar', 'case_study', 'refresh', 'template', 'brief', 'other',
+    ];
+
+    /**
+     * Content workflow statuses — matches reach_content_items.workflow_status CHECK.
+     */
+    public array $contentWorkflowStatus = [
+        'idea', 'brief', 'draft', 'validation_pending', 'review_pending',
+        'changes_requested', 'approved', 'scheduled', 'ready_for_publication',
+        'published', 'archived', 'rejected', 'refresh_due',
+    ];
+
+    /**
+     * Content approval statuses — matches reach_content_items.approval_status CHECK.
+     */
+    public array $contentApprovalStatus = [
+        'not_required', 'pending', 'approved', 'rejected', 'changes_requested',
+    ];
+
+    /**
+     * Content validation statuses — matches reach_content_items.validation_status CHECK.
+     */
+    public array $contentValidationStatus = [
+        'not_run', 'passed', 'failed', 'warnings', 'waived', 'skipped',
+    ];
+
+    /**
+     * Content publication statuses — matches reach_content_items.publication_status CHECK.
+     */
+    public array $contentPublicationStatus = [
+        'not_scheduled', 'scheduled', 'ready', 'blocked', 'cancelled',
+    ];
+
+    /**
+     * Content risk levels — matches reach_content_items.risk_level CHECK.
+     */
+    public array $contentRiskLevel = ['low', 'medium', 'high', 'critical'];
+
+    /**
+     * Validation types — matches reach_content_validations.validation_type CHECK.
+     */
+    public array $contentValidationType = [
+        'product_claim', 'fact', 'seo', 'brand', 'tone', 'grammar',
+        'legal', 'compliance', 'plagiarism', 'accessibility', 'readability',
+        'link', 'format', 'custom',
+    ];
+
+    /**
+     * Assignment roles — matches reach_content_assignments.role CHECK.
+     */
+    public array $assignmentRole = [
+        'owner', 'writer', 'reviewer', 'subject_matter_reviewer',
+        'compliance_reviewer', 'publisher', 'observer',
+    ];
+
+    /**
+     * Publication channels — matches reach_content_publication_targets.channel CHECK.
+     */
+    public array $publicationChannel = [
+        'aicountly_website', 'youtube', 'linkedin', 'twitter', 'facebook',
+        'instagram', 'email_newsletter', 'whatsapp_broadcast', 'sms_blast',
+        'partner_portal', 'docs_site', 'webinar_platform', 'other',
+    ];
+
+    /**
+     * Approval stages — matches reach_approvals.stage CHECK.
+     */
+    public array $approvalStage = [
+        'editorial_review', 'subject_matter_review', 'compliance_review', 'final_approval',
+    ];
+
+    /**
+     * Daily pack statuses — matches reach_daily_marketing_packs.pack_status CHECK.
+     */
+    public array $packStatus = ['draft', 'in_progress', 'ready', 'completed', 'cancelled'];
+
     /**
      * Return true if the value is a member of the named enum. Unknown enum
      * names return false so typos in controllers fail closed.
