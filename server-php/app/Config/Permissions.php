@@ -83,6 +83,57 @@ final class Permissions
     public const AUDIT_VIEW         = 'audit.view';
     public const ANALYTICS_VIEW     = 'analytics.view';
 
+    // ── Phase 1: Knowledge Foundation ────────────────────────────────────────
+
+    /** Knowledge (cross-entity) */
+    public const KNOWLEDGE_VIEW    = 'knowledge.view';
+    public const KNOWLEDGE_CREATE  = 'knowledge.create';
+    public const KNOWLEDGE_EDIT    = 'knowledge.edit';
+    public const KNOWLEDGE_SUBMIT  = 'knowledge.submit';
+    public const KNOWLEDGE_APPROVE = 'knowledge.approve';
+    public const KNOWLEDGE_ARCHIVE = 'knowledge.archive';
+
+    /** Products */
+    public const PRODUCT_VIEW   = 'product.view';
+    public const PRODUCT_MANAGE = 'product.manage';
+
+    /** Personas */
+    public const PERSONA_VIEW   = 'persona.view';
+    public const PERSONA_MANAGE = 'persona.manage';
+
+    /** Industries */
+    public const INDUSTRY_VIEW   = 'industry.view';
+    public const INDUSTRY_MANAGE = 'industry.manage';
+
+    /** Search intents */
+    public const INTENT_VIEW   = 'intent.view';
+    public const INTENT_MANAGE = 'intent.manage';
+
+    /** Sources */
+    public const SOURCE_VIEW    = 'source.view';
+    public const SOURCE_MANAGE  = 'source.manage';
+    public const SOURCE_APPROVE = 'source.approve';
+
+    /** Citations */
+    public const CITATION_VIEW    = 'citation.view';
+    public const CITATION_MANAGE  = 'citation.manage';
+    public const CITATION_APPROVE = 'citation.approve';
+
+    /** Claims */
+    public const CLAIM_VIEW    = 'claim.view';
+    public const CLAIM_MANAGE  = 'claim.manage';
+    public const CLAIM_APPROVE = 'claim.approve';
+
+    /** Brand rules */
+    public const BRAND_RULES_VIEW    = 'brand_rules.view';
+    public const BRAND_RULES_MANAGE  = 'brand_rules.manage';
+    public const BRAND_RULES_APPROVE = 'brand_rules.approve';
+
+    /** Content policies */
+    public const CONTENT_POLICY_VIEW    = 'content_policy.view';
+    public const CONTENT_POLICY_MANAGE  = 'content_policy.manage';
+    public const CONTENT_POLICY_APPROVE = 'content_policy.approve';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -116,8 +167,22 @@ final class Permissions
             'job'         => [self::JOB_VIEW, self::JOB_RETRY, self::JOB_CANCEL],
             'settings'    => [self::SETTINGS_VIEW, self::SETTINGS_MANAGE],
             'integration' => [self::INTEGRATION_VIEW, self::INTEGRATION_MANAGE],
-            'audit'       => [self::AUDIT_VIEW],
-            'analytics'   => [self::ANALYTICS_VIEW],
+            'audit'          => [self::AUDIT_VIEW],
+            'analytics'      => [self::ANALYTICS_VIEW],
+            // Phase 1 knowledge groups
+            'knowledge'      => [
+                self::KNOWLEDGE_VIEW, self::KNOWLEDGE_CREATE, self::KNOWLEDGE_EDIT,
+                self::KNOWLEDGE_SUBMIT, self::KNOWLEDGE_APPROVE, self::KNOWLEDGE_ARCHIVE,
+            ],
+            'product'        => [self::PRODUCT_VIEW, self::PRODUCT_MANAGE],
+            'persona'        => [self::PERSONA_VIEW, self::PERSONA_MANAGE],
+            'industry'       => [self::INDUSTRY_VIEW, self::INDUSTRY_MANAGE],
+            'intent'         => [self::INTENT_VIEW, self::INTENT_MANAGE],
+            'source'         => [self::SOURCE_VIEW, self::SOURCE_MANAGE, self::SOURCE_APPROVE],
+            'citation'       => [self::CITATION_VIEW, self::CITATION_MANAGE, self::CITATION_APPROVE],
+            'claim'          => [self::CLAIM_VIEW, self::CLAIM_MANAGE, self::CLAIM_APPROVE],
+            'brand_rules'    => [self::BRAND_RULES_VIEW, self::BRAND_RULES_MANAGE, self::BRAND_RULES_APPROVE],
+            'content_policy' => [self::CONTENT_POLICY_VIEW, self::CONTENT_POLICY_MANAGE, self::CONTENT_POLICY_APPROVE],
         ];
     }
 

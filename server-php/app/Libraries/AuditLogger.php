@@ -25,7 +25,26 @@ class AuditLogger
         'social.', 'email.', 'whatsapp.', 'lead.',
         'engage_push.', 'settings.', 'publish.', 'permission.',
         'security.', 'integration.', 'role.',
+        // Phase 1 knowledge events
+        'knowledge.',
     ];
+
+    /**
+     * Phase 1 knowledge audit event slugs.
+     * Controllers and services MUST use these constants rather than inline strings.
+     */
+    public const KNOWLEDGE_CREATED       = 'knowledge.created';
+    public const KNOWLEDGE_UPDATED       = 'knowledge.updated';
+    public const KNOWLEDGE_DELETED       = 'knowledge.deleted';
+    public const KNOWLEDGE_STATUS_CHANGE = 'knowledge.status_changed';
+    public const KNOWLEDGE_SUBMITTED     = 'knowledge.submitted';
+    public const KNOWLEDGE_APPROVED      = 'knowledge.approved';
+    public const KNOWLEDGE_REJECTED      = 'knowledge.rejected';
+    public const KNOWLEDGE_ARCHIVED      = 'knowledge.archived';
+    public const KNOWLEDGE_IMPORT        = 'knowledge.taxonomy_imported';
+    public const KNOWLEDGE_RELATION_ADD  = 'knowledge.relation_added';
+    public const KNOWLEDGE_RELATION_DEL  = 'knowledge.relation_removed';
+    public const KNOWLEDGE_CLAIM_HIGH_RISK_BLOCKED = 'knowledge.claim_high_risk_blocked';
 
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.

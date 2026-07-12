@@ -24,16 +24,37 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         $now = date('Y-m-d H:i:s');
 
-        $blogAll     = Permissions::groups()['blog'];
-        $campaignAll = Permissions::groups()['campaign'];
-        $socialAll   = Permissions::groups()['social'];
-        $emailAll    = Permissions::groups()['email'];
-        $whatsappAll = Permissions::groups()['whatsapp'];
-        $leadAll     = Permissions::groups()['lead'];
-        $approvalAll = Permissions::groups()['approval'];
-        $botAll      = Permissions::groups()['bot'];
-        $jobAll      = Permissions::groups()['job'];
+        $blogAll        = Permissions::groups()['blog'];
+        $campaignAll    = Permissions::groups()['campaign'];
+        $socialAll      = Permissions::groups()['social'];
+        $emailAll       = Permissions::groups()['email'];
+        $whatsappAll    = Permissions::groups()['whatsapp'];
+        $leadAll        = Permissions::groups()['lead'];
+        $approvalAll    = Permissions::groups()['approval'];
+        $botAll         = Permissions::groups()['bot'];
+        $jobAll         = Permissions::groups()['job'];
         $integrationAll = Permissions::groups()['integration'];
+
+        // Phase 1 knowledge permission groups
+        $knowledgeAll      = Permissions::groups()['knowledge'];
+        $productAll        = Permissions::groups()['product'];
+        $personaAll        = Permissions::groups()['persona'];
+        $industryAll       = Permissions::groups()['industry'];
+        $intentAll         = Permissions::groups()['intent'];
+        $sourceAll         = Permissions::groups()['source'];
+        $citationAll       = Permissions::groups()['citation'];
+        $claimAll          = Permissions::groups()['claim'];
+        $brandRulesAll     = Permissions::groups()['brand_rules'];
+        $contentPolicyAll  = Permissions::groups()['content_policy'];
+
+        $knowledgeViewOnly = [
+            Permissions::KNOWLEDGE_VIEW,
+            Permissions::PRODUCT_VIEW, Permissions::PERSONA_VIEW,
+            Permissions::INDUSTRY_VIEW, Permissions::INTENT_VIEW,
+            Permissions::SOURCE_VIEW, Permissions::CITATION_VIEW,
+            Permissions::CLAIM_VIEW, Permissions::BRAND_RULES_VIEW,
+            Permissions::CONTENT_POLICY_VIEW,
+        ];
 
         $roles = [
             [
@@ -51,6 +72,9 @@ class RolesAndPermissionsSeeder extends Seeder
                     [Permissions::SETTINGS_VIEW, Permissions::SETTINGS_MANAGE],
                     $blogAll, $campaignAll, $socialAll, $emailAll, $whatsappAll,
                     $leadAll, $approvalAll, $botAll, $jobAll, $integrationAll,
+                    // Phase 1 knowledge
+                    $knowledgeAll, $productAll, $personaAll, $industryAll, $intentAll,
+                    $sourceAll, $citationAll, $claimAll, $brandRulesAll, $contentPolicyAll,
                 ))),
             ],
             [
@@ -64,13 +88,16 @@ class RolesAndPermissionsSeeder extends Seeder
                     [Permissions::APPROVAL_VIEW, Permissions::APPROVAL_DECIDE],
                     [Permissions::BOT_VIEW, Permissions::BOT_DISPATCH],
                     [Permissions::JOB_VIEW],
+                    // Phase 1 knowledge — full create/edit/submit; approve own domain
+                    $knowledgeAll, $productAll, $personaAll, $industryAll, $intentAll,
+                    $sourceAll, $citationAll, $claimAll, $brandRulesAll, $contentPolicyAll,
                 ))),
             ],
             [
                 'slug' => 'content_reviewer',
                 'name' => 'Content Reviewer',
                 'description' => 'Reviews and approves/rejects content; cannot publish or dispatch.',
-                'permissions' => [
+                'permissions' => array_values(array_unique(array_merge([
                     Permissions::DASHBOARD_VIEW,
                     Permissions::BLOG_VIEW, Permissions::BLOG_APPROVE,
                     Permissions::CAMPAIGN_VIEW, Permissions::CAMPAIGN_APPROVE,
@@ -80,31 +107,44 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::APPROVAL_VIEW, Permissions::APPROVAL_DECIDE,
                     Permissions::LEAD_VIEW,
                     Permissions::BOT_VIEW,
-                ],
+                    // Phase 1 knowledge — view + approve knowledge entities
+                    Permissions::KNOWLEDGE_VIEW, Permissions::KNOWLEDGE_APPROVE, Permissions::KNOWLEDGE_ARCHIVE,
+                    Permissions::PRODUCT_VIEW, Permissions::PERSONA_VIEW,
+                    Permissions::INDUSTRY_VIEW, Permissions::INTENT_VIEW,
+                    Permissions::SOURCE_VIEW, Permissions::SOURCE_APPROVE,
+                    Permissions::CITATION_VIEW, Permissions::CITATION_APPROVE,
+                    Permissions::CLAIM_VIEW, Permissions::CLAIM_APPROVE,
+                    Permissions::BRAND_RULES_VIEW, Permissions::BRAND_RULES_APPROVE,
+                    Permissions::CONTENT_POLICY_VIEW, Permissions::CONTENT_POLICY_APPROVE,
+                ]))),
             ],
             [
                 'slug' => 'analyst',
                 'name' => 'Analyst',
                 'description' => 'Read-only analytics + audit visibility.',
-                'permissions' => [
+                'permissions' => array_values(array_unique(array_merge([
                     Permissions::DASHBOARD_VIEW,
                     Permissions::ANALYTICS_VIEW,
                     Permissions::AUDIT_VIEW,
                     Permissions::BLOG_VIEW, Permissions::CAMPAIGN_VIEW,
                     Permissions::SOCIAL_VIEW, Permissions::EMAIL_VIEW,
                     Permissions::WHATSAPP_VIEW, Permissions::LEAD_VIEW,
-                ],
+                ], $knowledgeViewOnly))),
             ],
             [
                 'slug' => 'viewer',
                 'name' => 'Viewer',
                 'description' => 'Dashboard + read-only view of published content.',
-                'permissions' => [
+                'permissions' => array_values(array_unique(array_merge([
                     Permissions::DASHBOARD_VIEW,
                     Permissions::BLOG_VIEW, Permissions::CAMPAIGN_VIEW,
                     Permissions::SOCIAL_VIEW, Permissions::EMAIL_VIEW,
                     Permissions::WHATSAPP_VIEW,
-                ],
+                    // Phase 1: viewers see approved knowledge only (enforced at service layer)
+                    Permissions::KNOWLEDGE_VIEW, Permissions::PRODUCT_VIEW,
+                    Permissions::PERSONA_VIEW, Permissions::INDUSTRY_VIEW,
+                    Permissions::CLAIM_VIEW, Permissions::SOURCE_VIEW,
+                ], []))),
             ],
         ];
 

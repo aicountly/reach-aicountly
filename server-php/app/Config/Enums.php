@@ -74,6 +74,71 @@ class Enums extends BaseConfig
      */
     public array $permissionMode = ['grant', 'deny'];
 
+    // ── Phase 1: Knowledge Foundation enums ──────────────────────────────────
+
+    /**
+     * Knowledge entity statuses — matches CHECK constraints on all knowledge tables.
+     */
+    public array $knowledgeStatus = [
+        'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived',
+    ];
+
+    /**
+     * Feature availability — matches reach_product_features.availability CHECK.
+     */
+    public array $featureAvailability = [
+        'available', 'limited', 'beta', 'planned', 'deprecated', 'unknown',
+    ];
+
+    /**
+     * Product claim risk levels — matches reach_product_claims.risk_level CHECK.
+     */
+    public array $claimRisk = ['low', 'medium', 'high', 'critical'];
+
+    /**
+     * Search intent types — matches reach_search_intents.intent_type CHECK.
+     */
+    public array $intentType = [
+        'informational', 'navigational', 'transactional', 'commercial',
+    ];
+
+    /**
+     * Search intent funnel stages — matches reach_search_intents.funnel_stage CHECK.
+     */
+    public array $funnelStage = ['top', 'middle', 'bottom'];
+
+    /**
+     * Evidence types — matches reach_evidence.evidence_type CHECK.
+     */
+    public array $evidenceType = [
+        'benchmark', 'case_study', 'whitepaper', 'demo', 'changelog',
+        'support_article', 'third_party_report', 'internal',
+    ];
+
+    /**
+     * Source types — matches reach_sources.source_type CHECK.
+     */
+    public array $sourceType = [
+        'official_docs', 'press_release', 'third_party', 'community', 'internal',
+    ];
+
+    /**
+     * Brand rule types — matches reach_brand_rules.rule_type CHECK.
+     */
+    public array $brandRuleType = [
+        'preferred_name', 'avoid_term', 'tone', 'trademark', 'competitor_mention',
+    ];
+
+    /**
+     * Content policy types — matches reach_content_policies.policy_type CHECK.
+     */
+    public array $contentPolicyType = ['legal', 'brand', 'accuracy', 'format', 'channel'];
+
+    /**
+     * Product alias sources — matches reach_product_aliases.source CHECK.
+     */
+    public array $aliasSource = ['legacy_code', 'user_defined', 'brand'];
+
     /**
      * Return true if the value is a member of the named enum. Unknown enum
      * names return false so typos in controllers fail closed.
