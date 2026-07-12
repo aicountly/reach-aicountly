@@ -5,6 +5,7 @@ namespace App\Libraries;
 use App\Models\Content\ContentScheduleModel;
 use App\Models\Content\ContentItemModel;
 use App\Models\Content\ContentPublicationTargetModel;
+use App\Models\ContentCalendarItemModel;
 
 /**
  * Manages content scheduling records.
@@ -17,14 +18,16 @@ class ContentScheduleService
     private ContentScheduleModel          $schedules;
     private ContentItemModel              $items;
     private ContentPublicationTargetModel $targets;
+    private ContentCalendarItemModel      $calendarItems;
     private AuditLogger                   $audit;
 
     public function __construct()
     {
-        $this->schedules = new ContentScheduleModel();
-        $this->items     = new ContentItemModel();
-        $this->targets   = new ContentPublicationTargetModel();
-        $this->audit     = new AuditLogger();
+        $this->schedules     = new ContentScheduleModel();
+        $this->items         = new ContentItemModel();
+        $this->targets       = new ContentPublicationTargetModel();
+        $this->calendarItems = new ContentCalendarItemModel();
+        $this->audit         = new AuditLogger();
     }
 
     public function schedule(
@@ -70,6 +73,17 @@ class ContentScheduleService
             'content_item_id'       => $contentItemId,
             'publication_target_id' => $publicationTargetId,
             'scheduled_at'          => $scheduledAt,
+        ]);
+
+        // Create a calendar item so the content appears in the content calendar
+        $this->calendarItems->insert([
+            'date'       => substr($scheduledAt, 0, 10),
+            'item_kind'  => 'content_item',
+            'ref_type'   => 'content_item',
+            'ref_id'     => $contentItemId,
+            'title'      => $item['title'],
+            'notes'      => "Scheduled for publication via target #{$publicationTargetId}",
+            'created_by' => $actor['id'] ?? null,
         ]);
 
         return $this->schedules->find($id);

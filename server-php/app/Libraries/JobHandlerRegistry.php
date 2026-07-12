@@ -5,6 +5,12 @@ namespace App\Libraries;
 use App\Jobs\EngagePushRetryJob;
 use App\Jobs\HealthCheckJob;
 use App\Jobs\MarketingBotDispatchJob;
+use App\Jobs\DailyApprovalDigestJob;
+use App\Jobs\DailyMarketingPackJob;
+use App\Jobs\ContentDueDateReminderJob;
+use App\Jobs\ContentOverdueEscalationJob;
+use App\Jobs\ContentRefreshDetectionJob;
+use App\Jobs\ContentScheduleReadinessJob;
 use RuntimeException;
 
 /**
@@ -18,9 +24,16 @@ class JobHandlerRegistry
 
     public function __construct()
     {
-        $this->handlers['reach.health_check']          = new HealthCheckJob();
-        $this->handlers['reach.marketing_bot_dispatch'] = new MarketingBotDispatchJob();
-        $this->handlers['reach.engage_push_retry']      = new EngagePushRetryJob();
+        $this->handlers['reach.health_check']                   = new HealthCheckJob();
+        $this->handlers['reach.marketing_bot_dispatch']          = new MarketingBotDispatchJob();
+        $this->handlers['reach.engage_push_retry']               = new EngagePushRetryJob();
+        // Phase 2 content jobs
+        $this->handlers['reach.daily_approval_digest']           = new DailyApprovalDigestJob();
+        $this->handlers['reach.daily_marketing_pack']            = new DailyMarketingPackJob();
+        $this->handlers['reach.content_due_date_reminder']       = new ContentDueDateReminderJob();
+        $this->handlers['reach.content_overdue_escalation']      = new ContentOverdueEscalationJob();
+        $this->handlers['reach.content_refresh_detection']       = new ContentRefreshDetectionJob();
+        $this->handlers['reach.content_schedule_readiness']      = new ContentScheduleReadinessJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

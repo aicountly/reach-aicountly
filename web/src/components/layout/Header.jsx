@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { BotModeBadge } from '../bot/BotModeBadge';
 import { ReachLogo } from '../brand/ReachLogo';
 import { AppLauncher } from './AppLauncher';
+import { NotificationBell } from './NotificationBell';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -25,6 +26,7 @@ export function Header() {
       </div>
       <div className="flex items-center gap-3">
         <AppLauncher />
+        <NotificationBell />
         <BotModeBadge />
         <div className="flex items-center gap-2">
           <div style={{

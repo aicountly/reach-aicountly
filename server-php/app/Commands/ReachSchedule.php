@@ -30,6 +30,9 @@ class ReachSchedule extends BaseCommand
         $recovered = $svc->recoverExpiredLeases();
         $pruned    = $svc->pruneOlderThanDays($days);
 
+        // Dispatch scheduled Phase 2 jobs once per day (idempotent)
+        $this->dispatchDailyJobs($svc);
+
         $out = json_encode([
             'event'     => 'schedule.tick',
             'ts'        => gmdate('c'),
@@ -39,5 +42,38 @@ class ReachSchedule extends BaseCommand
         ], JSON_UNESCAPED_SLASHES);
         CLI::write($out);
         return 0;
+    }
+
+    /**
+     * Enqueue Phase 2 scheduled jobs. Each job class is idempotent so
+     * duplicate enqueues within the same day are safe but wasteful; a
+     * lightweight dedup uses the job `queue_key` column when available.
+     */
+    private function dispatchDailyJobs(mixed $svc): void
+    {
+        $today = date('Y-m-d');
+        $hour  = (int) date('H');
+
+        // 08:00 — daily approval digest
+        if ($hour === 8) {
+            $svc->enqueue('reach.daily_approval_digest', ['date' => $today], ['queue' => 'notifications']);
+        }
+
+        // 07:00 — generate tomorrow's marketing pack
+        if ($hour === 7) {
+            $svc->enqueue('reach.daily_marketing_pack', [
+                'date' => date('Y-m-d', strtotime('+1 day')),
+            ]);
+        }
+
+        // Every hour: due-date reminders, overdue escalation, schedule readiness
+        $svc->enqueue('reach.content_due_date_reminder',  [], ['queue' => 'notifications']);
+        $svc->enqueue('reach.content_overdue_escalation', [], ['queue' => 'notifications']);
+        $svc->enqueue('reach.content_schedule_readiness', []);
+
+        // 03:00 — refresh detection
+        if ($hour === 3) {
+            $svc->enqueue('reach.content_refresh_detection', []);
+        }
     }
 }

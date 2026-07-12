@@ -115,7 +115,11 @@ export const contentService = {
 
   // Notifications
   listNotifications: () => request('GET', '/notifications'),
+  getNotifications: () => request('GET', '/notifications'),
   getUnreadCount: () => request('GET', '/notifications/count'),
+  getNotificationCount: () => request('GET', '/notifications/count'),
   markRead: (id) => request('POST', `/notifications/${id}/read`),
+  markNotificationRead: (id) => request('POST', `/notifications/${id}/read`),
   markAllRead: () => request('POST', '/notifications/read-all'),
+  markAllNotificationsRead: () => request('POST', '/notifications/read-all'),
 };
