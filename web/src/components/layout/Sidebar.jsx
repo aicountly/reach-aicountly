@@ -4,6 +4,7 @@ import {
   Share2, ListOrdered, Mail, MessageCircle, TrendingUp, Sparkles,
   Paintbrush, BarChart3, Users, ArrowRightCircle, Bot, ScrollText,
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
+  BookOpen,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -38,6 +39,16 @@ const NAV = [
       { label: 'Bot Queue',         path: ROUTES.BOT_QUEUE,   icon: Bot,        countKey: 'bot_queue_running', requires: 'bot.view' },
       { label: 'Bot Reports',       path: ROUTES.BOT_REPORTS, icon: ScrollText, requires: 'bot.view' },
       { label: 'Console Approvals', path: ROUTES.APPROVALS,   icon: ShieldCheck, countKey: 'approvals', requires: 'approval.view' },
+    ],
+  },
+  {
+    title: 'Knowledge Foundation',
+    items: [
+      { label: 'Knowledge Overview', path: ROUTES.KNOWLEDGE,            icon: BookOpen, end: true, requires: 'knowledge.view' },
+      { label: 'Products',           path: ROUTES.KNOWLEDGE_PRODUCTS,   icon: BookOpen, requires: 'product.view' },
+      { label: 'Claims',             path: ROUTES.KNOWLEDGE_CLAIMS,     icon: BookOpen, requires: 'claim.view' },
+      { label: 'Brand Rules',        path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: BookOpen, requires: 'brand_rules.view' },
+      { label: 'Content Policies',   path: ROUTES.KNOWLEDGE_POLICIES,   icon: BookOpen, requires: 'content_policy.view' },
     ],
   },
   {

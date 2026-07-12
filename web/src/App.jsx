@@ -49,6 +49,22 @@ import { WorkerStatusPage } from './pages/admin/WorkerStatusPage';
 import { JobMonitorPage } from './pages/admin/JobMonitorPage';
 import { LocalBotReportsPage } from './pages/admin/LocalBotReportsPage';
 
+import { KnowledgeLayout } from './pages/knowledge/KnowledgeLayout';
+import { KnowledgeIndexPage } from './pages/knowledge/KnowledgeIndexPage';
+import { ProductListPage } from './pages/knowledge/ProductListPage';
+import { ProductDetailPage } from './pages/knowledge/ProductDetailPage';
+import { PersonaListPage } from './pages/knowledge/PersonaListPage';
+import { IndustryListPage } from './pages/knowledge/IndustryListPage';
+import { MarketListPage } from './pages/knowledge/MarketListPage';
+import { BusinessProblemListPage } from './pages/knowledge/BusinessProblemListPage';
+import { SearchIntentListPage } from './pages/knowledge/SearchIntentListPage';
+import { TopicClusterListPage } from './pages/knowledge/TopicClusterListPage';
+import { SourceListPage } from './pages/knowledge/SourceListPage';
+import { CitationListPage } from './pages/knowledge/CitationListPage';
+import { ClaimListPage } from './pages/knowledge/ClaimListPage';
+import { BrandRulesPage } from './pages/knowledge/BrandRulesPage';
+import { ContentPoliciesPage } from './pages/knowledge/ContentPoliciesPage';
+
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
 
@@ -115,6 +131,23 @@ export default function App() {
         <Route path={ROUTES.BOT_REPORTS}        element={<BotReportsPage />} />
         <Route path={ROUTES.BOT_REPORT_DETAIL}  element={<BotReportDetailPage />} />
         <Route path={ROUTES.APPROVALS}          element={<ApprovalsPage />} />
+
+        <Route path="/knowledge" element={<KnowledgeLayout />}>
+          <Route index element={<KnowledgeIndexPage />} />
+          <Route path="products" element={<ProductListPage />} />
+          <Route path="products/:id" element={<ProductDetailPage />} />
+          <Route path="personas" element={<PersonaListPage />} />
+          <Route path="industries" element={<IndustryListPage />} />
+          <Route path="markets" element={<MarketListPage />} />
+          <Route path="problems" element={<BusinessProblemListPage />} />
+          <Route path="search-intents" element={<SearchIntentListPage />} />
+          <Route path="topic-clusters" element={<TopicClusterListPage />} />
+          <Route path="sources" element={<SourceListPage />} />
+          <Route path="citations" element={<CitationListPage />} />
+          <Route path="claims" element={<ClaimListPage />} />
+          <Route path="brand-rules" element={<BrandRulesPage />} />
+          <Route path="content-policies" element={<ContentPoliciesPage />} />
+        </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />

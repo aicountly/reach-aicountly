@@ -53,4 +53,20 @@ export const ROUTES = {
   JOB_DETAIL: '/admin/jobs/:id',
   LOCAL_BOT_REPORTS: '/admin/local-bot-reports',
   FORBIDDEN: '/forbidden',
+
+  // Phase 1: Knowledge Foundation
+  KNOWLEDGE:            '/knowledge',
+  KNOWLEDGE_PRODUCTS:   '/knowledge/products',
+  KNOWLEDGE_PRODUCT:    '/knowledge/products/:id',
+  KNOWLEDGE_PERSONAS:   '/knowledge/personas',
+  KNOWLEDGE_INDUSTRIES: '/knowledge/industries',
+  KNOWLEDGE_MARKETS:    '/knowledge/markets',
+  KNOWLEDGE_PROBLEMS:   '/knowledge/problems',
+  KNOWLEDGE_INTENTS:    '/knowledge/search-intents',
+  KNOWLEDGE_CLUSTERS:   '/knowledge/topic-clusters',
+  KNOWLEDGE_SOURCES:    '/knowledge/sources',
+  KNOWLEDGE_CITATIONS:  '/knowledge/citations',
+  KNOWLEDGE_CLAIMS:     '/knowledge/claims',
+  KNOWLEDGE_BRAND_RULES:'/knowledge/brand-rules',
+  KNOWLEDGE_POLICIES:   '/knowledge/content-policies',
 };
