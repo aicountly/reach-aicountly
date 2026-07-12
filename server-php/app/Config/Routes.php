@@ -461,6 +461,8 @@ $routes->group('v1', static function ($routes) {
         // Daily Marketing Packs
         $routes->get('content/daily-packs',                        'Api\\V1\\Content\\DailyPackController::index',              ['filter' => 'permission:daily_pack.view']);
         $routes->post('content/daily-packs/generate',              'Api\\V1\\Content\\DailyPackController::generate',           ['filter' => 'permission:daily_pack.create']);
+        $routes->get('content/daily-packs/config',                 'Api\\V1\\Content\\DailyPackController::getConfig',          ['filter' => 'permission:daily_pack.view']);
+        $routes->put('content/daily-packs/config',                 'Api\\V1\\Content\\DailyPackController::updateConfig',       ['filter' => 'permission:daily_pack.manage']);
         $routes->get('content/daily-packs/(:num)',                 'Api\\V1\\Content\\DailyPackController::show/$1',             ['filter' => 'permission:daily_pack.view']);
         $routes->put('content/daily-packs/(:num)/items/(:num)',    'Api\\V1\\Content\\DailyPackController::assignItem/$1/$2',    ['filter' => 'permission:daily_pack.manage']);
 

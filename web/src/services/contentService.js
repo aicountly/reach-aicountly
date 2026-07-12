@@ -97,6 +97,8 @@ export const contentService = {
   generatePack: (data) => request('POST', '/content/daily-packs/generate', data),
   assignPackItem: (packId, slotId, contentItemId) =>
     request('PUT', `/content/daily-packs/${packId}/items/${slotId}`, { content_item_id: contentItemId }),
+  getPackConfig: () => request('GET', '/content/daily-packs/config'),
+  updatePackConfig: (config) => request('PUT', '/content/daily-packs/config', config),
 
   // Approval queue
   getApprovalQueue: (params = {}) => {
