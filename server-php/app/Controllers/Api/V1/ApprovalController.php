@@ -36,6 +36,10 @@ class ApprovalController extends BaseApiController
     {
         $body     = $this->input();
         $decision = (string) ($body['decision'] ?? '');
+        $override = (bool) ($body['override'] ?? false);
+        $reason   = isset($body['reason']) ? (string) $body['reason'] : null;
+        $note     = isset($body['note'])   ? (string) $body['note']   : null;
+
         if (! in_array($decision, ['approved', 'rejected'], true)) {
             return $this->fail('decision must be approved or rejected.', 422);
         }
@@ -44,14 +48,41 @@ class ApprovalController extends BaseApiController
         if (! $row) {
             return $this->fail('Approval not found.', 404);
         }
+
+        // Only apply ApprovalPolicy on approvals; rejections require just approval.decide.
+        if ($decision === 'approved') {
+            $policy = Services::approvalPolicy();
+            $result = $policy->canApprove($row, $this->user() ?? ['id' => $this->userId()], $override, $reason);
+            if (! $result->allowed) {
+                Services::auditLogger()->log(
+                    userId: $this->userId(),
+                    action: 'approval.policy_denied',
+                    entityType: 'approval',
+                    entityId: $id,
+                    newValue: ['rule' => $result->rule, 'message' => $result->message],
+                );
+                return $this->fail($result->message ?? 'Approval denied by policy.', 403, [
+                    'rule' => $result->rule,
+                ]);
+            }
+        }
+
         $m->update($id, [
             'decision'   => $decision,
             'decided_by' => $this->userId(),
             'decided_at' => date('Y-m-d H:i:s'),
-            'note'       => (string) ($body['note'] ?? null),
+            'note'       => $note,
         ]);
-        $this->audit('approval.decide', 'approval', $id, $row, ['decision' => $decision]);
-        // Console fan-out for approval decisions.
+        $auditPayload = ['decision' => $decision];
+        if ($override) {
+            $auditPayload['override'] = true;
+            $auditPayload['reason']   = $reason;
+        }
+        $this->audit('approval.decided', 'approval', $id, $row, $auditPayload, $reason);
+        if ($override) {
+            $this->audit('approval.overridden', 'approval', $id, $row, $auditPayload, $reason);
+        }
+
         try {
             Services::consoleAudit()->event('reach.approval.decided', [
                 'approval_id'  => $id,
@@ -59,6 +90,7 @@ class ApprovalController extends BaseApiController
                 'subject_id'   => (int) $row['subject_id'],
                 'decision'     => $decision,
                 'decided_by'   => $this->userId(),
+                'override'     => $override,
             ]);
             $m->update($id, ['console_synced_at' => date('Y-m-d H:i:s')]);
         } catch (\Throwable $e) {

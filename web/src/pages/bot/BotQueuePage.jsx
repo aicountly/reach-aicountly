@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { botService } from '../../services/botService';
 import { Card } from '../../components/common/Card';
@@ -7,6 +8,8 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { RequirePermission } from '../../components/auth/RequirePermission';
+import { ROUTES } from '../../constants/routes';
 
 const BOT_ACTIONS = [
   ['generate_campaign_ideas',       'Generate campaign ideas'],
@@ -27,6 +30,7 @@ export function BotQueuePage() {
   const [rows, setRows]     = useState([]);
   const [loading, setLoading]= useState(true);
   const [error, setError]   = useState(null);
+  const [success, setSuccess] = useState(null);
   const [open, setOpen]     = useState(false);
   const [action, setAction] = useState(BOT_ACTIONS[0][0]);
   const [payload, setPayload] = useState('{}');
@@ -43,13 +47,22 @@ export function BotQueuePage() {
 
   const dispatch = async () => {
     setDispatching(true);
+    setError(null);
+    setSuccess(null);
     try {
       let obj = {};
       try { obj = payload ? JSON.parse(payload) : {}; }
       catch { throw new Error('Payload must be valid JSON.'); }
-      await botService.dispatch(action, obj);
+      const res = await botService.dispatch(action, obj);
       setOpen(false);
       setPayload('{}');
+      const jobId = res?.job_id;
+      const queueId = res?.queue_id;
+      setSuccess(
+        jobId
+          ? `Bot dispatch accepted — queue #${queueId ?? '?'} (job #${jobId}). Follow progress in the Job Monitor.`
+          : 'Bot dispatch accepted.',
+      );
       load();
     } catch (e) { setError(e.message); }
     finally { setDispatching(false); }
@@ -71,10 +84,18 @@ export function BotQueuePage() {
           <h1>Marketing bot queue</h1>
           <p className="text-sm text-muted">Dispatch bot actions, review awaiting-approval items, monitor runs.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setOpen(true)}><Send size={14}/> Dispatch bot action</button>
+        <RequirePermission permission="bot.dispatch">
+          <button className="btn btn-primary" onClick={() => setOpen(true)}><Send size={14}/> Dispatch bot action</button>
+        </RequirePermission>
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {success && (
+        <Alert variant="success">
+          {success}{' '}
+          <Link to={ROUTES.JOBS} style={{ color: 'inherit', textDecoration: 'underline' }}>Open Job Monitor →</Link>
+        </Alert>
+      )}
       {loading ? <Loader /> : (
         <Card padding={false}>
           <DataTable columns={columns} rows={rows} emptyMessage="Bot queue is empty." />

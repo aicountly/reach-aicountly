@@ -1,0 +1,142 @@
+<?php
+
+namespace Config;
+
+/**
+ * Registry of Reach permission slugs and their groupings.
+ *
+ * A permission is a dotted string `<group>.<action>`. A role or user grant
+ * of `*` means "all permissions". A group wildcard like `blog.*` grants
+ * every permission in the group.
+ *
+ * Backend enforcement lives in App\Filters\PermissionFilter + PermissionService.
+ * Frontend uses the same slugs via /v1/me `permissions` and the usePermission hook.
+ */
+final class Permissions
+{
+    /** Dashboard */
+    public const DASHBOARD_VIEW = 'dashboard.view';
+
+    /** Blog */
+    public const BLOG_VIEW      = 'blog.view';
+    public const BLOG_CREATE    = 'blog.create';
+    public const BLOG_EDIT      = 'blog.edit';
+    public const BLOG_SUBMIT    = 'blog.submit';
+    public const BLOG_APPROVE   = 'blog.approve';
+    public const BLOG_SCHEDULE  = 'blog.schedule';
+    public const BLOG_PUBLISH   = 'blog.publish';
+    public const BLOG_UNPUBLISH = 'blog.unpublish';
+
+    /** Campaign */
+    public const CAMPAIGN_VIEW     = 'campaign.view';
+    public const CAMPAIGN_CREATE   = 'campaign.create';
+    public const CAMPAIGN_EDIT     = 'campaign.edit';
+    public const CAMPAIGN_APPROVE  = 'campaign.approve';
+    public const CAMPAIGN_DISPATCH = 'campaign.dispatch';
+
+    /** Social */
+    public const SOCIAL_VIEW     = 'social.view';
+    public const SOCIAL_CREATE   = 'social.create';
+    public const SOCIAL_EDIT     = 'social.edit';
+    public const SOCIAL_APPROVE  = 'social.approve';
+    public const SOCIAL_DISPATCH = 'social.dispatch';
+
+    /** Email */
+    public const EMAIL_VIEW     = 'email.view';
+    public const EMAIL_CREATE   = 'email.create';
+    public const EMAIL_EDIT     = 'email.edit';
+    public const EMAIL_APPROVE  = 'email.approve';
+    public const EMAIL_DISPATCH = 'email.dispatch';
+
+    /** WhatsApp */
+    public const WHATSAPP_VIEW     = 'whatsapp.view';
+    public const WHATSAPP_CREATE   = 'whatsapp.create';
+    public const WHATSAPP_EDIT     = 'whatsapp.edit';
+    public const WHATSAPP_APPROVE  = 'whatsapp.approve';
+    public const WHATSAPP_DISPATCH = 'whatsapp.dispatch';
+
+    /** Leads */
+    public const LEAD_VIEW   = 'lead.view';
+    public const LEAD_MANAGE = 'lead.manage';
+    public const LEAD_EXPORT = 'lead.export';
+
+    /** Approvals */
+    public const APPROVAL_VIEW     = 'approval.view';
+    public const APPROVAL_DECIDE   = 'approval.decide';
+    public const APPROVAL_OVERRIDE = 'approval.override';
+
+    /** Marketing bot */
+    public const BOT_VIEW      = 'bot.view';
+    public const BOT_DISPATCH  = 'bot.dispatch';
+    public const BOT_CONFIGURE = 'bot.configure';
+
+    /** Jobs */
+    public const JOB_VIEW   = 'job.view';
+    public const JOB_RETRY  = 'job.retry';
+    public const JOB_CANCEL = 'job.cancel';
+
+    /** Settings / integrations / audit / analytics */
+    public const SETTINGS_VIEW      = 'settings.view';
+    public const SETTINGS_MANAGE    = 'settings.manage';
+    public const INTEGRATION_VIEW   = 'integration.view';
+    public const INTEGRATION_MANAGE = 'integration.manage';
+    public const AUDIT_VIEW         = 'audit.view';
+    public const ANALYTICS_VIEW     = 'analytics.view';
+
+    /**
+     * @return array<string, string[]> group => permission list
+     */
+    public static function groups(): array
+    {
+        return [
+            'dashboard'   => [self::DASHBOARD_VIEW],
+            'blog'        => [
+                self::BLOG_VIEW, self::BLOG_CREATE, self::BLOG_EDIT, self::BLOG_SUBMIT,
+                self::BLOG_APPROVE, self::BLOG_SCHEDULE, self::BLOG_PUBLISH, self::BLOG_UNPUBLISH,
+            ],
+            'campaign'    => [
+                self::CAMPAIGN_VIEW, self::CAMPAIGN_CREATE, self::CAMPAIGN_EDIT,
+                self::CAMPAIGN_APPROVE, self::CAMPAIGN_DISPATCH,
+            ],
+            'social'      => [
+                self::SOCIAL_VIEW, self::SOCIAL_CREATE, self::SOCIAL_EDIT,
+                self::SOCIAL_APPROVE, self::SOCIAL_DISPATCH,
+            ],
+            'email'       => [
+                self::EMAIL_VIEW, self::EMAIL_CREATE, self::EMAIL_EDIT,
+                self::EMAIL_APPROVE, self::EMAIL_DISPATCH,
+            ],
+            'whatsapp'    => [
+                self::WHATSAPP_VIEW, self::WHATSAPP_CREATE, self::WHATSAPP_EDIT,
+                self::WHATSAPP_APPROVE, self::WHATSAPP_DISPATCH,
+            ],
+            'lead'        => [self::LEAD_VIEW, self::LEAD_MANAGE, self::LEAD_EXPORT],
+            'approval'    => [self::APPROVAL_VIEW, self::APPROVAL_DECIDE, self::APPROVAL_OVERRIDE],
+            'bot'         => [self::BOT_VIEW, self::BOT_DISPATCH, self::BOT_CONFIGURE],
+            'job'         => [self::JOB_VIEW, self::JOB_RETRY, self::JOB_CANCEL],
+            'settings'    => [self::SETTINGS_VIEW, self::SETTINGS_MANAGE],
+            'integration' => [self::INTEGRATION_VIEW, self::INTEGRATION_MANAGE],
+            'audit'       => [self::AUDIT_VIEW],
+            'analytics'   => [self::ANALYTICS_VIEW],
+        ];
+    }
+
+    /**
+     * @return string[] flat list of every defined permission
+     */
+    public static function all(): array
+    {
+        $out = [];
+        foreach (self::groups() as $perms) {
+            foreach ($perms as $p) {
+                $out[] = $p;
+            }
+        }
+        return $out;
+    }
+
+    public static function isKnown(string $perm): bool
+    {
+        return $perm === '*' || str_ends_with($perm, '.*') || in_array($perm, self::all(), true);
+    }
+}

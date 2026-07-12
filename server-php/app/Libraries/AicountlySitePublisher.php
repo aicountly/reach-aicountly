@@ -3,6 +3,7 @@
 namespace App\Libraries;
 
 use App\Models\BlogPostModel;
+use Config\Services;
 
 /**
  * Blog publisher for AICOUNTLY.com.
@@ -59,14 +60,29 @@ class AicountlySitePublisher
             ];
         }
 
-        // Mark as publishing (in-flight).
+        $endpoint = $this->baseUrl . '/blog/posts';
+        $urlCheck = Services::urlPolicy()->validate($endpoint, [
+            'allowedHosts' => array_filter([parse_url($this->baseUrl, PHP_URL_HOST) ?: null]),
+        ]);
+        if (! $urlCheck->allowed) {
+            $this->blog->update($postId, [
+                'publishing_status' => 'failed',
+                'publishing_error'  => 'Publisher endpoint rejected by URL policy: ' . ($urlCheck->reason ?? 'invalid'),
+            ]);
+            return [
+                'status'           => 'failed',
+                'publishing_error' => $urlCheck->reason ?? 'URL policy rejected endpoint',
+                'external_post_id' => null,
+            ];
+        }
+
         $this->blog->update($postId, [
             'publishing_status' => 'publishing',
             'publishing_error'  => null,
         ]);
 
         $body = $this->buildBody($post);
-        $ch   = curl_init($this->baseUrl . '/blog/posts');
+        $ch   = curl_init($endpoint);
         if ($ch === false) {
             $this->blog->update($postId, [
                 'publishing_status' => 'failed',
@@ -80,12 +96,13 @@ class AicountlySitePublisher
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_HTTPHEADER     => [
+            CURLOPT_HTTPHEADER     => array_filter([
                 'Content-Type: application/json',
                 'Accept: application/json',
                 'Authorization: Bearer ' . $this->token,
                 'X-Source: reach.aicountly.org',
-            ],
+                $this->currentRequestId() ? 'X-Request-Id: ' . $this->currentRequestId() : null,
+            ]),
         ]);
         $raw    = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -134,6 +151,17 @@ class AicountlySitePublisher
             'external_post_id' => $externalId,
             'response'         => is_array($decoded) ? $decoded : [],
         ];
+    }
+
+    private function currentRequestId(): ?string
+    {
+        try {
+            $req = service('request');
+            $id  = $req->reachRequestId ?? null;
+            return is_string($id) && $id !== '' ? $id : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function buildBody(array $post): array

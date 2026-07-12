@@ -93,15 +93,21 @@ class AuthController extends BaseApiController
         if (! $u) {
             return $this->fail('Not authenticated.', 401);
         }
-        $row = (new UserModel())->find((int) $u['id']);
+        $row = (new UserModel())->withRole((int) $u['id']);
         if (! $row) {
             return $this->fail('User no longer exists.', 401);
         }
+        $roleSlug = (string) ($row['role_slug'] ?? 'super_admin');
+        $permissions = Services::permissionService()->resolveEffective((int) $row['id']);
+
         return $this->ok([
             'id'              => (int) $row['id'],
             'email'           => (string) $row['email'],
             'name'            => (string) $row['name'],
-            'role'            => 'super_admin',
+            'role'            => $roleSlug,
+            'role_slug'       => $roleSlug,
+            'permissions'     => $permissions,
+            'actor_type'      => (string) ($row['actor_type'] ?? 'human'),
             'controller_apps' => $this->controllerAppsForRequest(),
         ]);
     }
@@ -348,6 +354,8 @@ class AuthController extends BaseApiController
             ],
         );
 
+        $permissions = Services::permissionService()->resolveEffective((int) $user['id']);
+
         return [
             'token'      => $reachToken,
             'expires_in' => Services::jwt()->ttlSeconds(),
@@ -356,6 +364,9 @@ class AuthController extends BaseApiController
                 'email'           => (string) $user['email'],
                 'name'            => (string) $user['name'],
                 'role'            => 'super_admin',
+                'role_slug'       => 'super_admin',
+                'permissions'     => $permissions,
+                'actor_type'      => 'human',
                 'controller_apps' => $this->normalizeLauncherApps(
                     is_array($identity['controller_apps'] ?? null) ? $identity['controller_apps'] : [],
                 ),

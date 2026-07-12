@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { LogOut, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -7,7 +6,6 @@ import { AppLauncher } from './AppLauncher';
 
 export function Header() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const doLogout = async () => {
     await logout();
   };

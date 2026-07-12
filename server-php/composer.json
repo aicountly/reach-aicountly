@@ -6,6 +6,7 @@
     "require": {
         "php": "^8.1",
         "codeigniter4/framework": "^4.6",
+        "ezyang/htmlpurifier": "^4.17",
         "firebase/php-jwt": "^7.0"
     },
     "require-dev": {
@@ -32,7 +33,9 @@
             "@composer dump-autoload"
         ],
         "migrate": "php spark migrate",
-        "seed": "php spark db:seed InitialReachSeeder"
+        "seed": "php spark db:seed InitialReachSeeder",
+        "test": "phpunit --no-coverage",
+        "test:coverage": "phpunit"
     },
     "config": {
         "optimize-autoloader": true,

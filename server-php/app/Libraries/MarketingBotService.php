@@ -68,7 +68,48 @@ class MarketingBotService
     }
 
     /**
-     * Dispatch a bot action.
+     * Enqueue an async dispatch. Returns immediately with the queue row and
+     * the async job reference — the controller responds `202 Accepted`.
+     *
+     * @return array{
+     *   queue_id: int,
+     *   job_id: int,
+     *   status: 'queued',
+     *   mode: string,
+     * }
+     */
+    public function enqueue(string $action, array $payload, ?int $userId, ?string $requestId = null): array
+    {
+        if (! in_array($action, self::ACTIONS, true)) {
+            throw new \InvalidArgumentException("Unknown bot action: {$action}");
+        }
+        $mode    = $this->botSettings->currentMode();
+        $queueId = $this->createQueueRow($action, $payload, $userId);
+        $jobId   = Services::jobService()->enqueue('reach.marketing_bot_dispatch', [
+            'action'   => $action,
+            'payload'  => $payload,
+            'user_id'  => $userId,
+            'queue_id' => $queueId,
+        ], [
+            'queue'               => 'marketing_bot',
+            'enqueued_by_user_id' => $userId,
+            'enqueued_actor_type' => 'human',
+            'request_id'          => $requestId,
+            'max_attempts'        => 3,
+        ]);
+        // Attach the job id to the queue row so BotQueuePage can link back.
+        $this->queue->update($queueId, ['generation_job_id' => $jobId]);
+        return [
+            'queue_id' => $queueId,
+            'job_id'   => $jobId,
+            'status'   => 'queued',
+            'mode'     => $mode,
+        ];
+    }
+
+    /**
+     * Synchronous execution of a bot action. Called by the async job handler
+     * and by legacy tests. Same core logic as the previous dispatch() flow.
      *
      * @return array{
      *   queue_id:int,
@@ -79,7 +120,7 @@ class MarketingBotService
      *   result:array,
      * }
      */
-    public function dispatch(string $action, array $payload, ?int $userId): array
+    public function execute(string $action, array $payload, ?int $userId, ?int $queueId = null, ?int $generationJobId = null): array
     {
         if (! in_array($action, self::ACTIONS, true)) {
             throw new \InvalidArgumentException("Unknown bot action: {$action}");
@@ -89,10 +130,18 @@ class MarketingBotService
         $allowedAutoAllow  = $this->botSettings->currentAllowedAutoActions();
         $requiresApproval  = $this->requiresApproval($action, $payload, $mode, $allowedAutoAllow);
 
-        $queueId = $this->createQueueRow($action, $payload, $userId);
+        if ($queueId === null) {
+            $queueId = $this->createQueueRow($action, $payload, $userId);
+        } else {
+            // Mark the pre-created queue row as running now that the worker picked it up.
+            $this->queue->update($queueId, [
+                'status'     => 'running',
+                'started_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
 
         try {
-            $result = $this->execute($action, $payload, $requiresApproval);
+            $result = $this->doExecute($action, $payload, $requiresApproval);
         } catch (\Throwable $e) {
             $this->queue->update($queueId, [
                 'status'        => 'failed',
@@ -206,7 +255,7 @@ class MarketingBotService
     // Action execution — LLM-agnostic. Real LLM calls plug in here later.
     // -----------------------------------------------------------------------
 
-    private function execute(string $action, array $payload, bool $requiresApproval): array
+    private function doExecute(string $action, array $payload, bool $requiresApproval): array
     {
         $llmConfigured = $this->llmConfigured();
         $stubNote      = $llmConfigured

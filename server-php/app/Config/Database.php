@@ -61,6 +61,21 @@ class Database extends Config
         $this->default['username'] = env('DB_USER', '');
         $this->default['password'] = env('DB_PASS', '');
 
+        // Test DB group — read from phpunit.xml.dist env or environment overrides.
+        // Never falls back to the production connection.
+        $this->tests['hostname'] = env('database.tests.hostname', env('TEST_DB_HOST', '127.0.0.1'));
+        $this->tests['port']     = (int) env('database.tests.port',     env('TEST_DB_PORT', '5432'));
+        $this->tests['database'] = env('database.tests.database', env('TEST_DB_NAME', 'aicountly_reach_test'));
+        $this->tests['username'] = env('database.tests.username', env('TEST_DB_USER', ''));
+        $this->tests['password'] = env('database.tests.password', env('TEST_DB_PASS', ''));
+        $driver                  = env('database.tests.DBDriver', env('TEST_DB_DRIVER', 'Postgre'));
+        $this->tests['DBDriver'] = $driver;
+        if ($driver === 'SQLite3') {
+            $this->tests['database'] = env('database.tests.database', ':memory:');
+            unset($this->tests['hostname'], $this->tests['port']);
+            $this->tests['foreignKeys'] = true;
+        }
+
         if (ENVIRONMENT === 'testing') {
             $this->defaultGroup = 'tests';
         }

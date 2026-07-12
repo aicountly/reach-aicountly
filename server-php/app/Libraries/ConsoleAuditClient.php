@@ -62,12 +62,13 @@ class ConsoleAuditClient
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_HTTPHEADER     => [
+            CURLOPT_HTTPHEADER     => array_filter([
                 'Content-Type: application/json',
                 'Accept: application/json',
                 'Authorization: Bearer ' . $this->token,
                 'X-Source: reach.aicountly.org',
-            ],
+                $this->currentRequestId() ? 'X-Request-Id: ' . $this->currentRequestId() : null,
+            ]),
         ]);
 
         $raw    = curl_exec($ch);
@@ -94,6 +95,22 @@ class ConsoleAuditClient
             $ok,
             $ok ? null : ($err !== '' ? $err : (is_string($raw) ? substr($raw, 0, 500) : 'unknown error')),
         );
+    }
+
+    /**
+     * Best-effort read of the current HTTP request-id, if set by
+     * RequestIdFilter. Returns null when running outside an HTTP context
+     * (Spark commands populate it via JobContext directly).
+     */
+    private function currentRequestId(): ?string
+    {
+        try {
+            $req = service('request');
+            $id  = $req->reachRequestId ?? null;
+            return is_string($id) && $id !== '' ? $id : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function recordAttempt(

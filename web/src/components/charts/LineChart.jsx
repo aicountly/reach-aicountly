@@ -1,4 +1,4 @@
-﻿export function LineChart({ data, labelKey = 'label', valueKey = 'value', color = 'var(--color-primary)', height = 200 }) {
+﻿export function LineChart({ data, valueKey = 'value', color = 'var(--color-primary)', height = 200 }) {
   if (!data || data.length < 2) return <p className="text-sm text-muted text-center">Not enough data</p>;
 
   const max = Math.max(...data.map((d) => d[valueKey] || 0)) || 1;

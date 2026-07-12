@@ -4,6 +4,7 @@ namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
 use App\Models\LandingPageModel;
+use Config\Services;
 
 class LandingPageController extends BaseApiController
 {
@@ -34,6 +35,13 @@ class LandingPageController extends BaseApiController
         $body = $this->input();
         $m    = new LandingPageModel();
         $row  = array_intersect_key($body, array_flip(['campaign_id', 'slug', 'title', 'meta', 'body', 'status']));
+        $sanitizer = Services::htmlSanitizer();
+        if (isset($row['title'])) {
+            $row['title'] = $sanitizer->purifyText((string) $row['title']);
+        }
+        if (isset($row['body'])) {
+            $row['body'] = $sanitizer->purify((string) $row['body']);
+        }
         if (isset($row['meta']) && is_array($row['meta'])) {
             $row['meta'] = json_encode($row['meta']);
         }
@@ -53,8 +61,15 @@ class LandingPageController extends BaseApiController
         if (! $row) {
             return $this->fail('Landing page not found.', 404);
         }
-        $body   = $this->input();
-        $update = array_intersect_key($body, array_flip(['campaign_id', 'slug', 'title', 'meta', 'body', 'status', 'published_at']));
+        $body      = $this->input();
+        $update    = array_intersect_key($body, array_flip(['campaign_id', 'slug', 'title', 'meta', 'body', 'status', 'published_at']));
+        $sanitizer = Services::htmlSanitizer();
+        if (isset($update['title'])) {
+            $update['title'] = $sanitizer->purifyText((string) $update['title']);
+        }
+        if (isset($update['body'])) {
+            $update['body'] = $sanitizer->purify((string) $update['body']);
+        }
         if (isset($update['meta']) && is_array($update['meta'])) {
             $update['meta'] = json_encode($update['meta']);
         }

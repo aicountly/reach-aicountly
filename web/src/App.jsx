@@ -46,6 +46,7 @@ import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { ApiHealthPage } from './pages/admin/ApiHealthPage';
 import { ConsoleSyncPage } from './pages/admin/ConsoleSyncPage';
 import { WorkerStatusPage } from './pages/admin/WorkerStatusPage';
+import { JobMonitorPage } from './pages/admin/JobMonitorPage';
 import { LocalBotReportsPage } from './pages/admin/LocalBotReportsPage';
 
 import { ROUTES } from './constants/routes';
@@ -121,6 +122,7 @@ export default function App() {
         <Route path={ROUTES.API_HEALTH}        element={<ApiHealthPage />} />
         <Route path={ROUTES.CONSOLE_SYNC}      element={<ConsoleSyncPage />} />
         <Route path={ROUTES.WORKER_STATUS}     element={<WorkerStatusPage />} />
+        <Route path={ROUTES.JOBS}              element={<JobMonitorPage />} />
         <Route path={ROUTES.LOCAL_BOT_REPORTS} element={<LocalBotReportsPage />} />
       </Route>
 

@@ -4,7 +4,6 @@ namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
 use App\Models\CampaignModel;
-use App\Models\EngagePushAttemptModel;
 use App\Models\LeadModel;
 use Config\Services;
 
@@ -43,15 +42,6 @@ class EngagePushController extends BaseApiController
     {
         // Same as push but marks the intent explicitly.
         return $this->push($leadId);
-    }
-
-    public function attempts(int $leadId)
-    {
-        $rows = (new EngagePushAttemptModel())
-            ->where('lead_id', $leadId)
-            ->orderBy('attempted_at', 'DESC')
-            ->findAll(50);
-        return $this->ok(['items' => $rows]);
     }
 
     private function enrich(array $lead): array
