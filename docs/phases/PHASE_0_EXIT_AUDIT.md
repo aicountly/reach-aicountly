@@ -1,15 +1,15 @@
 # Phase 0 Exit Audit
 
-- **Branch:** `feature/phase-0-foundation`
-- **Baseline commit:** `1766ec2`
-- **Audit date:** on Phase 0 close
+- **Branch:** `hotfix/phase-0-feature-test-discovery`
+- **Baseline commit:** `aaaded1` (Phase 0 merged to `main`)
+- **Audit date:** 2026-07-12 (feature-test discovery hotfix)
 - **Scope:** Stability, RBAC, Security, Async Job Foundation
 
 ## Cross-check with `REACH_PROPOSED_PHASE_PLAN.md` — Phase 0 Exit checklist
 
 | # | Item                                                    | Status | Evidence |
 |---|---------------------------------------------------------|--------|----------|
-| 1 | Re-run build/lint/test — all pass                       | Passed | `.github/workflows/ci.yml`, local `vendor/bin/phpunit --testsuite Unit` (24/24) |
+| 1 | Re-run build/lint/test — all pass                       | Passed | `.github/workflows/ci.yml`, local `vendor/bin/phpunit --testsuite Unit` (24/24), `vendor/bin/phpunit --testsuite Feature` (13/13 skipped w/o test DB), full `vendor/bin/phpunit` (37 tests: 24 pass + 13 skip) |
 | 2 | Role matrix documented                                  | Passed | `docs/architecture/REACH_RBAC.md` |
 | 3 | No dead routes/components                               | Passed | `LoginPage.jsx` removed; `EngagePushController::attempts()` removed; legacy script archived |
 | 4 | Audit logs capture queue job execution                  | Passed | `job.enqueued/reserved/completed/retried/failed/cancelled` emitted by `JobService`; `reach_audit_logs.job_id` populated |
@@ -26,8 +26,8 @@ end-of-phase inspection. The inspection matrix below is authoritative.
 | 2  | Backend `php -l` passes on every touched file                           | Passed | Manual sweep during implementation; CI job `syntax` step |
 | 3  | Frontend build succeeds                                                 | Passed | `web/package.json` `build` script, run in CI |
 | 4  | Frontend tests present + green                                          | Passed | `web/src/**/__tests__/*` (5 files) |
-| 5  | Backend unit tests present + green                                      | Passed | `tests/Unit/*` (4 files, 24 assertions locally) |
-| 6  | Backend feature tests present (skip gracefully w/o DB)                  | Passed | `tests/Feature/*` (7 files, gated on `TEST_DB_NAME`) |
+| 5  | Backend unit tests present + green                                      | Passed | `tests/Unit/*` (4 files, 24 tests / 45 assertions locally) |
+| 6  | Backend feature tests present (skip gracefully w/o DB)                  | Passed | `tests/Feature/*` (7 files, 13 tests; each skips with exact DB prerequisite when `database.tests.database` / `TEST_DB_NAME` unset) |
 | 7  | All routes require an explicit permission slug                          | Passed | `app/Config/Routes.php` — no blanket group filter |
 | 8  | Six seeded roles distinct + super-admin wildcard preserved              | Passed | `RolesAndPermissionsSeeder` |
 | 9  | Per-user permission overrides supported (grant/deny)                    | Passed | `reach_user_permissions` migration + `PermissionService::resolveEffective` |
@@ -101,6 +101,39 @@ for evidence links.
 - The Phase 0 feature branch does not touch the deploy workflow.
 - No changes to the Console SSO contract or to Engage's inbound token
   scheme.
+
+## Hotfix verification — feature-test discovery (`hotfix/phase-0-feature-test-discovery`)
+
+**Root cause:** Feature tests were discovered correctly, but
+`DatabaseTestCase::setUpBeforeClass()` skipped entire test classes when
+no isolated test DB was configured. PHPUnit 10 then reported
+`No tests executed!` for `--testsuite Feature` (zero method-level runs)
+while the full run only counted Unit tests plus seven skipped *suites*.
+
+**Fix:** Per-test skip in `setUp()` before DB bootstrap; explicit
+`suffix="Test.php"` suite directories; `Tests\Unit\` and
+`Tests\Feature\` PSR-4 autoload-dev entries; CI runs Unit and Feature
+suites separately.
+
+### Local results (2026-07-12, no test Postgres)
+
+| Command | Result |
+|---------|--------|
+| `vendor/bin/phpunit --testsuite Unit` | **OK** — 24 tests, 45 assertions |
+| `vendor/bin/phpunit --testsuite Feature` | **OK (skipped)** — 13 tests, 13 skipped |
+| `vendor/bin/phpunit` | **OK** — 37 tests (24 pass + 13 skip), 45 assertions |
+| `npm run lint` (web) | **OK** |
+| `npm run test:run` (web) | **OK** — 16 tests |
+| `npm run build` (web) | **OK** |
+
+**Skipped tests (13):** all Feature tests skip with:
+`Isolated PostgreSQL test database unavailable: set database.tests.database or TEST_DB_NAME (and matching host/user/password via database.tests.* or TEST_DB_* env keys).`
+
+**CI:** `.github/workflows/ci.yml` — separate `PHPUnit (Unit)` and
+`PHPUnit (Feature)` steps; Feature step receives isolated Postgres
+service credentials.
+
+**Phase 1:** not started — no Phase 1 code, migrations, or docs touched.
 
 ## Ready-for-merge checklist
 

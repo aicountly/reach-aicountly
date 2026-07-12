@@ -25,23 +25,31 @@ abstract class DatabaseTestCase extends CIUnitTestCase
     protected $namespace = 'App';
     protected $DBGroup   = 'tests';
 
-    public static function setUpBeforeClass(): void
+    protected function setUp(): void
     {
-        parent::setUpBeforeClass();
         if (! self::hasTestDatabase()) {
-            self::markTestSkipped(
-                'Test database not configured. Set TEST_DB_HOST/TEST_DB_NAME/TEST_DB_USER (or the database.tests.* env keys in phpunit.xml) to run feature tests.',
-            );
+            $this->markTestSkipped(self::missingTestDatabaseReason());
         }
+
+        parent::setUp();
     }
 
     protected static function hasTestDatabase(): bool
     {
-        // phpunit.xml env value beats OS env.
+        return self::missingTestDatabaseReason() === null;
+    }
+
+    protected static function missingTestDatabaseReason(): ?string
+    {
         $name = getenv('database.tests.database');
         if ($name === false || $name === '') {
             $name = getenv('TEST_DB_NAME') ?: '';
         }
-        return $name !== '';
+
+        if ($name !== '') {
+            return null;
+        }
+
+        return 'Isolated PostgreSQL test database unavailable: set database.tests.database or TEST_DB_NAME (and matching host/user/password via database.tests.* or TEST_DB_* env keys).';
     }
 }

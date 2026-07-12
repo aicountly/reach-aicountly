@@ -25,7 +25,9 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\Support\\": "tests/_support/"
+            "Tests\\Support\\": "tests/_support/",
+            "Tests\\Unit\\": "tests/Unit/",
+            "Tests\\Feature\\": "tests/Feature/"
         }
     },
     "scripts": {
