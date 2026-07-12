@@ -397,5 +397,87 @@ $routes->group('v1', static function ($routes) {
 
         }); // end knowledge group
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // Phase 2 — Unified Content Studio
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Content Items
+        $routes->get('content/items',                              'Api\\V1\\Content\\ContentItemController::index',          ['filter' => 'permission:content.view']);
+        $routes->post('content/items',                             'Api\\V1\\Content\\ContentItemController::create',         ['filter' => 'permission:content.create']);
+        $routes->get('content/items/(:num)',                       'Api\\V1\\Content\\ContentItemController::show/$1',        ['filter' => 'permission:content.view']);
+        $routes->put('content/items/(:num)',                       'Api\\V1\\Content\\ContentItemController::update/$1',      ['filter' => 'permission:content.edit']);
+        $routes->delete('content/items/(:num)',                    'Api\\V1\\Content\\ContentItemController::delete/$1',      ['filter' => 'permission:content.edit']);
+        $routes->post('content/items/(:num)/submit',               'Api\\V1\\Content\\ContentItemController::submit/$1',      ['filter' => 'permission:content.submit']);
+        $routes->post('content/items/(:num)/approve',              'Api\\V1\\Content\\ContentItemController::approve/$1',     ['filter' => ['permission:content.approve', 'throttle:approval']]);
+        $routes->post('content/items/(:num)/reject',               'Api\\V1\\Content\\ContentItemController::reject/$1',      ['filter' => ['permission:content.approve', 'throttle:approval']]);
+        $routes->post('content/items/(:num)/request-changes',      'Api\\V1\\Content\\ContentItemController::requestChanges/$1', ['filter' => 'permission:content.review']);
+        $routes->post('content/items/(:num)/archive',              'Api\\V1\\Content\\ContentItemController::archive/$1',    ['filter' => 'permission:content.archive']);
+        $routes->get('content/items/(:num)/transitions',           'Api\\V1\\Content\\ContentItemController::transitions/$1', ['filter' => 'permission:content.view']);
+
+        // Content Versions
+        $routes->get('content/items/(:num)/versions',              'Api\\V1\\Content\\ContentVersionController::index/$1',   ['filter' => 'permission:content_version.view']);
+        $routes->post('content/items/(:num)/versions',             'Api\\V1\\Content\\ContentVersionController::create/$1',  ['filter' => 'permission:content.edit']);
+        $routes->get('content/items/(:num)/versions/compare',      'Api\\V1\\Content\\ContentVersionController::compare/$1', ['filter' => 'permission:content_version.view']);
+        $routes->get('content/items/(:num)/versions/(:num)',       'Api\\V1\\Content\\ContentVersionController::show/$1/$2', ['filter' => 'permission:content_version.view']);
+
+        // Content Brief
+        $routes->get('content/items/(:num)/brief',                 'Api\\V1\\Content\\ContentBriefController::show/$1',    ['filter' => 'permission:content.view']);
+        $routes->post('content/items/(:num)/brief',                'Api\\V1\\Content\\ContentBriefController::upsert/$1',  ['filter' => 'permission:content.edit']);
+        $routes->put('content/items/(:num)/brief',                 'Api\\V1\\Content\\ContentBriefController::upsert/$1',  ['filter' => 'permission:content.edit']);
+
+        // Content Comments
+        $routes->get('content/items/(:num)/comments',              'Api\\V1\\Content\\ContentCommentController::index/$1',  ['filter' => 'permission:content_comment.view']);
+        $routes->post('content/items/(:num)/comments',             'Api\\V1\\Content\\ContentCommentController::create/$1', ['filter' => 'permission:content_comment.create']);
+        $routes->post('content/items/(:num)/comments/(:num)/resolve', 'Api\\V1\\Content\\ContentCommentController::resolve/$1/$2', ['filter' => 'permission:content_comment.resolve']);
+        $routes->delete('content/items/(:num)/comments/(:num)',    'Api\\V1\\Content\\ContentCommentController::delete/$1/$2', ['filter' => 'permission:content_comment.delete']);
+
+        // Content Validations
+        $routes->get('content/items/(:num)/validations',           'Api\\V1\\Content\\ContentValidationController::index/$1',  ['filter' => 'permission:content_validation.view']);
+        $routes->post('content/items/(:num)/validations',          'Api\\V1\\Content\\ContentValidationController::create/$1', ['filter' => 'permission:content_validation.manage']);
+        $routes->post('content/items/(:num)/validations/(:num)/waive', 'Api\\V1\\Content\\ContentValidationController::waive/$1/$2', ['filter' => ['permission:content_validation.waive', 'throttle:approval']]);
+
+        // Content Assignments
+        $routes->get('content/items/(:num)/assignments',           'Api\\V1\\Content\\ContentAssignmentController::index/$1',  ['filter' => 'permission:content_assignment.view']);
+        $routes->post('content/items/(:num)/assignments',          'Api\\V1\\Content\\ContentAssignmentController::create/$1', ['filter' => 'permission:content_assignment.manage']);
+        $routes->delete('content/items/(:num)/assignments/(:num)', 'Api\\V1\\Content\\ContentAssignmentController::delete/$1/$2', ['filter' => 'permission:content_assignment.manage']);
+
+        // Content Schedules
+        $routes->get('content/items/(:num)/schedules',             'Api\\V1\\Content\\ContentScheduleController::index/$1',  ['filter' => 'permission:content_schedule.view']);
+        $routes->post('content/items/(:num)/schedules',            'Api\\V1\\Content\\ContentScheduleController::create/$1', ['filter' => 'permission:content_schedule.create']);
+        $routes->delete('content/items/(:num)/schedules/(:num)',   'Api\\V1\\Content\\ContentScheduleController::delete/$1/$2', ['filter' => 'permission:content_schedule.cancel']);
+
+        // Content Knowledge Mappings
+        $routes->get('content/items/(:num)/mappings',              'Api\\V1\\Content\\ContentMappingController::index/$1',   ['filter' => 'permission:content.view']);
+        $routes->put('content/items/(:num)/mappings',              'Api\\V1\\Content\\ContentMappingController::sync/$1',    ['filter' => 'permission:content.edit']);
+        $routes->post('content/items/(:num)/mappings/(:alpha)',    'Api\\V1\\Content\\ContentMappingController::addMapping/$1/$2', ['filter' => 'permission:content.edit']);
+        $routes->delete('content/items/(:num)/mappings/(:alpha)/(:num)', 'Api\\V1\\Content\\ContentMappingController::removeMapping/$1/$2/$3', ['filter' => 'permission:content.edit']);
+
+        // Publication Targets
+        $routes->get('content/publication-targets',                'Api\\V1\\Content\\ContentPublicationTargetController::index',      ['filter' => 'permission:publication_target.view']);
+        $routes->post('content/publication-targets',               'Api\\V1\\Content\\ContentPublicationTargetController::create',     ['filter' => 'permission:publication_target.manage']);
+        $routes->get('content/publication-targets/(:num)',         'Api\\V1\\Content\\ContentPublicationTargetController::show/$1',    ['filter' => 'permission:publication_target.view']);
+        $routes->put('content/publication-targets/(:num)',         'Api\\V1\\Content\\ContentPublicationTargetController::update/$1',  ['filter' => 'permission:publication_target.manage']);
+
+        // Daily Marketing Packs
+        $routes->get('content/daily-packs',                        'Api\\V1\\Content\\DailyPackController::index',              ['filter' => 'permission:daily_pack.view']);
+        $routes->post('content/daily-packs/generate',              'Api\\V1\\Content\\DailyPackController::generate',           ['filter' => 'permission:daily_pack.create']);
+        $routes->get('content/daily-packs/(:num)',                 'Api\\V1\\Content\\DailyPackController::show/$1',             ['filter' => 'permission:daily_pack.view']);
+        $routes->put('content/daily-packs/(:num)/items/(:num)',    'Api\\V1\\Content\\DailyPackController::assignItem/$1/$2',    ['filter' => 'permission:daily_pack.manage']);
+
+        // Approval Queue
+        $routes->get('approval-queue',                             'Api\\V1\\Content\\ApprovalQueueController::index',           ['filter' => 'permission:content.review']);
+        $routes->get('approval-queue/stats',                       'Api\\V1\\Content\\ApprovalQueueController::stats',           ['filter' => 'permission:content.review']);
+        $routes->post('approval-queue/bulk-approve',               'Api\\V1\\Content\\ApprovalQueueController::bulkApprove',     ['filter' => ['permission:content.approve', 'throttle:approval']]);
+        $routes->post('approval-queue/(:num)/approve',             'Api\\V1\\Content\\ApprovalQueueController::approve/$1',      ['filter' => ['permission:content.approve', 'throttle:approval']]);
+        $routes->post('approval-queue/(:num)/reject',              'Api\\V1\\Content\\ApprovalQueueController::reject/$1',       ['filter' => ['permission:content.approve', 'throttle:approval']]);
+        $routes->post('approval-queue/(:num)/return',              'Api\\V1\\Content\\ApprovalQueueController::returnForChanges/$1', ['filter' => 'permission:content.review']);
+        $routes->post('approval-queue/(:num)/waive-validation',    'Api\\V1\\Content\\ApprovalQueueController::waiveValidation/$1', ['filter' => ['permission:content_validation.waive', 'throttle:approval']]);
+
+        // Notifications
+        $routes->get('notifications',                              'Api\\V1\\Content\\NotificationController::index',           ['filter' => 'permission:content.view']);
+        $routes->get('notifications/count',                        'Api\\V1\\Content\\NotificationController::count',           ['filter' => 'permission:content.view']);
+        $routes->post('notifications/(:num)/read',                 'Api\\V1\\Content\\NotificationController::markRead/$1',     ['filter' => 'permission:content.view']);
+        $routes->post('notifications/read-all',                    'Api\\V1\\Content\\NotificationController::markAllRead',     ['filter' => 'permission:content.view']);
+
     });
 });
