@@ -227,5 +227,171 @@ $routes->group('v1', static function ($routes) {
         $routes->get('jobs/(:num)',            'Api\\V1\\JobController::show/$1', ['filter' => 'permission:job.view']);
         $routes->post('jobs/(:num)/retry',     'Api\\V1\\JobController::retry/$1',  ['filter' => ['permission:job.retry',  'throttle:integration']]);
         $routes->post('jobs/(:num)/cancel',    'Api\\V1\\JobController::cancel/$1', ['filter' => ['permission:job.cancel', 'throttle:integration']]);
+
+        // ── Phase 1: Knowledge Foundation ─────────────────────────────────────
+        $routes->group('knowledge', static function ($routes) {
+
+            // Grounding (read-only, approved data only, no AI calls)
+            $routes->get('grounding/product/(:segment)',  'Api\\V1\\Knowledge\\GroundingController::product/$1', ['filter' => 'permission:knowledge.view']);
+            $routes->get('grounding/intent/(:num)',       'Api\\V1\\Knowledge\\GroundingController::intent/$1',  ['filter' => 'permission:knowledge.view']);
+            $routes->post('grounding/context',            'Api\\V1\\Knowledge\\GroundingController::context',    ['filter' => 'permission:knowledge.view']);
+
+            // Products
+            $routes->get('products',                          'Api\\V1\\Knowledge\\ProductController::index',          ['filter' => 'permission:product.view']);
+            $routes->post('products',                         'Api\\V1\\Knowledge\\ProductController::store',          ['filter' => 'permission:product.manage']);
+            $routes->get('products/(:num)',                   'Api\\V1\\Knowledge\\ProductController::show/$1',        ['filter' => 'permission:product.view']);
+            $routes->put('products/(:num)',                   'Api\\V1\\Knowledge\\ProductController::update/$1',      ['filter' => 'permission:product.manage']);
+            $routes->delete('products/(:num)',                'Api\\V1\\Knowledge\\ProductController::destroy/$1',     ['filter' => 'permission:product.manage']);
+            $routes->post('products/(:num)/submit',           'Api\\V1\\Knowledge\\ProductController::submit/$1',     ['filter' => 'permission:knowledge.submit']);
+            $routes->post('products/(:num)/approve',          'Api\\V1\\Knowledge\\ProductController::approve/$1',    ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('products/(:num)/reject',           'Api\\V1\\Knowledge\\ProductController::reject/$1',     ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('products/(:num)/archive',          'Api\\V1\\Knowledge\\ProductController::archive/$1',    ['filter' => 'permission:knowledge.archive']);
+            $routes->get('products/(:num)/aliases',           'Api\\V1\\Knowledge\\ProductController::aliases/$1',    ['filter' => 'permission:product.view']);
+            $routes->post('products/(:num)/aliases',          'Api\\V1\\Knowledge\\ProductController::storeAlias/$1', ['filter' => 'permission:product.manage']);
+
+            // Modules
+            $routes->get('modules',                   'Api\\V1\\Knowledge\\ModuleController::index',       ['filter' => 'permission:product.view']);
+            $routes->post('modules',                  'Api\\V1\\Knowledge\\ModuleController::store',       ['filter' => 'permission:product.manage']);
+            $routes->get('modules/(:num)',            'Api\\V1\\Knowledge\\ModuleController::show/$1',     ['filter' => 'permission:product.view']);
+            $routes->put('modules/(:num)',            'Api\\V1\\Knowledge\\ModuleController::update/$1',   ['filter' => 'permission:product.manage']);
+            $routes->delete('modules/(:num)',         'Api\\V1\\Knowledge\\ModuleController::destroy/$1',  ['filter' => 'permission:product.manage']);
+            $routes->post('modules/(:num)/submit',    'Api\\V1\\Knowledge\\ModuleController::submit/$1',   ['filter' => 'permission:knowledge.submit']);
+            $routes->post('modules/(:num)/approve',   'Api\\V1\\Knowledge\\ModuleController::approve/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('modules/(:num)/reject',    'Api\\V1\\Knowledge\\ModuleController::reject/$1',   ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Features
+            $routes->get('features',                  'Api\\V1\\Knowledge\\FeatureController::index',      ['filter' => 'permission:product.view']);
+            $routes->post('features',                 'Api\\V1\\Knowledge\\FeatureController::store',      ['filter' => 'permission:product.manage']);
+            $routes->get('features/(:num)',           'Api\\V1\\Knowledge\\FeatureController::show/$1',    ['filter' => 'permission:product.view']);
+            $routes->put('features/(:num)',           'Api\\V1\\Knowledge\\FeatureController::update/$1',  ['filter' => 'permission:product.manage']);
+            $routes->delete('features/(:num)',        'Api\\V1\\Knowledge\\FeatureController::destroy/$1', ['filter' => 'permission:product.manage']);
+            $routes->post('features/(:num)/submit',   'Api\\V1\\Knowledge\\FeatureController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('features/(:num)/approve',  'Api\\V1\\Knowledge\\FeatureController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('features/(:num)/reject',   'Api\\V1\\Knowledge\\FeatureController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Personas
+            $routes->get('personas',                  'Api\\V1\\Knowledge\\PersonaController::index',      ['filter' => 'permission:persona.view']);
+            $routes->post('personas',                 'Api\\V1\\Knowledge\\PersonaController::store',      ['filter' => 'permission:persona.manage']);
+            $routes->get('personas/(:num)',           'Api\\V1\\Knowledge\\PersonaController::show/$1',    ['filter' => 'permission:persona.view']);
+            $routes->put('personas/(:num)',           'Api\\V1\\Knowledge\\PersonaController::update/$1',  ['filter' => 'permission:persona.manage']);
+            $routes->delete('personas/(:num)',        'Api\\V1\\Knowledge\\PersonaController::destroy/$1', ['filter' => 'permission:persona.manage']);
+            $routes->post('personas/(:num)/submit',   'Api\\V1\\Knowledge\\PersonaController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('personas/(:num)/approve',  'Api\\V1\\Knowledge\\PersonaController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('personas/(:num)/reject',   'Api\\V1\\Knowledge\\PersonaController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Industries
+            $routes->get('industries',                  'Api\\V1\\Knowledge\\IndustryController::index',      ['filter' => 'permission:industry.view']);
+            $routes->post('industries',                 'Api\\V1\\Knowledge\\IndustryController::store',      ['filter' => 'permission:industry.manage']);
+            $routes->get('industries/(:num)',           'Api\\V1\\Knowledge\\IndustryController::show/$1',    ['filter' => 'permission:industry.view']);
+            $routes->put('industries/(:num)',           'Api\\V1\\Knowledge\\IndustryController::update/$1',  ['filter' => 'permission:industry.manage']);
+            $routes->delete('industries/(:num)',        'Api\\V1\\Knowledge\\IndustryController::destroy/$1', ['filter' => 'permission:industry.manage']);
+            $routes->post('industries/(:num)/submit',   'Api\\V1\\Knowledge\\IndustryController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('industries/(:num)/approve',  'Api\\V1\\Knowledge\\IndustryController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('industries/(:num)/reject',   'Api\\V1\\Knowledge\\IndustryController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Markets
+            $routes->get('markets',                  'Api\\V1\\Knowledge\\MarketController::index',      ['filter' => 'permission:knowledge.view']);
+            $routes->post('markets',                 'Api\\V1\\Knowledge\\MarketController::store',      ['filter' => 'permission:knowledge.create']);
+            $routes->get('markets/(:num)',           'Api\\V1\\Knowledge\\MarketController::show/$1',    ['filter' => 'permission:knowledge.view']);
+            $routes->put('markets/(:num)',           'Api\\V1\\Knowledge\\MarketController::update/$1',  ['filter' => 'permission:knowledge.edit']);
+            $routes->delete('markets/(:num)',        'Api\\V1\\Knowledge\\MarketController::destroy/$1', ['filter' => 'permission:knowledge.edit']);
+            $routes->post('markets/(:num)/submit',   'Api\\V1\\Knowledge\\MarketController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('markets/(:num)/approve',  'Api\\V1\\Knowledge\\MarketController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('markets/(:num)/reject',   'Api\\V1\\Knowledge\\MarketController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Business Problems
+            $routes->get('problems',                  'Api\\V1\\Knowledge\\BusinessProblemController::index',      ['filter' => 'permission:knowledge.view']);
+            $routes->post('problems',                 'Api\\V1\\Knowledge\\BusinessProblemController::store',      ['filter' => 'permission:knowledge.create']);
+            $routes->get('problems/(:num)',           'Api\\V1\\Knowledge\\BusinessProblemController::show/$1',    ['filter' => 'permission:knowledge.view']);
+            $routes->put('problems/(:num)',           'Api\\V1\\Knowledge\\BusinessProblemController::update/$1',  ['filter' => 'permission:knowledge.edit']);
+            $routes->delete('problems/(:num)',        'Api\\V1\\Knowledge\\BusinessProblemController::destroy/$1', ['filter' => 'permission:knowledge.edit']);
+            $routes->post('problems/(:num)/submit',   'Api\\V1\\Knowledge\\BusinessProblemController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('problems/(:num)/approve',  'Api\\V1\\Knowledge\\BusinessProblemController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('problems/(:num)/reject',   'Api\\V1\\Knowledge\\BusinessProblemController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Search Intents
+            $routes->get('search-intents',                               'Api\\V1\\Knowledge\\SearchIntentController::index',          ['filter' => 'permission:intent.view']);
+            $routes->post('search-intents',                              'Api\\V1\\Knowledge\\SearchIntentController::store',          ['filter' => 'permission:intent.manage']);
+            $routes->get('search-intents/(:num)',                        'Api\\V1\\Knowledge\\SearchIntentController::show/$1',        ['filter' => 'permission:intent.view']);
+            $routes->put('search-intents/(:num)',                        'Api\\V1\\Knowledge\\SearchIntentController::update/$1',      ['filter' => 'permission:intent.manage']);
+            $routes->delete('search-intents/(:num)',                     'Api\\V1\\Knowledge\\SearchIntentController::destroy/$1',     ['filter' => 'permission:intent.manage']);
+            $routes->post('search-intents/(:num)/submit',                'Api\\V1\\Knowledge\\SearchIntentController::submit/$1',      ['filter' => 'permission:knowledge.submit']);
+            $routes->post('search-intents/(:num)/approve',               'Api\\V1\\Knowledge\\SearchIntentController::approve/$1',     ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('search-intents/(:num)/reject',                'Api\\V1\\Knowledge\\SearchIntentController::reject/$1',      ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('search-intents/(:num)/sync-relations',        'Api\\V1\\Knowledge\\SearchIntentController::syncRelations/$1', ['filter' => 'permission:intent.manage']);
+
+            // Topic Clusters
+            $routes->get('topic-clusters',                 'Api\\V1\\Knowledge\\TopicClusterController::index',      ['filter' => 'permission:knowledge.view']);
+            $routes->post('topic-clusters',                'Api\\V1\\Knowledge\\TopicClusterController::store',      ['filter' => 'permission:knowledge.create']);
+            $routes->get('topic-clusters/(:num)',          'Api\\V1\\Knowledge\\TopicClusterController::show/$1',    ['filter' => 'permission:knowledge.view']);
+            $routes->put('topic-clusters/(:num)',          'Api\\V1\\Knowledge\\TopicClusterController::update/$1',  ['filter' => 'permission:knowledge.edit']);
+            $routes->delete('topic-clusters/(:num)',       'Api\\V1\\Knowledge\\TopicClusterController::destroy/$1', ['filter' => 'permission:knowledge.edit']);
+            $routes->post('topic-clusters/(:num)/submit',  'Api\\V1\\Knowledge\\TopicClusterController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('topic-clusters/(:num)/approve', 'Api\\V1\\Knowledge\\TopicClusterController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('topic-clusters/(:num)/reject',  'Api\\V1\\Knowledge\\TopicClusterController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Claims
+            $routes->get('claims',                       'Api\\V1\\Knowledge\\ClaimController::index',         ['filter' => 'permission:claim.view']);
+            $routes->post('claims',                      'Api\\V1\\Knowledge\\ClaimController::store',         ['filter' => 'permission:claim.manage']);
+            $routes->get('claims/(:num)',                'Api\\V1\\Knowledge\\ClaimController::show/$1',       ['filter' => 'permission:claim.view']);
+            $routes->put('claims/(:num)',                'Api\\V1\\Knowledge\\ClaimController::update/$1',     ['filter' => 'permission:claim.manage']);
+            $routes->delete('claims/(:num)',             'Api\\V1\\Knowledge\\ClaimController::destroy/$1',    ['filter' => 'permission:claim.manage']);
+            $routes->post('claims/(:num)/submit',        'Api\\V1\\Knowledge\\ClaimController::submit/$1',     ['filter' => 'permission:knowledge.submit']);
+            $routes->post('claims/(:num)/approve',       'Api\\V1\\Knowledge\\ClaimController::approve/$1',    ['filter' => ['permission:claim.approve', 'throttle:approval']]);
+            $routes->post('claims/(:num)/reject',        'Api\\V1\\Knowledge\\ClaimController::reject/$1',     ['filter' => ['permission:claim.approve', 'throttle:approval']]);
+            $routes->post('claims/(:num)/sync-evidence', 'Api\\V1\\Knowledge\\ClaimController::syncEvidence/$1', ['filter' => 'permission:claim.manage']);
+
+            // Evidence
+            $routes->get('evidence',                  'Api\\V1\\Knowledge\\EvidenceController::index',      ['filter' => 'permission:knowledge.view']);
+            $routes->post('evidence',                 'Api\\V1\\Knowledge\\EvidenceController::store',      ['filter' => 'permission:knowledge.create']);
+            $routes->get('evidence/(:num)',           'Api\\V1\\Knowledge\\EvidenceController::show/$1',    ['filter' => 'permission:knowledge.view']);
+            $routes->put('evidence/(:num)',           'Api\\V1\\Knowledge\\EvidenceController::update/$1',  ['filter' => 'permission:knowledge.edit']);
+            $routes->delete('evidence/(:num)',        'Api\\V1\\Knowledge\\EvidenceController::destroy/$1', ['filter' => 'permission:knowledge.edit']);
+            $routes->post('evidence/(:num)/submit',   'Api\\V1\\Knowledge\\EvidenceController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('evidence/(:num)/approve',  'Api\\V1\\Knowledge\\EvidenceController::approve/$1', ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+            $routes->post('evidence/(:num)/reject',   'Api\\V1\\Knowledge\\EvidenceController::reject/$1',  ['filter' => ['permission:knowledge.approve', 'throttle:approval']]);
+
+            // Sources
+            $routes->get('sources',                  'Api\\V1\\Knowledge\\SourceController::index',      ['filter' => 'permission:source.view']);
+            $routes->post('sources',                 'Api\\V1\\Knowledge\\SourceController::store',      ['filter' => 'permission:source.manage']);
+            $routes->get('sources/(:num)',           'Api\\V1\\Knowledge\\SourceController::show/$1',    ['filter' => 'permission:source.view']);
+            $routes->put('sources/(:num)',           'Api\\V1\\Knowledge\\SourceController::update/$1',  ['filter' => 'permission:source.manage']);
+            $routes->delete('sources/(:num)',        'Api\\V1\\Knowledge\\SourceController::destroy/$1', ['filter' => 'permission:source.manage']);
+            $routes->post('sources/(:num)/submit',   'Api\\V1\\Knowledge\\SourceController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('sources/(:num)/approve',  'Api\\V1\\Knowledge\\SourceController::approve/$1', ['filter' => ['permission:source.approve', 'throttle:approval']]);
+            $routes->post('sources/(:num)/reject',   'Api\\V1\\Knowledge\\SourceController::reject/$1',  ['filter' => ['permission:source.approve', 'throttle:approval']]);
+
+            // Citations
+            $routes->get('citations',                  'Api\\V1\\Knowledge\\CitationController::index',      ['filter' => 'permission:citation.view']);
+            $routes->post('citations',                 'Api\\V1\\Knowledge\\CitationController::store',      ['filter' => 'permission:citation.manage']);
+            $routes->get('citations/(:num)',           'Api\\V1\\Knowledge\\CitationController::show/$1',    ['filter' => 'permission:citation.view']);
+            $routes->put('citations/(:num)',           'Api\\V1\\Knowledge\\CitationController::update/$1',  ['filter' => 'permission:citation.manage']);
+            $routes->delete('citations/(:num)',        'Api\\V1\\Knowledge\\CitationController::destroy/$1', ['filter' => 'permission:citation.manage']);
+            $routes->post('citations/(:num)/submit',   'Api\\V1\\Knowledge\\CitationController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('citations/(:num)/approve',  'Api\\V1\\Knowledge\\CitationController::approve/$1', ['filter' => ['permission:citation.approve', 'throttle:approval']]);
+            $routes->post('citations/(:num)/reject',   'Api\\V1\\Knowledge\\CitationController::reject/$1',  ['filter' => ['permission:citation.approve', 'throttle:approval']]);
+
+            // Brand Rules
+            $routes->get('brand-rules',                  'Api\\V1\\Knowledge\\BrandRuleController::index',      ['filter' => 'permission:brand_rules.view']);
+            $routes->post('brand-rules',                 'Api\\V1\\Knowledge\\BrandRuleController::store',      ['filter' => 'permission:brand_rules.manage']);
+            $routes->get('brand-rules/(:num)',           'Api\\V1\\Knowledge\\BrandRuleController::show/$1',    ['filter' => 'permission:brand_rules.view']);
+            $routes->put('brand-rules/(:num)',           'Api\\V1\\Knowledge\\BrandRuleController::update/$1',  ['filter' => 'permission:brand_rules.manage']);
+            $routes->delete('brand-rules/(:num)',        'Api\\V1\\Knowledge\\BrandRuleController::destroy/$1', ['filter' => 'permission:brand_rules.manage']);
+            $routes->post('brand-rules/(:num)/submit',   'Api\\V1\\Knowledge\\BrandRuleController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('brand-rules/(:num)/approve',  'Api\\V1\\Knowledge\\BrandRuleController::approve/$1', ['filter' => ['permission:brand_rules.approve', 'throttle:approval']]);
+            $routes->post('brand-rules/(:num)/reject',   'Api\\V1\\Knowledge\\BrandRuleController::reject/$1',  ['filter' => ['permission:brand_rules.approve', 'throttle:approval']]);
+
+            // Content Policies
+            $routes->get('content-policies',                  'Api\\V1\\Knowledge\\ContentPolicyController::index',      ['filter' => 'permission:content_policy.view']);
+            $routes->post('content-policies',                 'Api\\V1\\Knowledge\\ContentPolicyController::store',      ['filter' => 'permission:content_policy.manage']);
+            $routes->get('content-policies/(:num)',           'Api\\V1\\Knowledge\\ContentPolicyController::show/$1',    ['filter' => 'permission:content_policy.view']);
+            $routes->put('content-policies/(:num)',           'Api\\V1\\Knowledge\\ContentPolicyController::update/$1',  ['filter' => 'permission:content_policy.manage']);
+            $routes->delete('content-policies/(:num)',        'Api\\V1\\Knowledge\\ContentPolicyController::destroy/$1', ['filter' => 'permission:content_policy.manage']);
+            $routes->post('content-policies/(:num)/submit',   'Api\\V1\\Knowledge\\ContentPolicyController::submit/$1',  ['filter' => 'permission:knowledge.submit']);
+            $routes->post('content-policies/(:num)/approve',  'Api\\V1\\Knowledge\\ContentPolicyController::approve/$1', ['filter' => ['permission:content_policy.approve', 'throttle:approval']]);
+            $routes->post('content-policies/(:num)/reject',   'Api\\V1\\Knowledge\\ContentPolicyController::reject/$1',  ['filter' => ['permission:content_policy.approve', 'throttle:approval']]);
+
+        }); // end knowledge group
+
     });
 });
