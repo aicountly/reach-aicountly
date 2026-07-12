@@ -53,7 +53,7 @@ export function ContentEditorPage() {
     }
   }, [id]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -116,3 +116,4 @@ export function ContentEditorPage() {
     </div>
   );
 }
+

@@ -25,7 +25,7 @@ export function ContentBriefPage() {
     finally { setLoading(false); }
   }, [id]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -89,3 +89,4 @@ export function ContentBriefPage() {
     </div>
   );
 }
+

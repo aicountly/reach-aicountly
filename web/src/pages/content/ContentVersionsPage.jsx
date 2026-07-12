@@ -25,7 +25,7 @@ export function ContentVersionsPage() {
     finally { setLoading(false); }
   }, [id]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleCompare = async () => {
     if (!compareA || !compareB) return;
@@ -90,3 +90,4 @@ export function ContentVersionsPage() {
     </div>
   );
 }
+

@@ -45,7 +45,7 @@ export function ContentDetailPage() {
     }
   }, [id]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleSubmit = async () => {
     setActioning('submit');
@@ -185,3 +185,4 @@ export function ContentDetailPage() {
     </div>
   );
 }
+

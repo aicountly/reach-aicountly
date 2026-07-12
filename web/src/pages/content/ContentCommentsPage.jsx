@@ -25,7 +25,7 @@ export function ContentCommentsPage() {
     finally { setLoading(false); }
   }, [id, showResolved]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   if (loading) return <Loader />;
 
@@ -50,3 +50,4 @@ export function ContentCommentsPage() {
     </div>
   );
 }
+

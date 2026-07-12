@@ -24,7 +24,7 @@ export function ContentValidationsPage() {
     finally { setLoading(false); }
   }, [id]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   if (loading) return <Loader />;
 
@@ -43,3 +43,4 @@ export function ContentValidationsPage() {
     </div>
   );
 }
+

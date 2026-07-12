@@ -102,7 +102,7 @@ export function DailyPackPage() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { loadDetail(selected); }, [loadDetail, selected]);
 
   const handleGenerate = async () => {

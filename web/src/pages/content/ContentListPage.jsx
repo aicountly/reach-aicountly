@@ -43,7 +43,7 @@ export function ContentListPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const columns = [
     { key: 'type', label: 'Type', render: (r) => <ContentTypeBadge type={r.content_type} /> },

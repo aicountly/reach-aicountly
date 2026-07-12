@@ -30,7 +30,7 @@ export function ContentSchedulePage() {
     finally { setLoading(false); }
   }, [id]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleSchedule = async (e) => {
     e.preventDefault();
@@ -101,3 +101,4 @@ export function ContentSchedulePage() {
     </div>
   );
 }
+
