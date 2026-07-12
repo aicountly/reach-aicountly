@@ -117,7 +117,10 @@ jobs:
             sleep 1
           done
 
-      - name: PHPUnit
+      - name: PHPUnit (Unit)
+        run: vendor/bin/phpunit --testsuite Unit --no-coverage
+
+      - name: PHPUnit (Feature)
         env:
           database.tests.hostname: 127.0.0.1
           database.tests.port: '5432'
@@ -126,4 +129,4 @@ jobs:
           database.tests.password: reach_test_password
           database.tests.DBDriver: Postgre
           JWT_SECRET: ci-jwt-secret-32-chars-of-material-abcdef
-        run: vendor/bin/phpunit --no-coverage
+        run: vendor/bin/phpunit --testsuite Feature --no-coverage
