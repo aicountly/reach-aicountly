@@ -67,6 +67,7 @@ export const ROUTES = {
   KNOWLEDGE_SOURCES:    '/knowledge/sources',
   KNOWLEDGE_CITATIONS:  '/knowledge/citations',
   KNOWLEDGE_CLAIMS:     '/knowledge/claims',
-  KNOWLEDGE_BRAND_RULES:'/knowledge/brand-rules',
-  KNOWLEDGE_POLICIES:   '/knowledge/content-policies',
+  KNOWLEDGE_BRAND_RULES:   '/knowledge/brand-rules',
+  KNOWLEDGE_POLICIES:      '/knowledge/content-policies',
+  KNOWLEDGE_COMPLETENESS:  '/knowledge/completeness',
 };

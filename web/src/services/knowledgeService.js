@@ -138,4 +138,8 @@ export const knowledgeService = {
   groundingProduct: (slug) => api.get(`${K}/grounding/product/${slug}`),
   groundingIntent:  (id)   => api.get(`${K}/grounding/intent/${id}`),
   groundingContext: (b)    => api.post(`${K}/grounding/context`, b),
+
+  // Completeness scoring
+  completenessAll:     ()   => api.get(`${K}/completeness`),
+  completenessProduct: (id) => api.get(`${K}/completeness/product/${id}`),
 };

@@ -236,6 +236,10 @@ $routes->group('v1', static function ($routes) {
             $routes->get('grounding/intent/(:num)',       'Api\\V1\\Knowledge\\GroundingController::intent/$1',  ['filter' => 'permission:knowledge.view']);
             $routes->post('grounding/context',            'Api\\V1\\Knowledge\\GroundingController::context',    ['filter' => 'permission:knowledge.view']);
 
+            // Completeness scoring
+            $routes->get('completeness',               'Api\\V1\\Knowledge\\CompletenessController::index',       ['filter' => 'permission:knowledge.view']);
+            $routes->get('completeness/product/(:num)','Api\\V1\\Knowledge\\CompletenessController::product/$1',  ['filter' => 'permission:knowledge.view']);
+
             // Products
             $routes->get('products',                          'Api\\V1\\Knowledge\\ProductController::index',          ['filter' => 'permission:product.view']);
             $routes->post('products',                         'Api\\V1\\Knowledge\\ProductController::store',          ['filter' => 'permission:product.manage']);

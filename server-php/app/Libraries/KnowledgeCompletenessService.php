@@ -109,9 +109,9 @@ class KnowledgeCompletenessService
         return $summaries;
     }
 
-    // ── Private ─────────────────────────────────────────────────────────────
+    // ── Protected (overrideable in tests) ────────────────────────────────────
 
-    private function calculate(array $product): array
+    public function calculate(array $product): array
     {
         $id      = (int) $product['id'];
         $missing = [];
@@ -138,7 +138,7 @@ class KnowledgeCompletenessService
         $scores['identity'] = $identityScore;
 
         // 2. Modules
-        $modules = $this->modules->forProduct($id, true);
+        $modules = $this->modulesForProduct($id);
         $modScore = min(100, count($modules) * 25);
         if (count($modules) === 0) {
             $missing[] = 'no_modules';
@@ -147,7 +147,7 @@ class KnowledgeCompletenessService
 
         // 3. Features
         $featureCount = 0;
-        $availCounts  = $this->features->availabilityCountsForProduct($id);
+        $availCounts  = $this->featureAvailabilityCountsForProduct($id);
         foreach ($availCounts as $count) {
             $featureCount += $count;
         }
@@ -162,7 +162,7 @@ class KnowledgeCompletenessService
         $scores['features'] = $featScore;
 
         // 4. Personas
-        $personaCount = count($this->personas->forProduct($id, true));
+        $personaCount = count($this->personasForProduct($id));
         $persScore    = min(100, $personaCount * 34);
         if ($personaCount === 0) {
             $missing[] = 'no_personas';
@@ -178,7 +178,7 @@ class KnowledgeCompletenessService
         $scores['industries'] = $indScore;
 
         // 6. Markets
-        $marketIds  = $this->markets->forProduct($id, true);
+        $marketIds  = $this->marketsForProduct($id);
         $mktScore   = min(100, count($marketIds) * 50);
         if (empty($marketIds)) {
             $missing[] = 'no_markets';
@@ -194,7 +194,7 @@ class KnowledgeCompletenessService
         $scores['problems'] = $probScore;
 
         // 8. Search intents
-        $intentCount = count($this->intents->forProduct($id, true));
+        $intentCount = count($this->intentsForProduct($id));
         $intScore    = min(100, $intentCount * 10);
         if ($intentCount < 3) {
             $missing[] = 'insufficient_search_intents';
@@ -202,14 +202,14 @@ class KnowledgeCompletenessService
         $scores['search_intents'] = $intScore;
 
         // 9. Claims
-        $allClaims    = $this->claims->forProduct($id);
+        $allClaims    = $this->claimsForProduct($id);
         $approvedClaims = array_filter($allClaims, fn($c) => $c['status'] === 'approved');
         $unsupportedClaims = [];
         $expiredEvidence   = [];
 
         foreach ($approvedClaims as $claim) {
             if ($claim['requires_evidence']) {
-                $evCount = $this->claims->approvedEvidenceCount((int) $claim['id']);
+                $evCount = $this->approvedEvidenceCountForClaim((int) $claim['id']);
                 if ($evCount === 0) {
                     $unsupportedClaims[] = [
                         'id'           => $claim['id'],
@@ -231,7 +231,7 @@ class KnowledgeCompletenessService
         // 10. Evidence
         $evidenceRows  = $this->evidenceForProduct($id);
         $approvedEv    = array_filter($evidenceRows, fn($e) => $e['status'] === 'approved');
-        $expiredEv     = array_filter($approvedEv, fn($e) => $this->evidence->isExpired($e));
+        $expiredEv     = array_filter($approvedEv, fn($e) => $this->isEvidenceExpired($e));
         $evScore       = min(100, count($approvedEv) * 17);
         if (count($approvedEv) === 0) {
             $missing[] = 'no_evidence';
@@ -245,7 +245,7 @@ class KnowledgeCompletenessService
         $scores['evidence'] = $evScore;
 
         // 11. Sources
-        $sourceCount = count($this->sources->findApproved());
+        $sourceCount = count($this->findApprovedSources());
         $srcScore    = min(100, $sourceCount * 20);
         if ($sourceCount === 0) {
             $missing[] = 'no_verified_sources';
@@ -253,7 +253,7 @@ class KnowledgeCompletenessService
         $scores['sources'] = $srcScore;
 
         // 12. Brand rules
-        $brandRuleCount = count($this->brandRules->forProduct($id, true));
+        $brandRuleCount = count($this->brandRulesForProduct($id));
         $brScore        = min(100, $brandRuleCount * 50);
         if ($brandRuleCount === 0) {
             $missing[] = 'no_brand_rules';
@@ -290,7 +290,57 @@ class KnowledgeCompletenessService
         ];
     }
 
-    private function industriesForProduct(int $productId): array
+    protected function modulesForProduct(int $productId): array
+    {
+        return $this->modules->forProduct($productId, true);
+    }
+
+    protected function featureAvailabilityCountsForProduct(int $productId): array
+    {
+        return $this->features->availabilityCountsForProduct($productId);
+    }
+
+    protected function personasForProduct(int $productId): array
+    {
+        return $this->personas->forProduct($productId, true);
+    }
+
+    protected function marketsForProduct(int $productId): array
+    {
+        return $this->markets->forProduct($productId, true);
+    }
+
+    protected function intentsForProduct(int $productId): array
+    {
+        return $this->intents->forProduct($productId, true);
+    }
+
+    protected function claimsForProduct(int $productId): array
+    {
+        return $this->claims->forProduct($productId);
+    }
+
+    protected function approvedEvidenceCountForClaim(int $claimId): int
+    {
+        return $this->claims->approvedEvidenceCount($claimId);
+    }
+
+    protected function isEvidenceExpired(array $evidence): bool
+    {
+        return $this->evidence->isExpired($evidence);
+    }
+
+    protected function findApprovedSources(): array
+    {
+        return $this->sources->findApproved();
+    }
+
+    protected function brandRulesForProduct(int $productId): array
+    {
+        return $this->brandRules->forProduct($productId, true);
+    }
+
+    protected function industriesForProduct(int $productId): array
     {
         $rows = \Config\Database::connect()
             ->table('reach_product_industries')
@@ -300,7 +350,7 @@ class KnowledgeCompletenessService
         return array_column($rows, 'industry_id');
     }
 
-    private function problemsForProduct(int $productId): array
+    protected function problemsForProduct(int $productId): array
     {
         $db = \Config\Database::connect();
         $rows = $db->table('reach_feature_problems fp')
@@ -313,7 +363,7 @@ class KnowledgeCompletenessService
         return array_unique(array_column($rows, 'problem_id'));
     }
 
-    private function evidenceForProduct(int $productId): array
+    protected function evidenceForProduct(int $productId): array
     {
         $db = \Config\Database::connect();
         $rows = $db->table('reach_product_evidence pe')

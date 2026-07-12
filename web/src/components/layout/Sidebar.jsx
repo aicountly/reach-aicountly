@@ -48,7 +48,8 @@ const NAV = [
       { label: 'Products',           path: ROUTES.KNOWLEDGE_PRODUCTS,   icon: BookOpen, requires: 'product.view' },
       { label: 'Claims',             path: ROUTES.KNOWLEDGE_CLAIMS,     icon: BookOpen, requires: 'claim.view' },
       { label: 'Brand Rules',        path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: BookOpen, requires: 'brand_rules.view' },
-      { label: 'Content Policies',   path: ROUTES.KNOWLEDGE_POLICIES,   icon: BookOpen, requires: 'content_policy.view' },
+      { label: 'Content Policies',   path: ROUTES.KNOWLEDGE_POLICIES,      icon: BookOpen, requires: 'content_policy.view' },
+      { label: 'Completeness',       path: ROUTES.KNOWLEDGE_COMPLETENESS,  icon: BookOpen, requires: 'knowledge.view' },
     ],
   },
   {

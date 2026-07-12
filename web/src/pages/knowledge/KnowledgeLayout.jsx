@@ -3,7 +3,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { ROUTES } from '../../constants/routes';
 import {
   BookOpen, Users, Building2, Globe2, HelpCircle,
-  Search, Layers, Link2, Quote, ShieldAlert, FileText, Tag,
+  Search, Layers, Link2, Quote, ShieldAlert, FileText, Tag, Activity,
 } from 'lucide-react';
 
 const KNOWLEDGE_NAV = [
@@ -19,7 +19,8 @@ const KNOWLEDGE_NAV = [
   { label: 'Citations',         path: ROUTES.KNOWLEDGE_CITATIONS,  icon: Quote,       requires: 'citation.view' },
   { label: 'Claims',            path: ROUTES.KNOWLEDGE_CLAIMS,     icon: ShieldAlert, requires: 'claim.view' },
   { label: 'Brand Rules',       path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: FileText,    requires: 'brand_rules.view' },
-  { label: 'Content Policies',  path: ROUTES.KNOWLEDGE_POLICIES,   icon: FileText,    requires: 'content_policy.view' },
+  { label: 'Content Policies',  path: ROUTES.KNOWLEDGE_POLICIES,      icon: FileText,  requires: 'content_policy.view' },
+  { label: 'Completeness',      path: ROUTES.KNOWLEDGE_COMPLETENESS,  icon: Activity,  requires: 'knowledge.view' },
 ];
 
 export function KnowledgeLayout() {

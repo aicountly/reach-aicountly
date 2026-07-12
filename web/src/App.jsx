@@ -64,6 +64,7 @@ import { CitationListPage } from './pages/knowledge/CitationListPage';
 import { ClaimListPage } from './pages/knowledge/ClaimListPage';
 import { BrandRulesPage } from './pages/knowledge/BrandRulesPage';
 import { ContentPoliciesPage } from './pages/knowledge/ContentPoliciesPage';
+import { CompletenessPage } from './pages/knowledge/CompletenessPage';
 
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
@@ -147,6 +148,7 @@ export default function App() {
           <Route path="claims" element={<ClaimListPage />} />
           <Route path="brand-rules" element={<BrandRulesPage />} />
           <Route path="content-policies" element={<ContentPoliciesPage />} />
+          <Route path="completeness" element={<CompletenessPage />} />
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />

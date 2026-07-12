@@ -25,6 +25,7 @@ export function ProductDetailPage() {
     knowledgeService.getProduct(id).then(setProduct).catch((e) => setError(e.message));
     knowledgeService.listModules({ product_id: id, limit: 50 }).then((d) => setModules(d.items || [])).catch(() => {});
     knowledgeService.listClaims({ product_id: id, limit: 50 }).then((d) => setClaims(d.items || [])).catch(() => {});
+    knowledgeService.completenessProduct(id).then(setCompl).catch(() => {});
   }, [id]);
 
   useEffect(() => { load(); }, [load]);

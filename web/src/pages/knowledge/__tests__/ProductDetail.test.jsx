@@ -9,9 +9,10 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 vi.mock('../../../services/knowledgeService', () => ({
   knowledgeService: {
-    getProduct: vi.fn(),
-    listModules: vi.fn(),
-    listClaims: vi.fn(),
+    getProduct:          vi.fn(),
+    listModules:         vi.fn(),
+    listClaims:          vi.fn(),
+    completenessProduct: vi.fn(),
   },
 }));
 
@@ -22,6 +23,7 @@ beforeEach(() => {
   knowledgeService.getProduct.mockReset();
   knowledgeService.listModules.mockReset();
   knowledgeService.listClaims.mockReset();
+  knowledgeService.completenessProduct.mockReset();
 });
 
 const authAsAdmin = {
@@ -36,6 +38,7 @@ describe('ProductDetailPage', () => {
     knowledgeService.getProduct.mockResolvedValueOnce({ id: 42, name: 'Reach AI', slug: 'reach-ai', knowledge_status: 'approved' });
     knowledgeService.listModules.mockResolvedValueOnce({ items: [] });
     knowledgeService.listClaims.mockResolvedValueOnce({ items: [] });
+    knowledgeService.completenessProduct.mockResolvedValueOnce({ score: 72, missing: [] });
 
     renderWithAuth(<ProductDetailPage />, authAsAdmin);
     await waitFor(() => expect(screen.getByText('Reach AI')).toBeInTheDocument());
@@ -45,6 +48,7 @@ describe('ProductDetailPage', () => {
     knowledgeService.getProduct.mockRejectedValueOnce(new Error('Not found'));
     knowledgeService.listModules.mockResolvedValueOnce({ items: [] });
     knowledgeService.listClaims.mockResolvedValueOnce({ items: [] });
+    knowledgeService.completenessProduct.mockResolvedValueOnce({ score: 0, missing: [] });
 
     renderWithAuth(<ProductDetailPage />, authAsAdmin);
     await waitFor(() => expect(screen.getByText(/Not found/)).toBeInTheDocument());
