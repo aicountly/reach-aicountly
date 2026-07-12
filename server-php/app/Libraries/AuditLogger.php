@@ -27,6 +27,10 @@ class AuditLogger
         'security.', 'integration.', 'role.',
         // Phase 1 knowledge events
         'knowledge.',
+        // Phase 2 content events
+        'content.',
+        'publication.',
+        'daily_pack.',
     ];
 
     /**
@@ -45,6 +49,34 @@ class AuditLogger
     public const KNOWLEDGE_RELATION_ADD  = 'knowledge.relation_added';
     public const KNOWLEDGE_RELATION_DEL  = 'knowledge.relation_removed';
     public const KNOWLEDGE_CLAIM_HIGH_RISK_BLOCKED = 'knowledge.claim_high_risk_blocked';
+
+    /**
+     * Phase 2 content audit event slugs.
+     */
+    public const CONTENT_CREATED              = 'content.created';
+    public const CONTENT_UPDATED              = 'content.updated';
+    public const CONTENT_ARCHIVED             = 'content.archived';
+    public const CONTENT_STATUS_CHANGED       = 'content.status_changed';
+    public const CONTENT_SUBMITTED            = 'content.submitted';
+    public const CONTENT_APPROVED             = 'content.approved';
+    public const CONTENT_REJECTED             = 'content.rejected';
+    public const CONTENT_CHANGES_REQUESTED    = 'content.changes_requested';
+    public const CONTENT_ASSIGNED             = 'content.assigned';
+    public const CONTENT_UNASSIGNED           = 'content.unassigned';
+    public const CONTENT_COMMENTED            = 'content.commented';
+    public const CONTENT_COMMENT_DELETED      = 'content.comment_deleted';
+    public const CONTENT_COMMENT_RESOLVED     = 'content.comment_resolved';
+    public const CONTENT_VALIDATION_STORED    = 'content.validation_stored';
+    public const CONTENT_VALIDATION_WAIVED    = 'content.validation_waived';
+    public const CONTENT_SCHEDULED            = 'content.scheduled';
+    public const CONTENT_SCHEDULE_CANCELLED   = 'content.schedule_cancelled';
+    public const CONTENT_MAPPED               = 'content.mapped';
+    public const CONTENT_VERSION_CREATED      = 'content.version_created';
+    public const PUBLICATION_ATTEMPT_CREATED  = 'publication.attempt_created';
+    public const PUBLICATION_ATTEMPT_BLOCKED  = 'publication.attempt_blocked';
+    public const DAILY_PACK_GENERATED         = 'daily_pack.generated';
+    public const DAILY_PACK_ITEM_ASSIGNED     = 'daily_pack.item_assigned';
+    public const DAILY_PACK_APPROVED          = 'daily_pack.approved';
 
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.
