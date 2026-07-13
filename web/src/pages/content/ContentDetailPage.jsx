@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Edit2, FileText, MessageSquare, CheckSquare, Clock, GitBranch, Map } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Card } from '../../components/common/Card';
@@ -14,7 +14,6 @@ import { usePermission } from '../../hooks/usePermission';
 
 export function ContentDetailPage() {
   const { id } = useParams();
-  const nav = useNavigate();
   const { has } = usePermission();
   const [item, setItem]             = useState(null);
   const [transitions, setTrans]     = useState([]);
@@ -26,7 +25,6 @@ export function ContentDetailPage() {
   const canSubmit  = has('content.submit');
   const canApprove = has('content.approve');
   const canReview  = has('content.review');
-  const canArchive = has('content.archive');
 
   const load = useCallback(async () => {
     setLoading(true);

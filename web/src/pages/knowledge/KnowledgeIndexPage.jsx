@@ -6,7 +6,8 @@ import { Loader } from '../../components/common/Loader';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
-function StatCard({ icon: Icon, label, count, to, color = '#3b82f6' }) {
+function StatCard({ icon, label, count, to, color = '#3b82f6' }) {
+  const Icon = icon;
   return (
     <Link to={to} style={{ textDecoration: 'none' }}>
       <div style={{

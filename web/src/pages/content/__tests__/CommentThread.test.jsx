@@ -18,8 +18,6 @@ const comments = [
 describe('CommentThread', () => {
   it('renders all comments', () => {
     renderWithAuth(<CommentThread comments={comments} onPost={vi.fn()} />, ctx);
-    // Comments rendered via innerHTML, check count
-    const commentItems = document.querySelectorAll('[data-testid="comment"]') || [];
     expect(screen.queryAllByText(/comment/i).length).toBeGreaterThanOrEqual(0);
   });
 

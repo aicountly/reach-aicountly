@@ -18,7 +18,7 @@ async function fetchQueue(area) {
       const d = await res.json();
       return d.data?.items ?? [];
     }
-  } catch (_) { /* fall through */ }
+  } catch { /* fall through */ }
   // Phase 0 fallback
   const d = await approvalService.list({ decision: 'pending' });
   return d.items || d;
@@ -33,7 +33,7 @@ async function fetchStats() {
       const d = await res.json();
       return d.data?.counts ?? {};
     }
-  } catch (_) { /* ignore */ }
+  } catch { /* ignore */ }
   return {};
 }
 
@@ -118,7 +118,6 @@ export function ApprovalsPage() {
 
   const canApprove = has('content.approve') || has('approval.decide');
   const canReview  = has('content.review') || has('approval.decide');
-  const canWaive   = has('content_validation.waive');
 
   const loadStats = useCallback(() => {
     setStatsLoading(true);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithAuth } from '../../../test/renderWithAuth';
 import { DailyPackPage } from '../DailyPackPage';

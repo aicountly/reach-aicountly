@@ -22,16 +22,13 @@ export default function GenerationPanel({
   const [request, setRequest] = useState(null);
   const [findings, setFindings] = useState([]);
   const [error, setError] = useState(null);
-  const [polling, setPolling] = useState(false);
 
   const pollUntilComplete = useCallback(async (uuid) => {
-    setPolling(true);
     let attempts = 0;
 
     const poll = async () => {
       if (attempts > 60) {
         setError('Generation timed out. Please check the AI Control Centre for status.');
-        setPolling(false);
         return;
       }
 
@@ -42,7 +39,6 @@ export default function GenerationPanel({
         setStatus(req.status);
 
         if (['completed', 'failed', 'cancelled', 'blocked'].includes(req.status)) {
-          setPolling(false);
           if (req.status === 'completed' && onDraftReady) {
             onDraftReady(req);
           }
@@ -56,7 +52,6 @@ export default function GenerationPanel({
         setTimeout(poll, 3000);
       } catch (e) {
         setError(e.message);
-        setPolling(false);
       }
     };
 

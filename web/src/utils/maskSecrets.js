@@ -19,7 +19,7 @@ const SECRET_PATTERNS = [
   // AWS access keys
   [/AKIA[0-9A-Z]{16}/g, '[AWS_KEY]'],
   // Generic API key patterns
-  [/(api[_-]?key|apikey|client_secret)\s*[:=]\s*["']?[A-Za-z0-9_\-]{16,}["']?/gi, '$1: [REDACTED]'],
+  [/(api[_-]?key|apikey|client_secret)\s*[:=]\s*["']?[A-Za-z0-9_-]{16,}["']?/gi, '$1: [REDACTED]'],
   // Private key blocks
   [/-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g, '[PRIVATE_KEY]'],
 ];
