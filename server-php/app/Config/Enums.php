@@ -223,6 +223,79 @@ class Enums extends BaseConfig
      */
     public array $packStatus = ['draft', 'in_progress', 'ready', 'completed', 'cancelled'];
 
+    // ── Phase 3: AI Generation Engine ────────────────────────────────────────
+
+    /**
+     * AI provider status — matches reach_ai_providers.status CHECK.
+     */
+    public array $aiProviderStatus = ['draft', 'enabled', 'disabled', 'deprecated'];
+
+    /**
+     * AI model approval status — matches reach_ai_models.approval_status CHECK.
+     */
+    public array $aiModelApprovalStatus = ['pending', 'approved', 'deprecated'];
+
+    /**
+     * AI generation request status — matches reach_ai_generation_requests.status CHECK.
+     */
+    public array $aiGenerationStatus = [
+        'pending', 'grounding', 'queued', 'processing', 'validating',
+        'completed', 'failed', 'cancelled', 'blocked',
+    ];
+
+    /**
+     * AI generation run status — matches reach_ai_generation_runs.status CHECK.
+     */
+    public array $aiRunStatus = ['pending', 'running', 'completed', 'failed', 'cancelled'];
+
+    /**
+     * AI prompt template/version status.
+     */
+    public array $aiPromptStatus = ['draft', 'needs_review', 'approved', 'rejected', 'deprecated'];
+
+    /**
+     * AI task types — what kind of generation is being requested.
+     */
+    public array $aiTaskType = [
+        'draft_generation', 'section_regeneration', 'title_suggestions',
+        'meta_description', 'summary_generation', 'email_subject_suggestions',
+        'hashtag_generation', 'cta_generation', 'content_expansion',
+        'tone_adjustment', 'seo_optimisation', 'translation_prep',
+    ];
+
+    /**
+     * AI content types — the 16 supported structured output schemas.
+     */
+    public array $aiContentType = [
+        'blog_post', 'landing_page', 'email_campaign', 'social_post',
+        'whatsapp_campaign', 'sms_campaign', 'push_notification',
+        'product_description', 'case_study', 'whitepaper',
+        'press_release', 'video_script', 'podcast_script',
+        'ad_copy', 'knowledge_article', 'generic',
+    ];
+
+    /**
+     * AI validation finding severity.
+     */
+    public array $aiValidationSeverity = ['critical', 'high', 'warning', 'info'];
+
+    /**
+     * AI validation finding status.
+     */
+    public array $aiValidationFindingStatus = ['passed', 'failed', 'warning', 'not_applicable', 'waived'];
+
+    /**
+     * AI budget scope types — matches reach_ai_budgets.scope_type CHECK.
+     */
+    public array $aiBudgetScopeType = [
+        'global', 'provider', 'model', 'content_type', 'task_type', 'user',
+    ];
+
+    /**
+     * AI budget period types — matches reach_ai_budgets.period_type CHECK.
+     */
+    public array $aiBudgetPeriodType = ['daily', 'monthly'];
+
     /**
      * Return true if the value is a member of the named enum. Unknown enum
      * names return false so typos in controllers fail closed.

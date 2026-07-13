@@ -180,6 +180,47 @@ final class Permissions
     public const PUBLICATION_TARGET_VIEW   = 'publication_target.view';
     public const PUBLICATION_TARGET_MANAGE = 'publication_target.manage';
 
+    // ── Phase 3: AI Generation, Validation, and Control Centre ───────────────
+
+    /** AI generation — who may trigger AI drafts */
+    public const AI_VIEW            = 'ai.view';
+    public const AI_GENERATE        = 'ai.generate';
+    public const AI_CANCEL          = 'ai.cancel';
+    public const AI_BULK_GENERATE   = 'ai.bulk_generate';
+
+    /** AI provider management — infrastructure team only */
+    public const AI_PROVIDER_VIEW   = 'ai_provider.view';
+    public const AI_PROVIDER_MANAGE = 'ai_provider.manage';
+
+    /** AI model management */
+    public const AI_MODEL_VIEW   = 'ai_model.view';
+    public const AI_MODEL_MANAGE = 'ai_model.manage';
+
+    /** AI routing management */
+    public const AI_ROUTING_VIEW   = 'ai_routing.view';
+    public const AI_ROUTING_MANAGE = 'ai_routing.manage';
+
+    /** AI prompt governance */
+    public const AI_PROMPT_VIEW    = 'ai_prompt.view';
+    public const AI_PROMPT_MANAGE  = 'ai_prompt.manage';
+    public const AI_PROMPT_APPROVE = 'ai_prompt.approve';
+
+    /** AI generation request visibility */
+    public const AI_GENERATION_VIEW   = 'ai_generation.view';
+    public const AI_GENERATION_MANAGE = 'ai_generation.manage';
+
+    /** AI grounding visibility */
+    public const AI_GROUNDING_VIEW = 'ai_grounding.view';
+
+    /** AI usage and budget */
+    public const AI_USAGE_VIEW     = 'ai_usage.view';
+    public const AI_BUDGET_VIEW    = 'ai_budget.view';
+    public const AI_BUDGET_MANAGE  = 'ai_budget.manage';
+
+    /** AI validation — viewing and waiving findings */
+    public const AI_VALIDATION_VIEW  = 'ai_validation.view';
+    public const AI_VALIDATION_WAIVE = 'ai_validation.waive';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -249,6 +290,17 @@ final class Permissions
                 self::CONTENT_SCHEDULE_VIEW, self::CONTENT_SCHEDULE_CREATE, self::CONTENT_SCHEDULE_CANCEL,
             ],
             'publication_target' => [self::PUBLICATION_TARGET_VIEW, self::PUBLICATION_TARGET_MANAGE],
+            // Phase 3: AI groups
+            'ai'             => [self::AI_VIEW, self::AI_GENERATE, self::AI_CANCEL, self::AI_BULK_GENERATE],
+            'ai_provider'    => [self::AI_PROVIDER_VIEW, self::AI_PROVIDER_MANAGE],
+            'ai_model'       => [self::AI_MODEL_VIEW, self::AI_MODEL_MANAGE],
+            'ai_routing'     => [self::AI_ROUTING_VIEW, self::AI_ROUTING_MANAGE],
+            'ai_prompt'      => [self::AI_PROMPT_VIEW, self::AI_PROMPT_MANAGE, self::AI_PROMPT_APPROVE],
+            'ai_generation'  => [self::AI_GENERATION_VIEW, self::AI_GENERATION_MANAGE],
+            'ai_grounding'   => [self::AI_GROUNDING_VIEW],
+            'ai_usage'       => [self::AI_USAGE_VIEW],
+            'ai_budget'      => [self::AI_BUDGET_VIEW, self::AI_BUDGET_MANAGE],
+            'ai_validation'  => [self::AI_VALIDATION_VIEW, self::AI_VALIDATION_WAIVE],
         ];
     }
 

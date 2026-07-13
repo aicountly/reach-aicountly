@@ -31,6 +31,11 @@ class AuditLogger
         'content.',
         'publication.',
         'daily_pack.',
+        // Phase 3 AI events
+        'ai.',
+        'generation.',
+        'ai_prompt.',
+        'ai_budget.',
     ];
 
     /**
@@ -77,6 +82,40 @@ class AuditLogger
     public const DAILY_PACK_GENERATED         = 'daily_pack.generated';
     public const DAILY_PACK_ITEM_ASSIGNED     = 'daily_pack.item_assigned';
     public const DAILY_PACK_APPROVED          = 'daily_pack.approved';
+
+    /**
+     * Phase 3 AI audit event slugs.
+     */
+    public const AI_GENERATION_REQUESTED   = 'ai.generation_requested';
+    public const AI_GENERATION_STARTED     = 'ai.generation_started';
+    public const AI_GENERATION_COMPLETED   = 'ai.generation_completed';
+    public const AI_GENERATION_FAILED      = 'ai.generation_failed';
+    public const AI_GENERATION_CANCELLED   = 'ai.generation_cancelled';
+    public const AI_GENERATION_BLOCKED     = 'ai.generation_blocked';
+    public const AI_GROUNDING_BUILT        = 'ai.grounding_built';
+    public const AI_GROUNDING_SNAPSHOT     = 'ai.grounding_snapshot_stored';
+    public const AI_ARTIFACT_STORED        = 'ai.artifact_stored';
+    public const AI_ARTIFACT_SCHEMA_FAILED = 'ai.artifact_schema_validation_failed';
+    public const AI_PROVIDER_HEALTH_CHANGED = 'ai.provider_health_changed';
+    public const AI_PROVIDER_CIRCUIT_OPEN  = 'ai.provider_circuit_opened';
+    public const AI_PROVIDER_CIRCUIT_CLOSE = 'ai.provider_circuit_closed';
+    public const AI_PROMPT_CREATED         = 'ai_prompt.created';
+    public const AI_PROMPT_VERSION_CREATED = 'ai_prompt.version_created';
+    public const AI_PROMPT_VERSION_APPROVED= 'ai_prompt.version_approved';
+    public const AI_PROMPT_VERSION_REJECTED= 'ai_prompt.version_rejected';
+    public const AI_BUDGET_WARNED          = 'ai_budget.warning_threshold_reached';
+    public const AI_BUDGET_HARD_BLOCKED    = 'ai_budget.hard_limit_blocked';
+    public const AI_BUDGET_UPDATED         = 'ai_budget.updated';
+    public const AI_VALIDATION_RUN_STARTED = 'ai.validation_run_started';
+    public const AI_VALIDATION_RUN_DONE    = 'ai.validation_run_completed';
+    public const AI_VALIDATION_FINDING_WAIVED = 'ai.validation_finding_waived';
+    public const AI_USAGE_RECORDED         = 'ai.usage_recorded';
+    public const AI_ROUTE_SELECTED         = 'ai.route_selected';
+    public const AI_FALLBACK_TRIGGERED     = 'ai.fallback_triggered';
+    public const AI_MODEL_ENABLED          = 'ai.model_enabled';
+    public const AI_MODEL_DISABLED         = 'ai.model_disabled';
+    public const AI_PROVIDER_ENABLED       = 'ai.provider_enabled';
+    public const AI_PROVIDER_DISABLED      = 'ai.provider_disabled';
 
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.

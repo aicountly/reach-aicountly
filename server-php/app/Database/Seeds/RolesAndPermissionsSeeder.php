@@ -57,6 +57,25 @@ class RolesAndPermissionsSeeder extends Seeder
         $contentScheduleAll    = Permissions::groups()['content_schedule'];
         $publicationTargetAll  = Permissions::groups()['publication_target'];
 
+        // Phase 3 AI permission groups
+        $aiAll             = Permissions::groups()['ai'];
+        $aiProviderAll     = Permissions::groups()['ai_provider'];
+        $aiModelAll        = Permissions::groups()['ai_model'];
+        $aiRoutingAll      = Permissions::groups()['ai_routing'];
+        $aiPromptAll       = Permissions::groups()['ai_prompt'];
+        $aiGenerationAll   = Permissions::groups()['ai_generation'];
+        $aiGroundingAll    = Permissions::groups()['ai_grounding'];
+        $aiUsageAll        = Permissions::groups()['ai_usage'];
+        $aiBudgetAll       = Permissions::groups()['ai_budget'];
+        $aiValidationAll   = Permissions::groups()['ai_validation'];
+
+        // AI view-only subsets for restricted roles
+        $aiViewOnly = [
+            Permissions::AI_VIEW,
+            Permissions::AI_GENERATION_VIEW,
+            Permissions::AI_VALIDATION_VIEW,
+        ];
+
         $knowledgeViewOnly = [
             Permissions::KNOWLEDGE_VIEW,
             Permissions::PRODUCT_VIEW, Permissions::PERSONA_VIEW,
@@ -99,6 +118,9 @@ class RolesAndPermissionsSeeder extends Seeder
                     // Phase 2 content studio
                     $contentAll, $contentVersionAll, $contentCommentAll, $contentAssignmentAll,
                     $contentValidationAll, $dailyPackAll, $contentScheduleAll, $publicationTargetAll,
+                    // Phase 3 AI — admins get full AI access
+                    $aiAll, $aiProviderAll, $aiModelAll, $aiRoutingAll, $aiPromptAll,
+                    $aiGenerationAll, $aiGroundingAll, $aiUsageAll, $aiBudgetAll, $aiValidationAll,
                 ))),
             ],
             [
@@ -125,6 +147,15 @@ class RolesAndPermissionsSeeder extends Seeder
                     $contentValidationAll,
                     $dailyPackAll, $contentScheduleAll,
                     [Permissions::PUBLICATION_TARGET_VIEW],
+                    // Phase 3 AI — managers can generate drafts; view usage/validations
+                    [
+                        Permissions::AI_VIEW, Permissions::AI_GENERATE, Permissions::AI_CANCEL,
+                        Permissions::AI_BULK_GENERATE,
+                        Permissions::AI_GENERATION_VIEW, Permissions::AI_GROUNDING_VIEW,
+                        Permissions::AI_PROMPT_VIEW, Permissions::AI_PROMPT_APPROVE,
+                        Permissions::AI_VALIDATION_VIEW, Permissions::AI_VALIDATION_WAIVE,
+                        Permissions::AI_USAGE_VIEW, Permissions::AI_BUDGET_VIEW,
+                    ],
                 ))),
             ],
             [
@@ -163,6 +194,12 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::DAILY_PACK_VIEW,
                     Permissions::CONTENT_SCHEDULE_VIEW,
                     Permissions::PUBLICATION_TARGET_VIEW,
+                    // Phase 3 AI — reviewers approve prompts, waive AI findings, view generations
+                    Permissions::AI_VIEW, Permissions::AI_GENERATION_VIEW,
+                    Permissions::AI_PROMPT_VIEW, Permissions::AI_PROMPT_APPROVE,
+                    Permissions::AI_GROUNDING_VIEW,
+                    Permissions::AI_VALIDATION_VIEW, Permissions::AI_VALIDATION_WAIVE,
+                    Permissions::AI_USAGE_VIEW,
                 ]))),
             ],
             [
@@ -176,7 +213,9 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::BLOG_VIEW, Permissions::CAMPAIGN_VIEW,
                     Permissions::SOCIAL_VIEW, Permissions::EMAIL_VIEW,
                     Permissions::WHATSAPP_VIEW, Permissions::LEAD_VIEW,
-                ], $knowledgeViewOnly, $contentViewOnly))),
+                ], $knowledgeViewOnly, $contentViewOnly, $aiViewOnly, [
+                    Permissions::AI_USAGE_VIEW,
+                ]))),
             ],
             [
                 'slug' => 'viewer',
