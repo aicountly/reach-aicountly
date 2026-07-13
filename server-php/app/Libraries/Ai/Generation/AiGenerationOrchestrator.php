@@ -15,6 +15,10 @@ use App\Libraries\Ai\Grounding\GroundingException;
 use App\Libraries\Ai\Grounding\GroundingSnapshotService;
 use App\Libraries\Ai\Prompts\OutputSchemaRegistry;
 use App\Libraries\Ai\Prompts\PromptRenderer;
+use App\Libraries\Ai\Security\AiCircuitBreaker;
+use App\Libraries\Ai\Security\ConfidentialDataDetector;
+use App\Libraries\Ai\Security\PiiScrubber;
+use App\Libraries\Ai\Security\PromptInjectionDetector;
 use App\Libraries\AuditLogger;
 
 /**
@@ -38,6 +42,8 @@ use App\Libraries\AuditLogger;
 class AiGenerationOrchestrator
 {
     private const MAX_ATTEMPTS = 3;
+    /** Maximum characters allowed in a single prompt part (system or user). */
+    private const MAX_PROMPT_CHARS = 32_000;
 
     private AiProviderRegistry $registry;
     private AiModelRouter $router;
@@ -49,19 +55,27 @@ class AiGenerationOrchestrator
     private AiGenerationArtifactService $artifacts;
     private AiBudgetService $budget;
     private PromptRenderer $renderer;
+    private PromptInjectionDetector $injectionDetector;
+    private PiiScrubber $piiScrubber;
+    private ConfidentialDataDetector $confidentialDetector;
+    private AiCircuitBreaker $circuitBreaker;
 
     public function __construct()
     {
-        $this->registry  = new AiProviderRegistry();
-        $this->router    = new AiModelRouter($this->registry);
-        $this->fallback  = new AiFallbackResolver($this->registry);
-        $this->grounding = new AiGroundingContextBuilder();
-        $this->snapshots = new GroundingSnapshotService();
-        $this->requests  = new AiGenerationRequestService();
-        $this->runs      = new AiGenerationRunService();
-        $this->artifacts = new AiGenerationArtifactService();
-        $this->budget    = new AiBudgetService();
-        $this->renderer  = new PromptRenderer();
+        $this->registry             = new AiProviderRegistry();
+        $this->router               = new AiModelRouter($this->registry);
+        $this->fallback             = new AiFallbackResolver($this->registry);
+        $this->grounding            = new AiGroundingContextBuilder();
+        $this->snapshots            = new GroundingSnapshotService();
+        $this->requests             = new AiGenerationRequestService();
+        $this->runs                 = new AiGenerationRunService();
+        $this->artifacts            = new AiGenerationArtifactService();
+        $this->budget               = new AiBudgetService();
+        $this->renderer             = new PromptRenderer();
+        $this->injectionDetector    = new PromptInjectionDetector();
+        $this->piiScrubber          = new PiiScrubber();
+        $this->confidentialDetector = new ConfidentialDataDetector();
+        $this->circuitBreaker       = new AiCircuitBreaker();
     }
 
     /**
@@ -125,6 +139,13 @@ class AiGenerationOrchestrator
             return;
         }
 
+        // --- Security: scan grounding context for confidential data ---
+        $groundingJson = json_encode($groundingContext);
+        if (! $this->confidentialDetector->isClean($groundingJson)) {
+            $this->failRequest($requestId, 'confidential_data_in_grounding', 'Confidential data detected in grounding context.');
+            return;
+        }
+
         // --- Prompt preparation ---
         $promptVersion = $this->resolvePromptVersion($request);
         $outputSchema  = $promptVersion
@@ -134,15 +155,49 @@ class AiGenerationOrchestrator
         $systemPrompt = $this->buildSystemPrompt($promptVersion, $groundingContext, $request);
         $userPrompt   = $this->buildUserPrompt($promptVersion, $request);
 
+        // --- Security: injection detection on rendered prompts ---
+        if ($this->injectionDetector->detect($userPrompt)) {
+            $this->failRequest($requestId, 'prompt_injection_detected', 'Prompt injection pattern detected in user prompt.');
+            return;
+        }
+
+        // --- Security: PII scrub user prompt ---
+        $userPrompt = $this->piiScrubber->scrub($userPrompt);
+
+        // --- Size control: hard cap on prompt lengths ---
+        if (strlen($systemPrompt) > self::MAX_PROMPT_CHARS) {
+            $systemPrompt = substr($systemPrompt, 0, self::MAX_PROMPT_CHARS);
+        }
+        if (strlen($userPrompt) > self::MAX_PROMPT_CHARS) {
+            $userPrompt = substr($userPrompt, 0, self::MAX_PROMPT_CHARS);
+        }
+
         // --- Generation with fallback ---
         $attemptedModelIds = [];
         $attemptNumber     = $this->runs->countAttemptsForRequest($requestId) + 1;
         $currentDecision   = $decision;
 
         while ($attemptNumber <= self::MAX_ATTEMPTS) {
+            $providerKey = $currentDecision->provider->getProviderKey();
+
+            // --- Circuit breaker: skip open circuits ---
+            if ($this->circuitBreaker->isOpen($providerKey)) {
+                $attemptedModelIds[] = 0;
+                $nextDecision = $currentDecision->routeId
+                    ? $this->fallback->resolveNext($currentDecision->routeId, 0, AiProviderError::CATEGORY_SERVICE_UNAVAILABLE, $attemptedModelIds)
+                    : null;
+                if (! $nextDecision) {
+                    $this->failRequest($requestId, AiProviderError::CATEGORY_SERVICE_UNAVAILABLE, 'Circuit open for provider: ' . $providerKey);
+                    return;
+                }
+                $currentDecision = $nextDecision;
+                $attemptNumber++;
+                continue;
+            }
+
             $db          = db_connect();
             $providerRow = $db->table('reach_ai_providers')
-                ->where('provider_key', $currentDecision->provider->getProviderKey())
+                ->where('provider_key', $providerKey)
                 ->limit(1)->get()->getRowArray();
             $modelRow = $db->table('reach_ai_models')
                 ->where('model_key', $currentDecision->modelKey)
@@ -166,6 +221,7 @@ class AiGenerationOrchestrator
 
             try {
                 $result = $currentDecision->provider->generate($input);
+                $this->circuitBreaker->recordSuccess($providerKey);
                 $this->runs->markCompleted($run['id'], $result);
 
                 $artifact = $this->artifacts->store($requestId, $run['id'], $result, $outputSchema);
@@ -204,6 +260,7 @@ class AiGenerationOrchestrator
 
                 return;
             } catch (AiProviderException $e) {
+                $this->circuitBreaker->recordFailure($providerKey, $e->getProviderError()->category);
                 $this->runs->markFailed($run['id'], $e->getProviderError());
 
                 if (! $e->isRetryable()) {
