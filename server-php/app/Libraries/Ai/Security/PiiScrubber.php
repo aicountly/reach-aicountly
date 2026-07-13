@@ -19,10 +19,10 @@ class PiiScrubber
     private const RULES = [
         // Email addresses
         ['/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/', '[EMAIL]'],
+        // Credit/debit card numbers (13-19 digits, optionally space-separated) — before phone to avoid false positives
+        ['/\b(?:\d[ \-]?){13,19}\b/', '[CARD_NUMBER]'],
         // Phone numbers (international E.164 and common local formats)
         ['/(\+?[1-9]\d{1,3}[\s\-.]?)?\(?\d{2,4}\)?[\s\-.]?\d{3,4}[\s\-.]?\d{4}/', '[PHONE]'],
-        // Credit/debit card numbers (13-19 digits, optionally space-separated)
-        ['/\b(?:\d[ \-]?){13,19}\b/', '[CARD_NUMBER]'],
         // Social security / national ID (###-##-####)
         ['/\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/', '[NATIONAL_ID]'],
         // UK National Insurance number

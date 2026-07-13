@@ -24,9 +24,9 @@ class ConfidentialDataDetector
         // Generic API key patterns
         ['/\b(api[_\-]?key|apikey|api_secret|client_secret)\s*[=:]\s*["\']?[A-Za-z0-9_\-]{16,}["\']?/i', 'api_key'],
         // Bearer tokens / JWT
-        ['/\bBearer\s+[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b/', 'bearer_token'],
-        // JWT structure without Bearer prefix
-        ['/\beyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\b/', 'jwt_token'],
+        ['/Bearer\s+[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/', 'bearer_token'],
+        // JWT structure without Bearer prefix (no dot in char class to avoid greedy match of separators)
+        ['/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/', 'jwt_token'],
         // Database connection strings
         ['/\b(postgres|mysql|mongodb|redis):\/\/[^\s]{8,}/', 'db_connection_string'],
         // Password fields
