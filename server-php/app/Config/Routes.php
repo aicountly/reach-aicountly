@@ -513,5 +513,27 @@ $routes->group('v1', static function ($routes) {
         $routes->get('ai/budgets',                                          'Api\\V1\\Ai\\AiUsageController::budgets',                     ['filter' => 'permission:ai_provider.manage']);
         $routes->put('ai/budgets/(:num)',                                   'Api\\V1\\Ai\\AiUsageController::updateBudget/$1',             ['filter' => 'permission:ai_provider.manage']);
 
+        // --- Phase 4: Publishing ---
+        $routes->get('publishing/blogs',                                    'Api\\V1\\Publishing\\BlogPublishingController::index',                    ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/knowledge-bases',                          'Api\\V1\\Publishing\\KbPublishingController::index',                      ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/calendar',                                 'Api\\V1\\Publishing\\PublishingCalendarController::index',                 ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/deployments',                              'Api\\V1\\Publishing\\DeploymentController::index',                        ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/deployments/(:num)',                       'Api\\V1\\Publishing\\DeploymentController::show/$1',                      ['filter' => 'permission:publishing.view']);
+        $routes->post('publishing/deployments/(:num)/retry',                'Api\\V1\\Publishing\\DeploymentController::retry/$1',                     ['filter' => 'permission:publishing.publish']);
+        $routes->post('publishing/deployments/(:num)/cancel',               'Api\\V1\\Publishing\\DeploymentController::cancel/$1',                    ['filter' => 'permission:publishing.publish']);
+        $routes->post('publishing/deployments/(:num)/verify',               'Api\\V1\\Publishing\\DeploymentController::verify/$1',                    ['filter' => 'permission:publishing.publish']);
+        $routes->post('publishing/deployments/(:num)/rollback',             'Api\\V1\\Publishing\\DeploymentController::rollback/$1',                  ['filter' => 'permission:publishing.rollback']);
+        $routes->get('publishing/deployments/(:num)/verifications',         'Api\\V1\\Publishing\\DeploymentController::verifications/$1',             ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/verifications',                            'Api\\V1\\Publishing\\VerificationController::index',                      ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/connections',                              'Api\\V1\\Publishing\\ConnectionController::index',                        ['filter' => 'permission:publishing.manage_connections']);
+        $routes->post('publishing/connections/(:segment)/health-check',     'Api\\V1\\Publishing\\ConnectionController::healthCheck/$1',               ['filter' => 'permission:publishing.manage_connections']);
+        $routes->get('publishing/readiness/(:num)',                         'Api\\V1\\Publishing\\ReadinessController::evaluate/$1',                   ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/seo/(:num)',                               'Api\\V1\\Publishing\\SeoProfileController::show/$1',                      ['filter' => 'permission:seo.view']);
+        $routes->put('publishing/seo/(:num)',                               'Api\\V1\\Publishing\\SeoProfileController::update/$1',                    ['filter' => 'permission:seo.manage']);
+        $routes->post('publishing/seo/(:num)/evaluate',                     'Api\\V1\\Publishing\\SeoProfileController::evaluate/$1',                  ['filter' => 'permission:seo.manage']);
+        $routes->post('publishing/content/(:num)/publish',                  'Api\\V1\\Publishing\\ContentPublishController::publish/$1',               ['filter' => 'permission:publishing.publish']);
+        $routes->post('publishing/content/(:num)/schedule',                 'Api\\V1\\Publishing\\ContentPublishController::schedule/$1',              ['filter' => 'permission:publishing.publish']);
+        $routes->post('publishing/content/(:num)/unpublish',                'Api\\V1\\Publishing\\ContentPublishController::unpublish/$1',             ['filter' => 'permission:publishing.publish']);
+
     });
 });

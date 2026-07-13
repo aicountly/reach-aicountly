@@ -78,6 +78,17 @@ import { ContentValidationsPage } from './pages/content/ContentValidationsPage';
 import { ContentSchedulePage }  from './pages/content/ContentSchedulePage';
 import { DailyPackPage }        from './pages/content/DailyPackPage';
 
+import PublishingLayout          from './pages/publishing/PublishingLayout.jsx';
+import BlogPublishingListPage   from './pages/publishing/BlogPublishingListPage.jsx';
+import KbPublishingListPage     from './pages/publishing/KbPublishingListPage.jsx';
+import PublishingCalendarPage   from './pages/publishing/PublishingCalendarPage.jsx';
+import DeploymentListPage       from './pages/publishing/DeploymentListPage.jsx';
+import DeploymentDetailPage     from './pages/publishing/DeploymentDetailPage.jsx';
+import VerificationListPage     from './pages/publishing/VerificationListPage.jsx';
+import ConnectionsPage          from './pages/publishing/ConnectionsPage.jsx';
+import ReadinessPage            from './pages/publishing/ReadinessPage.jsx';
+import SeoEditorPage            from './pages/publishing/SeoEditorPage.jsx';
+
 import AiLayout            from './pages/ai/AiLayout.jsx';
 import AiDashboardPage     from './pages/ai/AiDashboardPage.jsx';
 import AiProvidersPage     from './pages/ai/AiProvidersPage.jsx';
@@ -191,6 +202,20 @@ export default function App() {
           <Route path=":id/validations" element={<ContentValidationsPage />} />
           <Route path=":id/schedule" element={<ContentSchedulePage />} />
           <Route path="calendar" element={<ContentListPage />} />
+        </Route>
+
+        {/* Phase 4 — Publishing */}
+        <Route path="/publishing" element={<PublishingLayout />}>
+          <Route index element={<DeploymentListPage />} />
+          <Route path="blogs" element={<BlogPublishingListPage />} />
+          <Route path="knowledge-bases" element={<KbPublishingListPage />} />
+          <Route path="calendar" element={<PublishingCalendarPage />} />
+          <Route path="deployments" element={<DeploymentListPage />} />
+          <Route path="deployments/:id" element={<DeploymentDetailPage />} />
+          <Route path="verifications" element={<VerificationListPage />} />
+          <Route path="connections" element={<ConnectionsPage />} />
+          <Route path="readiness" element={<ReadinessPage />} />
+          <Route path="seo/:contentId" element={<SeoEditorPage />} />
         </Route>
 
         {/* Phase 3 — AI Control Centre */}

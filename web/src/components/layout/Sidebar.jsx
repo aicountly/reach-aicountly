@@ -6,6 +6,7 @@ import {
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
   BookOpen, PenTool, Package, BrainCircuit, Cpu, Route, FlaskConical,
   Zap, CircleDollarSign, ShieldAlert, HeartPulse,
+  Globe, Send, Link2, CheckCircle2, Radio,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -60,6 +61,18 @@ const NAV = [
       { label: 'Brand Rules',        path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: BookOpen, requires: 'brand_rules.view' },
       { label: 'Content Policies',   path: ROUTES.KNOWLEDGE_POLICIES,      icon: BookOpen, requires: 'content_policy.view' },
       { label: 'Completeness',       path: ROUTES.KNOWLEDGE_COMPLETENESS,  icon: BookOpen, requires: 'knowledge.view' },
+    ],
+  },
+  {
+    title: 'Publishing',
+    items: [
+      { label: 'Blog Publishing',  path: '/publishing/blogs',          icon: Globe,         requires: 'publishing.view' },
+      { label: 'Knowledge Base',   path: '/publishing/knowledge-bases', icon: BookOpen,      requires: 'publishing.view' },
+      { label: 'Calendar',         path: '/publishing/calendar',        icon: CalendarDays,  requires: 'publishing.view' },
+      { label: 'Deployments',      path: '/publishing/deployments',     icon: Send,          requires: 'publishing.view' },
+      { label: 'Verifications',    path: '/publishing/verifications',   icon: CheckCircle2,  requires: 'publishing.view' },
+      { label: 'Connections',      path: '/publishing/connections',     icon: Link2,         requires: 'publishing.manage_connections' },
+      { label: 'Readiness',        path: '/publishing/readiness',       icon: Radio,         requires: 'publishing.view' },
     ],
   },
   {
