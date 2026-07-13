@@ -255,6 +255,46 @@ final class Permissions
     public const AI_VALIDATION_VIEW  = 'ai_validation.view';
     public const AI_VALIDATION_WAIVE = 'ai_validation.waive';
 
+    // =========================================================================
+    // Phase 5 — Community and Official Q&A
+    // =========================================================================
+
+    /** Community — general access */
+    public const COMMUNITY_VIEW = 'community.view';
+
+    /** Community — question intake */
+    public const COMMUNITY_INTAKE_CREATE = 'community.intake.create';
+    public const COMMUNITY_INTAKE_IMPORT = 'community.intake.import';
+
+    /** Community — question management */
+    public const COMMUNITY_QUESTION_EDIT     = 'community.question.edit';
+    public const COMMUNITY_QUESTION_CLASSIFY = 'community.question.classify';
+    public const COMMUNITY_QUESTION_MODERATE = 'community.question.moderate';
+
+    /** Community — official answer lifecycle */
+    public const COMMUNITY_ANSWER_GENERATE             = 'community.answer.generate';
+    public const COMMUNITY_ANSWER_EDIT                 = 'community.answer.edit';
+    public const COMMUNITY_ANSWER_REVIEW               = 'community.answer.review';
+    public const COMMUNITY_ANSWER_PROFESSIONAL_REVIEW  = 'community.answer.professional_review';
+    public const COMMUNITY_ANSWER_APPROVE              = 'community.answer.approve';
+    public const COMMUNITY_ANSWER_SCHEDULE             = 'community.answer.schedule';
+    public const COMMUNITY_ANSWER_PUBLISH              = 'community.answer.publish';
+    public const COMMUNITY_ANSWER_UNPUBLISH            = 'community.answer.unpublish';
+    public const COMMUNITY_ANSWER_RESTORE              = 'community.answer.restore';
+    public const COMMUNITY_ANSWER_WITHDRAW             = 'community.answer.withdraw';
+    public const COMMUNITY_ANSWER_OVERRIDE_VALIDATION  = 'community.answer.override_validation';
+
+    /** Community — identity and settings management */
+    public const COMMUNITY_IDENTITY_MANAGE  = 'community.identity.manage';
+    public const COMMUNITY_SETTINGS_MANAGE  = 'community.settings.manage';
+
+    /** Community — analytics and audit */
+    public const COMMUNITY_ANALYTICS_VIEW   = 'community.analytics.view';
+    public const COMMUNITY_AUDIT_VIEW       = 'community.audit.view';
+
+    /** Community — engagement */
+    public const COMMUNITY_ENGAGEMENT_INGEST = 'community.engagement.ingest';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -345,6 +385,21 @@ final class Permissions
             'aeo'              => [self::AEO_VIEW, self::AEO_MANAGE, self::AEO_REVIEW],
             'structured_data'  => [self::STRUCTURED_DATA_VIEW, self::STRUCTURED_DATA_MANAGE, self::STRUCTURED_DATA_REVIEW],
             'kb_publishing'    => [self::KB_PUBLISHING_VIEW, self::KB_PUBLISHING_PUBLISH, self::KB_PUBLISHING_MANAGE],
+            // Phase 5: Community and Official Q&A groups
+            'community'        => [
+                self::COMMUNITY_VIEW,
+                self::COMMUNITY_INTAKE_CREATE, self::COMMUNITY_INTAKE_IMPORT,
+                self::COMMUNITY_QUESTION_EDIT, self::COMMUNITY_QUESTION_CLASSIFY, self::COMMUNITY_QUESTION_MODERATE,
+                self::COMMUNITY_ANSWER_GENERATE, self::COMMUNITY_ANSWER_EDIT,
+                self::COMMUNITY_ANSWER_REVIEW, self::COMMUNITY_ANSWER_PROFESSIONAL_REVIEW,
+                self::COMMUNITY_ANSWER_APPROVE, self::COMMUNITY_ANSWER_SCHEDULE,
+                self::COMMUNITY_ANSWER_PUBLISH, self::COMMUNITY_ANSWER_UNPUBLISH,
+                self::COMMUNITY_ANSWER_RESTORE, self::COMMUNITY_ANSWER_WITHDRAW,
+                self::COMMUNITY_ANSWER_OVERRIDE_VALIDATION,
+                self::COMMUNITY_IDENTITY_MANAGE, self::COMMUNITY_SETTINGS_MANAGE,
+                self::COMMUNITY_ANALYTICS_VIEW, self::COMMUNITY_AUDIT_VIEW,
+                self::COMMUNITY_ENGAGEMENT_INGEST,
+            ],
         ];
     }
 

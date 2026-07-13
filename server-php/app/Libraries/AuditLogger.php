@@ -36,6 +36,8 @@ class AuditLogger
         'generation.',
         'ai_prompt.',
         'ai_budget.',
+        // Phase 5 community events
+        'community.',
     ];
 
     /**
@@ -154,6 +156,61 @@ class AuditLogger
     public const BLOG_PROFILE_UPDATED           = 'blog_profile.updated';
     public const KB_PROFILE_UPDATED             = 'kb_profile.updated';
     public const KB_STRUCTURE_VALIDATED         = 'kb_structure.validated';
+
+    // =========================================================================
+    // Phase 5 — Community and Official Q&A audit events
+    // =========================================================================
+    public const COMMUNITY_QUESTION_INTAKE              = 'community.question.intake';
+    public const COMMUNITY_QUESTION_IMPORT              = 'community.question.import';
+    public const COMMUNITY_QUESTION_CLASSIFIED          = 'community.question.classified';
+    public const COMMUNITY_QUESTION_TRIAGE_SCORED       = 'community.question.triage_scored';
+    public const COMMUNITY_QUESTION_ASSIGNED            = 'community.question.assigned';
+    public const COMMUNITY_QUESTION_DUPLICATE_DETECTED  = 'community.question.duplicate_detected';
+    public const COMMUNITY_QUESTION_DUPLICATE_MERGED    = 'community.question.duplicate_merged';
+    public const COMMUNITY_QUESTION_MODERATED           = 'community.question.moderated';
+    public const COMMUNITY_QUESTION_ARCHIVED            = 'community.question.archived';
+
+    public const COMMUNITY_ANSWER_GENERATION_REQUESTED  = 'community.answer.generation_requested';
+    public const COMMUNITY_ANSWER_GENERATION_STARTED    = 'community.answer.generation_started';
+    public const COMMUNITY_ANSWER_GENERATION_COMPLETED  = 'community.answer.generation_completed';
+    public const COMMUNITY_ANSWER_GENERATION_FAILED     = 'community.answer.generation_failed';
+    public const COMMUNITY_ANSWER_DRAFT_CREATED         = 'community.answer.draft_created';
+    public const COMMUNITY_ANSWER_VERSION_CREATED       = 'community.answer.version_created';
+    public const COMMUNITY_ANSWER_SOURCE_ATTACHED       = 'community.answer.source_attached';
+    public const COMMUNITY_ANSWER_VALIDATION_PASSED     = 'community.answer.validation_passed';
+    public const COMMUNITY_ANSWER_VALIDATION_FAILED     = 'community.answer.validation_failed';
+    public const COMMUNITY_ANSWER_MODERATION_FINDING    = 'community.answer.moderation_finding';
+    public const COMMUNITY_ANSWER_MODERATION_OVERRIDE   = 'community.answer.moderation_override';
+    public const COMMUNITY_ANSWER_REVIEW_REQUESTED      = 'community.answer.review_requested';
+    public const COMMUNITY_ANSWER_REVIEW_COMPLETED      = 'community.answer.review_completed';
+    public const COMMUNITY_ANSWER_PROFESSIONAL_REVIEW   = 'community.answer.professional_review_requested';
+    public const COMMUNITY_ANSWER_APPROVAL_SUBMITTED    = 'community.answer.approval_submitted';
+    public const COMMUNITY_ANSWER_APPROVED              = 'community.answer.approved';
+    public const COMMUNITY_ANSWER_REJECTED              = 'community.answer.rejected';
+    public const COMMUNITY_ANSWER_CHANGES_REQUESTED     = 'community.answer.changes_requested';
+    public const COMMUNITY_ANSWER_SCHEDULED             = 'community.answer.scheduled';
+    public const COMMUNITY_ANSWER_PUBLISHING            = 'community.answer.publishing';
+    public const COMMUNITY_ANSWER_PUBLISHED             = 'community.answer.published';
+    public const COMMUNITY_ANSWER_VERIFICATION_PASSED   = 'community.answer.verification_passed';
+    public const COMMUNITY_ANSWER_VERIFICATION_FAILED   = 'community.answer.verification_failed';
+    public const COMMUNITY_ANSWER_CHECKSUM_MISMATCH     = 'community.answer.checksum_mismatch';
+    public const COMMUNITY_ANSWER_RETRY                 = 'community.answer.retry';
+    public const COMMUNITY_ANSWER_RECONCILIATION        = 'community.answer.reconciliation';
+    public const COMMUNITY_ANSWER_CORRECTION_STARTED    = 'community.answer.correction_started';
+    public const COMMUNITY_ANSWER_CORRECTED             = 'community.answer.corrected';
+    public const COMMUNITY_ANSWER_UNPUBLISHED           = 'community.answer.unpublished';
+    public const COMMUNITY_ANSWER_WITHDRAWN             = 'community.answer.withdrawn';
+    public const COMMUNITY_ANSWER_RESTORED              = 'community.answer.restored';
+
+    public const COMMUNITY_IDENTITY_CREATED             = 'community.identity.created';
+    public const COMMUNITY_IDENTITY_UPDATED             = 'community.identity.updated';
+    public const COMMUNITY_IDENTITY_DEACTIVATED         = 'community.identity.deactivated';
+
+    public const COMMUNITY_SETTINGS_CHANGED             = 'community.settings.changed';
+    public const COMMUNITY_ENGAGEMENT_INGESTED          = 'community.engagement.ingested';
+    public const COMMUNITY_ENGAGEMENT_BOT_FILTERED      = 'community.engagement.bot_filtered';
+    public const COMMUNITY_PUBLISHING_CHECKSUM_MISMATCH = 'community.publishing.checksum_mismatch';
+    public const COMMUNITY_PUBLISHING_ROLLBACK          = 'community.publishing.rollback';
 
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.
