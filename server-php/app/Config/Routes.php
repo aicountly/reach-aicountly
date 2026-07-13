@@ -481,5 +481,14 @@ $routes->group('v1', static function ($routes) {
         $routes->post('notifications/(:num)/read',                 'Api\\V1\\Content\\NotificationController::markRead/$1',     ['filter' => 'permission:content.view']);
         $routes->post('notifications/read-all',                    'Api\\V1\\Content\\NotificationController::markAllRead',     ['filter' => 'permission:content.view']);
 
+        // --- Phase 3: AI Prompt Governance ---
+        $routes->get('ai/prompts/schema-types',                            'Api\\V1\\Ai\\PromptController::schemaTypes',                  ['filter' => 'permission:ai_prompt.view']);
+        $routes->get('ai/prompts',                                          'Api\\V1\\Ai\\PromptController::index',                        ['filter' => 'permission:ai_prompt.view']);
+        $routes->post('ai/prompts',                                         'Api\\V1\\Ai\\PromptController::create',                       ['filter' => 'permission:ai_prompt.manage']);
+        $routes->get('ai/prompts/(:segment)',                               'Api\\V1\\Ai\\PromptController::show/$1',                      ['filter' => 'permission:ai_prompt.view']);
+        $routes->get('ai/prompts/(:num)/versions',                          'Api\\V1\\Ai\\PromptController::listVersions/$1',              ['filter' => 'permission:ai_prompt.view']);
+        $routes->post('ai/prompts/(:num)/versions',                         'Api\\V1\\Ai\\PromptController::createVersion/$1',             ['filter' => 'permission:ai_prompt.manage']);
+        $routes->post('ai/prompts/(:num)/versions/(:num)/approve',          'Api\\V1\\Ai\\PromptController::approveVersion/$1/$2',         ['filter' => 'permission:ai_prompt.approve']);
+
     });
 });
