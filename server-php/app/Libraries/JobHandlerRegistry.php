@@ -11,6 +11,7 @@ use App\Jobs\ContentDueDateReminderJob;
 use App\Jobs\ContentOverdueEscalationJob;
 use App\Jobs\ContentRefreshDetectionJob;
 use App\Jobs\ContentScheduleReadinessJob;
+use App\Jobs\AiGenerationJob;
 use RuntimeException;
 
 /**
@@ -34,6 +35,8 @@ class JobHandlerRegistry
         $this->handlers['reach.content_overdue_escalation']      = new ContentOverdueEscalationJob();
         $this->handlers['reach.content_refresh_detection']       = new ContentRefreshDetectionJob();
         $this->handlers['reach.content_schedule_readiness']      = new ContentScheduleReadinessJob();
+        // Phase 3 AI generation
+        $this->handlers['reach.ai_generation']                   = new AiGenerationJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

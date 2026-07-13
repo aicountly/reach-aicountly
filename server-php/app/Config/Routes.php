@@ -481,6 +481,12 @@ $routes->group('v1', static function ($routes) {
         $routes->post('notifications/(:num)/read',                 'Api\\V1\\Content\\NotificationController::markRead/$1',     ['filter' => 'permission:content.view']);
         $routes->post('notifications/read-all',                    'Api\\V1\\Content\\NotificationController::markAllRead',     ['filter' => 'permission:content.view']);
 
+        // --- Phase 3: AI Generation ---
+        $routes->post('ai/generate',                                        'Api\\V1\\Ai\\AiGenerationController::generate',               ['filter' => 'permission:ai.generate']);
+        $routes->get('ai/generations',                                      'Api\\V1\\Ai\\AiGenerationController::index',                  ['filter' => 'permission:ai.view']);
+        $routes->get('ai/generations/(:segment)',                           'Api\\V1\\Ai\\AiGenerationController::show/$1',                ['filter' => 'permission:ai.view']);
+        $routes->post('ai/generations/(:segment)/cancel',                   'Api\\V1\\Ai\\AiGenerationController::cancel/$1',              ['filter' => 'permission:ai.generate']);
+
         // --- Phase 3: AI Prompt Governance ---
         $routes->get('ai/prompts/schema-types',                            'Api\\V1\\Ai\\PromptController::schemaTypes',                  ['filter' => 'permission:ai_prompt.view']);
         $routes->get('ai/prompts',                                          'Api\\V1\\Ai\\PromptController::index',                        ['filter' => 'permission:ai_prompt.view']);
