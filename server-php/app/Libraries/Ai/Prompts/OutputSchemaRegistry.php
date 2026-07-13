@@ -35,6 +35,17 @@ class OutputSchemaRegistry
             'case_study', 'whitepaper', 'product_description', 'faq',
             'press_release', 'newsletter', 'ad_copy', 'video_script',
             'seo_meta', 'knowledge_base', 'testimonial', 'generic',
+            // Phase 5 — Community official answer types
+            'community_answer.concise',
+            'community_answer.detailed',
+            'community_answer.troubleshooting',
+            'community_answer.product_feature',
+            'community_answer.compliance',
+            'community_answer.clarification',
+            'community_answer.duplicate_response',
+            'community_answer.correction',
+            'community_answer.summary',
+            'community_answer.translation',
         ];
     }
 
@@ -227,6 +238,18 @@ class OutputSchemaRegistry
             ],
 
             'generic' => self::genericSchema(),
+
+            // Phase 5 — Community official answer types
+            'community_answer.concise'           => self::communityAnswerSchema('concise'),
+            'community_answer.detailed'          => self::communityAnswerSchema('detailed'),
+            'community_answer.troubleshooting'   => self::communityAnswerSchema('troubleshooting'),
+            'community_answer.product_feature'   => self::communityAnswerSchema('product_feature'),
+            'community_answer.compliance'        => self::communityAnswerSchema('compliance'),
+            'community_answer.clarification'     => self::communityAnswerSchema('clarification'),
+            'community_answer.duplicate_response' => self::communityAnswerSchema('duplicate_response'),
+            'community_answer.correction'        => self::communityAnswerSchema('correction'),
+            'community_answer.summary'           => self::communityAnswerSchema('summary'),
+            'community_answer.translation'       => self::communityAnswerSchema('translation'),
         ];
     }
 
@@ -265,6 +288,73 @@ class OutputSchemaRegistry
                 'body_plain_text' => ['type' => ['string', 'null']],
             ]),
             'additionalProperties' => true,
+        ];
+    }
+
+    // =========================================================================
+    // Phase 5 — Community answer schemas
+    // =========================================================================
+
+    private static function communityAnswerSchema(string $type): array
+    {
+        return [
+            'type'     => 'object',
+            'required' => [
+                'answer_title', 'answer_body', 'short_answer',
+                'source_references', 'risk_classification',
+                'limitations', 'recommended_disclosure',
+                'requires_professional_review', 'requires_legal_review',
+                'requires_product_review',
+            ],
+            'properties' => [
+                'answer_title' => [
+                    'type' => 'string', 'minLength' => 5, 'maxLength' => 512,
+                ],
+                'answer_body' => [
+                    'type' => 'string', 'minLength' => 50,
+                ],
+                'short_answer' => [
+                    'type' => 'string', 'minLength' => 10, 'maxLength' => 300,
+                ],
+                'clarifying_questions' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                ],
+                'source_references' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'source_type'  => ['type' => 'string'],
+                            'source_id'    => ['type' => ['integer', 'string', 'null']],
+                            'source_title' => ['type' => 'string'],
+                            'claim_supported' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+                'product_references' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                ],
+                'risk_classification' => [
+                    'type' => 'string',
+                    'enum' => ['low', 'medium', 'high', 'critical'],
+                ],
+                'jurisdiction' => ['type' => ['string', 'null']],
+                'limitations' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                ],
+                'recommended_disclosure' => ['type' => 'string'],
+                'requires_professional_review' => ['type' => 'boolean'],
+                'requires_legal_review'        => ['type' => 'boolean'],
+                'requires_product_review'      => ['type' => 'boolean'],
+                'answer_type' => ['type' => 'string', 'enum' => array_map(
+                    fn($t) => str_replace('community_answer.', '', $t),
+                    array_filter(self::allTypes(), fn($t) => str_starts_with($t, 'community_answer.'))
+                )],
+            ],
+            'additionalProperties' => false,
         ];
     }
 }
