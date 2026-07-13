@@ -6,7 +6,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
 
 /**
- * Phase 4 — Retry service with exponential backoff for failed publication deployments.
+ * Phase 4 â€” Retry service with exponential backoff for failed publication deployments.
  *
  * Retries are automatic only for retryable error categories.
  * Non-retryable errors require human resolution.
@@ -53,7 +53,7 @@ class PublicationRetryService
                 ->where('id', $deploymentId)
                 ->update(['status' => 'blocked', 'updated_at' => date('Y-m-d H:i:s')]);
 
-            AuditLogger::log('publishing.max_retries_reached', ['deployment_id' => $deploymentId]);
+            AuditLogger::record('publishing.max_retries_reached', ['deployment_id' => $deploymentId]);
             return;
         }
 
@@ -85,7 +85,7 @@ class PublicationRetryService
             'updated_at'   => date('Y-m-d H:i:s'),
         ]);
 
-        AuditLogger::log('publishing.retry_scheduled', [
+        AuditLogger::record('publishing.retry_scheduled', [
             'deployment_id'  => $deploymentId,
             'attempt'        => $attemptCount + 1,
             'delay_seconds'  => $delaySeconds,
@@ -102,7 +102,7 @@ class PublicationRetryService
             ->where('id', $deploymentId)
             ->update(['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s')]);
 
-        AuditLogger::log('publishing.cancelled', ['deployment_id' => $deploymentId], $actorId);
+        AuditLogger::record('publishing.cancelled', ['deployment_id' => $deploymentId], $actorId);
     }
 
     /**
@@ -116,3 +116,4 @@ class PublicationRetryService
             ->get()->getResultArray();
     }
 }
+

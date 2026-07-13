@@ -6,7 +6,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 
 /**
- * Phase 4 — Reconciliation service for publication deployments.
+ * Phase 4 â€” Reconciliation service for publication deployments.
  *
  * Finds deployments that are claimed as published/verified but
  * whose public-site status does not match. Enqueues reconciliation
@@ -48,7 +48,7 @@ class PublicationReconciliationService
 
             if (!($response['success'] ?? false)) {
                 $discrepancies++;
-                AuditLogger::log('publishing.reconciliation_error', [
+                AuditLogger::record('publishing.reconciliation_error', [
                     'deployment_id'    => $deployment['id'],
                     'public_content_id'=> $deployment['public_content_id'],
                 ]);
@@ -66,7 +66,7 @@ class PublicationReconciliationService
 
             if ($expectedLocal !== null && !in_array($localStatus, $expectedLocal, true)) {
                 $discrepancies++;
-                AuditLogger::log('publishing.reconciliation_discrepancy', [
+                AuditLogger::record('publishing.reconciliation_discrepancy', [
                     'deployment_id' => $deployment['id'],
                     'local_status'  => $localStatus,
                     'remote_status' => $remoteStatus,
@@ -85,3 +85,4 @@ class PublicationReconciliationService
         return ['checked' => $checked, 'discrepancies' => $discrepancies];
     }
 }
+

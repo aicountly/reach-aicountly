@@ -117,6 +117,44 @@ class AuditLogger
     public const AI_PROVIDER_ENABLED       = 'ai.provider_enabled';
     public const AI_PROVIDER_DISABLED      = 'ai.provider_disabled';
 
+    // =========================================================================
+    // Phase 4 — Publishing audit events
+    // =========================================================================
+    public const PUBLISHING_QUEUED              = 'publishing.queued';
+    public const PUBLISHING_ACCEPTED            = 'publishing.accepted';
+    public const PUBLISHING_FAILED              = 'publishing.failed';
+    public const PUBLISHING_VERIFIED            = 'publishing.verified';
+    public const PUBLISHING_ROLLED_BACK         = 'publishing.rolled_back';
+    public const PUBLISHING_ROLLBACK_FAILED     = 'publishing.rollback_failed';
+    public const PUBLISHING_CANCELLED           = 'publishing.cancelled';
+    public const PUBLISHING_RETRY_SCHEDULED     = 'publishing.retry_scheduled';
+    public const PUBLISHING_MAX_RETRIES         = 'publishing.max_retries_reached';
+    public const PUBLISHING_HEALTH_CHECKED      = 'publishing.health_checked';
+    public const PUBLISHING_REFRESH_REQUESTED   = 'publishing.refresh_requested';
+    public const PUBLISHING_SITEMAP_VERIFIED    = 'publishing.sitemap_verified';
+    public const PUBLISHING_INDEXING_READY      = 'publishing.indexing_ready';
+    public const PUBLISHING_RECONCILIATION_ERR  = 'publishing.reconciliation_error';
+    public const PUBLISHING_RECONCILIATION_DISC = 'publishing.reconciliation_discrepancy';
+
+    // Phase 4 — SEO/AEO audit events
+    public const SEO_PROFILE_UPDATED            = 'seo.profile_updated';
+    public const SEO_REVIEW_STARTED             = 'seo.review_started';
+    public const SEO_REVIEWED                   = 'seo.reviewed';
+    public const SEO_BLOCKED                    = 'seo.blocked';
+    public const AEO_PROFILE_UPDATED            = 'aeo.profile_updated';
+    public const AEO_REVIEWED                   = 'aeo.reviewed';
+
+    // Phase 4 — Structured data audit events
+    public const STRUCTURED_DATA_GENERATED      = 'structured_data.generated';
+    public const STRUCTURED_DATA_VALIDATED      = 'structured_data.validated';
+    public const STRUCTURED_DATA_BLOCKED        = 'structured_data.blocked';
+    public const STRUCTURED_DATA_REVIEWED       = 'structured_data.reviewed';
+
+    // Phase 4 — Blog/KB publication profile events
+    public const BLOG_PROFILE_UPDATED           = 'blog_profile.updated';
+    public const KB_PROFILE_UPDATED             = 'kb_profile.updated';
+    public const KB_STRUCTURE_VALIDATED         = 'kb_structure.validated';
+
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.
      * @param string  $action       Dotted event slug (see docs/architecture/REACH_SECURITY_CONTROLS.md).
@@ -196,6 +234,23 @@ class AuditLogger
                 log_message('error', 'AuditLogger console fanout failed: ' . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Phase 4 static convenience wrapper.
+     * Usage: AuditLogger::record(string $action, array $context = [], ?int $actorId = null)
+     */
+    public static function record(string $action, array $context = [], ?int $actorId = null): void
+    {
+        $instance = new self();
+        $instance->log(
+            userId:     $actorId,
+            action:     $action,
+            entityType: 'publishing',
+            entityId:   $context['content_item_id'] ?? $context['deployment_id'] ?? null,
+            extra:      $context,
+            actorType:  $actorId !== null ? 'human' : 'system',
+        );
     }
 
     private function shouldFanOut(string $action): bool

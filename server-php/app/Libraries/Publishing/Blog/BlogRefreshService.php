@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\Blog;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 — Blog content refresh lifecycle management.
+ * Phase 4 â€” Blog content refresh lifecycle management.
  *
  * Manages when published blogs need review or refresh.
  * Refresh triggers are recorded in reach_publication_refresh_reviews.
@@ -57,7 +57,7 @@ class BlogRefreshService
             ->where('content_item_id', $contentItemId)
             ->update(['refresh_status' => 'refresh_due', 'updated_at' => date('Y-m-d H:i:s')]);
 
-        AuditLogger::log('publishing.refresh_requested', [
+        AuditLogger::record('publishing.refresh_requested', [
             'content_item_id' => $contentItemId,
             'trigger_type'    => $triggerType,
             'review_id'       => $reviewId,
@@ -100,3 +100,4 @@ class BlogRefreshService
             ->get()->getResultArray();
     }
 }
+

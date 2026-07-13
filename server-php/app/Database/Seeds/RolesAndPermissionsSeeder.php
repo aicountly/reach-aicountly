@@ -156,6 +156,17 @@ class RolesAndPermissionsSeeder extends Seeder
                         Permissions::AI_VALIDATION_VIEW, Permissions::AI_VALIDATION_WAIVE,
                         Permissions::AI_USAGE_VIEW, Permissions::AI_BUDGET_VIEW,
                     ],
+                    // Phase 4: Publishing — managers can manage profiles and trigger publication
+                    [
+                        Permissions::PUBLISHING_VIEW, Permissions::PUBLISHING_PUBLISH,
+                        Permissions::PUBLISHING_SCHEDULE, Permissions::PUBLISHING_UNPUBLISH,
+                        Permissions::PUBLISHING_VERIFY, Permissions::PUBLISHING_MANAGE_PROFILES,
+                        Permissions::SEO_VIEW, Permissions::SEO_MANAGE, Permissions::SEO_REVIEW,
+                        Permissions::AEO_VIEW, Permissions::AEO_MANAGE,
+                        Permissions::STRUCTURED_DATA_VIEW, Permissions::STRUCTURED_DATA_MANAGE,
+                        Permissions::KB_PUBLISHING_VIEW, Permissions::KB_PUBLISHING_PUBLISH,
+                        Permissions::KB_PUBLISHING_MANAGE,
+                    ],
                 ))),
             ],
             [
@@ -200,6 +211,12 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::AI_GROUNDING_VIEW,
                     Permissions::AI_VALIDATION_VIEW, Permissions::AI_VALIDATION_WAIVE,
                     Permissions::AI_USAGE_VIEW,
+                    // Phase 4: Publishing — reviewers can review SEO/AEO but not publish
+                    Permissions::PUBLISHING_VIEW,
+                    Permissions::SEO_VIEW, Permissions::SEO_REVIEW,
+                    Permissions::AEO_VIEW, Permissions::AEO_REVIEW,
+                    Permissions::STRUCTURED_DATA_VIEW, Permissions::STRUCTURED_DATA_REVIEW,
+                    Permissions::KB_PUBLISHING_VIEW,
                 ]))),
             ],
             [

@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\KnowledgeBase;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 — Knowledge-base content refresh lifecycle.
+ * Phase 4 â€” Knowledge-base content refresh lifecycle.
  */
 class KnowledgeBaseRefreshService
 {
@@ -50,7 +50,7 @@ class KnowledgeBaseRefreshService
             ->where('content_item_id', $contentItemId)
             ->update(['refresh_status' => 'refresh_due', 'updated_at' => date('Y-m-d H:i:s')]);
 
-        AuditLogger::log('publishing.refresh_requested', [
+        AuditLogger::record('publishing.refresh_requested', [
             'content_item_id' => $contentItemId,
             'content_type'    => 'knowledge_base',
             'trigger_type'    => $triggerType,
@@ -60,3 +60,4 @@ class KnowledgeBaseRefreshService
         return $reviewId;
     }
 }
+

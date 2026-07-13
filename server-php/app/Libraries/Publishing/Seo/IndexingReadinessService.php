@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\Seo;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 — Indexing readiness: evaluates whether content is ready
+ * Phase 4 â€” Indexing readiness: evaluates whether content is ready
  * to be included in the sitemap and indexed by search engines.
  *
  * Fires the indexing_ready audit event when all criteria pass.
@@ -78,7 +78,7 @@ class IndexingReadinessService
         $ready = !in_array(false, array_column($checks, 'passed'), true);
 
         if ($ready) {
-            AuditLogger::log('publishing.indexing_ready', [
+            AuditLogger::record('publishing.indexing_ready', [
                 'deployment_id' => $deploymentId,
                 'canonical_url' => $deployment['canonical_url'],
             ]);
@@ -87,3 +87,4 @@ class IndexingReadinessService
         return ['ready' => $ready, 'checks' => $checks];
     }
 }
+

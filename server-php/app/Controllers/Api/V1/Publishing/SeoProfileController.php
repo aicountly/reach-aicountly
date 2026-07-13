@@ -50,7 +50,7 @@ class SeoProfileController extends BaseApiController
         }
 
         $actor = $this->request->actor ?? null;
-        AuditLogger::log('seo.profile_updated', ['content_item_id' => $contentItemId], $actor?->id);
+        AuditLogger::record('seo.profile_updated', ['content_item_id' => $contentItemId], $actor?->id);
 
         return $this->ok(['saved' => true]);
     }
@@ -61,3 +61,4 @@ class SeoProfileController extends BaseApiController
         return $this->ok($result);
     }
 }
+

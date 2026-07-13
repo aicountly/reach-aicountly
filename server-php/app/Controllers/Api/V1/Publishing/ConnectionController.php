@@ -54,7 +54,7 @@ class ConnectionController extends BaseApiController
             ]);
 
         $actor = $this->request->actor ?? null;
-        AuditLogger::log('publishing.health_checked', [
+        AuditLogger::record('publishing.health_checked', [
             'connection_key' => $connectionKey,
             'health_status'  => $status,
         ], $actor?->id);
@@ -62,3 +62,4 @@ class ConnectionController extends BaseApiController
         return $this->ok(['health_status' => $status]);
     }
 }
+

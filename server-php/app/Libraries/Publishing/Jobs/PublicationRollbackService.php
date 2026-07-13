@@ -6,7 +6,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 
 /**
- * Phase 4 — Rollback published content on the public site.
+ * Phase 4 â€” Rollback published content on the public site.
  *
  * Unpublishes content and marks the deployment as rolled_back.
  * Human authorisation required.
@@ -46,7 +46,7 @@ class PublicationRollbackService
         $response  = $publisher->unpublish($publicContentId, $reason);
 
         if (!($response['success'] ?? false)) {
-            AuditLogger::log('publishing.rollback_failed', [
+            AuditLogger::record('publishing.rollback_failed', [
                 'deployment_id'  => $deploymentId,
                 'error_category' => $response['error_category'] ?? 'unknown',
             ], $authorisedBy);
@@ -60,7 +60,7 @@ class PublicationRollbackService
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
 
-        AuditLogger::log('publishing.rolled_back', [
+        AuditLogger::record('publishing.rolled_back', [
             'deployment_id'    => $deploymentId,
             'public_content_id'=> $publicContentId,
             'reason'           => $reason,
@@ -69,3 +69,4 @@ class PublicationRollbackService
         return true;
     }
 }
+

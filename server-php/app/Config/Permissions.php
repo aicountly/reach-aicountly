@@ -209,6 +209,40 @@ final class Permissions
     public const AI_GENERATION_VIEW   = 'ai_generation.view';
     public const AI_GENERATION_MANAGE = 'ai_generation.manage';
 
+    // =========================================================================
+    // Phase 4 — Publishing, SEO/AEO, Structured Data, Knowledge Base
+    // =========================================================================
+
+    /** Publishing — deployment lifecycle */
+    public const PUBLISHING_VIEW               = 'publishing.view';
+    public const PUBLISHING_PUBLISH            = 'publishing.publish';
+    public const PUBLISHING_SCHEDULE           = 'publishing.schedule';
+    public const PUBLISHING_UNPUBLISH          = 'publishing.unpublish';
+    public const PUBLISHING_ROLLBACK           = 'publishing.rollback';
+    public const PUBLISHING_VERIFY             = 'publishing.verify';
+    public const PUBLISHING_MANAGE_CONNECTIONS = 'publishing.manage_connections';
+    public const PUBLISHING_MANAGE_PROFILES    = 'publishing.manage_profiles';
+
+    /** SEO profile management */
+    public const SEO_VIEW   = 'seo.view';
+    public const SEO_MANAGE = 'seo.manage';
+    public const SEO_REVIEW = 'seo.review';
+
+    /** AEO profile management */
+    public const AEO_VIEW   = 'aeo.view';
+    public const AEO_MANAGE = 'aeo.manage';
+    public const AEO_REVIEW = 'aeo.review';
+
+    /** Structured data management */
+    public const STRUCTURED_DATA_VIEW   = 'structured_data.view';
+    public const STRUCTURED_DATA_MANAGE = 'structured_data.manage';
+    public const STRUCTURED_DATA_REVIEW = 'structured_data.review';
+
+    /** Knowledge-base publishing and profiles */
+    public const KB_PUBLISHING_VIEW    = 'kb_publishing.view';
+    public const KB_PUBLISHING_PUBLISH = 'kb_publishing.publish';
+    public const KB_PUBLISHING_MANAGE  = 'kb_publishing.manage';
+
     /** AI grounding visibility */
     public const AI_GROUNDING_VIEW = 'ai_grounding.view';
 
@@ -301,6 +335,16 @@ final class Permissions
             'ai_usage'       => [self::AI_USAGE_VIEW],
             'ai_budget'      => [self::AI_BUDGET_VIEW, self::AI_BUDGET_MANAGE],
             'ai_validation'  => [self::AI_VALIDATION_VIEW, self::AI_VALIDATION_WAIVE],
+            // Phase 4: Publishing & SEO groups
+            'publishing'       => [
+                self::PUBLISHING_VIEW, self::PUBLISHING_PUBLISH, self::PUBLISHING_SCHEDULE,
+                self::PUBLISHING_UNPUBLISH, self::PUBLISHING_ROLLBACK, self::PUBLISHING_VERIFY,
+                self::PUBLISHING_MANAGE_CONNECTIONS, self::PUBLISHING_MANAGE_PROFILES,
+            ],
+            'seo'              => [self::SEO_VIEW, self::SEO_MANAGE, self::SEO_REVIEW],
+            'aeo'              => [self::AEO_VIEW, self::AEO_MANAGE, self::AEO_REVIEW],
+            'structured_data'  => [self::STRUCTURED_DATA_VIEW, self::STRUCTURED_DATA_MANAGE, self::STRUCTURED_DATA_REVIEW],
+            'kb_publishing'    => [self::KB_PUBLISHING_VIEW, self::KB_PUBLISHING_PUBLISH, self::KB_PUBLISHING_MANAGE],
         ];
     }
 

@@ -8,7 +8,7 @@ use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
 use App\Libraries\Publishing\Seo\PublicationReadinessAggregator;
 
 /**
- * Phase 4 — Publication deployment service.
+ * Phase 4 â€” Publication deployment service.
  *
  * Orchestrates the creation and progression of publication deployments.
  * Uses the Phase 0 job queue for async operations.
@@ -93,7 +93,7 @@ class PublicationDeploymentService
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
-        AuditLogger::log('publishing.queued', [
+        AuditLogger::record('publishing.queued', [
             'content_item_id' => $contentItemId,
             'deployment_id'   => $deploymentId,
             'operation'       => $operation,
@@ -103,7 +103,7 @@ class PublicationDeploymentService
     }
 
     /**
-     * Process a deployment — called by the job worker.
+     * Process a deployment â€” called by the job worker.
      */
     public function processDeployment(int $deploymentId): void
     {
@@ -170,7 +170,7 @@ class PublicationDeploymentService
             'updated_at'         => $now,
         ]);
 
-        AuditLogger::log('publishing.accepted', [
+        AuditLogger::record('publishing.accepted', [
             'deployment_id'    => $deploymentId,
             'public_content_id'=> $response['public_content_id'] ?? null,
         ]);
@@ -194,7 +194,7 @@ class PublicationDeploymentService
             'updated_at'     => $now,
         ]);
 
-        AuditLogger::log('publishing.failed', [
+        AuditLogger::record('publishing.failed', [
             'deployment_id'  => $deploymentId,
             'error_category' => $errorCategory,
         ]);
@@ -227,3 +227,4 @@ class PublicationDeploymentService
         ];
     }
 }
+
