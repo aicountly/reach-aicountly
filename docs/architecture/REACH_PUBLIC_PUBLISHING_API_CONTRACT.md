@@ -1,8 +1,8 @@
 # Reach — Public Publishing API Contract
 
-**Version:** 1  
-**Base path:** `/reach/v1/`  
-**Target:** `aicountly.com` (public website)  
+**Version:** 1
+**Base path:** `/reach/v1/`
+**Target:** `aicountly.com` (public website)
 **Consumer:** `reach-aicountly` via `AicountlyPublicSitePublisher`
 
 ---

@@ -100,4 +100,3 @@ class BlogRefreshService
             ->get()->getResultArray();
     }
 }
-

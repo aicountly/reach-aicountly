@@ -60,4 +60,3 @@ class KnowledgeBaseRefreshService
         return $reviewId;
     }
 }
-

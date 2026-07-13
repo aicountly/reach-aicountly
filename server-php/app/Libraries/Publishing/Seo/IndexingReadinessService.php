@@ -87,4 +87,3 @@ class IndexingReadinessService
         return ['ready' => $ready, 'checks' => $checks];
     }
 }
-

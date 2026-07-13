@@ -116,4 +116,3 @@ class PublicationRetryService
             ->get()->getResultArray();
     }
 }
-

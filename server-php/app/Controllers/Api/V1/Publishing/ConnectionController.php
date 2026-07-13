@@ -62,4 +62,3 @@ class ConnectionController extends BaseApiController
         return $this->ok(['health_status' => $status]);
     }
 }
-

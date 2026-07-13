@@ -93,4 +93,3 @@ class SitemapVerificationService
         return $result;
     }
 }
-

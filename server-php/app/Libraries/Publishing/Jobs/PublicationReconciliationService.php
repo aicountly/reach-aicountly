@@ -85,4 +85,3 @@ class PublicationReconciliationService
         return ['checked' => $checked, 'discrepancies' => $discrepancies];
     }
 }
-

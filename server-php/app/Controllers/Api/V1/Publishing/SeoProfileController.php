@@ -61,4 +61,3 @@ class SeoProfileController extends BaseApiController
         return $this->ok($result);
     }
 }
-

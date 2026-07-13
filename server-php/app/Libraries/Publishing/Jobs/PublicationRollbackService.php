@@ -69,4 +69,3 @@ class PublicationRollbackService
         return true;
     }
 }
-
