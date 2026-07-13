@@ -1,0 +1,248 @@
+# Reach Community Architecture — Phase 5
+
+## Overview
+
+Phase 5 adds a Community and Official Q&A Automation subsystem to AICOUNTLY Reach. It enables authorised operators to collect genuine community questions, generate grounded official answers with AI assistance, route drafts through validation and human approval, and securely publish approved answers to `aicountly.com/community` via the existing Phase 4 HMAC publishing protocol.
+
+This document covers system boundaries, data flow, component responsibilities, and key architectural decisions.
+
+---
+
+## System Boundaries
+
+### reach-aicountly (Reach Portal)
+
+Reach is responsible for all internal orchestration:
+
+- Question intake (manual, import, conversion from content requests)
+- Classification, triage, duplicate detection
+- Official identity management
+- AI answer generation (extends Phase 3 `AiGenerationOrchestrator`)
+- Validation, moderation, risk assessment
+- Approval workflow (extends Phase 0 `reach_approvals`)
+- Secure publishing to aicountly-com via HMAC API
+- Publication verification and reconciliation
+- Rollback and correction
+- Genuine engagement ingestion
+- Analytics and audit
+
+### aicountly-com (Public Website)
+
+The public site is responsible for:
+
+- Receiving and authenticating HMAC-signed community publishing commands
+- Idempotent content operations (create, update, publish, unpublish, withdraw, restore)
+- Storing official Q&A alongside genuine user-generated community content
+- Rendering official answers with appropriate disclosures
+- Canonical URLs, noindex rules, sitemap inclusion/exclusion
+- QAPage structured data (only when genuinely published)
+- Status and verification endpoints
+
+---
+
+## Architecture Diagram
+
+```
+reach-aicountly
+──────────────────────────────────────────────────────────────
+QuestionIntakeService ──► TriageService ──► DuplicateDetectionService
+                                │
+                       OfficialAnswerGenerationService
+                       (extends AiGenerationOrchestrator)
+                                │
+                       OfficialAnswerValidationService
+                       OfficialAnswerModerationService
+                                │
+                       OfficialAnswerApprovalService
+                       (checksum-locked, human required)
+                                │
+                       OfficialAnswerPublishingService
+                                │
+                    CommunityPublicSitePublisher
+                    (HMAC-signed, idempotent)
+──────────────────────────────────────────────────────────────
+                                │ HMAC POST
+                                ▼
+aicountly-com
+──────────────────────────────────────────────────────────────
+/api/reach/v1/community/ (ReachAuth middleware, same as Phase 4)
+                                │
+                    CommunityRepository.php
+                                │
+              existing community_answers table (extended)
+              community_official_identities table (new)
+                                │
+                    community/question.php
+                    (renders official answer with badge)
+──────────────────────────────────────────────────────────────
+```
+
+---
+
+## Key Architectural Decisions
+
+### 1. Reuse Phase 4 HMAC Protocol
+
+Phase 5 extends `/api/reach/v1/` with community-specific routes rather than introducing a new authentication system. The same `ReachAuth` middleware, `HmacSigner`, nonce replay protection, and body checksums apply.
+
+### 2. Extend Existing Community Tables
+
+Rather than creating a parallel community database, Phase 5 extends the existing `community_answers` table with official-answer fields and adds a `community_official_identities` table. This preserves existing community functionality and co-locates official and user-generated content in one rendering pipeline.
+
+### 3. Extend Phase 3 AI Generation
+
+New community-answer prompt template types (`community_answer.concise`, `community_answer.detailed`, etc.) are registered in `OutputSchemaRegistry` and use the existing `AiGenerationOrchestrator`. No parallel generation system is created.
+
+### 4. Immutable Version Checksums
+
+Every answer version stores a `SHA-256` checksum of its content. Approval is bound to a specific checksum. Any content change generates a new version and invalidates the prior approval. This is enforced in `OfficialAnswerApprovalService` and checked before every publication attempt.
+
+### 5. Official Identity ≠ Customer Account
+
+Official responder identities (AICOUNTLY Support, AICOUNTLY Product Team, etc.) are stored in `reach_community_official_identities` (Reach) and `community_official_identities` (public site). They are never linked to customer accounts and are administratively managed only.
+
+### 6. No Fake Engagement
+
+The engagement event model (`reach_community_engagement_events`) records only events generated by verified real interactions on the public site. Fabricated votes, views, helpful counts, or follower data are never generated or stored.
+
+---
+
+## Component Inventory
+
+### Backend Services (App\Libraries\Community\)
+
+| Service | Responsibility |
+|---------|---------------|
+| `CommunityQuestionIntakeService` | Normalise, detect language, screen spam, classify, intake questions |
+| `CommunityQuestionClassificationService` | Product, category, risk, jurisdiction tagging |
+| `CommunityDuplicateDetectionService` | Similarity matching against existing questions and answers |
+| `CommunityTriageService` | Triage scoring based on age, severity, impact, frequency |
+| `OfficialAnswerGenerationService` | Orchestrate AI generation with grounding and output validation |
+| `OfficialAnswerVersionService` | Create immutable versions, compute checksums, track supersession |
+| `OfficialAnswerValidationService` | Structural, factual, grounding, source coverage validation |
+| `OfficialAnswerModerationService` | XSS, prompt injection, PII, compliance, claim validation |
+| `OfficialAnswerApprovalService` | State machine, checksum locking, self-approval prevention |
+| `OfficialAnswerPublishingService` | Build publication envelope, enqueue jobs, manage idempotency |
+| `OfficialAnswerCorrectionService` | Correction drafts, correction notice, reapproval |
+| `OfficialAnswerWithdrawalService` | Withdrawal, audit preservation, noindex |
+| `CommunityPublicSitePublisher` | HMAC-signed HTTP calls to aicountly-com community API |
+| `MockCommunityPublisher` | Test double; records calls, injectable errors |
+| `CommunityPublisherFactory` | Returns mock in test/mock env, real publisher otherwise |
+| `CommunityPublicationVerificationService` | Verify public URL, checksum, disclosure metadata |
+| `CommunityPublicationReconciliationService` | Detect state drift between Reach and public site |
+| `CommunityEngagementIngestionService` | Ingest genuine engagement from public site webhook |
+| `CommunityAnalyticsService` | Aggregate genuine metrics for operator dashboard |
+
+### API Controllers (App\Controllers\Api\V1\Community\)
+
+| Controller | Routes |
+|------------|--------|
+| `QuestionController` | list, show, create, classify, assign, merge, moderate, archive |
+| `OfficialAnswerController` | list, show, request generation, create draft, edit, validate, approve, reject, schedule, publish, unpublish, restore, correct, withdraw |
+| `OfficialIdentityController` | list, show, create, update, deactivate |
+| `CommunitySpaceController` | list, show, create, update, configure |
+| `CommunityModerationController` | findings list, override, review queue |
+| `CommunityAnalyticsController` | overview, trends, turnaround, validation failure rate |
+| `CommunityDeploymentController` | list, show, retry, verify, rollback, reconcile |
+
+### Frontend Pages (web/src/pages/community/)
+
+| Page | Function |
+|------|---------|
+| `CommunityLayout.jsx` | Sub-navigation wrapper |
+| `CommunityOverviewPage.jsx` | Genuine operational metrics dashboard |
+| `QuestionInboxPage.jsx` | Filterable question list with triage |
+| `QuestionWorkspacePage.jsx` | Single question detail, duplicates, moderation, assignments |
+| `OfficialAnswerEditorPage.jsx` | Version history, grounding, validation, approval, publication |
+| `OfficialIdentitiesPage.jsx` | Manage official responder identities |
+| `CommunityModerationQueuePage.jsx` | Moderation findings by category |
+| `CommunityPublishingMonitorPage.jsx` | Deployment status, retries, verification |
+| `CommunitySettingsPage.jsx` | Spaces, disclosure templates, risk policies |
+| `CommunityAnalyticsPage.jsx` | Genuine metrics (no synthetic data) |
+
+---
+
+## Lifecycle State Machine
+
+```
+intake
+  │
+triaged ──── duplicate_merged
+  │
+draft_requested
+  │
+generating
+  │
+draft_generated
+  │
+  ├── validation_failed ──► [edit → draft_generated]
+  │
+  ├── moderation_required ──► [override/edit → draft_generated]
+  │
+  └── editorial_review
+        │
+        ├── professional_review (high-risk)
+        │
+        ├── changes_requested ──► [edit → draft_generated]
+        │
+        └── approved
+              │
+              ├── scheduled
+              │
+              └── publishing
+                    │
+                    ├── published
+                    │     │
+                    │     ├── verification_failed
+                    │     │
+                    │     ├── correction_required ──► [correction → approved]
+                    │     │
+                    │     └── unpublishing ──► unpublished ──► restoring ──► published
+                    │
+                    └── withdrawn ──► archived
+```
+
+---
+
+## Answer Version Immutability
+
+Every content edit creates a new version record in `reach_community_answer_versions`:
+
+1. Content is stored with a SHA-256 checksum.
+2. Approval records the checksum of the approved version.
+3. Before publication, `OfficialAnswerPublishingService` verifies the deployment checksum matches the approved version checksum.
+4. Any mismatch blocks publication and triggers a `community.publishing.checksum_mismatch` audit event.
+5. Historical versions are never modified; superseded versions retain a `superseded_by` reference.
+
+---
+
+## Official Identity Transparency
+
+Every published official answer carries:
+
+- `official_identity_id` — the controlled AICOUNTLY identity that responded
+- `ai_assisted` — boolean flag (true if AI materially assisted drafting)
+- `human_reviewed` — boolean flag (true when a human reviewer approved)
+- `approved_at` — approval timestamp
+- `approved_by_role` — reviewer role (without exposing internal usernames publicly)
+- `correction_note` — visible correction notice when the answer has been corrected
+- `withdrawn_at` — set when content is withdrawn
+
+These fields are rendered on the public site question page and embedded in JSON-LD structured data where applicable.
+
+---
+
+## Security Controls
+
+See `REACH_COMMUNITY_SECURITY_MODEL.md` for the full threat model.
+
+Key controls:
+- Community questions treated as untrusted content; prompt injection detection in moderation
+- HTML sanitisation (`HtmlSanitizer`) applied before storage on public site
+- HMAC-SHA256 authentication for all mutating API calls
+- Nonce replay protection (60s tolerance window)
+- Body hash integrity check
+- Idempotency keys prevent duplicate answer records
+- No service credentials stored in DB or exposed in frontend
+- Self-approval blocked for high-risk answers
+- Grounding sources verified before approval
