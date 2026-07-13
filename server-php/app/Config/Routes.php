@@ -496,5 +496,22 @@ $routes->group('v1', static function ($routes) {
         $routes->post('ai/prompts/(:num)/versions',                         'Api\\V1\\Ai\\PromptController::createVersion/$1',             ['filter' => 'permission:ai_prompt.manage']);
         $routes->post('ai/prompts/(:num)/versions/(:num)/approve',          'Api\\V1\\Ai\\PromptController::approveVersion/$1/$2',         ['filter' => 'permission:ai_prompt.approve']);
 
+        // --- Phase 3: AI Control Centre — Dashboard & Health ---
+        $routes->get('ai/dashboard',                                        'Api\\V1\\Ai\\AiDashboardController::dashboard',               ['filter' => 'permission:ai.view']);
+        $routes->get('ai/health',                                           'Api\\V1\\Ai\\AiDashboardController::health',                  ['filter' => 'permission:ai_provider.manage']);
+
+        // --- Phase 3: AI Providers ---
+        $routes->get('ai/providers',                                        'Api\\V1\\Ai\\AiProviderController::index',                    ['filter' => 'permission:ai_provider.manage']);
+        $routes->get('ai/providers/(:num)',                                 'Api\\V1\\Ai\\AiProviderController::show/$1',                  ['filter' => 'permission:ai_provider.manage']);
+        $routes->patch('ai/providers/(:num)/status',                       'Api\\V1\\Ai\\AiProviderController::updateStatus/$1',          ['filter' => 'permission:ai_provider.manage']);
+
+        // --- Phase 3: AI Models ---
+        $routes->get('ai/models',                                           'Api\\V1\\Ai\\AiModelController::index',                       ['filter' => 'permission:ai_provider.manage']);
+
+        // --- Phase 3: AI Usage & Budgets ---
+        $routes->get('ai/usage',                                            'Api\\V1\\Ai\\AiUsageController::usage',                       ['filter' => 'permission:ai_provider.manage']);
+        $routes->get('ai/budgets',                                          'Api\\V1\\Ai\\AiUsageController::budgets',                     ['filter' => 'permission:ai_provider.manage']);
+        $routes->put('ai/budgets/(:num)',                                   'Api\\V1\\Ai\\AiUsageController::updateBudget/$1',             ['filter' => 'permission:ai_provider.manage']);
+
     });
 });

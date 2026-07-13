@@ -4,7 +4,8 @@ import {
   Share2, ListOrdered, Mail, MessageCircle, TrendingUp, Sparkles,
   Paintbrush, BarChart3, Users, ArrowRightCircle, Bot, ScrollText,
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
-  BookOpen, PenTool, Package,
+  BookOpen, PenTool, Package, BrainCircuit, Cpu, Route, FlaskConical,
+  Zap, CircleDollarSign, ShieldAlert, HeartPulse,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -59,6 +60,21 @@ const NAV = [
       { label: 'Brand Rules',        path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: BookOpen, requires: 'brand_rules.view' },
       { label: 'Content Policies',   path: ROUTES.KNOWLEDGE_POLICIES,      icon: BookOpen, requires: 'content_policy.view' },
       { label: 'Completeness',       path: ROUTES.KNOWLEDGE_COMPLETENESS,  icon: BookOpen, requires: 'knowledge.view' },
+    ],
+  },
+  {
+    title: 'AI Control Centre',
+    items: [
+      { label: 'AI Dashboard',   path: ROUTES.AI_DASHBOARD,   icon: BrainCircuit, end: true, requires: 'ai.generate' },
+      { label: 'Providers',      path: ROUTES.AI_PROVIDERS,   icon: Cpu,          requires: 'ai_provider.manage' },
+      { label: 'Models',         path: ROUTES.AI_MODELS,      icon: Sparkles,     requires: 'ai_provider.manage' },
+      { label: 'Routing',        path: ROUTES.AI_ROUTING,     icon: Route,        requires: 'ai_provider.manage' },
+      { label: 'Prompts',        path: ROUTES.AI_PROMPTS,     icon: FlaskConical, requires: 'ai_prompt.approve' },
+      { label: 'Generations',    path: ROUTES.AI_GENERATIONS, icon: Zap,          requires: 'ai.generate' },
+      { label: 'Usage',          path: ROUTES.AI_USAGE,       icon: CircleDollarSign, requires: 'ai_provider.manage' },
+      { label: 'Budgets',        path: ROUTES.AI_BUDGETS,     icon: CircleDollarSign, requires: 'ai_provider.manage' },
+      { label: 'Validations',    path: ROUTES.AI_VALIDATIONS, icon: ShieldAlert,  requires: 'ai.generate' },
+      { label: 'Health',         path: ROUTES.AI_HEALTH,      icon: HeartPulse,   requires: 'ai_provider.manage' },
     ],
   },
   {

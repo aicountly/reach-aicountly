@@ -78,6 +78,21 @@ import { ContentValidationsPage } from './pages/content/ContentValidationsPage';
 import { ContentSchedulePage }  from './pages/content/ContentSchedulePage';
 import { DailyPackPage }        from './pages/content/DailyPackPage';
 
+import AiLayout            from './pages/ai/AiLayout.jsx';
+import AiDashboardPage     from './pages/ai/AiDashboardPage.jsx';
+import AiProvidersPage     from './pages/ai/AiProvidersPage.jsx';
+import AiProvidersDetailPage from './pages/ai/AiProvidersDetailPage.jsx';
+import AiModelsPage        from './pages/ai/AiModelsPage.jsx';
+import AiRoutingPage       from './pages/ai/AiRoutingPage.jsx';
+import AiPromptsPage       from './pages/ai/AiPromptsPage.jsx';
+import AiPromptDetailPage  from './pages/ai/AiPromptDetailPage.jsx';
+import AiGenerationsPage   from './pages/ai/AiGenerationsPage.jsx';
+import AiGenerationDetailPage from './pages/ai/AiGenerationDetailPage.jsx';
+import AiUsagePage         from './pages/ai/AiUsagePage.jsx';
+import AiBudgetsPage       from './pages/ai/AiBudgetsPage.jsx';
+import AiValidationsPage   from './pages/ai/AiValidationsPage.jsx';
+import AiHealthPage        from './pages/ai/AiHealthPage.jsx';
+
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
 
@@ -176,6 +191,24 @@ export default function App() {
           <Route path=":id/validations" element={<ContentValidationsPage />} />
           <Route path=":id/schedule" element={<ContentSchedulePage />} />
           <Route path="calendar" element={<ContentListPage />} />
+        </Route>
+
+        {/* Phase 3 — AI Control Centre */}
+        <Route path="/ai" element={<AiLayout />}>
+          <Route index element={<AiDashboardPage />} />
+          <Route path="dashboard" element={<AiDashboardPage />} />
+          <Route path="providers" element={<AiProvidersPage />} />
+          <Route path="providers/:id" element={<AiProvidersDetailPage />} />
+          <Route path="models" element={<AiModelsPage />} />
+          <Route path="routing" element={<AiRoutingPage />} />
+          <Route path="prompts" element={<AiPromptsPage />} />
+          <Route path="prompts/:id" element={<AiPromptDetailPage />} />
+          <Route path="generations" element={<AiGenerationsPage />} />
+          <Route path="generations/:uuid" element={<AiGenerationDetailPage />} />
+          <Route path="usage" element={<AiUsagePage />} />
+          <Route path="budgets" element={<AiBudgetsPage />} />
+          <Route path="validations" element={<AiValidationsPage />} />
+          <Route path="health" element={<AiHealthPage />} />
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />

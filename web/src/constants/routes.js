@@ -84,4 +84,20 @@ export const ROUTES = {
   CONTENT_CALENDAR:    '/content/calendar',
   CONTENT_DAILY_PACK:  '/content/daily-pack',
   CONTENT_TEMPLATES:   '/content/templates',
+
+  // Phase 3: AI Control Centre
+  AI:                    '/ai',
+  AI_DASHBOARD:          '/ai/dashboard',
+  AI_PROVIDERS:          '/ai/providers',
+  AI_PROVIDER_DETAIL:    '/ai/providers/:id',
+  AI_MODELS:             '/ai/models',
+  AI_ROUTING:            '/ai/routing',
+  AI_PROMPTS:            '/ai/prompts',
+  AI_PROMPT_DETAIL:      '/ai/prompts/:id',
+  AI_GENERATIONS:        '/ai/generations',
+  AI_GENERATION_DETAIL:  '/ai/generations/:uuid',
+  AI_USAGE:              '/ai/usage',
+  AI_BUDGETS:            '/ai/budgets',
+  AI_VALIDATIONS:        '/ai/validations',
+  AI_HEALTH:             '/ai/health',
 };
