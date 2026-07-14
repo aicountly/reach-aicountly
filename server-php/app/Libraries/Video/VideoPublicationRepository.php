@@ -22,15 +22,28 @@ class VideoPublicationRepository
         return $this->profileModel->findByProject($projectId, $platform);
     }
 
-    public function createProfile(array $data): int
+    public function createProfile(array $data): array
     {
         $this->profileModel->insert($data);
-        return (int) $this->profileModel->insertID();
+        $id = (int) $this->profileModel->insertID();
+        return $this->profileModel->find($id);
     }
 
     public function updateProfile(int $id, array $data): bool
     {
         return (bool) $this->profileModel->update($id, $data);
+    }
+
+    public function createDeployment(array $data): int
+    {
+        $db = \Config\Database::connect();
+        $db->table('reach_publication_deployments')->insert(array_merge([
+            'subject_type' => 'video_project',
+            'subject_id'   => $data['project_id'] ?? null,
+            'created_at'   => date('Y-m-d H:i:s'),
+            'updated_at'   => date('Y-m-d H:i:s'),
+        ], $data));
+        return (int) $db->insertID();
     }
 
     public function listDeployments(int $tenantId, int $page = 1, int $perPage = 25): array
