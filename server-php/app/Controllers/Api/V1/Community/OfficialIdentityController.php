@@ -40,7 +40,7 @@ class OfficialIdentityController extends BaseApiController
     /** POST /community/identities */
     public function create(): ResponseInterface
     {
-        $body = $this->request->getJSON(true) ?? [];
+        $body = $this->input() ?: [];
 
         $required = ['slug', 'display_name'];
         foreach ($required as $field) {
@@ -78,7 +78,7 @@ class OfficialIdentityController extends BaseApiController
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
         }
 
-        $body = $this->request->getJSON(true) ?? [];
+        $body = $this->input() ?: [];
         $updateData = array_intersect_key($body, array_flip(['display_name', 'department', 'badge_type', 'disclosure_template', 'is_active']));
 
         $this->model->update($identity['id'], $updateData);

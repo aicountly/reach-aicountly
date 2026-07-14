@@ -104,6 +104,12 @@ final class MigrationLifecycleTest extends DatabaseTestCase
                     END LOOP;
                 END \$\$;
             ");
+
+            // Recreate a fresh runner so stale internal state from the failed
+            // regress() call (cached batches, migration history, etc.) does not
+            // interfere with the upcoming latest() run.
+            $runner = \Config\Services::migrations($config, $db, false);
+            $runner->setNamespace('App');
         }
 
         // Step 3 — apply all migrations from scratch
@@ -366,6 +372,10 @@ final class MigrationLifecycleTest extends DatabaseTestCase
                     END LOOP;
                 END \$\$;
             ");
+
+            // Recreate runner after nuclear reset to clear stale internal state.
+            $runner = Services::migrations(config('Migrations'), $this->db, false);
+            $runner->setNamespace('App');
         }
 
         foreach (['reach_content_items', 'reach_content_product_map', 'reach_actors', 'reach_content_seo_profiles'] as $t) {

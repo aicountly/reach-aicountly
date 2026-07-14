@@ -36,7 +36,7 @@ class CommunitySpaceController extends BaseApiController
     /** POST /community/spaces */
     public function create(): ResponseInterface
     {
-        $body = $this->request->getJSON(true) ?? [];
+        $body = $this->input() ?: [];
         $required = ['slug', 'title'];
         foreach ($required as $f) {
             if (empty($body[$f])) {
@@ -67,7 +67,7 @@ class CommunitySpaceController extends BaseApiController
         if (!$space) {
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
         }
-        $body       = $this->request->getJSON(true) ?? [];
+        $body       = $this->input() ?: [];
         $updateData = array_intersect_key($body, array_flip(['title', 'description', 'visibility', 'moderation_mode', 'official_answer_policy', 'is_active']));
         $this->model->update($space['id'], $updateData);
         AuditLogger::record(AuditLogger::COMMUNITY_SPACE_UPDATED, ['slug' => $slug]);

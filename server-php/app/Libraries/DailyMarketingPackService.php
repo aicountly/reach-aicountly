@@ -44,9 +44,6 @@ class DailyMarketingPackService
 
         $config = $this->getConfig();
 
-        $db = \Config\Database::connect();
-        $db->transStart();
-
         $packId = $this->packs->insert([
             'pack_date'          => $date,
             'market_id'          => $marketId,
@@ -58,9 +55,11 @@ class DailyMarketingPackService
             'created_actor_type' => $actor['type'] ?? 'system',
         ], true);
 
-        $this->buildSlots($packId, $date, $marketId, $language, $config, $actor);
+        if (! $packId) {
+            throw new \RuntimeException('Failed to insert daily marketing pack.');
+        }
 
-        $db->transComplete();
+        $this->buildSlots((int) $packId, $date, $marketId, $language, $config, $actor);
 
         $this->audit->log(
             $actor['id'] ?? null,

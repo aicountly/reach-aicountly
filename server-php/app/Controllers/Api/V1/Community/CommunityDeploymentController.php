@@ -28,7 +28,7 @@ class CommunityDeploymentController extends BaseApiController
         $db    = db_connect();
         $total = (int) $db->table('reach_community_deployments')->countAllResults();
         $rows  = $db->table('reach_community_deployments d')
-            ->select('d.*, a.external_id AS answer_uuid')
+            ->select('d.*, a.uuid AS answer_uuid')
             ->join('reach_community_official_answers a', 'a.id = d.answer_id', 'left')
             ->orderBy('d.created_at', 'DESC')
             ->limit($perPage, $offset)

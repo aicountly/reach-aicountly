@@ -54,11 +54,11 @@ class CommunityAnalyticsController extends BaseApiController
         $db   = db_connect();
 
         $rows = $db->query("
-            SELECT DATE(created_at) AS day, event_type, COUNT(*) AS cnt
+            SELECT DATE(event_timestamp) AS day, event_type, COUNT(*) AS cnt
             FROM reach_community_engagement_events
-            WHERE is_validated = TRUE
-              AND created_at >= NOW() - INTERVAL '{$days} days'
-            GROUP BY DATE(created_at), event_type
+            WHERE validated = TRUE
+              AND event_timestamp >= NOW() - INTERVAL '{$days} days'
+            GROUP BY DATE(event_timestamp), event_type
             ORDER BY day ASC
         ")->getResultArray();
 
@@ -86,7 +86,7 @@ class CommunityAnalyticsController extends BaseApiController
     {
         $db   = db_connect();
         $rows = $db->table('reach_community_analytics_cache')
-            ->orderBy('cache_date', 'DESC')
+            ->orderBy('computed_at', 'DESC')
             ->limit(30)
             ->get()->getResultArray();
 

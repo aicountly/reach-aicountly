@@ -23,6 +23,9 @@ class CommunityDeploymentModel extends Model
 
     public function findByUuid(string $uuid): ?array
     {
+        if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid)) {
+            return null;
+        }
         return $this->where('uuid', $uuid)->first();
     }
 

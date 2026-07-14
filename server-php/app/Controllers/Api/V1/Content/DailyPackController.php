@@ -54,7 +54,8 @@ class DailyPackController extends BaseContentController
         try {
             $pack = $this->service->generateForDate($date, $marketId, $language, $this->actor());
             return $this->ok($pack, 201);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
+            log_message('error', '[DailyPackController::generate] ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             return $this->fail($e->getMessage(), 422);
         }
     }

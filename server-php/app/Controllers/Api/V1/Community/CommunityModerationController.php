@@ -51,18 +51,18 @@ class CommunityModerationController extends BaseApiController
     /** POST /community/moderation/(:num)/resolve */
     public function resolve(int $findingId): ResponseInterface
     {
-        $body   = $this->request->getJSON(true) ?? [];
+        $body   = $this->input() ?: [];
         $note   = $body['resolution_note'] ?? '';
-        $userId = auth_user_id();
+        $userId = $this->userId();
 
         $db = db_connect();
         $db->table('reach_community_moderation_findings')
             ->where('id', $findingId)
             ->update([
                 'status'          => 'resolved',
-                'resolved_by'     => $userId,
-                'resolution_note' => $note,
-                'resolved_at'     => date('Y-m-d H:i:s'),
+                'override_by'     => $userId,
+                'override_reason' => $note,
+                'override_at'     => date('Y-m-d H:i:s'),
             ]);
 
         AuditLogger::record(AuditLogger::COMMUNITY_MODERATION_FINDING_RESOLVED, ['finding_id' => $findingId, 'resolver_id' => $userId]);
@@ -72,13 +72,13 @@ class CommunityModerationController extends BaseApiController
     /** POST /community/moderation/(:num)/escalate */
     public function escalate(int $findingId): ResponseInterface
     {
-        $body = $this->request->getJSON(true) ?? [];
+        $body = $this->input() ?: [];
         $note = $body['note'] ?? '';
 
         $db = db_connect();
         $db->table('reach_community_moderation_findings')
             ->where('id', $findingId)
-            ->update(['status' => 'escalated', 'resolution_note' => $note]);
+            ->update(['status' => 'overridden', 'override_reason' => $note]);
 
         AuditLogger::record(AuditLogger::COMMUNITY_MODERATION_FINDING_ESCALATED, ['finding_id' => $findingId]);
         return $this->response->setJSON(['success' => true]);

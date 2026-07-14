@@ -25,25 +25,16 @@ class OfficialAnswerController extends BaseApiController
     /** GET /community/answers — list by status/question */
     public function index(): ResponseInterface
     {
-        $status       = $this->request->getGet('status');
-        $questionUuid = $this->request->getGet('question_uuid');
-        $page         = (int) ($this->request->getGet('page') ?? 1);
-        $perPage      = min((int) ($this->request->getGet('per_page') ?? 25), 100);
+        $status  = (string) ($this->request->getGet('status') ?? '');
+        $perPage = min((int) ($this->request->getGet('per_page') ?? 100), 100);
 
-        $result = $this->repo->listByStatus(
-            filters: array_filter(compact('status', 'questionUuid')),
-            page: $page,
-            perPage: $perPage,
-        );
+        $items = $status !== ''
+            ? $this->repo->listByStatus($status, $perPage)
+            : $this->repo->listByStatus('draft', $perPage);
 
         return $this->response->setJSON([
-            'data' => $result['items'],
-            'meta' => [
-                'current_page' => $page,
-                'per_page'     => $perPage,
-                'total'        => $result['total'],
-                'last_page'    => (int) ceil($result['total'] / $perPage),
-            ],
+            'data' => $items,
+            'meta' => ['total' => count($items)],
         ]);
     }
 
@@ -107,7 +98,7 @@ class OfficialAnswerController extends BaseApiController
     {
         $body    = $this->request->getJSON(true) ?? [];
         $note    = $body['note'] ?? null;
-        $userId  = auth_user_id();
+        $userId  = $this->userId();
 
         try {
             $approvalSvc = new OfficialAnswerApprovalService();
@@ -124,7 +115,7 @@ class OfficialAnswerController extends BaseApiController
     {
         $body    = $this->request->getJSON(true) ?? [];
         $reason  = $body['reason'] ?? '';
-        $userId  = auth_user_id();
+        $userId  = $this->userId();
 
         try {
             $approvalSvc = new OfficialAnswerApprovalService();
@@ -154,7 +145,7 @@ class OfficialAnswerController extends BaseApiController
     {
         $body   = $this->request->getJSON(true) ?? [];
         $reason = $body['reason'] ?? '';
-        $userId = auth_user_id();
+        $userId = $this->userId();
 
         $withdrawalSvc = new OfficialAnswerWithdrawalService();
         $withdrawalSvc->withdraw($uuid, $userId, $reason);
@@ -165,7 +156,7 @@ class OfficialAnswerController extends BaseApiController
     /** POST /community/answers/(:segment)/restore */
     public function restore(string $uuid): ResponseInterface
     {
-        $userId        = auth_user_id();
+        $userId        = $this->userId();
         $withdrawalSvc = new OfficialAnswerWithdrawalService();
         $withdrawalSvc->restore($uuid, $userId);
         AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_RESTORED, ['answer_uuid' => $uuid]);
@@ -178,7 +169,7 @@ class OfficialAnswerController extends BaseApiController
         $body      = $this->request->getJSON(true) ?? [];
         $content   = $body['content'] ?? [];
         $note      = $body['correction_note'] ?? '';
-        $userId    = auth_user_id();
+        $userId    = $this->userId();
 
         $correctionSvc = new OfficialAnswerCorrectionService();
         $version       = $correctionSvc->correct($uuid, $userId, $content, $note);
@@ -189,7 +180,11 @@ class OfficialAnswerController extends BaseApiController
     /** GET /community/answers/(:segment)/versions */
     public function versions(string $uuid): ResponseInterface
     {
-        $versions = $this->repo->listVersions($uuid);
+        $answer = $this->repo->findByUuid($uuid);
+        if (!$answer) {
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+        }
+        $versions = $this->repo->listVersions((int) $answer['id']);
         return $this->response->setJSON(['data' => $versions]);
     }
 }

@@ -35,7 +35,7 @@ final class RateLimitTest extends ApiTestCase
         $body = json_decode((string) $blocked->getJSON(), true);
         $this->assertFalse($body['ok']);
         $this->assertArrayHasKey('retry_after', $body);
-        $this->assertNotEmpty($blocked->getHeaderLine('Retry-After'));
+        $this->assertNotEmpty($blocked->response()->getHeaderLine('Retry-After'));
     }
 }
 

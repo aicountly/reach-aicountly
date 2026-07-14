@@ -12,11 +12,14 @@ final class ApprovalDecisionTest extends ApiTestCase
     private function seedPendingApproval(int $requestedBy): int
     {
         $db = \Config\Database::connect();
+        // Use a different requester ID so the approver is not the same person.
+        // ApprovalPolicy denies self-approval (requested_by === deciding user).
+        $otherRequesterId = ($requestedBy !== 9999) ? 9999 : 9998;
         $db->table('reach_approvals')->insert([
             'subject_type' => 'blog',
             'subject_id'   => 1234,
             'summary'      => 'Test pending approval',
-            'requested_by' => $requestedBy,
+            'requested_by' => $otherRequesterId,
             'decision'     => 'pending',
             'created_at'   => date('Y-m-d H:i:s'),
             'updated_at'   => date('Y-m-d H:i:s'),
