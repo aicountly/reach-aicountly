@@ -51,6 +51,29 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     protected $migrateOnce = true;
     protected $refresh      = false;
 
+    /**
+     * Guarantee a clean, fully-applied DB state before any assertion test runs.
+     *
+     * The parent DatabaseTestCase with $migrateOnce=true only calls latest() once,
+     * but if previous test classes already populated the migrations table (their
+     * regress+latest cycle left all records), the latest() call in setUp() is a
+     * no-op. This hook performs a single explicit regress(0)+latest() so every
+     * assertion test in this class starts from a deterministic, fully-migrated DB.
+     */
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        $db     = \Config\Database::connect('tests');
+        $config = new \Config\Migrations();
+        $config->enabled = true;
+
+        $runner = \Config\Services::migrations($config, $db, false);
+        $runner->setSilent(false)->setNamespace('App');
+        $runner->regress(0, 'tests');
+        $runner->latest('tests');
+    }
+
     // -------------------------------------------------------------------------
     // Post-migrate-up assertions
     // -------------------------------------------------------------------------

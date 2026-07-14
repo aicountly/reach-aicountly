@@ -58,7 +58,7 @@ class BlogController extends BaseApiController
             'excerpt'         => isset($body['excerpt']) ? $sanitizer->purifyText((string) $body['excerpt']) : null,
             'content'         => $sanitizer->purify((string) ($body['content'] ?? '')),
             'category'        => $body['category']        ?? null,
-            'tags'            => isset($body['tags']) ? json_encode($body['tags']) : null,
+            'tags'            => isset($body['tags']) ? json_encode($body['tags']) : '[]',
             'seo_title'       => isset($body['seo_title']) ? $sanitizer->purifyText((string) $body['seo_title']) : null,
             'seo_description' => isset($body['seo_description']) ? $sanitizer->purifyText((string) $body['seo_description']) : null,
             'canonical_url'   => $body['canonical_url']   ?? null,

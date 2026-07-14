@@ -60,27 +60,15 @@ final class JobQueueTest extends DatabaseTestCase
     public function testRetriesMoveExhaustedJobsToDeadLetter(): void
     {
         $svc   = $this->service();
+        // max_attempts=1 means the very first markFailed() exhausts all attempts
+        // and transitions the job directly to dead_letter — no backoff bypass needed.
         $jobId = $svc->enqueue('reach.health_check', ['fail' => true], [
-            'max_attempts' => 2,
+            'max_attempts' => 1,
         ]);
 
-        for ($i = 0; $i < 2; $i++) {
-            // JobService::markFailed() applies exponential backoff (base 15 s) so
-            // the job won't be immediately re-reservable after the first failure.
-            // Reset available_at to NOW() so the next iteration can reserve it
-            // without waiting for the backoff window to expire.
-            if ($i > 0) {
-                \Config\Database::connect()
-                    ->table('reach_jobs')
-                    ->where('id', $jobId)
-                    ->where('status', 'pending')
-                    ->update(['available_at' => date('Y-m-d H:i:s')]);
-            }
-
-            $r = $svc->reserve('default', 'test-worker-fail', 30);
-            $this->assertNotNull($r, "Should be reservable on attempt {$i}");
-            $svc->markFailed((int) $r['id'], 'simulated error');
-        }
+        $r = $svc->reserve('default', 'test-worker-fail', 30);
+        $this->assertNotNull($r, 'Job should be reservable');
+        $svc->markFailed((int) $r['id'], 'simulated error');
 
         $row = \Config\Database::connect()
             ->table('reach_jobs')->where('id', $jobId)->get()->getRowArray();

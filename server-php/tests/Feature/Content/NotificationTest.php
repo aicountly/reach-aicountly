@@ -14,12 +14,13 @@ final class NotificationTest extends ApiTestCase
         $headers = $this->authAs('super_admin');
 
         $list = $this->withHeaders($headers)->call('GET', 'v1/notifications');
-        $this->assertSame(200, $list->getStatusCode());
+        $this->assertSame(200, $list->response()->getStatusCode());
         $body = json_decode((string) $list->getJSON(), true);
         $this->assertTrue($body['ok']);
         $this->assertArrayHasKey('notifications', $body['data']);
 
         $count = $this->withHeaders($headers)->call('GET', 'v1/notifications/count');
-        $this->assertSame(200, $count->getStatusCode());
+        $this->assertSame(200, $count->response()->getStatusCode());
     }
 }
+

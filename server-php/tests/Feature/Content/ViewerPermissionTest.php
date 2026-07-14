@@ -14,7 +14,7 @@ final class ViewerPermissionTest extends ApiTestCase
     {
         $headers = $this->authAs('viewer');
         $res = $this->withHeaders($headers)->call('GET', 'v1/content/items');
-        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(200, $res->response()->getStatusCode());
     }
 
     public function testViewerCannotCreateContent(): void
@@ -24,13 +24,14 @@ final class ViewerPermissionTest extends ApiTestCase
             'title'        => 'Should fail',
             'content_type' => 'blog',
         ]);
-        $this->assertGreaterThanOrEqual(400, $res->getStatusCode());
+        $this->assertGreaterThanOrEqual(400, $res->response()->getStatusCode());
     }
 
     public function testViewerCannotAccessApprovalQueue(): void
     {
         $headers = $this->authAs('viewer');
         $res = $this->withHeaders($headers)->call('GET', 'v1/approval-queue');
-        $this->assertGreaterThanOrEqual(400, $res->getStatusCode());
+        $this->assertGreaterThanOrEqual(400, $res->response()->getStatusCode());
     }
 }
+

@@ -12,14 +12,14 @@ final class QuestionInboxApiTest extends ApiTestCase
     public function testListQuestionsRequiresAuth(): void
     {
         $response = $this->call('GET', 'v1/community/questions');
-        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame(401, $response->response()->getStatusCode());
     }
 
     public function testListQuestionsReturnsPaginatedData(): void
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/questions');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         $this->assertArrayHasKey('data', $body);
         $this->assertArrayHasKey('meta', $body);
@@ -29,7 +29,7 @@ final class QuestionInboxApiTest extends ApiTestCase
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/questions/stats');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         $this->assertArrayHasKey('data', $body);
     }
@@ -38,14 +38,14 @@ final class QuestionInboxApiTest extends ApiTestCase
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/questions/00000000-0000-0000-0000-000000000000');
-        $this->assertSame(404, $response->getStatusCode());
+        $this->assertSame(404, $response->response()->getStatusCode());
     }
 
     public function testListQuestionsFilterByStatus(): void
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/questions?status=new');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         foreach ($body['data'] ?? [] as $q) {
             $this->assertSame('new', $q['status']);
@@ -62,3 +62,4 @@ final class QuestionInboxApiTest extends ApiTestCase
         $this->assertArrayHasKey('total', $body['meta']);
     }
 }
+

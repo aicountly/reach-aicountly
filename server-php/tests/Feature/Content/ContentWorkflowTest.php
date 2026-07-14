@@ -18,20 +18,20 @@ final class ContentWorkflowTest extends ApiTestCase
             'title'        => 'Workflow test',
             'content_type' => 'blog',
         ]);
-        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(201, $res->response()->getStatusCode());
         $id = json_decode((string) $res->getJSON(), true)['data']['id'];
 
         // Move through workflow: idea → brief
         $t1 = $this->withHeaders($headers)->call('POST', "v1/content/items/{$id}/transition", [
             'status' => 'brief',
         ]);
-        $this->assertSame(200, $t1->getStatusCode());
+        $this->assertSame(200, $t1->response()->getStatusCode());
 
         // brief → draft
         $t2 = $this->withHeaders($headers)->call('POST', "v1/content/items/{$id}/transition", [
             'status' => 'draft',
         ]);
-        $this->assertSame(200, $t2->getStatusCode());
+        $this->assertSame(200, $t2->response()->getStatusCode());
     }
 
     public function testInvalidTransitionIsRejected(): void
@@ -49,6 +49,7 @@ final class ContentWorkflowTest extends ApiTestCase
             'status' => 'approved',
         ]);
         // Should return error (422 or 400)
-        $this->assertGreaterThanOrEqual(400, $bad->getStatusCode());
+        $this->assertGreaterThanOrEqual(400, $bad->response()->getStatusCode());
     }
 }
+

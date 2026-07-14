@@ -14,7 +14,7 @@ final class AuthProtectionTest extends ApiTestCase
     public function testMeWithoutTokenReturns401(): void
     {
         $response = $this->call('GET', 'v1/me');
-        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame(401, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         $this->assertIsArray($body);
         $this->assertFalse($body['ok'] ?? true);
@@ -24,7 +24,7 @@ final class AuthProtectionTest extends ApiTestCase
     {
         $headers = $this->authAs('super_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/me');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         $this->assertTrue($body['ok']);
         $this->assertSame('super_admin@test.aicountly.org', $body['data']['email']);
@@ -35,6 +35,7 @@ final class AuthProtectionTest extends ApiTestCase
     {
         $response = $this->call('POST', 'v1/auth/login', ['email' => 'x@y.z', 'password' => 'irrelevant']);
         // Backend returns 403 with a Console SSO message.
-        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame(403, $response->response()->getStatusCode());
     }
 }
+

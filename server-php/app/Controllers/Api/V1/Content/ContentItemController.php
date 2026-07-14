@@ -70,10 +70,10 @@ class ContentItemController extends BaseContentController
         unset($body['version']);
 
         if (!empty($body['body_html'])) {
-            $body['body_html'] = $this->sanitizer->clean($body['body_html']);
+            $body['body_html'] = $this->sanitizer->purify($body['body_html']);
         }
         if (!empty($versionData['body_html'])) {
-            $versionData['body_html'] = $this->sanitizer->clean($versionData['body_html']);
+            $versionData['body_html'] = $this->sanitizer->purify($versionData['body_html']);
         }
 
         try {

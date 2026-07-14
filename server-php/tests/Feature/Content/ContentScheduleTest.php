@@ -26,6 +26,7 @@ final class ContentScheduleTest extends ApiTestCase
             'scheduled_at'          => date('Y-m-d H:i:s', strtotime('+1 day')),
         ]);
         // Should fail because content is not yet approved
-        $this->assertGreaterThanOrEqual(400, $schedule->getStatusCode());
+        $this->assertGreaterThanOrEqual(400, $schedule->response()->getStatusCode());
     }
 }
+

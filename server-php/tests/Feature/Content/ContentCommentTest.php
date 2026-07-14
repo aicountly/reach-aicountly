@@ -22,9 +22,10 @@ final class ContentCommentTest extends ApiTestCase
         $comment = $this->withHeaders($headers)->call('POST', "v1/content/items/{$id}/comments", [
             'body_html' => '<p>Test comment</p>',
         ]);
-        $this->assertSame(200, $comment->getStatusCode());
+        $this->assertSame(200, $comment->response()->getStatusCode());
 
         $list = $this->withHeaders($headers)->call('GET', "v1/content/items/{$id}/comments");
-        $this->assertSame(200, $list->getStatusCode());
+        $this->assertSame(200, $list->response()->getStatusCode());
     }
 }
+

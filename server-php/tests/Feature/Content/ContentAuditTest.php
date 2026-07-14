@@ -18,11 +18,11 @@ final class ContentAuditTest extends ApiTestCase
             'title'        => 'Audit test content',
             'content_type' => 'blog',
         ]);
-        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(201, $res->response()->getStatusCode());
 
         // Check audit logs endpoint if available
         $audit = $this->withHeaders($headers)->call('GET', 'v1/admin/audit-logs?limit=5');
-        if ($audit->getStatusCode() === 200) {
+        if ($audit->response()->getStatusCode() === 200) {
             $body = json_decode((string) $audit->getJSON(), true);
             $this->assertTrue($body['ok']);
         } else {
@@ -31,3 +31,4 @@ final class ContentAuditTest extends ApiTestCase
         }
     }
 }
+

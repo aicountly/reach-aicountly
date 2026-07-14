@@ -24,7 +24,7 @@ final class OfficialIdentityApiTest extends ApiTestCase
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/identities');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
         $this->assertArrayHasKey('data', json_decode((string) $response->getJSON(), true));
     }
 
@@ -48,7 +48,7 @@ final class OfficialIdentityApiTest extends ApiTestCase
             'slug'         => $slug,
             'display_name' => 'Second',
         ]);
-        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame(409, $response->response()->getStatusCode());
     }
 
     public function testGetIdentityBySlug(): void
@@ -58,7 +58,7 @@ final class OfficialIdentityApiTest extends ApiTestCase
         $slug    = $created['data']['slug'];
 
         $response = $this->withHeaders($headers)->call('GET', "v1/community/identities/{$slug}");
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
     }
 
     public function testDeactivateIdentity(): void
@@ -68,7 +68,7 @@ final class OfficialIdentityApiTest extends ApiTestCase
         $slug    = $created['data']['slug'];
 
         $response = $this->withHeaders($headers)->call('DELETE', "v1/community/identities/{$slug}");
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
     }
 
     public function testCreateIdentityWithoutPermissionReturns403(): void
@@ -78,6 +78,7 @@ final class OfficialIdentityApiTest extends ApiTestCase
             'slug'         => 'no-perm-' . uniqid(),
             'display_name' => 'NoPerm',
         ]);
-        $this->assertContains($response->getStatusCode(), [401, 403]);
+        $this->assertContains($response->response()->getStatusCode(), [401, 403]);
     }
 }
+

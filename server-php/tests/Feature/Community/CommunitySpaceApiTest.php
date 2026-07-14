@@ -12,14 +12,14 @@ final class CommunitySpaceApiTest extends ApiTestCase
     public function testListSpacesRequiresAuth(): void
     {
         $response = $this->call('GET', 'v1/community/spaces');
-        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame(401, $response->response()->getStatusCode());
     }
 
     public function testListSpacesReturnsPaginatedData(): void
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/spaces');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         $this->assertArrayHasKey('data', $body);
     }
@@ -31,7 +31,7 @@ final class CommunitySpaceApiTest extends ApiTestCase
             'slug'  => 'test-space-' . uniqid(),
             'title' => 'Test Space',
         ]);
-        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame(201, $response->response()->getStatusCode());
         $body = json_decode((string) $response->getJSON(), true);
         $this->assertNotEmpty($body['data']['id']);
     }
@@ -42,7 +42,7 @@ final class CommunitySpaceApiTest extends ApiTestCase
         $response = $this->withHeaders($headers)->call('POST', 'v1/community/spaces', [
             'title' => 'No Slug Space',
         ]);
-        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame(422, $response->response()->getStatusCode());
     }
 
     public function testCreateSpaceWithoutPermissionReturns403(): void
@@ -52,13 +52,14 @@ final class CommunitySpaceApiTest extends ApiTestCase
             'slug'  => 'denied-space',
             'title' => 'Denied',
         ]);
-        $this->assertContains($response->getStatusCode(), [403, 401]);
+        $this->assertContains($response->response()->getStatusCode(), [403, 401]);
     }
 
     public function testGetNonExistentSpaceReturns404(): void
     {
         $headers  = $this->authAs('reach_admin');
         $response = $this->withHeaders($headers)->call('GET', 'v1/community/spaces/nonexistent-slug-99999');
-        $this->assertSame(404, $response->getStatusCode());
+        $this->assertSame(404, $response->response()->getStatusCode());
     }
 }
+

@@ -20,8 +20,9 @@ final class ContentMappingTest extends ApiTestCase
         $id = json_decode((string) $res->getJSON(), true)['data']['id'];
 
         $mappings = $this->withHeaders($headers)->call('GET', "v1/content/items/{$id}/mappings");
-        $this->assertSame(200, $mappings->getStatusCode());
+        $this->assertSame(200, $mappings->response()->getStatusCode());
         $body = json_decode((string) $mappings->getJSON(), true);
         $this->assertTrue($body['ok']);
     }
 }
+

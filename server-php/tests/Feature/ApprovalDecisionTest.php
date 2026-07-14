@@ -34,7 +34,7 @@ final class ApprovalDecisionTest extends ApiTestCase
             'decision' => 'approved',
             'note'     => 'Looks good.',
         ]);
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
 
         $row = \Config\Database::connect()->table('reach_approvals')->where('id', $id)->get()->getRowArray();
         $this->assertSame('approved', $row['decision']);
@@ -51,10 +51,11 @@ final class ApprovalDecisionTest extends ApiTestCase
             'decision' => 'rejected',
             'note'     => 'Needs citations.',
         ]);
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
 
         $row = \Config\Database::connect()->table('reach_approvals')->where('id', $id)->get()->getRowArray();
         $this->assertSame('rejected', $row['decision']);
         $this->assertSame('Needs citations.', $row['note']);
     }
 }
+

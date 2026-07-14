@@ -30,7 +30,7 @@ final class PermissionEnforcementTest extends ApiTestCase
         $response = $this->withHeaders($headers)->call('POST', 'v1/approvals/' . $id . '/decide', [
             'decision' => 'approved',
         ]);
-        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame(403, $response->response()->getStatusCode());
         $row = $db->table('reach_approvals')->where('id', $id)->get()->getRowArray();
         $this->assertSame('pending', $row['decision']);
     }
@@ -39,6 +39,7 @@ final class PermissionEnforcementTest extends ApiTestCase
     {
         $headers = $this->authAs('analyst');
         $response = $this->withHeaders($headers)->call('GET', 'v1/dashboard/summary');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->response()->getStatusCode());
     }
 }
+

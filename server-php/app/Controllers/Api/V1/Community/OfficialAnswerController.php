@@ -70,7 +70,7 @@ class OfficialAnswerController extends BaseApiController
 
         $versionSvc = new OfficialAnswerVersionService();
         $answer     = $versionSvc->createBlank($questionUuid, $identitySlug);
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_DRAFT_CREATED, ['answer_uuid' => $answer['external_id']]);
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_DRAFT_CREATED, ['answer_uuid' => $answer['external_id']]);
         return $this->response->setStatusCode(201)->setJSON(['data' => $answer]);
     }
 
@@ -83,7 +83,7 @@ class OfficialAnswerController extends BaseApiController
         try {
             $genSvc = new OfficialAnswerGenerationService();
             $result = $genSvc->generate($uuid, $options);
-            AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_GENERATION_STARTED, ['answer_uuid' => $uuid]);
+            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_GENERATION_STARTED, ['answer_uuid' => $uuid]);
             return $this->response->setJSON(['data' => $result]);
         } catch (\RuntimeException $e) {
             return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
@@ -98,7 +98,7 @@ class OfficialAnswerController extends BaseApiController
 
         $versionSvc = new OfficialAnswerVersionService();
         $version    = $versionSvc->createVersion($uuid, $content, 'human_edit');
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_EDITED, ['answer_uuid' => $uuid]);
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_EDITED, ['answer_uuid' => $uuid]);
         return $this->response->setJSON(['data' => $version]);
     }
 
@@ -112,7 +112,7 @@ class OfficialAnswerController extends BaseApiController
         try {
             $approvalSvc = new OfficialAnswerApprovalService();
             $approval    = $approvalSvc->approve($uuid, $userId, $note);
-            AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_APPROVED, ['answer_uuid' => $uuid, 'approver_id' => $userId]);
+            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_APPROVED, ['answer_uuid' => $uuid, 'approver_id' => $userId]);
             return $this->response->setJSON(['data' => $approval]);
         } catch (\RuntimeException $e) {
             return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
@@ -129,7 +129,7 @@ class OfficialAnswerController extends BaseApiController
         try {
             $approvalSvc = new OfficialAnswerApprovalService();
             $approvalSvc->reject($uuid, $userId, $reason);
-            AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_APPROVAL_REJECTED, ['answer_uuid' => $uuid]);
+            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_APPROVAL_REJECTED, ['answer_uuid' => $uuid]);
             return $this->response->setJSON(['success' => true]);
         } catch (\RuntimeException $e) {
             return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
@@ -142,7 +142,7 @@ class OfficialAnswerController extends BaseApiController
         try {
             $pubSvc = new OfficialAnswerPublishingService();
             $result = $pubSvc->publish($uuid);
-            AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_PUBLISHED, ['answer_uuid' => $uuid]);
+            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_PUBLISHED, ['answer_uuid' => $uuid]);
             return $this->response->setJSON(['data' => $result]);
         } catch (\RuntimeException $e) {
             return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
@@ -158,7 +158,7 @@ class OfficialAnswerController extends BaseApiController
 
         $withdrawalSvc = new OfficialAnswerWithdrawalService();
         $withdrawalSvc->withdraw($uuid, $userId, $reason);
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_WITHDRAWN, ['answer_uuid' => $uuid, 'reason' => $reason]);
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_WITHDRAWN, ['answer_uuid' => $uuid, 'reason' => $reason]);
         return $this->response->setJSON(['success' => true]);
     }
 
@@ -168,7 +168,7 @@ class OfficialAnswerController extends BaseApiController
         $userId        = auth_user_id();
         $withdrawalSvc = new OfficialAnswerWithdrawalService();
         $withdrawalSvc->restore($uuid, $userId);
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_RESTORED, ['answer_uuid' => $uuid]);
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_RESTORED, ['answer_uuid' => $uuid]);
         return $this->response->setJSON(['success' => true]);
     }
 
@@ -182,7 +182,7 @@ class OfficialAnswerController extends BaseApiController
 
         $correctionSvc = new OfficialAnswerCorrectionService();
         $version       = $correctionSvc->correct($uuid, $userId, $content, $note);
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_CORRECTED, ['answer_uuid' => $uuid, 'note' => $note]);
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_CORRECTED, ['answer_uuid' => $uuid, 'note' => $note]);
         return $this->response->setJSON(['data' => $version]);
     }
 
@@ -193,3 +193,4 @@ class OfficialAnswerController extends BaseApiController
         return $this->response->setJSON(['data' => $versions]);
     }
 }
+

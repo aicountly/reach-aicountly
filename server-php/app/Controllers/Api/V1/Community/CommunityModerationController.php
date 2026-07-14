@@ -65,7 +65,7 @@ class CommunityModerationController extends BaseApiController
                 'resolved_at'     => date('Y-m-d H:i:s'),
             ]);
 
-        AuditLogger::log(AuditLogger::COMMUNITY_MODERATION_FINDING_RESOLVED, ['finding_id' => $findingId, 'resolver_id' => $userId]);
+        AuditLogger::record(AuditLogger::COMMUNITY_MODERATION_FINDING_RESOLVED, ['finding_id' => $findingId, 'resolver_id' => $userId]);
         return $this->response->setJSON(['success' => true]);
     }
 
@@ -80,7 +80,7 @@ class CommunityModerationController extends BaseApiController
             ->where('id', $findingId)
             ->update(['status' => 'escalated', 'resolution_note' => $note]);
 
-        AuditLogger::log(AuditLogger::COMMUNITY_MODERATION_FINDING_ESCALATED, ['finding_id' => $findingId]);
+        AuditLogger::record(AuditLogger::COMMUNITY_MODERATION_FINDING_ESCALATED, ['finding_id' => $findingId]);
         return $this->response->setJSON(['success' => true]);
     }
 
@@ -90,10 +90,11 @@ class CommunityModerationController extends BaseApiController
         try {
             $modSvc   = new OfficialAnswerModerationService();
             $findings = $modSvc->moderate($answerUuid);
-            AuditLogger::log(AuditLogger::COMMUNITY_MODERATION_RUN, ['answer_uuid' => $answerUuid]);
+            AuditLogger::record(AuditLogger::COMMUNITY_MODERATION_RUN, ['answer_uuid' => $answerUuid]);
             return $this->response->setJSON(['data' => $findings]);
         } catch (\RuntimeException $e) {
             return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
         }
     }
 }
+

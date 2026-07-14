@@ -30,7 +30,7 @@ class ContentCommentService
         array $options = [],
         array $actor = []
     ): array {
-        $clean = $this->sanitizer->clean($body);
+        $clean = $this->sanitizer->purify($body);
 
         $id = $this->comments->insert([
             'content_item_id'    => $contentItemId,

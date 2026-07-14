@@ -14,12 +14,12 @@ final class DailyPackTest extends ApiTestCase
         $headers = $this->authAs('super_admin');
 
         $list = $this->withHeaders($headers)->call('GET', 'v1/content/daily-packs');
-        $this->assertSame(200, $list->getStatusCode());
+        $this->assertSame(200, $list->response()->getStatusCode());
 
         $generate = $this->withHeaders($headers)->call('POST', 'v1/content/daily-packs/generate', [
             'pack_date' => date('Y-m-d'),
         ]);
-        $this->assertSame(200, $generate->getStatusCode());
+        $this->assertSame(200, $generate->response()->getStatusCode());
         $body = json_decode((string) $generate->getJSON(), true);
         $this->assertTrue($body['ok']);
     }
@@ -28,6 +28,7 @@ final class DailyPackTest extends ApiTestCase
     {
         $headers = $this->authAs('super_admin');
         $config = $this->withHeaders($headers)->call('GET', 'v1/content/daily-packs/config');
-        $this->assertSame(200, $config->getStatusCode());
+        $this->assertSame(200, $config->response()->getStatusCode());
     }
 }
+

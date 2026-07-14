@@ -56,7 +56,7 @@ class CommunitySpaceController extends BaseApiController
 
         $id    = $this->model->insert($data, true);
         $space = $this->model->find($id);
-        AuditLogger::log(AuditLogger::COMMUNITY_SPACE_CREATED, ['slug' => $body['slug']]);
+        AuditLogger::record(AuditLogger::COMMUNITY_SPACE_CREATED, ['slug' => $body['slug']]);
         return $this->response->setStatusCode(201)->setJSON(['data' => $space]);
     }
 
@@ -70,7 +70,8 @@ class CommunitySpaceController extends BaseApiController
         $body       = $this->request->getJSON(true) ?? [];
         $updateData = array_intersect_key($body, array_flip(['title', 'description', 'visibility', 'moderation_mode', 'official_answer_policy', 'is_active']));
         $this->model->update($space['id'], $updateData);
-        AuditLogger::log(AuditLogger::COMMUNITY_SPACE_UPDATED, ['slug' => $slug]);
+        AuditLogger::record(AuditLogger::COMMUNITY_SPACE_UPDATED, ['slug' => $slug]);
         return $this->response->setJSON(['data' => $this->model->findBySlug($slug)]);
     }
 }
+

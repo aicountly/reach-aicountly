@@ -18,12 +18,13 @@ final class ContentVersionTest extends ApiTestCase
             'content_type' => 'blog',
             'body_html'    => '<p>First version</p>',
         ]);
-        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(201, $res->response()->getStatusCode());
         $id = json_decode((string) $res->getJSON(), true)['data']['id'];
 
         $versions = $this->withHeaders($headers)->call('GET', "v1/content/items/{$id}/versions");
-        $this->assertSame(200, $versions->getStatusCode());
+        $this->assertSame(200, $versions->response()->getStatusCode());
         $vBody = json_decode((string) $versions->getJSON(), true);
         $this->assertTrue($vBody['ok']);
     }
 }
+

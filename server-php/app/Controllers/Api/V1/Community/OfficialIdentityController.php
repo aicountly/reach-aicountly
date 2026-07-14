@@ -66,7 +66,7 @@ class OfficialIdentityController extends BaseApiController
         $id = $this->model->insert($data, true);
         $identity = $this->model->find($id);
 
-        AuditLogger::log(AuditLogger::COMMUNITY_IDENTITY_CREATED, ['slug' => $body['slug']]);
+        AuditLogger::record(AuditLogger::COMMUNITY_IDENTITY_CREATED, ['slug' => $body['slug']]);
         return $this->response->setStatusCode(201)->setJSON(['data' => $identity]);
     }
 
@@ -82,7 +82,7 @@ class OfficialIdentityController extends BaseApiController
         $updateData = array_intersect_key($body, array_flip(['display_name', 'department', 'badge_type', 'disclosure_template', 'is_active']));
 
         $this->model->update($identity['id'], $updateData);
-        AuditLogger::log(AuditLogger::COMMUNITY_IDENTITY_UPDATED, ['slug' => $slug]);
+        AuditLogger::record(AuditLogger::COMMUNITY_IDENTITY_UPDATED, ['slug' => $slug]);
         return $this->response->setJSON(['data' => $this->model->findBySlug($slug)]);
     }
 
@@ -94,7 +94,8 @@ class OfficialIdentityController extends BaseApiController
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
         }
         $this->model->update($identity['id'], ['is_active' => false]);
-        AuditLogger::log(AuditLogger::COMMUNITY_IDENTITY_DEACTIVATED, ['slug' => $slug]);
+        AuditLogger::record(AuditLogger::COMMUNITY_IDENTITY_DEACTIVATED, ['slug' => $slug]);
         return $this->response->setJSON(['success' => true]);
     }
 }
+

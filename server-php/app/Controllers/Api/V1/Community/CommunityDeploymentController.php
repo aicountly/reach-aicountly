@@ -65,7 +65,7 @@ class CommunityDeploymentController extends BaseApiController
 
         $pubSvc = new OfficialAnswerPublishingService();
         $result = $pubSvc->retryDeployment($deployment);
-        AuditLogger::log(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, ['deployment_uuid' => $uuid]);
+        AuditLogger::record(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, ['deployment_uuid' => $uuid]);
         return $this->response->setJSON(['data' => $result]);
     }
 
@@ -79,7 +79,8 @@ class CommunityDeploymentController extends BaseApiController
 
         $verifySvc = new CommunityPublicationVerificationService();
         $result    = $verifySvc->verify($deployment['answer_id']);
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_VERIFICATION_RUN, ['deployment_uuid' => $uuid]);
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_VERIFICATION_RUN, ['deployment_uuid' => $uuid]);
         return $this->response->setJSON(['data' => $result]);
     }
 }
+

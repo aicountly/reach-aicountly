@@ -17,6 +17,7 @@ class MarketingBotQueueModel extends Model
     protected $allowedFields = [
         'action', 'payload', 'status', 'result_summary',
         'requested_by', 'started_at', 'finished_at', 'error_message',
+        'generation_job_id',
     ];
 
     protected array $casts = [

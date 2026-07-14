@@ -26,9 +26,10 @@ final class ContentBriefTest extends ApiTestCase
             'word_count_min'  => 800,
             'word_count_max'  => 1200,
         ]);
-        $this->assertSame(200, $brief->getStatusCode());
+        $this->assertSame(200, $brief->response()->getStatusCode());
 
         $get = $this->withHeaders($headers)->call('GET', "v1/content/items/{$id}/brief");
-        $this->assertSame(200, $get->getStatusCode());
+        $this->assertSame(200, $get->response()->getStatusCode());
     }
 }
+

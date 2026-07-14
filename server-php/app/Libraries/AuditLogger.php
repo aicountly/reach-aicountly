@@ -309,20 +309,26 @@ class AuditLogger
     }
 
     /**
-     * Phase 4 static convenience wrapper.
-     * Usage: AuditLogger::record(string $action, array $context = [], ?int $actorId = null)
+     * Static convenience wrapper for controller audit events.
+     * Automatically derives entityType from the action prefix (community.* → 'community',
+     * everything else → 'publishing'). Never throws — failures are logged only.
      */
     public static function record(string $action, array $context = [], ?int $actorId = null): void
     {
-        $instance = new self();
-        $instance->log(
-            userId:     $actorId,
-            action:     $action,
-            entityType: 'publishing',
-            entityId:   $context['content_item_id'] ?? $context['deployment_id'] ?? null,
-            extra:      $context,
-            actorType:  $actorId !== null ? 'human' : 'system',
-        );
+        try {
+            $entityType = str_starts_with($action, 'community.') ? 'community' : 'publishing';
+            (new self())->log(
+                userId:       $actorId,
+                action:       $action,
+                entityType:   $entityType,
+                entityId:     $context['content_item_id'] ?? $context['deployment_id'] ?? null,
+                extra:        $context ?: null,
+                actorType:    $actorId !== null ? 'human' : 'system',
+                actorService: 'reach:api',
+            );
+        } catch (\Throwable $e) {
+            log_message('error', 'AuditLogger::record failed: ' . $e->getMessage());
+        }
     }
 
     private function shouldFanOut(string $action): bool
