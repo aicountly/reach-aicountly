@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Libraries\Ai\Prompts;
 
 /**
- * Phase 3 + Phase 5 — JSON Schema definitions for all 26 content types.
+ * Phase 3 + Phase 5 + Phase 6 — JSON Schema definitions for all 32 content types.
  *
  * Phase 3 added 16 governed schemas (blog_post … generic).
  * Phase 5 added 10 community_answer.* schemas, all satisfying the global
  * registry contract: every schema requires claims_used, citations_used,
  * and risk_notes.
+ * Phase 6 added 6 video.* schemas for the governed video automation workflow:
+ *   video_script, video_scene_plan, video_caption_pack,
+ *   video_chapter_pack, video_metadata_pack, video_thumbnail_brief.
+ *   The legacy 'video_script' entry was replaced with a richer
+ *   governed schema; all 6 satisfy the global registry contract.
  *
  * These schemas are used to:
  * 1. Validate structured output from AI providers.
@@ -51,6 +56,13 @@ class OutputSchemaRegistry
             'community_answer.correction',
             'community_answer.summary',
             'community_answer.translation',
+            // Phase 6 — Video automation schemas
+            'video_scene_plan',
+            'video_caption_pack',
+            'video_chapter_pack',
+            'video_metadata_pack',
+            'video_thumbnail_brief',
+            'video_idea_batch',
         ];
     }
 
@@ -200,16 +212,8 @@ class OutputSchemaRegistry
                 'additionalProperties' => false,
             ],
 
-            'video_script' => [
-                'type'       => 'object',
-                'required'   => ['title', 'summary', 'body_plain_text', 'scenes', 'target_duration_seconds', 'claims_used', 'citations_used', 'risk_notes'],
-                'properties' => array_merge($base, [
-                    'body_plain_text'         => ['type' => 'string'],
-                    'scenes'                  => ['type' => 'array', 'items' => ['type' => 'object']],
-                    'target_duration_seconds' => ['type' => 'integer', 'minimum' => 10],
-                ]),
-                'additionalProperties' => false,
-            ],
+            // Phase 6 — Governed video script schema (replaces Phase 3 stub)
+            'video_script' => self::videoScriptSchema(),
 
             'seo_meta' => [
                 'type'       => 'object',
@@ -247,6 +251,14 @@ class OutputSchemaRegistry
             ],
 
             'generic' => self::genericSchema(),
+
+            // Phase 6 — Video automation schemas
+            'video_scene_plan'      => self::videoScenePlanSchema(),
+            'video_caption_pack'    => self::videoCaptionPackSchema(),
+            'video_chapter_pack'    => self::videoChapterPackSchema(),
+            'video_metadata_pack'   => self::videoMetadataPackSchema(),
+            'video_thumbnail_brief' => self::videoThumbnailBriefSchema(),
+            'video_idea_batch'      => self::videoIdeaBatchSchema(),
 
             // Phase 5 — Community official answer types
             'community_answer.concise'           => self::communityAnswerSchema('concise'),
@@ -297,6 +309,190 @@ class OutputSchemaRegistry
                 'body_plain_text' => ['type' => ['string', 'null']],
             ]),
             'additionalProperties' => true,
+        ];
+    }
+
+    // =========================================================================
+    // Phase 6 — Video automation schemas
+    // =========================================================================
+
+    private static function videoScriptSchema(): array
+    {
+        $base = self::baseContentFields();
+        $sceneItem = [
+            'type'     => 'object',
+            'required' => ['order', 'scene_type', 'voice_over_text', 'visual_direction'],
+            'properties' => [
+                'order'              => ['type' => 'integer', 'minimum' => 1],
+                'scene_type'         => ['type' => 'string', 'enum' => ['hook', 'intro', 'scene', 'transition', 'cta', 'outro']],
+                'title'              => ['type' => ['string', 'null']],
+                'voice_over_text'    => ['type' => 'string', 'minLength' => 5],
+                'visual_direction'   => ['type' => 'string', 'minLength' => 5],
+                'duration_hint_secs' => ['type' => ['integer', 'null'], 'minimum' => 1],
+                'b_roll_notes'       => ['type' => ['string', 'null']],
+            ],
+        ];
+        return [
+            'type'     => 'object',
+            'required' => [
+                'title', 'summary', 'hook_text', 'scenes', 'cta_text',
+                'target_duration_seconds', 'claims_used', 'citations_used', 'risk_notes',
+            ],
+            'properties' => array_merge($base, [
+                'hook_text'               => ['type' => 'string', 'minLength' => 10, 'maxLength' => 500],
+                'scenes'                  => ['type' => 'array', 'minItems' => 1, 'items' => $sceneItem],
+                'cta_text'                => ['type' => 'string', 'maxLength' => 200],
+                'target_duration_seconds' => ['type' => 'integer', 'minimum' => 10],
+                'body_plain_text'         => ['type' => ['string', 'null']],
+                'caption_hint'            => ['type' => ['string', 'null']],
+            ]),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function videoScenePlanSchema(): array
+    {
+        $base = self::baseContentFields();
+        return [
+            'type'     => 'object',
+            'required' => ['title', 'summary', 'scenes', 'claims_used', 'citations_used', 'risk_notes'],
+            'properties' => array_merge($base, [
+                'scenes' => [
+                    'type'  => 'array',
+                    'minItems' => 1,
+                    'items' => [
+                        'type'     => 'object',
+                        'required' => ['order', 'visual_direction'],
+                        'properties' => [
+                            'order'            => ['type' => 'integer', 'minimum' => 1],
+                            'visual_direction' => ['type' => 'string'],
+                            'duration_hint'    => ['type' => ['integer', 'null']],
+                            'mood'             => ['type' => ['string', 'null']],
+                            'camera_notes'     => ['type' => ['string', 'null']],
+                        ],
+                    ],
+                ],
+            ]),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function videoCaptionPackSchema(): array
+    {
+        $base = self::baseContentFields();
+        return [
+            'type'     => 'object',
+            'required' => ['title', 'summary', 'captions', 'language', 'claims_used', 'citations_used', 'risk_notes'],
+            'properties' => array_merge($base, [
+                'language' => ['type' => 'string', 'minLength' => 2, 'maxLength' => 10],
+                'captions' => [
+                    'type'  => 'array',
+                    'minItems' => 1,
+                    'items' => [
+                        'type'     => 'object',
+                        'required' => ['start_hint_secs', 'end_hint_secs', 'text'],
+                        'properties' => [
+                            'start_hint_secs' => ['type' => 'number', 'minimum' => 0],
+                            'end_hint_secs'   => ['type' => 'number', 'minimum' => 0],
+                            'text'            => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+            ]),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function videoChapterPackSchema(): array
+    {
+        $base = self::baseContentFields();
+        return [
+            'type'     => 'object',
+            'required' => ['title', 'summary', 'chapters', 'claims_used', 'citations_used', 'risk_notes'],
+            'properties' => array_merge($base, [
+                'chapters' => [
+                    'type'  => 'array',
+                    'minItems' => 1,
+                    'items' => [
+                        'type'     => 'object',
+                        'required' => ['order', 'chapter_title', 'start_time_secs'],
+                        'properties' => [
+                            'order'           => ['type' => 'integer', 'minimum' => 1],
+                            'chapter_title'   => ['type' => 'string', 'minLength' => 3, 'maxLength' => 200],
+                            'start_time_secs' => ['type' => 'integer', 'minimum' => 0],
+                        ],
+                    ],
+                ],
+            ]),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function videoMetadataPackSchema(): array
+    {
+        $base = self::baseContentFields();
+        return [
+            'type'     => 'object',
+            'required' => [
+                'title', 'summary', 'yt_title', 'yt_description',
+                'yt_tags', 'yt_category', 'claims_used', 'citations_used', 'risk_notes',
+            ],
+            'properties' => array_merge($base, [
+                'yt_title'       => ['type' => 'string', 'minLength' => 5, 'maxLength' => 100],
+                'yt_description' => ['type' => 'string', 'minLength' => 20, 'maxLength' => 5000],
+                'yt_tags'        => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 30],
+                'yt_category'    => ['type' => 'string'],
+                'yt_privacy'     => ['type' => 'string', 'enum' => ['public', 'unlisted', 'private']],
+                'default_language' => ['type' => ['string', 'null']],
+            ]),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function videoThumbnailBriefSchema(): array
+    {
+        $base = self::baseContentFields();
+        return [
+            'type'     => 'object',
+            'required' => [
+                'title', 'summary', 'composition_description',
+                'text_overlay', 'claims_used', 'citations_used', 'risk_notes',
+            ],
+            'properties' => array_merge($base, [
+                'composition_description' => ['type' => 'string', 'minLength' => 20],
+                'text_overlay'            => ['type' => 'string', 'maxLength' => 60],
+                'focal_element'           => ['type' => ['string', 'null']],
+                'color_palette'           => ['type' => ['array', 'null'], 'items' => ['type' => 'string']],
+                'mood'                    => ['type' => ['string', 'null']],
+            ]),
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function videoIdeaBatchSchema(): array
+    {
+        $base = self::baseContentFields();
+        return [
+            'type'     => 'object',
+            'required' => ['title', 'summary', 'ideas', 'claims_used', 'citations_used', 'risk_notes'],
+            'properties' => array_merge($base, [
+                'ideas' => [
+                    'type'  => 'array',
+                    'minItems' => 1,
+                    'items' => [
+                        'type'     => 'object',
+                        'required' => ['idea_title', 'idea_summary'],
+                        'properties' => [
+                            'idea_title'       => ['type' => 'string', 'minLength' => 5, 'maxLength' => 500],
+                            'idea_summary'     => ['type' => 'string'],
+                            'score_rationale'  => ['type' => ['string', 'null']],
+                            'target_audience'  => ['type' => ['string', 'null']],
+                            'source_type'      => ['type' => ['string', 'null']],
+                        ],
+                    ],
+                ],
+            ]),
+            'additionalProperties' => false,
         ];
     }
 

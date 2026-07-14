@@ -87,7 +87,32 @@ class VideoScriptController extends BaseApiController
 
     public function generate(string $projectUuid): ResponseInterface
     {
-        return $this->fail('Script generation requires CP4 implementation', 501);
+        $project = $this->findProject($projectUuid);
+        if ($project === null) {
+            return $this->fail('Not found', 404);
+        }
+
+        $body      = $this->input() ?: [];
+        $overrides = [
+            'target_duration_seconds' => (int) ($body['target_duration_seconds'] ?? 120),
+            'style_notes'             => $body['style_notes'] ?? '',
+        ];
+
+        try {
+            $service = new \App\Libraries\Video\VideoScriptGenerationService(
+                $this->projectRepo,
+                $this->scriptRepo,
+            );
+            $result = $service->requestGeneration($projectUuid, $this->userId(), $overrides);
+        } catch (\InvalidArgumentException $e) {
+            return $this->fail($e->getMessage(), 422);
+        } catch (\LogicException $e) {
+            return $this->fail($e->getMessage(), 409);
+        } catch (\Throwable $e) {
+            return $this->fail('Generation failed: ' . $e->getMessage(), 500);
+        }
+
+        return $this->ok($result, 202);
     }
 
     public function submit(string $projectUuid): ResponseInterface

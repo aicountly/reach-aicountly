@@ -13,9 +13,10 @@ use CodeIgniter\Test\CIUnitTestCase;
 class OutputSchemaRegistryTest extends CIUnitTestCase
 {
     /**
-     * Canonical list of all 26 expected schema type identifiers.
+     * Canonical list of all 32 expected schema type identifiers.
      *
-     * Phase 3 original 16 + Phase 5 added 10 community_answer.* types.
+     * Phase 3 original 16 + Phase 5 added 10 community_answer.* types
+     * + Phase 6 added 6 video.* types.
      * Update this list deliberately whenever a new schema is intentionally added.
      */
     private const EXPECTED_TYPES = [
@@ -47,6 +48,13 @@ class OutputSchemaRegistryTest extends CIUnitTestCase
         'community_answer.correction',
         'community_answer.summary',
         'community_answer.translation',
+        // Phase 6 — 6 video automation schemas
+        'video_scene_plan',
+        'video_caption_pack',
+        'video_chapter_pack',
+        'video_metadata_pack',
+        'video_thumbnail_brief',
+        'video_idea_batch',
     ];
 
     // -------------------------------------------------------------------------
@@ -101,12 +109,34 @@ class OutputSchemaRegistryTest extends CIUnitTestCase
 
     public function testAllPhase5CommunitySchemasPresent(): void
     {
-        $phase5 = array_slice(self::EXPECTED_TYPES, 16);
+        $phase5 = array_filter(self::EXPECTED_TYPES, fn ($t) => str_starts_with($t, 'community_answer.'));
         $types  = OutputSchemaRegistry::allTypes();
         foreach ($phase5 as $type) {
             $this->assertContains($type, $types, "Phase 5 community schema '{$type}' must be in registry");
         }
         $this->assertCount(10, $phase5, '10 Phase 5 community schemas expected');
+    }
+
+    public function testAllPhase6VideoSchemasPresent(): void
+    {
+        $phase6 = [
+            'video_scene_plan', 'video_caption_pack', 'video_chapter_pack',
+            'video_metadata_pack', 'video_thumbnail_brief', 'video_idea_batch',
+        ];
+        $types = OutputSchemaRegistry::allTypes();
+        foreach ($phase6 as $type) {
+            $this->assertContains($type, $types, "Phase 6 video schema '{$type}' must be in registry");
+        }
+        $this->assertCount(6, $phase6, '6 Phase 6 video schemas expected');
+    }
+
+    public function testVideoSchemasHaveSceneStructure(): void
+    {
+        $script = OutputSchemaRegistry::get('video_script');
+        $this->assertContains('hook_text', $script['required']);
+        $this->assertContains('scenes', $script['required']);
+        $this->assertContains('cta_text', $script['required']);
+        $this->assertArrayHasKey('scenes', $script['properties']);
     }
 
     // -------------------------------------------------------------------------
@@ -150,7 +180,7 @@ class OutputSchemaRegistryTest extends CIUnitTestCase
     }
 
     // -------------------------------------------------------------------------
-    // Global registry contract — ALL 26 schemas
+    // Global registry contract — ALL 32 schemas
     // -------------------------------------------------------------------------
 
     public function testAllSchemasHaveTypeObject(): void
