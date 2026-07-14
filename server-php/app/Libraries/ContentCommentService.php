@@ -42,9 +42,8 @@ class ContentCommentService
             'created_actor_type' => $actor['type'] ?? 'human',
         ], true);
 
-        $this->audit->log(AuditLogger::CONTENT_COMMENTED, $actor['id'] ?? null, [
-            'content_item_id'  => $contentItemId,
-            'comment_id'       => $id,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_COMMENTED, 'content', $contentItemId, null, null, [
+            'comment_id'        => $id,
             'parent_comment_id' => $options['parent_comment_id'] ?? null,
         ]);
 
@@ -81,7 +80,7 @@ class ContentCommentService
     public function delete(int $commentId, array $actor = []): void
     {
         $this->comments->delete($commentId);
-        $this->audit->log(AuditLogger::CONTENT_COMMENT_DELETED, $actor['id'] ?? null, [
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_COMMENT_DELETED, 'content', null, null, null, [
             'comment_id' => $commentId,
         ]);
     }

@@ -78,7 +78,7 @@ class ContentItemController extends BaseContentController
 
         try {
             $result = $this->service->create($body, $versionData, $this->actor());
-            return $this->ok($result, 201);
+            return $this->ok($result['item'], 201);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
         }
@@ -96,7 +96,7 @@ class ContentItemController extends BaseContentController
         unset($body['version']);
 
         if (!empty($versionData['body_html'])) {
-            $versionData['body_html'] = $this->sanitizer->clean($versionData['body_html']);
+            $versionData['body_html'] = $this->sanitizer->purify($versionData['body_html']);
         }
 
         try {
@@ -225,5 +225,24 @@ class ContentItemController extends BaseContentController
             'current_status' => $item['workflow_status'],
             'next_statuses'  => $this->workflow->validNextStatuses($item['workflow_status']),
         ]);
+    }
+
+    /** POST /v1/content/items/:id/transition — generic workflow transition */
+    public function transition($id)
+    {
+        $item = $this->findItem($id);
+        if ($item instanceof \CodeIgniter\HTTP\ResponseInterface) {
+            return $item;
+        }
+
+        $body   = $this->input();
+        $status = $body['status'] ?? '';
+        $reason = $body['reason'] ?? '';
+
+        if (empty($status)) {
+            return $this->fail('status is required.', 422);
+        }
+
+        return $this->transitionItem($item['id'], $status, (string) $reason);
     }
 }

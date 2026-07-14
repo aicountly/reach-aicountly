@@ -23,7 +23,7 @@ class DailyMarketingPackModel extends Model
     ];
 
     protected array $casts = [
-        'config_snapshot' => 'json-array',
+        'config_snapshot' => '?json-array',
     ];
 
     public function forDate(string $date, ?int $marketId = null, string $language = 'en'): ?array

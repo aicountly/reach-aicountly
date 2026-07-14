@@ -19,7 +19,7 @@ final class DailyPackTest extends ApiTestCase
         $generate = $this->withHeaders($headers)->call('POST', 'v1/content/daily-packs/generate', [
             'pack_date' => date('Y-m-d'),
         ]);
-        $this->assertSame(200, $generate->response()->getStatusCode());
+        $this->assertSame(201, $generate->response()->getStatusCode());
         $body = json_decode((string) $generate->getJSON(), true);
         $this->assertTrue($body['ok']);
     }

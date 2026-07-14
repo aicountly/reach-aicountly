@@ -22,7 +22,7 @@ class ContentValidationModel extends Model
     ];
 
     protected array $casts = [
-        'details' => 'json-array',
+        'details' => '?json-array',
     ];
 
     public function forItem(int $contentItemId): array

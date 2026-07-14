@@ -23,7 +23,7 @@ final class RateLimitTest extends ApiTestCase
                 'action'  => 'generate_campaign_ideas',
                 'payload' => ['topic' => 'unit test ' . $i],
             ]);
-            $this->assertSame(200, $r->response()->getStatusCode(), "Iteration {$i} should be allowed under rate limit");
+            $this->assertSame(202, $r->response()->getStatusCode(), "Iteration {$i} should be allowed under rate limit");
         }
 
         // Over limit — should be blocked.

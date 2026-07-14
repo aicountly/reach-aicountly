@@ -24,12 +24,12 @@ class ContentBriefModel extends Model
     ];
 
     protected array $casts = [
-        'secondary_keywords'   => 'json-array',
-        'questions_to_answer'  => 'json-array',
-        'required_claim_ids'   => 'json-array',
-        'excluded_claim_ids'   => 'json-array',
-        'sources'              => 'json-array',
-        'competitor_urls'      => 'json-array',
+        'secondary_keywords'   => '?json-array',
+        'questions_to_answer'  => '?json-array',
+        'required_claim_ids'   => '?json-array',
+        'excluded_claim_ids'   => '?json-array',
+        'sources'              => '?json-array',
+        'competitor_urls'      => '?json-array',
         'is_approved'          => 'boolean',
     ];
 

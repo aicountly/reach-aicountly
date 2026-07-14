@@ -58,7 +58,7 @@ class BlogController extends BaseApiController
             'excerpt'         => isset($body['excerpt']) ? $sanitizer->purifyText((string) $body['excerpt']) : null,
             'content'         => $sanitizer->purify((string) ($body['content'] ?? '')),
             'category'        => $body['category']        ?? null,
-            'tags'            => isset($body['tags']) ? json_encode($body['tags']) : '[]',
+            'tags'            => $body['tags'] ?? [],
             'seo_title'       => isset($body['seo_title']) ? $sanitizer->purifyText((string) $body['seo_title']) : null,
             'seo_description' => isset($body['seo_description']) ? $sanitizer->purifyText((string) $body['seo_description']) : null,
             'canonical_url'   => $body['canonical_url']   ?? null,
@@ -115,9 +115,7 @@ class BlogController extends BaseApiController
         if (isset($update['slug'])) {
             $update['slug'] = $this->uniqueSlug($blog, (string) $update['slug'], $id);
         }
-        if (isset($update['tags']) && is_array($update['tags'])) {
-            $update['tags'] = json_encode($update['tags']);
-        }
+        // Pass tags as raw array; CI4's json-array cast handles encoding.
         $newVersion = ((int) ($row['current_version'] ?? 1)) + 1;
         $update['current_version'] = $newVersion;
         $blog->update($id, $update);

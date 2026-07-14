@@ -53,7 +53,7 @@ class DailyMarketingPackService
             'language'           => $language,
             'pack_status'        => 'draft',
             'admin_owner_id'     => $actor['id'] ?? null,
-            'config_snapshot'    => json_encode($config),
+            'config_snapshot'    => $config,
             'generated_by'       => $actor['id'] ?? null,
             'created_actor_type' => $actor['type'] ?? 'system',
         ], true);
@@ -62,12 +62,15 @@ class DailyMarketingPackService
 
         $db->transComplete();
 
-        $this->audit->log(AuditLogger::DAILY_PACK_GENERATED, $actor['id'] ?? null, [
-            'pack_id'   => $packId,
-            'pack_date' => $date,
-            'market_id' => $marketId,
-            'language'  => $language,
-        ]);
+        $this->audit->log(
+            $actor['id'] ?? null,
+            AuditLogger::DAILY_PACK_GENERATED,
+            'daily_pack',
+            $packId,
+            null,
+            null,
+            ['pack_date' => $date, 'market_id' => $marketId, 'language' => $language],
+        );
 
         return $this->packs->find($packId);
     }
@@ -84,10 +87,15 @@ class DailyMarketingPackService
             'is_placeholder'  => false,
         ]);
 
-        $this->audit->log(AuditLogger::DAILY_PACK_ITEM_ASSIGNED, $actor['id'] ?? null, [
-            'pack_id'         => $packId,
-            'content_item_id' => $contentItemId,
-        ]);
+        $this->audit->log(
+            $actor['id'] ?? null,
+            AuditLogger::DAILY_PACK_ITEM_ASSIGNED,
+            'daily_pack',
+            $packId,
+            null,
+            null,
+            ['content_item_id' => $contentItemId],
+        );
 
         return $this->items->find($slotItemId);
     }

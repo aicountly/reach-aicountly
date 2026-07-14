@@ -67,9 +67,8 @@ class ContentMappingService
             $this->maps->syncMappings($contentItemId, $entityType, $ids, $actor['id'] ?? null);
         }
 
-        $this->audit->log(AuditLogger::CONTENT_MAPPED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
-            'entity_types'    => array_keys($mappings),
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_MAPPED, 'content', $contentItemId, null, null, [
+            'entity_types' => array_keys($mappings),
         ]);
     }
 

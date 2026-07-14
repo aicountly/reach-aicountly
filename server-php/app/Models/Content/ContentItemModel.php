@@ -30,7 +30,7 @@ class ContentItemModel extends Model
     ];
 
     protected array $casts = [
-        'internal_notes' => 'json-array',
+        'internal_notes' => '?json-array',
     ];
 
     /** Return paginated list with optional filters. */

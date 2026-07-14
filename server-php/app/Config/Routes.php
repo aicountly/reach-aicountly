@@ -413,6 +413,7 @@ $routes->group('v1', static function ($routes) {
         $routes->post('content/items/(:num)/request-changes',      'Api\\V1\\Content\\ContentItemController::requestChanges/$1', ['filter' => 'permission:content.review']);
         $routes->post('content/items/(:num)/archive',              'Api\\V1\\Content\\ContentItemController::archive/$1',    ['filter' => 'permission:content.archive']);
         $routes->get('content/items/(:num)/transitions',           'Api\\V1\\Content\\ContentItemController::transitions/$1', ['filter' => 'permission:content.view']);
+        $routes->post('content/items/(:num)/transition',           'Api\\V1\\Content\\ContentItemController::transition/$1',  ['filter' => 'permission:content.edit']);
 
         // Content Versions
         $routes->get('content/items/(:num)/versions',              'Api\\V1\\Content\\ContentVersionController::index/$1',   ['filter' => 'permission:content_version.view']);

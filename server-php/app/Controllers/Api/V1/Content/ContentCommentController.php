@@ -41,12 +41,13 @@ class ContentCommentController extends BaseContentController
         }
 
         $body = $this->input();
-        if (empty($body['body'])) {
+        $rawBody = $body['body'] ?? $body['body_html'] ?? null;
+        if (empty($rawBody)) {
             return $this->fail('Comment body is required.', 422);
         }
 
         try {
-            $comment = $this->service->addComment($item['id'], $body['body'], $body, $this->actor());
+            $comment = $this->service->addComment($item['id'], (string) $rawBody, $body, $this->actor());
             return $this->ok($comment, 201);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);

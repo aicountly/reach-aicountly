@@ -25,7 +25,7 @@ final class ContentValidationTest extends ApiTestCase
             'score'             => 92,
             'message'           => 'SEO looks good.',
         ]);
-        $this->assertSame(200, $v->response()->getStatusCode());
+        $this->assertSame(201, $v->response()->getStatusCode());
 
         $list = $this->withHeaders($headers)->call('GET', "v1/content/items/{$id}/validations");
         $this->assertSame(200, $list->response()->getStatusCode());

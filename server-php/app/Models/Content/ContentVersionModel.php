@@ -19,7 +19,7 @@ class ContentVersionModel extends Model
     ];
 
     protected array $casts = [
-        'structured_payload' => 'json-array',
+        'structured_payload' => '?json-array',
         'is_current'         => 'boolean',
     ];
 

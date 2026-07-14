@@ -104,11 +104,10 @@ class ContentWorkflowService
 
         $this->items->update($contentItemId, $updates);
 
-        $this->audit->log(AuditLogger::CONTENT_STATUS_CHANGED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
-            'from_status'     => $from,
-            'to_status'       => $newStatus,
-            'reason'          => $reason ?: null,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_STATUS_CHANGED, 'content', $contentItemId, null, null, [
+            'from_status' => $from,
+            'to_status'   => $newStatus,
+            'reason'      => $reason ?: null,
         ]);
 
         $this->dispatchTransitionNotifications($item, $newStatus, $actor);
@@ -174,9 +173,8 @@ class ContentWorkflowService
             'review_notes' => $comment,
         ]);
 
-        $this->audit->log(AuditLogger::CONTENT_APPROVED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
-            'stage'           => $stage,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_APPROVED, 'content', $contentItemId, null, null, [
+            'stage' => $stage,
         ]);
 
         // Check if all required stages are approved → final transition
@@ -218,10 +216,9 @@ class ContentWorkflowService
             'approval_status' => 'rejected',
         ]);
 
-        $this->audit->log(AuditLogger::CONTENT_REJECTED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
-            'stage'           => $stage,
-            'reason'          => $reason,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_REJECTED, 'content', $contentItemId, null, null, [
+            'stage'  => $stage,
+            'reason' => $reason,
         ]);
 
         return $this->items->find($contentItemId);

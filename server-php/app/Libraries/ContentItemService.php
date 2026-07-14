@@ -54,7 +54,11 @@ class ContentItemService
             }
         }
 
-        $data['uuid']               = $data['uuid'] ?? null;
+        // If uuid is not provided, unset it so the DB DEFAULT (gen_random_uuid()) fires.
+        // Passing null would violate the NOT NULL constraint.
+        if (empty($data['uuid'])) {
+            unset($data['uuid']);
+        }
         $data['workflow_status']    = $data['workflow_status'] ?? 'idea';
         $data['approval_status']    = 'not_required';
         $data['validation_status']  = 'not_run';
@@ -84,10 +88,9 @@ class ContentItemService
 
         $item = $this->items->find($itemId);
 
-        $this->audit->log(AuditLogger::CONTENT_CREATED, $actor['id'] ?? null, [
-            'content_item_id' => $itemId,
-            'content_type'    => $item['content_type'],
-            'title'           => $item['title'],
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_CREATED, 'content', $itemId, null, null, [
+            'content_type' => $item['content_type'],
+            'title'        => $item['title'],
         ]);
 
         return ['item' => $item, 'version' => $version];
@@ -134,9 +137,8 @@ class ContentItemService
 
         $db->transComplete();
 
-        $this->audit->log(AuditLogger::CONTENT_UPDATED, $actor['id'] ?? null, [
-            'content_item_id' => $id,
-            'new_version'     => $version ? $version['id'] : null,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_UPDATED, 'content', $id, null, null, [
+            'new_version' => $version ? $version['id'] : null,
         ]);
 
         return ['item' => $this->items->find($id), 'version' => $version];
@@ -159,9 +161,8 @@ class ContentItemService
             'updated_by_user_id' => $actor['id'] ?? null,
         ]);
 
-        $this->audit->log(AuditLogger::CONTENT_ARCHIVED, $actor['id'] ?? null, [
-            'content_item_id' => $id,
-            'reason'          => $reason,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_ARCHIVED, 'content', $id, null, null, [
+            'reason' => $reason,
         ]);
 
         return $this->items->find($id);

@@ -66,7 +66,7 @@ abstract class BaseContentController extends BaseApiController
     {
         foreach ($fields as $field) {
             if (isset($data[$field])) {
-                $data[$field] = $this->sanitizer->clean($data[$field]);
+                $data[$field] = $this->sanitizer->purify($data[$field]);
             }
         }
         return $data;

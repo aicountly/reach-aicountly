@@ -60,8 +60,7 @@ class ContentValidationService
         // Recompute overall validation status on the item
         $this->updateOverallStatus($contentItemId);
 
-        $this->audit->log(AuditLogger::CONTENT_VALIDATION_STORED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_VALIDATION_STORED, 'content', $contentItemId, null, null, [
             'validation_type' => $validationType,
             'status'          => $status,
         ]);
@@ -90,10 +89,9 @@ class ContentValidationService
 
         $this->updateOverallStatus($v['content_item_id']);
 
-        $this->audit->log(AuditLogger::CONTENT_VALIDATION_WAIVED, $actor['id'] ?? null, [
-            'validation_id'   => $validationId,
-            'content_item_id' => $v['content_item_id'],
-            'reason'          => $reason,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_VALIDATION_WAIVED, 'content', (int) $v['content_item_id'], null, null, [
+            'validation_id' => $validationId,
+            'reason'        => $reason,
         ]);
 
         return $this->validations->find($validationId);

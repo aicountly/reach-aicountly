@@ -69,8 +69,7 @@ class ContentScheduleService
             'scheduled_at'    => $scheduledAt,
         ]);
 
-        $this->audit->log(AuditLogger::CONTENT_SCHEDULED, $actor['id'] ?? null, [
-            'content_item_id'       => $contentItemId,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_SCHEDULED, 'content', $contentItemId, null, null, [
             'publication_target_id' => $publicationTargetId,
             'scheduled_at'          => $scheduledAt,
         ]);
@@ -109,7 +108,7 @@ class ContentScheduleService
             'cancellation_reason' => $reason,
         ]);
 
-        $this->audit->log(AuditLogger::CONTENT_SCHEDULE_CANCELLED, $actor['id'] ?? null, [
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_SCHEDULE_CANCELLED, 'content', null, null, null, [
             'schedule_id' => $scheduleId,
             'reason'      => $reason,
         ]);

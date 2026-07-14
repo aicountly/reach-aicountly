@@ -39,9 +39,10 @@ class ContentPublicationTargetController extends BaseContentController
 
     public function create()
     {
-        $body               = $this->input();
-        $body['created_by'] = $this->userId();
-        $id                 = $this->targets->insert($body, true);
+        $body                  = $this->input();
+        $body['created_by']    = $this->userId();
+        $body['target_config'] = $body['target_config'] ?? [];
+        $id                    = $this->targets->insert($body, true);
         if (!$id) {
             return $this->fail('Failed to create publication target.', 422);
         }

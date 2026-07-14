@@ -59,7 +59,23 @@ abstract class ApiTestCase extends DatabaseTestCase
         if ($row) {
             return (int) $row['id'];
         }
-        $permissions = $slug === 'super_admin' ? ['*'] : [];
+
+        // Assign realistic permissions so tests are not blocked by the
+        // permission filter. Roles that need to be denied specific actions
+        // must NOT have those permissions listed here.
+        $permissionMap = [
+            'super_admin'  => ['*'],
+            'reach_admin'  => ['*'],
+            // analyst: can read dashboards/analytics but cannot approve
+            'analyst'      => ['dashboard.view', 'analytics.view', 'content.view', 'content_version.view'],
+            // viewer: read-only content access, no create/approve/review
+            'viewer'       => ['content.view', 'content_version.view', 'content_comment.view',
+                              'content_validation.view', 'content_assignment.view', 'content_schedule.view'],
+            // blog_author: blog operations only; no community or approval access
+            'blog_author'  => ['blog.view', 'blog.create', 'blog.edit', 'blog.submit'],
+        ];
+        $permissions = $permissionMap[$slug] ?? [];
+
         $db->table('reach_roles')->insert([
             'slug'        => $slug,
             'name'        => ucfirst(str_replace('_', ' ', $slug)),

@@ -16,10 +16,12 @@ final class JobQueueTest extends DatabaseTestCase
 {
     private function service(): JobService
     {
-        // Soft-reset so each test starts with a fresh JobService without
-        // re-initializing the autoloader (which reset(true) would do).
-        Services::reset(false);
-        return Services::jobService();
+        // Create a new JobService instance directly so it shares the same
+        // DB connection as the test's transaction wrapper ($this->db).
+        // Services::reset() must NOT be called here: it would create a new
+        // connection outside the current test transaction, causing enqueued
+        // jobs to persist across tests and break reserve() ordering.
+        return new JobService();
     }
 
     public function testEnqueueCreatesPendingRow(): void

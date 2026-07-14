@@ -21,7 +21,7 @@ class MarketingBotQueueModel extends Model
     ];
 
     protected array $casts = [
-        'payload'        => 'json-array',
-        'result_summary' => 'json-array',
+        'payload'        => '?json-array',
+        'result_summary' => '?json-array',
     ];
 }

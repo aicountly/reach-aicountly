@@ -26,7 +26,7 @@ final class ContentAssignmentTest extends ApiTestCase
             'user_id' => $userId,
             'role'    => 'reviewer',
         ]);
-        $this->assertSame(200, $assign->response()->getStatusCode());
+        $this->assertSame(201, $assign->response()->getStatusCode());
 
         $list = $this->withHeaders($headers)->call('GET', "v1/content/items/{$id}/assignments");
         $this->assertSame(200, $list->response()->getStatusCode());

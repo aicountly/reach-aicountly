@@ -22,7 +22,7 @@ class ContentPublicationTargetModel extends Model
     ];
 
     protected array $casts = [
-        'target_config' => 'json-array',
+        'target_config' => '?json-array',
         'is_active'     => 'boolean',
     ];
 

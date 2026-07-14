@@ -20,7 +20,7 @@ class ApprovalModel extends Model
         'console_synced_at', 'metadata',
     ];
 
-    protected array $casts = ['metadata' => 'json-array'];
+    protected array $casts = ['metadata' => '?json-array'];
 
     public function pendingCount(): int
     {

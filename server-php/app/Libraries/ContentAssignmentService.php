@@ -47,10 +47,9 @@ class ContentAssignmentService
 
         $assignment = $this->assignments->find($id);
 
-        $this->audit->log(AuditLogger::CONTENT_ASSIGNED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
-            'user_id'         => $userId,
-            'role'            => $role,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_ASSIGNED, 'content', $contentItemId, null, null, [
+            'user_id' => $userId,
+            'role'    => $role,
         ]);
 
         return $assignment;
@@ -67,10 +66,9 @@ class ContentAssignmentService
             'unassigned_at' => date('Y-m-d H:i:s'),
         ]);
 
-        $this->audit->log(AuditLogger::CONTENT_UNASSIGNED, $actor['id'] ?? null, [
-            'content_item_id' => $contentItemId,
-            'user_id'         => $userId,
-            'role'            => $role,
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_UNASSIGNED, 'content', $contentItemId, null, null, [
+            'user_id' => $userId,
+            'role'    => $role,
         ]);
 
         return true;
