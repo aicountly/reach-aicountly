@@ -54,7 +54,7 @@ class RequestIdFilter implements FilterInterface
 
     private function generate(): string
     {
-        $prefix = trim((string) env('REACH_REQUEST_ID_PREFIX', ''));
+        $prefix = $this->resolvePrefix();
         try {
             $bytes = random_bytes(16);
         } catch (\Throwable $e) {
@@ -72,5 +72,37 @@ class RequestIdFilter implements FilterInterface
             substr($hex, 20, 12),
         );
         return $prefix !== '' ? $prefix . ':' . $uuid : $uuid;
+    }
+
+    /**
+     * Resolve the REACH_REQUEST_ID_PREFIX value portably.
+     *
+     * CI4's env() helper checks $_ENV before $_SERVER and getenv(), using
+     * the null-coalescing operator. This means an empty string stored in
+     * $_ENV by DotEnv (from .env.example's `REACH_REQUEST_ID_PREFIX=`) will
+     * satisfy the ?? operator and prevent the correct value from being read —
+     * even if putenv() and $_SERVER have been updated by a caller or test.
+     *
+     * This resolver checks getenv() first because putenv() updates it
+     * synchronously on all supported platforms, making it safe for both
+     * production (DotEnv calls putenv() during bootstrap) and test isolation
+     * (tests call putenv() to inject a temporary override).
+     *
+     * Resolution order:
+     *   1. getenv(key)          — updated by putenv(); works on all platforms
+     *   2. $_ENV[key]           — populated by DotEnv at bootstrap
+     *   3. $_SERVER[key]        — populated by DotEnv and web-server SAPI
+     *
+     * Blank, whitespace-only, false, and null all resolve to no prefix.
+     */
+    private function resolvePrefix(): string
+    {
+        $key   = 'REACH_REQUEST_ID_PREFIX';
+        $value = getenv($key);
+        if ($value === false) {
+            $value = $_ENV[$key] ?? $_SERVER[$key] ?? null;
+        }
+        $value = is_string($value) ? trim($value) : '';
+        return $value;
     }
 }
