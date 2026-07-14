@@ -91,4 +91,53 @@ class PublishingPermissionsGroupsIntegrationTest extends CIUnitTestCase
         $groups = Permissions::groups();
         $this->assertArrayHasKey('kb_publishing', $groups);
     }
+
+    // -------------------------------------------------------------------------
+    // Phase 5 — Community permission groups (Failure 3 regression)
+    // -------------------------------------------------------------------------
+
+    public function testCommunityGroupsExist(): void
+    {
+        $groups = Permissions::groups();
+        foreach ([
+            'community', 'community_intake', 'community_question',
+            'community_answer', 'community_identity', 'community_settings',
+            'community_analytics', 'community_audit', 'community_engagement',
+        ] as $group) {
+            $this->assertArrayHasKey($group, $groups, "Community group '{$group}' must exist in Permissions::groups()");
+        }
+    }
+
+    public function testNoCommunityPermissionContainsMoreThanOneDot(): void
+    {
+        $all = Permissions::all();
+        foreach ($all as $perm) {
+            if (!str_starts_with($perm, 'community')) {
+                continue;
+            }
+            $this->assertSame(
+                1,
+                substr_count($perm, '.'),
+                "Community permission '{$perm}' must contain exactly one dot"
+            );
+        }
+    }
+
+    public function testPhase04PermissionsUnchanged(): void
+    {
+        $all = Permissions::all();
+        // Spot-check a representative set of Phase 0–4 permissions
+        $phase04 = [
+            'dashboard.view',
+            'blog.publish', 'blog.approve',
+            'campaign.dispatch',
+            'knowledge.approve',
+            'content.approve',
+            'ai.generate', 'ai_prompt.approve',
+            'publishing.publish', 'seo.manage',
+        ];
+        foreach ($phase04 as $slug) {
+            $this->assertContains($slug, $all, "Phase 0–4 permission '{$slug}' must remain present");
+        }
+    }
 }

@@ -29,7 +29,9 @@ describe('Sidebar', () => {
     expect(screen.getByText('Bot Queue')).toBeInTheDocument();
     expect(screen.getByText('Audit Logs')).toBeInTheDocument();
     expect(screen.getByText('Job Monitor')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    // 'Settings' appears in both Administration and Community Q&A sections for super_admin
+    const settingsItems = screen.getAllByText('Settings');
+    expect(settingsItems.length).toBeGreaterThanOrEqual(1);
   });
 
   it('hides Marketing Bot and Administration items for an analyst', () => {

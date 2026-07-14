@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace App\Libraries\Ai\Prompts;
 
 /**
- * Phase 3 — JSON Schema definitions for all 16 content types.
+ * Phase 3 + Phase 5 — JSON Schema definitions for all 26 content types.
+ *
+ * Phase 3 added 16 governed schemas (blog_post … generic).
+ * Phase 5 added 10 community_answer.* schemas, all satisfying the global
+ * registry contract: every schema requires claims_used, citations_used,
+ * and risk_notes.
  *
  * These schemas are used to:
  * 1. Validate structured output from AI providers.
@@ -161,9 +166,11 @@ class OutputSchemaRegistry
                 'type'       => 'object',
                 'required'   => ['title', 'summary', 'body_html', 'body_plain_text', 'headline', 'dateline', 'boilerplate', 'claims_used', 'citations_used', 'risk_notes'],
                 'properties' => array_merge($base, [
-                    'headline'    => ['type' => 'string', 'maxLength' => 200],
-                    'dateline'    => ['type' => 'string'],
-                    'boilerplate' => ['type' => 'string'],
+                    'body_html'       => ['type' => 'string'],
+                    'body_plain_text' => ['type' => 'string'],
+                    'headline'        => ['type' => 'string', 'maxLength' => 200],
+                    'dateline'        => ['type' => 'string'],
+                    'boilerplate'     => ['type' => 'string'],
                 ]),
                 'additionalProperties' => false,
             ],
@@ -172,9 +179,11 @@ class OutputSchemaRegistry
                 'type'       => 'object',
                 'required'   => ['title', 'summary', 'subject_line', 'preview_text', 'body_html', 'body_plain_text', 'claims_used', 'citations_used', 'risk_notes'],
                 'properties' => array_merge($base, [
-                    'subject_line' => ['type' => 'string', 'maxLength' => 150],
-                    'preview_text' => ['type' => 'string', 'maxLength' => 200],
-                    'sections'     => ['type' => 'array', 'items' => ['type' => 'object']],
+                    'subject_line'    => ['type' => 'string', 'maxLength' => 150],
+                    'preview_text'    => ['type' => 'string', 'maxLength' => 200],
+                    'body_html'       => ['type' => 'string'],
+                    'body_plain_text' => ['type' => 'string'],
+                    'sections'        => ['type' => 'array', 'items' => ['type' => 'object']],
                 ]),
                 'additionalProperties' => false,
             ],
@@ -299,7 +308,17 @@ class OutputSchemaRegistry
     {
         return [
             'type'     => 'object',
+            // Every community schema must satisfy the global registry contract:
+            //   claims_used  — the approved knowledge claims the AI relied on
+            //   risk_notes   — flags, caveats, or reviewer notes from the AI
+            //   citations_used — source IDs cited in the answer body
+            // Plus community-specific required fields.
             'required' => [
+                // ── Global registry contract (matches Phase 0–4 schemas) ──
+                'claims_used',
+                'citations_used',
+                'risk_notes',
+                // ── Community answer specifics ──
                 'answer_title', 'answer_body', 'short_answer',
                 'source_references', 'risk_classification',
                 'limitations', 'recommended_disclosure',
@@ -307,6 +326,30 @@ class OutputSchemaRegistry
                 'requires_product_review',
             ],
             'properties' => [
+                // ── Global registry contract fields ──
+                'claims_used' => [
+                    'type'  => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'claim_id'   => ['type' => ['integer', 'string']],
+                            'claim_text' => ['type' => 'string'],
+                            'confidence' => ['type' => 'string', 'enum' => ['high', 'medium', 'low']],
+                        ],
+                    ],
+                    'description' => 'Approved AICOUNTLY claims this answer relies on.',
+                ],
+                'citations_used' => [
+                    'type'  => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Source IDs cited in the answer body.',
+                ],
+                'risk_notes' => [
+                    'type'  => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Reviewer flags, caveats, or compliance notes.',
+                ],
+                // ── Community answer specifics ──
                 'answer_title' => [
                     'type' => 'string', 'minLength' => 5, 'maxLength' => 512,
                 ],
@@ -325,9 +368,9 @@ class OutputSchemaRegistry
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'source_type'  => ['type' => 'string'],
-                            'source_id'    => ['type' => ['integer', 'string', 'null']],
-                            'source_title' => ['type' => 'string'],
+                            'source_type'     => ['type' => 'string'],
+                            'source_id'       => ['type' => ['integer', 'string', 'null']],
+                            'source_title'    => ['type' => 'string'],
                             'claim_supported' => ['type' => 'string'],
                         ],
                     ],
@@ -345,7 +388,7 @@ class OutputSchemaRegistry
                     'type' => 'array',
                     'items' => ['type' => 'string'],
                 ],
-                'recommended_disclosure' => ['type' => 'string'],
+                'recommended_disclosure'      => ['type' => 'string'],
                 'requires_professional_review' => ['type' => 'boolean'],
                 'requires_legal_review'        => ['type' => 'boolean'],
                 'requires_product_review'      => ['type' => 'boolean'],

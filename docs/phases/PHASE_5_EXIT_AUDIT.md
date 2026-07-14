@@ -1,8 +1,17 @@
 # Phase 5 Exit Audit — Community and Official Q&A Automation
 
-**Date**: 2026-07-14
+**Date**: 2026-07-14 (remediation applied 2026-07-14)
 **Auditor**: Cursor AI Agent
-**Status**: PASS — All 56 criteria satisfied
+**Status**: PASS SUBJECT TO POSTGRESQL CI/STAGING VALIDATION
+
+> **Remediation note (post-review):** Three validation defects were fixed after the initial audit:
+> 1. `OutputSchemaRegistry` now defines and tests exactly 26 schemas (16 Phase 3 + 10 Phase 5 community); all schemas require `claims_used`, `citations_used`, and `risk_notes`.
+> 2. All 10 community answer schemas now include the global registry contract fields (`claims_used`, `citations_used`, `risk_notes`) as required properties with meaningful structured definitions.
+> 3. Phase 5 permission slugs have been corrected from three-segment form (`community.intake.create`) to the established two-segment `group.action` format (`community_intake.create`). All route filters, enums, config, migration 100103, frontend, and tests updated atomically.
+>
+> **Local PHPUnit results (post-remediation):** Unit 674/674 PASS · Full suite 991/991 (74 PostgreSQL skipped) PASS · 0 non-database failures.
+>
+> **PostgreSQL Feature tests** (74 tests) require an isolated PostgreSQL server and must be validated in CI or staging before tagging.
 
 ---
 
@@ -63,7 +72,7 @@
 | D2 | `CommunityQuestionStatus` enum with valid transitions | PASS | 22 states including `DuplicateMerged` |
 | D3 | `CommunityRiskClassification` enum with review gates | PASS | `requiresProfessionalReview()`, `requiresComplianceReview()` |
 | D4 | `CommunityModerationFindingType` with auto-block detection | PASS | `isAutoBlocking()`, `requiresReview()` |
-| D5 | `CommunityPermission` enum with 22+ entries, `community.` prefix | PASS | 22 permissions, all prefixed |
+| D5 | `CommunityPermission` enum with 22 entries, two-segment `group.action` format | PASS | 22 permissions, all matching `/^[a-z_]+\.[a-z_]+$/`; sub-domains use underscore prefixes (e.g. `community_intake.create`) |
 | D6 | Repository pattern for questions and answers | PASS | `CommunityQuestionRepository`, `OfficialAnswerRepository` |
 | D7 | Immutable answer versions with checksums | PASS | `CommunityAnswerVersionModel`, `OfficialAnswerVersionService` |
 | D8 | Approval checksum lock enforced | PASS | `OfficialAnswerApprovalService` binds approval to `content_checksum` |
@@ -91,7 +100,7 @@
 |---|-----------|--------|----------|
 | F1 | 7 Community API controllers in `Controllers/Api/V1/Community/` | PASS | QuestionController, OfficialAnswerController, OfficialIdentityController, CommunitySpaceController, CommunityModerationController, CommunityAnalyticsController, CommunityDeploymentController |
 | F2 | 10 frontend pages in `web/src/pages/community/` | PASS | CommunityLayout + CommunityOverviewPage + 8 functional pages |
-| F3 | All community API routes require `community.*` permission | PASS | `PermissionFilter` applied in controller constructors |
+| F3 | All community API routes require canonical two-segment permission | PASS | Route filters use `community.view`, `community_answer.publish`, `community_question.moderate`, etc.; all match `group.action` format |
 | F4 | Public receiver exposes 8 community endpoints | PASS | `api/reach/v1/community.php` with questions/answers CRUD + publish/unpublish/withdraw/restore/status/verification |
 | F5 | Community endpoints included from `index.php` router | PASS | `if ($segments[0] === 'community') { require './community.php'; }` |
 | F6 | Official badge, AI disclosure, correction notice in `question.php` | PASS | `community/question.php` renders `official-answer-badge`, `ai-disclosure`, `correction-notice` sections |
@@ -124,4 +133,6 @@
 | Jobs and Observability | 6 | 6 | 0 |
 | **Total** | **56** | **56** | **0** |
 
-**Result: PASS — ready for human review, testing, and deployment.**
+**Result: PASS SUBJECT TO POSTGRESQL CI/STAGING VALIDATION**
+
+All 56 criteria satisfied for local (non-database) code. The 74 PostgreSQL-dependent Feature tests must execute in CI or staging before the release can be tagged. No non-database failures remain.

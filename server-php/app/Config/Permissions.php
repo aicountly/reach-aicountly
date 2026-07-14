@@ -257,43 +257,70 @@ final class Permissions
 
     // =========================================================================
     // Phase 5 — Community and Official Q&A
+    //
+    // All slugs follow the established two-segment format: group.action
+    // Sub-domains use underscored group prefixes (community_intake, etc.).
+    //
+    // Mapping from the original three-segment form corrected in Phase 5 remediation:
+    //   community.view                         → community.view  (unchanged)
+    //   community.intake.create                → community_intake.create
+    //   community.intake.import                → community_intake.import
+    //   community.question.edit                → community_question.edit
+    //   community.question.classify            → community_question.classify
+    //   community.question.moderate            → community_question.moderate
+    //   community.answer.generate              → community_answer.generate
+    //   community.answer.edit                  → community_answer.edit
+    //   community.answer.review                → community_answer.review
+    //   community.answer.professional_review   → community_answer.professional_review
+    //   community.answer.approve               → community_answer.approve
+    //   community.answer.schedule              → community_answer.schedule
+    //   community.answer.publish               → community_answer.publish
+    //   community.answer.unpublish             → community_answer.unpublish
+    //   community.answer.restore               → community_answer.restore
+    //   community.answer.withdraw              → community_answer.withdraw
+    //   community.answer.override_validation   → community_answer.override_validation
+    //   community.identity.manage              → community_identity.manage
+    //   community.settings.manage              → community_settings.manage
+    //   community.analytics.view               → community_analytics.view
+    //   community.audit.view                   → community_audit.view
+    //   community.engagement.ingest            → community_engagement.ingest
     // =========================================================================
 
     /** Community — general access */
     public const COMMUNITY_VIEW = 'community.view';
 
     /** Community — question intake */
-    public const COMMUNITY_INTAKE_CREATE = 'community.intake.create';
-    public const COMMUNITY_INTAKE_IMPORT = 'community.intake.import';
+    public const COMMUNITY_INTAKE_CREATE = 'community_intake.create';
+    public const COMMUNITY_INTAKE_IMPORT = 'community_intake.import';
 
     /** Community — question management */
-    public const COMMUNITY_QUESTION_EDIT     = 'community.question.edit';
-    public const COMMUNITY_QUESTION_CLASSIFY = 'community.question.classify';
-    public const COMMUNITY_QUESTION_MODERATE = 'community.question.moderate';
+    public const COMMUNITY_QUESTION_EDIT     = 'community_question.edit';
+    public const COMMUNITY_QUESTION_CLASSIFY = 'community_question.classify';
+    public const COMMUNITY_QUESTION_MODERATE = 'community_question.moderate';
 
     /** Community — official answer lifecycle */
-    public const COMMUNITY_ANSWER_GENERATE             = 'community.answer.generate';
-    public const COMMUNITY_ANSWER_EDIT                 = 'community.answer.edit';
-    public const COMMUNITY_ANSWER_REVIEW               = 'community.answer.review';
-    public const COMMUNITY_ANSWER_PROFESSIONAL_REVIEW  = 'community.answer.professional_review';
-    public const COMMUNITY_ANSWER_APPROVE              = 'community.answer.approve';
-    public const COMMUNITY_ANSWER_SCHEDULE             = 'community.answer.schedule';
-    public const COMMUNITY_ANSWER_PUBLISH              = 'community.answer.publish';
-    public const COMMUNITY_ANSWER_UNPUBLISH            = 'community.answer.unpublish';
-    public const COMMUNITY_ANSWER_RESTORE              = 'community.answer.restore';
-    public const COMMUNITY_ANSWER_WITHDRAW             = 'community.answer.withdraw';
-    public const COMMUNITY_ANSWER_OVERRIDE_VALIDATION  = 'community.answer.override_validation';
+    public const COMMUNITY_ANSWER_GENERATE             = 'community_answer.generate';
+    public const COMMUNITY_ANSWER_EDIT                 = 'community_answer.edit';
+    public const COMMUNITY_ANSWER_REVIEW               = 'community_answer.review';
+    public const COMMUNITY_ANSWER_PROFESSIONAL_REVIEW  = 'community_answer.professional_review';
+    public const COMMUNITY_ANSWER_APPROVE              = 'community_answer.approve';
+    public const COMMUNITY_ANSWER_SCHEDULE             = 'community_answer.schedule';
+    public const COMMUNITY_ANSWER_PUBLISH              = 'community_answer.publish';
+    public const COMMUNITY_ANSWER_UNPUBLISH            = 'community_answer.unpublish';
+    public const COMMUNITY_ANSWER_RESTORE              = 'community_answer.restore';
+    public const COMMUNITY_ANSWER_WITHDRAW             = 'community_answer.withdraw';
+    public const COMMUNITY_ANSWER_OVERRIDE_VALIDATION  = 'community_answer.override_validation';
 
     /** Community — identity and settings management */
-    public const COMMUNITY_IDENTITY_MANAGE  = 'community.identity.manage';
-    public const COMMUNITY_SETTINGS_MANAGE  = 'community.settings.manage';
+    public const COMMUNITY_IDENTITY_MANAGE  = 'community_identity.manage';
+    public const COMMUNITY_SETTINGS_MANAGE  = 'community_settings.manage';
 
     /** Community — analytics and audit */
-    public const COMMUNITY_ANALYTICS_VIEW   = 'community.analytics.view';
-    public const COMMUNITY_AUDIT_VIEW       = 'community.audit.view';
+    public const COMMUNITY_ANALYTICS_VIEW   = 'community_analytics.view';
+    public const COMMUNITY_AUDIT_VIEW       = 'community_audit.view';
 
     /** Community — engagement */
-    public const COMMUNITY_ENGAGEMENT_INGEST = 'community.engagement.ingest';
+    public const COMMUNITY_ENGAGEMENT_INGEST = 'community_engagement.ingest';
 
     /**
      * @return array<string, string[]> group => permission list
@@ -385,21 +412,25 @@ final class Permissions
             'aeo'              => [self::AEO_VIEW, self::AEO_MANAGE, self::AEO_REVIEW],
             'structured_data'  => [self::STRUCTURED_DATA_VIEW, self::STRUCTURED_DATA_MANAGE, self::STRUCTURED_DATA_REVIEW],
             'kb_publishing'    => [self::KB_PUBLISHING_VIEW, self::KB_PUBLISHING_PUBLISH, self::KB_PUBLISHING_MANAGE],
-            // Phase 5: Community and Official Q&A groups
-            'community'        => [
-                self::COMMUNITY_VIEW,
-                self::COMMUNITY_INTAKE_CREATE, self::COMMUNITY_INTAKE_IMPORT,
+            // Phase 5: Community and Official Q&A — each sub-domain is its own group
+            'community'            => [self::COMMUNITY_VIEW],
+            'community_intake'     => [self::COMMUNITY_INTAKE_CREATE, self::COMMUNITY_INTAKE_IMPORT],
+            'community_question'   => [
                 self::COMMUNITY_QUESTION_EDIT, self::COMMUNITY_QUESTION_CLASSIFY, self::COMMUNITY_QUESTION_MODERATE,
+            ],
+            'community_answer'     => [
                 self::COMMUNITY_ANSWER_GENERATE, self::COMMUNITY_ANSWER_EDIT,
                 self::COMMUNITY_ANSWER_REVIEW, self::COMMUNITY_ANSWER_PROFESSIONAL_REVIEW,
                 self::COMMUNITY_ANSWER_APPROVE, self::COMMUNITY_ANSWER_SCHEDULE,
                 self::COMMUNITY_ANSWER_PUBLISH, self::COMMUNITY_ANSWER_UNPUBLISH,
                 self::COMMUNITY_ANSWER_RESTORE, self::COMMUNITY_ANSWER_WITHDRAW,
                 self::COMMUNITY_ANSWER_OVERRIDE_VALIDATION,
-                self::COMMUNITY_IDENTITY_MANAGE, self::COMMUNITY_SETTINGS_MANAGE,
-                self::COMMUNITY_ANALYTICS_VIEW, self::COMMUNITY_AUDIT_VIEW,
-                self::COMMUNITY_ENGAGEMENT_INGEST,
             ],
+            'community_identity'   => [self::COMMUNITY_IDENTITY_MANAGE],
+            'community_settings'   => [self::COMMUNITY_SETTINGS_MANAGE],
+            'community_analytics'  => [self::COMMUNITY_ANALYTICS_VIEW],
+            'community_audit'      => [self::COMMUNITY_AUDIT_VIEW],
+            'community_engagement' => [self::COMMUNITY_ENGAGEMENT_INGEST],
         ];
     }
 

@@ -12,7 +12,7 @@ use App\Models\CommunityModerationFindingModel;
  * Moderates official answer versions for safety, compliance, and quality.
  *
  * Findings may auto-block publication, require review, or be overridable.
- * Override requires community.answer.override_validation permission + reason.
+ * Override requires community_answer.override_validation permission + reason.
  */
 class OfficialAnswerModerationService
 {
@@ -124,7 +124,7 @@ class OfficialAnswerModerationService
     }
 
     /**
-     * Override a moderation finding. Requires community.answer.override_validation permission.
+     * Override a moderation finding. Requires community_answer.override_validation permission.
      */
     public function overrideFinding(int $findingId, string $reason, int $actorId): void
     {

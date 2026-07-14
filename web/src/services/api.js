@@ -73,6 +73,8 @@ export const api = {
   delete: (path)         => request(path, { method: 'DELETE' }),
 };
 
+export default api;
+
 function withQuery(path, params) {
   if (!params) return path;
   const qs = new URLSearchParams();

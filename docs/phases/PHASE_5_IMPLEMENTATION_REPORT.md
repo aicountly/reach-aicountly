@@ -1,9 +1,26 @@
 # Phase 5 Implementation Report — Community and Official Q&A Automation
 
-**Completed**: 2026-07-14
-**Repositories**: `reach-aicountly` (11 commits), `aicountly-com` (3 commits)
+**Completed**: 2026-07-14 (remediation commit applied 2026-07-14)
+**Repositories**: `reach-aicountly` (12 commits), `aicountly-com` (3 commits)
 **Branch**: `main` (no feature branch created)
-**Status**: Ready for human review, testing, push, and tagging
+**Status**: PASS SUBJECT TO POSTGRESQL CI/STAGING VALIDATION
+
+---
+
+## Post-Review Remediation Summary
+
+Three validation defects were found and fixed after the initial implementation:
+
+| # | Defect | Fix |
+|---|--------|-----|
+| 1 | `OutputSchemaRegistryTest::testAllTypesDefined` asserted 16 schemas; registry intentionally has 26 after Phase 5 | Test updated with explicit list of all 26 type identifiers; assertions for exact membership, uniqueness, and Phase 3 + Phase 5 presence |
+| 2 | `community_answer.concise` (and all other community schemas) missing `claims_used` (and `citations_used`, `risk_notes`) from `required` | All 10 community answer schemas now include the global registry contract fields as meaningful structured definitions |
+| 3 | Phase 5 permissions used three-segment form (`community.intake.create`) violating the `group.action` contract | All 22 Phase 5 permissions renamed to two-segment `group.action` format (e.g. `community_intake.create`); updated atomically across enum, config, migration 100103, route filters, frontend, and tests |
+
+**Local PHPUnit results (post-remediation):** Unit 674/674 PASS · Full suite 991/991 (74 PostgreSQL skipped) PASS
+**Frontend (post-remediation):** lint PASS · 250/250 tests PASS · build PASS
+
+**PostgreSQL Feature tests** (74 tests) require an isolated PostgreSQL server and must validate in CI or staging before tagging.
 
 ---
 
@@ -194,3 +211,6 @@ COMMUNITY_RISK_HIGH_REQUIRES_PROFESSIONAL_REVIEW=true
 - `QAPage` structured data only on genuinely published Q&A
 - Drafts and withdrawn content are `noindex`
 - No Phase 6 distribution functionality present
+- Schema registry expanded from 16 to 26; all schemas require `claims_used`, `citations_used`, `risk_notes`
+- All Phase 5 permissions use the established two-segment `group.action` format
+- 74 PostgreSQL-dependent Feature tests pending CI/staging validation (no local database available)

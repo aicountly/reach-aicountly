@@ -48,8 +48,9 @@ describe('QuestionInboxPage', () => {
     });
     renderWithAuth(<QuestionInboxPage />, ctx);
     await waitFor(() => expect(screen.getByText('How to file GST?')).toBeInTheDocument());
-    expect(screen.getByText('new')).toBeInTheDocument();
-    expect(screen.getByText('45')).toBeInTheDocument();
+    // 'new' may appear in multiple badge elements; assert at least one is present
+    expect(screen.getAllByText('new').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('45').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows error on API failure', async () => {

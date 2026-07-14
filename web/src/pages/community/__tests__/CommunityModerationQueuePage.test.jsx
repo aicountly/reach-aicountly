@@ -11,7 +11,7 @@ import CommunityModerationQueuePage from '../CommunityModerationQueuePage';
 const ctx = {
   auth: {
     user: { id: 1, email: 'admin@aicountly.com', role: 'super_admin' },
-    permissions: ['community.moderate'],
+    permissions: ['community_question.moderate'],
   },
 };
 

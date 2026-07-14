@@ -11,7 +11,7 @@ import CommunityAnalyticsPage from '../CommunityAnalyticsPage';
 const ctx = {
   auth: {
     user: { id: 1, email: 'admin@aicountly.com', role: 'super_admin' },
-    permissions: ['community.view_analytics'],
+    permissions: ['community_analytics.view'],
   },
 };
 
