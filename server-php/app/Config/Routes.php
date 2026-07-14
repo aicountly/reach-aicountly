@@ -535,5 +535,58 @@ $routes->group('v1', static function ($routes) {
         $routes->post('publishing/content/(:num)/schedule',                 'Api\\V1\\Publishing\\ContentPublishController::schedule/$1',              ['filter' => 'permission:publishing.publish']);
         $routes->post('publishing/content/(:num)/unpublish',                'Api\\V1\\Publishing\\ContentPublishController::unpublish/$1',             ['filter' => 'permission:publishing.publish']);
 
+        // --- Phase 5: Community Q&A ---
+        // Spaces
+        $routes->get('community/spaces',                                     'Api\\V1\\Community\\CommunitySpaceController::index',                     ['filter' => 'permission:community.view']);
+        $routes->post('community/spaces',                                    'Api\\V1\\Community\\CommunitySpaceController::create',                    ['filter' => 'permission:community.manage_spaces']);
+        $routes->get('community/spaces/(:segment)',                          'Api\\V1\\Community\\CommunitySpaceController::show/$1',                   ['filter' => 'permission:community.view']);
+        $routes->put('community/spaces/(:segment)',                          'Api\\V1\\Community\\CommunitySpaceController::update/$1',                 ['filter' => 'permission:community.manage_spaces']);
+
+        // Questions
+        $routes->get('community/questions',                                  'Api\\V1\\Community\\QuestionController::index',                           ['filter' => 'permission:community.view']);
+        $routes->post('community/questions',                                 'Api\\V1\\Community\\QuestionController::create',                          ['filter' => 'permission:community.intake_manage']);
+        $routes->get('community/questions/stats',                            'Api\\V1\\Community\\QuestionController::stats',                           ['filter' => 'permission:community.view']);
+        $routes->get('community/questions/(:segment)',                       'Api\\V1\\Community\\QuestionController::show/$1',                         ['filter' => 'permission:community.view']);
+        $routes->put('community/questions/(:segment)/status',                'Api\\V1\\Community\\QuestionController::updateStatus/$1',                 ['filter' => 'permission:community.intake_manage']);
+
+        // Official Identities
+        $routes->get('community/identities',                                 'Api\\V1\\Community\\OfficialIdentityController::index',                   ['filter' => 'permission:community.view']);
+        $routes->post('community/identities',                                'Api\\V1\\Community\\OfficialIdentityController::create',                  ['filter' => 'permission:community.manage_identities']);
+        $routes->get('community/identities/(:segment)',                      'Api\\V1\\Community\\OfficialIdentityController::show/$1',                 ['filter' => 'permission:community.view']);
+        $routes->put('community/identities/(:segment)',                      'Api\\V1\\Community\\OfficialIdentityController::update/$1',               ['filter' => 'permission:community.manage_identities']);
+        $routes->delete('community/identities/(:segment)',                   'Api\\V1\\Community\\OfficialIdentityController::deactivate/$1',           ['filter' => 'permission:community.manage_identities']);
+
+        // Official Answers
+        $routes->get('community/answers',                                    'Api\\V1\\Community\\OfficialAnswerController::index',                     ['filter' => 'permission:community.view']);
+        $routes->post('community/answers',                                   'Api\\V1\\Community\\OfficialAnswerController::create',                    ['filter' => 'permission:community.answer_draft']);
+        $routes->get('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::show/$1',                   ['filter' => 'permission:community.view']);
+        $routes->put('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::update/$1',                 ['filter' => 'permission:community.answer_edit']);
+        $routes->get('community/answers/(:segment)/versions',                'Api\\V1\\Community\\OfficialAnswerController::versions/$1',               ['filter' => 'permission:community.view']);
+        $routes->post('community/answers/(:segment)/generate',               'Api\\V1\\Community\\OfficialAnswerController::generate/$1',               ['filter' => 'permission:community.answer_generate']);
+        $routes->post('community/answers/(:segment)/approve',                'Api\\V1\\Community\\OfficialAnswerController::approve/$1',                ['filter' => 'permission:community.answer_approve']);
+        $routes->post('community/answers/(:segment)/reject',                 'Api\\V1\\Community\\OfficialAnswerController::reject/$1',                 ['filter' => 'permission:community.answer_approve']);
+        $routes->post('community/answers/(:segment)/publish',                'Api\\V1\\Community\\OfficialAnswerController::publish/$1',                ['filter' => 'permission:community.answer_publish']);
+        $routes->post('community/answers/(:segment)/withdraw',               'Api\\V1\\Community\\OfficialAnswerController::withdraw/$1',               ['filter' => 'permission:community.answer_withdraw']);
+        $routes->post('community/answers/(:segment)/restore',                'Api\\V1\\Community\\OfficialAnswerController::restore/$1',                ['filter' => 'permission:community.answer_withdraw']);
+        $routes->post('community/answers/(:segment)/correct',                'Api\\V1\\Community\\OfficialAnswerController::correct/$1',                ['filter' => 'permission:community.answer_edit']);
+
+        // Moderation
+        $routes->get('community/moderation/queue',                           'Api\\V1\\Community\\CommunityModerationController::queue',                ['filter' => 'permission:community.moderate']);
+        $routes->post('community/moderation/(:num)/resolve',                 'Api\\V1\\Community\\CommunityModerationController::resolve/$1',           ['filter' => 'permission:community.moderate']);
+        $routes->post('community/moderation/(:num)/escalate',                'Api\\V1\\Community\\CommunityModerationController::escalate/$1',          ['filter' => 'permission:community.moderate']);
+        $routes->post('community/answers/(:segment)/run-moderation',         'Api\\V1\\Community\\CommunityModerationController::runModeration/$1',     ['filter' => 'permission:community.moderate']);
+
+        // Deployments
+        $routes->get('community/deployments',                                'Api\\V1\\Community\\CommunityDeploymentController::index',                ['filter' => 'permission:community.view']);
+        $routes->get('community/deployments/(:segment)',                     'Api\\V1\\Community\\CommunityDeploymentController::show/$1',              ['filter' => 'permission:community.view']);
+        $routes->post('community/deployments/(:segment)/retry',              'Api\\V1\\Community\\CommunityDeploymentController::retry/$1',             ['filter' => 'permission:community.answer_publish']);
+        $routes->post('community/deployments/(:segment)/verify',             'Api\\V1\\Community\\CommunityDeploymentController::verify/$1',            ['filter' => 'permission:community.answer_publish']);
+
+        // Analytics
+        $routes->get('community/analytics/overview',                         'Api\\V1\\Community\\CommunityAnalyticsController::overview',              ['filter' => 'permission:community.view_analytics']);
+        $routes->get('community/analytics/engagement',                       'Api\\V1\\Community\\CommunityAnalyticsController::engagement',            ['filter' => 'permission:community.view_analytics']);
+        $routes->get('community/analytics/coverage',                         'Api\\V1\\Community\\CommunityAnalyticsController::sourceCoverage',        ['filter' => 'permission:community.view_analytics']);
+        $routes->get('community/analytics/cache',                            'Api\\V1\\Community\\CommunityAnalyticsController::cache',                 ['filter' => 'permission:community.view_analytics']);
+
     });
 });

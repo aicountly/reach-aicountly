@@ -7,6 +7,7 @@ import {
   BookOpen, PenTool, Package, BrainCircuit, Cpu, Route, FlaskConical,
   Zap, CircleDollarSign, ShieldAlert, HeartPulse,
   Globe, Send, Link2, CheckCircle2, Radio,
+  MessagesSquare, BadgeCheck, ShieldQuestion, LineChart,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -73,6 +74,19 @@ const NAV = [
       { label: 'Verifications',    path: '/publishing/verifications',   icon: CheckCircle2,  requires: 'publishing.view' },
       { label: 'Connections',      path: '/publishing/connections',     icon: Link2,         requires: 'publishing.manage_connections' },
       { label: 'Readiness',        path: '/publishing/readiness',       icon: Radio,         requires: 'publishing.view' },
+    ],
+  },
+  {
+    title: 'Community Q&A',
+    items: [
+      { label: 'Overview',         path: '/community/overview',     icon: MessagesSquare, requires: 'community.view' },
+      { label: 'Question Inbox',   path: '/community/questions',    icon: ShieldQuestion, requires: 'community.view' },
+      { label: 'Official Answers', path: '/community/answers',      icon: BadgeCheck,     requires: 'community.view' },
+      { label: 'Identities',       path: '/community/identities',   icon: Users,          requires: 'community.manage_identities' },
+      { label: 'Moderation',       path: '/community/moderation',   icon: ShieldCheck,    requires: 'community.moderate' },
+      { label: 'Deployments',      path: '/community/deployments',  icon: Send,           requires: 'community.view' },
+      { label: 'Analytics',        path: '/community/analytics',    icon: LineChart,      requires: 'community.view_analytics' },
+      { label: 'Settings',         path: '/community/settings',     icon: Settings,       requires: 'community.manage_spaces' },
     ],
   },
   {

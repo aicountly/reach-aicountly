@@ -79,6 +79,18 @@ import { ContentSchedulePage }  from './pages/content/ContentSchedulePage';
 import { DailyPackPage }        from './pages/content/DailyPackPage';
 
 import PublishingLayout          from './pages/publishing/PublishingLayout.jsx';
+
+import CommunityLayout              from './pages/community/CommunityLayout.jsx';
+import CommunityOverviewPage        from './pages/community/CommunityOverviewPage.jsx';
+import QuestionInboxPage            from './pages/community/QuestionInboxPage.jsx';
+import QuestionWorkspacePage        from './pages/community/QuestionWorkspacePage.jsx';
+import OfficialAnswerListPage       from './pages/community/OfficialAnswerListPage.jsx';
+import OfficialAnswerEditorPage     from './pages/community/OfficialAnswerEditorPage.jsx';
+import OfficialIdentitiesPage       from './pages/community/OfficialIdentitiesPage.jsx';
+import CommunityModerationQueuePage from './pages/community/CommunityModerationQueuePage.jsx';
+import CommunityPublishingMonitorPage from './pages/community/CommunityPublishingMonitorPage.jsx';
+import CommunityAnalyticsPage       from './pages/community/CommunityAnalyticsPage.jsx';
+import CommunitySettingsPage        from './pages/community/CommunitySettingsPage.jsx';
 import BlogPublishingListPage   from './pages/publishing/BlogPublishingListPage.jsx';
 import KbPublishingListPage     from './pages/publishing/KbPublishingListPage.jsx';
 import PublishingCalendarPage   from './pages/publishing/PublishingCalendarPage.jsx';
@@ -216,6 +228,21 @@ export default function App() {
           <Route path="connections" element={<ConnectionsPage />} />
           <Route path="readiness" element={<ReadinessPage />} />
           <Route path="seo/:contentId" element={<SeoEditorPage />} />
+        </Route>
+
+        {/* Phase 5 — Community Control Centre */}
+        <Route path="/community" element={<CommunityLayout />}>
+          <Route index element={<CommunityOverviewPage />} />
+          <Route path="overview" element={<CommunityOverviewPage />} />
+          <Route path="questions" element={<QuestionInboxPage />} />
+          <Route path="questions/:uuid" element={<QuestionWorkspacePage />} />
+          <Route path="answers" element={<OfficialAnswerListPage />} />
+          <Route path="answers/:uuid" element={<OfficialAnswerEditorPage />} />
+          <Route path="identities" element={<OfficialIdentitiesPage />} />
+          <Route path="moderation" element={<CommunityModerationQueuePage />} />
+          <Route path="deployments" element={<CommunityPublishingMonitorPage />} />
+          <Route path="analytics" element={<CommunityAnalyticsPage />} />
+          <Route path="settings" element={<CommunitySettingsPage />} />
         </Route>
 
         {/* Phase 3 — AI Control Centre */}
