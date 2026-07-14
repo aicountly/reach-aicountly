@@ -110,15 +110,14 @@ class VideoRenderJobService
 
     public function dispatch(array $job): array
     {
-        $receipt = $this->provider->queue(
-            (string) ($job['uuid'] ?? $job['idempotency_key']),
-            [
-                'project_id'        => $job['project_id'],
-                'script_version_id' => $job['script_version_id'],
-                'render_profile_id' => $job['render_profile_id'],
-            ],
-            []
-        );
+        $receipt = $this->provider->queue([
+            'render_job_uuid'      => (string) ($job['uuid'] ?? $job['idempotency_key']),
+            'project_uuid'         => (string) ($job['project_uuid'] ?? ''),
+            'script_version_uuid'  => (string) ($job['script_version_uuid'] ?? ''),
+            'render_profile'       => [],
+            'asset_urls'           => [],
+            'idempotency_key'      => (string) ($job['idempotency_key'] ?? ''),
+        ]);
 
         $this->jobRepo->update((int) $job['id'], [
             'provider_job_id' => $receipt->providerJobId,
