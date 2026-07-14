@@ -708,5 +708,10 @@ $routes->group('v1', static function ($routes) {
         $routes->post('distribution/social/dispatch/(:num)',                 'Api\\V1\\Distribution\\SocialDispatchController::dispatch/$1',        ['filter' => 'permission:distribution.dispatch']);
         $routes->get('distribution/social/status/(:num)',                    'Api\\V1\\Distribution\\SocialDispatchController::status/$1',          ['filter' => 'permission:distribution.read']);
 
+        // Email dispatch (CP6)
+        $routes->post('distribution/email/dispatch/(:num)',                  'Api\\V1\\Distribution\\EmailDispatchController::dispatch/$1',         ['filter' => 'permission:distribution.dispatch']);
+        $routes->get('distribution/email/status/(:num)',                     'Api\\V1\\Distribution\\EmailDispatchController::status/$1',           ['filter' => 'permission:distribution.read']);
+        $routes->post('distribution/email/test/(:num)',                      'Api\\V1\\Distribution\\EmailDispatchController::test/$1',             ['filter' => 'permission:distribution.dispatch']);
+
     });
 });
