@@ -704,5 +704,9 @@ $routes->group('v1', static function ($routes) {
         $routes->put('distribution/variants/(:num)',                         'Api\\V1\\Distribution\\ChannelVariantController::update/$1',          ['filter' => 'permission:distribution.update']);
         $routes->post('distribution/variants/(:num)/validate',               'Api\\V1\\Distribution\\ChannelVariantController::validate/$1',        ['filter' => 'permission:distribution.update']);
 
+        // Social dispatch (CP5)
+        $routes->post('distribution/social/dispatch/(:num)',                 'Api\\V1\\Distribution\\SocialDispatchController::dispatch/$1',        ['filter' => 'permission:distribution.dispatch']);
+        $routes->get('distribution/social/status/(:num)',                    'Api\\V1\\Distribution\\SocialDispatchController::status/$1',          ['filter' => 'permission:distribution.read']);
+
     });
 });

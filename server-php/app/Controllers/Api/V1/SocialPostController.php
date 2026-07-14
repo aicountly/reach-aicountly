@@ -117,21 +117,18 @@ class SocialPostController extends BaseApiController
         return $this->ok($m->find($id));
     }
 
+    /**
+     * @deprecated Phase 7: Use POST /v1/distribution/social/dispatch/:id instead.
+     *
+     * This manual shortcut remains for backward-compat during Phase 7 transition.
+     * It will be removed in Phase 8.
+     */
     public function markPosted(int $id)
     {
-        $m   = new SocialPostModel();
-        $row = $m->find($id);
-        if (! $row) {
-            return $this->fail('Social post not found.', 404);
-        }
-        $externalId = (string) ($this->input()['external_post_id'] ?? '');
-        $m->update($id, [
-            'status'           => 'posted',
-            'published_at'     => date('Y-m-d H:i:s'),
-            'external_post_id' => $externalId !== '' ? $externalId : null,
-        ]);
-        $this->audit('social.posted', 'social', $id, null, ['external_post_id' => $externalId]);
-        return $this->ok($m->find($id));
+        return $this->fail(
+            'markPosted is deprecated. Use POST /v1/distribution/social/dispatch/' . $id . ' for governed provider dispatch.',
+            410
+        );
     }
 
     private function normalize(array $body, bool $partial = false): array
