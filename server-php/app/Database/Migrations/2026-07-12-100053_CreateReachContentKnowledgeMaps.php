@@ -10,6 +10,14 @@ use CodeIgniter\Database\RawSql;
  *
  * 14 tables mapping content_item_id to each Phase 1 entity type.
  * Each has a UNIQUE constraint on the FK pair to prevent duplicates.
+ *
+ * Defect fixed (2026-07-14): reach_content_module_map and reach_content_feature_map
+ * previously referenced the non-existent table names 'reach_modules' and
+ * 'reach_features'. The correct Phase 1 table names are 'reach_product_modules'
+ * and 'reach_product_features'. On PostgreSQL this caused up() to fail mid-batch,
+ * leaving reach_content_product_map stranded without a migration-history entry,
+ * which in turn prevented the down() sequence from removing it and blocked
+ * reach_content_items from being dropped during rollback.
  */
 class CreateReachContentKnowledgeMaps extends Migration
 {
@@ -32,8 +40,8 @@ class CreateReachContentKnowledgeMaps extends Migration
     public function up(): void
     {
         $this->makeJunction('reach_content_product_map',       'product_id',        'reach_products');
-        $this->makeJunction('reach_content_module_map',        'module_id',         'reach_modules');
-        $this->makeJunction('reach_content_feature_map',       'feature_id',        'reach_features');
+        $this->makeJunction('reach_content_module_map',        'module_id',         'reach_product_modules');   // was reach_modules (non-existent)
+        $this->makeJunction('reach_content_feature_map',       'feature_id',        'reach_product_features');  // was reach_features (non-existent)
         $this->makeJunction('reach_content_persona_map',       'persona_id',        'reach_personas');
         $this->makeJunction('reach_content_industry_map',      'industry_id',       'reach_industries');
         $this->makeJunction('reach_content_market_map',        'market_id',         'reach_markets');
