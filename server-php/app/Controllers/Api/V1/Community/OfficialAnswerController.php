@@ -2,7 +2,7 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\Community\OfficialAnswerRepository;
 use App\Libraries\Community\OfficialAnswerGenerationService;
 use App\Libraries\Community\OfficialAnswerApprovalService;
@@ -13,7 +13,7 @@ use App\Libraries\Community\OfficialAnswerVersionService;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class OfficialAnswerController extends BaseController
+class OfficialAnswerController extends BaseApiController
 {
     private OfficialAnswerRepository $repo;
 

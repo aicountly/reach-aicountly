@@ -2,13 +2,13 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\Community\CommunityQuestionIntakeService;
 use App\Libraries\Community\CommunityQuestionRepository;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class QuestionController extends BaseController
+class QuestionController extends BaseApiController
 {
     private CommunityQuestionRepository $repo;
 

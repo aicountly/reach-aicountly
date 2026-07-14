@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class CommunityAnalyticsController extends BaseController
+class CommunityAnalyticsController extends BaseApiController
 {
     /** GET /community/analytics/overview */
     public function overview(): ResponseInterface

@@ -2,13 +2,13 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Models\CommunityModerationFindingModel;
 use App\Libraries\Community\OfficialAnswerModerationService;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class CommunityModerationController extends BaseController
+class CommunityModerationController extends BaseApiController
 {
     private CommunityModerationFindingModel $model;
 

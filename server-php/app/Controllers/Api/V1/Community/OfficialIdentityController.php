@@ -2,12 +2,12 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Models\CommunityOfficialIdentityModel;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class OfficialIdentityController extends BaseController
+class OfficialIdentityController extends BaseApiController
 {
     private CommunityOfficialIdentityModel $model;
 

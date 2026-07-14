@@ -2,14 +2,14 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Models\CommunityDeploymentModel;
 use App\Libraries\Community\OfficialAnswerPublishingService;
 use App\Libraries\Community\CommunityPublicationVerificationService;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class CommunityDeploymentController extends BaseController
+class CommunityDeploymentController extends BaseApiController
 {
     private CommunityDeploymentModel $model;
 

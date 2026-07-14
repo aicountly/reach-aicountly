@@ -16,7 +16,9 @@ final class JobQueueTest extends DatabaseTestCase
 {
     private function service(): JobService
     {
-        Services::reset(true);
+        // Soft-reset so each test starts with a fresh JobService without
+        // re-initializing the autoloader (which reset(true) would do).
+        Services::reset(false);
         return Services::jobService();
     }
 
@@ -57,12 +59,24 @@ final class JobQueueTest extends DatabaseTestCase
 
     public function testRetriesMoveExhaustedJobsToDeadLetter(): void
     {
-        $svc = $this->service();
+        $svc   = $this->service();
         $jobId = $svc->enqueue('reach.health_check', ['fail' => true], [
             'max_attempts' => 2,
         ]);
 
         for ($i = 0; $i < 2; $i++) {
+            // JobService::markFailed() applies exponential backoff (base 15 s) so
+            // the job won't be immediately re-reservable after the first failure.
+            // Reset available_at to NOW() so the next iteration can reserve it
+            // without waiting for the backoff window to expire.
+            if ($i > 0) {
+                \Config\Database::connect()
+                    ->table('reach_jobs')
+                    ->where('id', $jobId)
+                    ->where('status', 'pending')
+                    ->update(['available_at' => date('Y-m-d H:i:s')]);
+            }
+
             $r = $svc->reserve('default', 'test-worker-fail', 30);
             $this->assertNotNull($r, "Should be reservable on attempt {$i}");
             $svc->markFailed((int) $r['id'], 'simulated error');

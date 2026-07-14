@@ -2,12 +2,12 @@
 
 namespace App\Controllers\Api\V1\Community;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Models\CommunitySpaceModel;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class CommunitySpaceController extends BaseController
+class CommunitySpaceController extends BaseApiController
 {
     private CommunitySpaceModel $model;
 

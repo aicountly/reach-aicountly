@@ -24,7 +24,11 @@ abstract class ApiTestCase extends DatabaseTestCase
      */
     protected function authAs(string $roleSlug, array $overrides = []): array
     {
-        Services::reset(true);
+        // Soft-reset: clear shared service instances so each authAs() call starts
+        // with a fresh PermissionService/JWT cache, but do NOT re-initialize the
+        // autoloader (reset(true) would break PHP's include_once class cache and
+        // can cause "class not found" errors or null responses in subsequent calls).
+        Services::reset(false);
 
         $roleId = $this->ensureRole($roleSlug);
         $userId = $this->ensureUser($roleSlug, $roleId, $overrides);

@@ -65,7 +65,7 @@ class BlogController extends BaseApiController
             'focus_keyword'   => isset($body['focus_keyword']) ? $sanitizer->purifyText((string) $body['focus_keyword']) : null,
             'author'          => isset($body['author']) ? $sanitizer->purifyText((string) $body['author']) : null,
             'featured_image'  => $body['featured_image']  ?? null,
-            'status'          => in_array($body['status'] ?? 'draft', self::WORKFLOW, true) ? $body['status'] : 'draft',
+            'status'          => in_array($body['status'] ?? 'draft', self::WORKFLOW, true) ? ($body['status'] ?? 'draft') : 'draft',
             'scheduled_at'    => $body['scheduled_at']    ?? null,
             'bot_generated'   => (bool) ($body['bot_generated'] ?? false),
             'current_version' => 1,
