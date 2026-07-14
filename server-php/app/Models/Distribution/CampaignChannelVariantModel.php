@@ -21,7 +21,7 @@ class CampaignChannelVariantModel extends Model
         'created_by', 'created_at',
     ];
 
-    protected $casts = [
+    protected array $casts = [
         'content_json'        => '?json-array',
         'merge_field_values'  => '?json-array',
         'validation_findings' => '?json-array',

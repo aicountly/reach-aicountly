@@ -20,7 +20,7 @@ class AudienceSnapshotModel extends Model
         'snapshot_criteria', 'frozen_at', 'frozen_by', 'created_at',
     ];
 
-    protected $casts = ['snapshot_criteria' => '?json-array'];
+    protected array $casts = ['snapshot_criteria' => '?json-array'];
 
     public function findByUuid(string $uuid): ?array
     {

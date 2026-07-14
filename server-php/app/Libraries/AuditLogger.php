@@ -283,6 +283,57 @@ class AuditLogger
     public const VIDEO_PROVIDER_CALLBACK_REPLAY_REJECTED = 'video.provider.callback_replay_rejected';
     public const VIDEO_PROVIDER_CALLBACK_INVALID_SIGNATURE = 'video.provider.callback_invalid_signature';
 
+    // ── Phase 7 — Distribution ────────────────────────────────────────────────
+    public const DISTRIBUTION_CAMPAIGN_VERSION_CREATED       = 'distribution.campaign.version_created';
+    public const DISTRIBUTION_CAMPAIGN_VERSION_SUBMITTED     = 'distribution.campaign.version_submitted';
+    public const DISTRIBUTION_CAMPAIGN_VERSION_APPROVED      = 'distribution.campaign.version_approved';
+    public const DISTRIBUTION_CAMPAIGN_VERSION_REJECTED      = 'distribution.campaign.version_rejected';
+    public const DISTRIBUTION_CAMPAIGN_CHANGES_REQUESTED     = 'distribution.campaign.changes_requested';
+    public const DISTRIBUTION_CAMPAIGN_VARIANT_CREATED       = 'distribution.campaign.variant_created';
+    public const DISTRIBUTION_CAMPAIGN_VARIANT_VALIDATED     = 'distribution.campaign.variant_validated';
+    public const DISTRIBUTION_CAMPAIGN_VARIANT_INVALID       = 'distribution.campaign.variant_invalid';
+    public const DISTRIBUTION_SEGMENT_CREATED                = 'distribution.segment.created';
+    public const DISTRIBUTION_SEGMENT_UPDATED                = 'distribution.segment.updated';
+    public const DISTRIBUTION_SEGMENT_DELETED                = 'distribution.segment.deleted';
+    public const DISTRIBUTION_SNAPSHOT_FROZEN                = 'distribution.snapshot.frozen';
+    public const DISTRIBUTION_SNAPSHOT_CREATED               = 'distribution.snapshot.created';
+    public const DISTRIBUTION_CONSENT_GRANTED                = 'distribution.consent.granted';
+    public const DISTRIBUTION_CONSENT_REVOKED                = 'distribution.consent.revoked';
+    public const DISTRIBUTION_SUPPRESSION_ADDED              = 'distribution.suppression.added';
+    public const DISTRIBUTION_SUPPRESSION_REMOVED            = 'distribution.suppression.removed';
+    public const DISTRIBUTION_DISPATCH_CREATED               = 'distribution.dispatch.created';
+    public const DISTRIBUTION_DISPATCH_STARTED               = 'distribution.dispatch.started';
+    public const DISTRIBUTION_DISPATCH_COMPLETED             = 'distribution.dispatch.completed';
+    public const DISTRIBUTION_DISPATCH_PAUSED                = 'distribution.dispatch.paused';
+    public const DISTRIBUTION_DISPATCH_CANCELLED             = 'distribution.dispatch.cancelled';
+    public const DISTRIBUTION_DISPATCH_FAILED                = 'distribution.dispatch.failed';
+    public const DISTRIBUTION_DISPATCH_DEAD_LETTERED         = 'distribution.dispatch.dead_lettered';
+    public const DISTRIBUTION_SOCIAL_POSTED                  = 'distribution.social.posted';
+    public const DISTRIBUTION_SOCIAL_FAILED                  = 'distribution.social.failed';
+    public const DISTRIBUTION_SOCIAL_WITHDRAWN               = 'distribution.social.withdrawn';
+    public const DISTRIBUTION_EMAIL_ACCEPTED                 = 'distribution.email.accepted';
+    public const DISTRIBUTION_EMAIL_BOUNCED                  = 'distribution.email.bounced';
+    public const DISTRIBUTION_EMAIL_COMPLAINED               = 'distribution.email.complained';
+    public const DISTRIBUTION_EMAIL_UNSUBSCRIBED             = 'distribution.email.unsubscribed';
+    public const DISTRIBUTION_WHATSAPP_SENT                  = 'distribution.whatsapp.sent';
+    public const DISTRIBUTION_WHATSAPP_DELIVERED             = 'distribution.whatsapp.delivered';
+    public const DISTRIBUTION_WHATSAPP_READ                  = 'distribution.whatsapp.read';
+    public const DISTRIBUTION_WHATSAPP_FAILED                = 'distribution.whatsapp.failed';
+    public const DISTRIBUTION_SMS_SENT                       = 'distribution.sms.sent';
+    public const DISTRIBUTION_SMS_DELIVERED                  = 'distribution.sms.delivered';
+    public const DISTRIBUTION_SMS_FAILED                     = 'distribution.sms.failed';
+    public const DISTRIBUTION_PROVIDER_CALLBACK_RECEIVED     = 'distribution.provider.callback_received';
+    public const DISTRIBUTION_PROVIDER_CALLBACK_VERIFIED     = 'distribution.provider.callback_verified';
+    public const DISTRIBUTION_PROVIDER_CALLBACK_REPLAY       = 'distribution.provider.callback_replay_rejected';
+    public const DISTRIBUTION_PROVIDER_CALLBACK_INVALID      = 'distribution.provider.callback_invalid_signature';
+    public const DISTRIBUTION_TEMPLATE_CREATED               = 'distribution.template.created';
+    public const DISTRIBUTION_TEMPLATE_VERSION_APPROVED      = 'distribution.template.version_approved';
+    public const DISTRIBUTION_CONNECTION_CREATED             = 'distribution.connection.created';
+    public const DISTRIBUTION_CONNECTION_REVOKED             = 'distribution.connection.revoked';
+    public const DISTRIBUTION_SENDER_PROFILE_CREATED         = 'distribution.sender_profile.created';
+    public const DISTRIBUTION_SMS_CAMPAIGN_CREATED           = 'distribution.sms_campaign.created';
+    public const DISTRIBUTION_SMS_CAMPAIGN_UPDATED           = 'distribution.sms_campaign.updated';
+
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.
      * @param string  $action       Dotted event slug (see docs/architecture/REACH_SECURITY_CONTROLS.md).

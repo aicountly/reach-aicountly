@@ -23,7 +23,7 @@ class SmsCampaignModel extends Model
         'scheduled_at', 'sent_at', 'status', 'stats', 'created_by',
     ];
 
-    protected $casts = [
+    protected array $casts = [
         'template_variables' => '?json-array',
         'audience_filter'    => '?json-array',
         'stats'              => '?json-array',

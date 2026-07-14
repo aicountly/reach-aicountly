@@ -349,6 +349,38 @@ final class Permissions
     /** Video — audit */
     public const VIDEO_AUDIT_READ = 'video_audit.read';
 
+    // Phase 7: Distribution
+    public const DISTRIBUTION_READ                  = 'distribution.read';
+    public const DISTRIBUTION_CREATE                = 'distribution.create';
+    public const DISTRIBUTION_UPDATE                = 'distribution.update';
+    public const DISTRIBUTION_SEGMENT               = 'distribution.segment';
+    public const DISTRIBUTION_PREVIEW               = 'distribution.preview';
+    public const DISTRIBUTION_TEST_SEND             = 'distribution.test_send';
+    public const DISTRIBUTION_SUBMIT                = 'distribution.submit';
+    public const DISTRIBUTION_REVIEW                = 'distribution.review';
+    public const DISTRIBUTION_APPROVE               = 'distribution.approve';
+    public const DISTRIBUTION_SCHEDULE              = 'distribution.schedule';
+    public const DISTRIBUTION_DISPATCH              = 'distribution.dispatch';
+    public const DISTRIBUTION_PAUSE                 = 'distribution.pause';
+    public const DISTRIBUTION_CANCEL                = 'distribution.cancel';
+    public const DISTRIBUTION_RETRY                 = 'distribution.retry';
+    public const DISTRIBUTION_CONNECTIONS_READ      = 'distribution.connections.read';
+    public const DISTRIBUTION_CONNECTIONS_MANAGE    = 'distribution.connections.manage';
+    public const DISTRIBUTION_TEMPLATES_READ        = 'distribution.templates.read';
+    public const DISTRIBUTION_TEMPLATES_MANAGE      = 'distribution.templates.manage';
+    public const DISTRIBUTION_CONSENT_READ          = 'distribution.consent.read';
+    public const DISTRIBUTION_CONSENT_MANAGE        = 'distribution.consent.manage';
+    public const DISTRIBUTION_SUPPRESSION_READ      = 'distribution.suppression.read';
+    public const DISTRIBUTION_SUPPRESSION_MANAGE    = 'distribution.suppression.manage';
+    public const DISTRIBUTION_OPERATIONS_READ       = 'distribution.operations.read';
+    public const DISTRIBUTION_AUDIT_READ            = 'distribution.audit.read';
+
+    // Phase 7: SMS
+    public const SMS_READ   = 'sms.read';
+    public const SMS_CREATE = 'sms.create';
+    public const SMS_UPDATE = 'sms.update';
+    public const SMS_SEND   = 'sms.send';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -467,6 +499,22 @@ final class Permissions
             'video_connections' => [self::VIDEO_CONNECTIONS_READ, self::VIDEO_CONNECTIONS_MANAGE],
             'video_operations'  => [self::VIDEO_OPERATIONS_READ],
             'video_audit'       => [self::VIDEO_AUDIT_READ],
+            // Phase 7: Omnichannel Campaign Distribution
+            'distribution' => [
+                self::DISTRIBUTION_READ, self::DISTRIBUTION_CREATE, self::DISTRIBUTION_UPDATE,
+                self::DISTRIBUTION_SEGMENT, self::DISTRIBUTION_PREVIEW, self::DISTRIBUTION_TEST_SEND,
+                self::DISTRIBUTION_SUBMIT, self::DISTRIBUTION_REVIEW, self::DISTRIBUTION_APPROVE,
+                self::DISTRIBUTION_SCHEDULE, self::DISTRIBUTION_DISPATCH,
+                self::DISTRIBUTION_PAUSE, self::DISTRIBUTION_CANCEL, self::DISTRIBUTION_RETRY,
+                self::DISTRIBUTION_CONNECTIONS_READ, self::DISTRIBUTION_CONNECTIONS_MANAGE,
+                self::DISTRIBUTION_TEMPLATES_READ, self::DISTRIBUTION_TEMPLATES_MANAGE,
+                self::DISTRIBUTION_CONSENT_READ, self::DISTRIBUTION_CONSENT_MANAGE,
+                self::DISTRIBUTION_SUPPRESSION_READ, self::DISTRIBUTION_SUPPRESSION_MANAGE,
+                self::DISTRIBUTION_OPERATIONS_READ, self::DISTRIBUTION_AUDIT_READ,
+            ],
+            'sms' => [
+                self::SMS_READ, self::SMS_CREATE, self::SMS_UPDATE, self::SMS_SEND,
+            ],
         ];
     }
 

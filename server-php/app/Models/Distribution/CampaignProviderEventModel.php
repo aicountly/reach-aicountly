@@ -20,7 +20,7 @@ class CampaignProviderEventModel extends Model
         'provider_event_id', 'received_at', 'processed_at', 'created_at',
     ];
 
-    protected $casts = ['raw_event' => '?json-array'];
+    protected array $casts = ['raw_event' => '?json-array'];
 
     public function isDuplicate(string $provider, ?int $connectionId, string $providerEventId): bool
     {

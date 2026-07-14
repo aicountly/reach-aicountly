@@ -19,7 +19,7 @@ class CampaignTemplateVersionModel extends Model
         'character_count', 'segment_count', 'approved_by', 'approved_at', 'created_by', 'created_at',
     ];
 
-    protected $casts = [
+    protected array $casts = [
         'content_json'       => '?json-array',
         'merge_field_schema' => '?json-array',
     ];
