@@ -54,21 +54,15 @@ class WhatsAppCampaignController extends BaseApiController
         return $this->ok($m->find($id));
     }
 
+    /**
+     * @deprecated Phase 7: Use POST /v1/distribution/whatsapp/dispatch/:id instead.
+     */
     public function markSent(int $id)
     {
-        $m   = new WhatsappCampaignModel();
-        $row = $m->find($id);
-        if (! $row) {
-            return $this->fail('WhatsApp campaign not found.', 404);
-        }
-        $stats = $this->input()['stats'] ?? [];
-        $m->update($id, [
-            'status'  => 'sent',
-            'sent_at' => date('Y-m-d H:i:s'),
-            'stats'   => is_array($stats) ? json_encode($stats) : null,
-        ]);
-        $this->audit('whatsapp.sent', 'whatsapp_campaign', $id, null, ['stats' => $stats]);
-        return $this->ok($m->find($id));
+        return $this->fail(
+            'markSent is deprecated. Use POST /v1/distribution/whatsapp/dispatch/' . $id . ' for governed provider dispatch.',
+            410
+        );
     }
 
     private function normalize(array $body, bool $partial = false): array
