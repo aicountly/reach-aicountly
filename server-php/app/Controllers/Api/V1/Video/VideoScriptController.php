@@ -115,24 +115,89 @@ class VideoScriptController extends BaseApiController
         return $this->ok($result, 202);
     }
 
+    private function workflowService(): \App\Libraries\Video\VideoWorkflowService
+    {
+        return new \App\Libraries\Video\VideoWorkflowService(
+            $this->projectRepo,
+            $this->scriptRepo,
+        );
+    }
+
+    private function findScript(string $projectUuid): ?array
+    {
+        $project = $this->findProject($projectUuid);
+        if ($project === null) {
+            return null;
+        }
+        return $this->scriptRepo->findScriptByProjectId((int) $project['id']);
+    }
+
     public function submit(string $projectUuid): ResponseInterface
     {
-        return $this->fail('Script submit requires CP5 implementation', 501);
+        $script = $this->findScript($projectUuid);
+        if ($script === null) {
+            return $this->fail('Script not found', 404);
+        }
+        try {
+            $result = $this->workflowService()->submit((int) $script['id'], $this->userId());
+        } catch (\LogicException $e) {
+            return $this->fail($e->getMessage(), 409);
+        } catch (\Throwable $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
+        return $this->ok($result);
     }
 
     public function approve(string $projectUuid): ResponseInterface
     {
-        return $this->fail('Script approval requires CP5 implementation', 501);
+        $script = $this->findScript($projectUuid);
+        if ($script === null) {
+            return $this->fail('Script not found', 404);
+        }
+        try {
+            $result = $this->workflowService()->approve((int) $script['id'], $this->userId());
+        } catch (\LogicException $e) {
+            return $this->fail($e->getMessage(), 409);
+        } catch (\Throwable $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
+        return $this->ok($result);
     }
 
     public function reject(string $projectUuid): ResponseInterface
     {
-        return $this->fail('Script rejection requires CP5 implementation', 501);
+        $script = $this->findScript($projectUuid);
+        if ($script === null) {
+            return $this->fail('Script not found', 404);
+        }
+        $body   = $this->input() ?: [];
+        $reason = $body['reason'] ?? '';
+        try {
+            $result = $this->workflowService()->reject((int) $script['id'], $this->userId(), $reason);
+        } catch (\LogicException $e) {
+            return $this->fail($e->getMessage(), 409);
+        } catch (\Throwable $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
+        return $this->ok($result);
     }
 
     public function requestChanges(string $projectUuid): ResponseInterface
     {
-        return $this->fail('Changes request requires CP5 implementation', 501);
+        $script = $this->findScript($projectUuid);
+        if ($script === null) {
+            return $this->fail('Script not found', 404);
+        }
+        $body  = $this->input() ?: [];
+        $notes = $body['notes'] ?? '';
+        try {
+            $result = $this->workflowService()->requestChanges((int) $script['id'], $this->userId(), $notes);
+        } catch (\LogicException $e) {
+            return $this->fail($e->getMessage(), 409);
+        } catch (\Throwable $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
+        return $this->ok($result);
     }
 
     public function versions(string $projectUuid): ResponseInterface

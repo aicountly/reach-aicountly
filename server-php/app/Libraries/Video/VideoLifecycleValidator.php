@@ -94,4 +94,36 @@ class VideoLifecycleValidator
             );
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Enum-based overloads (Phase 6 workflow services)
+    // -------------------------------------------------------------------------
+
+    public function canScriptTransition(VideoScriptWorkflowStatus $from, VideoScriptWorkflowStatus $to): bool
+    {
+        return $from->canTransitionTo($to);
+    }
+
+    public function assertScriptTransitionEnum(VideoScriptWorkflowStatus $from, VideoScriptWorkflowStatus $to): void
+    {
+        if (! $from->canTransitionTo($to)) {
+            throw new \LogicException(
+                "Invalid script workflow status transition: {$from->value} → {$to->value}"
+            );
+        }
+    }
+
+    public function canProjectTransition(VideoProjectStatus $from, VideoProjectStatus $to): bool
+    {
+        return $from->canTransitionTo($to);
+    }
+
+    public function assertProjectTransitionEnum(VideoProjectStatus $from, VideoProjectStatus $to): void
+    {
+        if (! $from->canTransitionTo($to)) {
+            throw new \LogicException(
+                "Invalid project status transition: {$from->value} → {$to->value}"
+            );
+        }
+    }
 }

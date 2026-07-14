@@ -43,6 +43,25 @@ class VideoProjectRepository
         return $this->model->transitionStatus($id, $newStatus, $lockVersion);
     }
 
+    /**
+     * Enum-based status transition helper.
+     *
+     * Fetches the current lock_version from DB and performs an optimistic
+     * concurrency-safe update to the new status.
+     *
+     * @param int                 $id   Project primary key.
+     * @param \App\Enums\VideoProjectStatus $from Expected current status (verified client-side).
+     * @param \App\Enums\VideoProjectStatus $to   Target status.
+     */
+    public function transitionStatusEnum(int $id, \App\Enums\VideoProjectStatus $from, \App\Enums\VideoProjectStatus $to): bool
+    {
+        $project = $this->model->find($id);
+        if ($project === null) {
+            throw new \RuntimeException("Video project #{$id} not found");
+        }
+        return $this->model->transitionStatus($id, $to->value, (int) ($project['lock_version'] ?? 0));
+    }
+
     public function countByStatus(int $tenantId): array
     {
         $rows = $this->model->db->table('reach_video_projects')

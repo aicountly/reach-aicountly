@@ -60,7 +60,7 @@ class VideoScriptGenerationService
 
         $currentStatus = VideoProjectStatus::from($project['status']);
         $validator     = new VideoLifecycleValidator();
-        $validator->assertProjectTransition($currentStatus, VideoProjectStatus::ScriptGenerating);
+        $validator->assertProjectTransition($currentStatus->value, VideoProjectStatus::ScriptGenerating->value);
 
         AuditLogger::record(AuditLogger::VIDEO_SCRIPT_GENERATED, [
             'project_uuid' => $projectUuid,
@@ -68,7 +68,7 @@ class VideoScriptGenerationService
             'actor_id'     => $actorId,
         ], $actorId);
 
-        $this->projectRepo->transitionStatus(
+        $this->projectRepo->transitionStatusEnum(
             (int) $project['id'],
             $currentStatus,
             VideoProjectStatus::ScriptGenerating
@@ -77,7 +77,7 @@ class VideoScriptGenerationService
         try {
             $result = $this->executeGeneration($project, $overrides, $actorId);
 
-            $this->projectRepo->transitionStatus(
+            $this->projectRepo->transitionStatusEnum(
                 (int) $project['id'],
                 VideoProjectStatus::ScriptGenerating,
                 VideoProjectStatus::ScriptDraft
@@ -85,7 +85,7 @@ class VideoScriptGenerationService
 
             return $result;
         } catch (\Throwable $e) {
-            $this->projectRepo->transitionStatus(
+            $this->projectRepo->transitionStatusEnum(
                 (int) $project['id'],
                 VideoProjectStatus::ScriptGenerating,
                 VideoProjectStatus::GenerationFailed

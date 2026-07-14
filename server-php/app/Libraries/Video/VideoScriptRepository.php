@@ -20,6 +20,11 @@ class VideoScriptRepository
         private readonly VideoChapterMarkerModel $chapterModel,
     ) {}
 
+    public function findScriptById(int $id): ?array
+    {
+        return $this->scriptModel->find($id);
+    }
+
     public function findScriptByProjectId(int $projectId): ?array
     {
         return $this->scriptModel->findByProjectId($projectId);
@@ -69,9 +74,29 @@ class VideoScriptRepository
         return $this->versionModel->getByVersionNumber($scriptId, $versionNumber);
     }
 
+    public function getVersionById(int $versionId): ?array
+    {
+        return $this->versionModel->find($versionId);
+    }
+
     public function updateVersion(int $versionId, array $data): bool
     {
         return (bool) $this->versionModel->update($versionId, $data);
+    }
+
+    public function stampVersionApproval(int $versionId, int $approverId): void
+    {
+        $this->versionModel->update($versionId, [
+            'approved_by' => $approverId,
+            'approved_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function stampVersionSubmitter(int $versionId, int $submitterId): void
+    {
+        $this->versionModel->update($versionId, [
+            'submitted_by' => $submitterId,
+        ]);
     }
 
     public function getVersionWithDetail(int $versionId): ?array
