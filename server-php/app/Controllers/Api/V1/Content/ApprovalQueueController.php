@@ -23,9 +23,9 @@ use App\Models\Content\ContentItemModel;
  */
 class ApprovalQueueController extends BaseContentController
 {
-    private ContentItemModel      $items;
-    private ContentWorkflowService $workflow;
-    private ContentValidationService $validations;
+    private ContentItemModel         $items;
+    protected ContentWorkflowService  $workflow;
+    private ContentValidationService  $validations;
 
     /** Bulk-approve is blocked for these risk levels. */
     private const BULK_BLOCKED_RISK = ['high', 'critical'];
