@@ -13,7 +13,9 @@ use Tests\Support\DatabaseTestCase;
  * Validates that the full migration set can be applied to a clean PostgreSQL
  * database, rolled back cleanly without FK-dependency errors, and reapplied.
  *
- * Root-cause regression target (2026-07-14):
+ * Root-cause regression targets:
+ *
+ *   [2026-07-14 — 100053 defect]
  *   2026-07-12-100053_CreateReachContentKnowledgeMaps used the non-existent
  *   table names 'reach_modules' and 'reach_features' as FK targets.  On
  *   PostgreSQL (which enforces FK targets at CREATE TABLE time) this caused
@@ -21,6 +23,17 @@ use Tests\Support\DatabaseTestCase;
  *   stranded without a migration-history record.  The regress() sequence
  *   then never called 100053.down(), so reach_content_product_map persisted
  *   with its FK to reach_content_items, blocking 100050.down().
+ *
+ *   [2026-07-14 — reach_actors defect]
+ *   Migrations 100075, 100076, 100083, 100086, 100087 reference reach_actors
+ *   via inline REFERENCES clauses, but no migration created the table.  Fixed
+ *   by adding 2026-07-12-100065_CreateReachActors which sorts before all
+ *   2026-07-13-1000XX migrations.
+ *
+ *   [2026-07-14 — 100081 defect]
+ *   2026-07-13-100081_CreateReachKbPublicationProfiles referenced the
+ *   non-existent reach_modules and reach_features tables (same defect class
+ *   as 100053).  Corrected to reach_product_modules and reach_product_features.
  *
  * Skip policy:
  *   These tests skip automatically when the isolated test PostgreSQL database
@@ -164,6 +177,99 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // Actor registry (reach_actors) + SEO profiles — regression for 100075
+    // -------------------------------------------------------------------------
+
+    public function testActorsTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->db->tableExists('reach_actors'),
+            'reach_actors must exist after migrate-up (created by 2026-07-12-100065)'
+        );
+    }
+
+    public function testSeoProfilesTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->db->tableExists('reach_content_seo_profiles'),
+            'reach_content_seo_profiles must exist after migrate-up (100075 must succeed)'
+        );
+    }
+
+    public function testSeoProfilesReviewedByForeignKeyToActorsExists(): void
+    {
+        $row = $this->db->query("
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.referential_constraints rc
+            JOIN information_schema.table_constraints tc
+              ON tc.constraint_name = rc.constraint_name
+             AND tc.constraint_catalog = rc.constraint_catalog
+             AND tc.constraint_schema = rc.constraint_schema
+            WHERE tc.table_name         = 'reach_content_seo_profiles'
+              AND tc.constraint_type    = 'FOREIGN KEY'
+              AND rc.unique_constraint_name IN (
+                  SELECT constraint_name
+                  FROM information_schema.table_constraints
+                  WHERE table_name      = 'reach_actors'
+                    AND constraint_type = 'PRIMARY KEY'
+              )
+        ")->getRowArray();
+
+        $this->assertGreaterThan(
+            0,
+            (int) ($row['cnt'] ?? 0),
+            'reach_content_seo_profiles.reviewed_by must FK to reach_actors'
+        );
+    }
+
+    public function testActorsMigrationIsRecordedInHistory(): void
+    {
+        $row = $this->db->query("
+            SELECT COUNT(*) AS cnt
+            FROM migrations
+            WHERE version LIKE '%100065%'
+              AND class LIKE '%CreateReachActors%'
+        ")->getRowArray();
+
+        $this->assertGreaterThan(
+            0,
+            (int) ($row['cnt'] ?? 0),
+            'Migration 2026-07-12-100065_CreateReachActors must appear in the migrations history table'
+        );
+    }
+
+    public function testKbPublicationProfilesForeignKeyToProductModulesExists(): void
+    {
+        $this->assertTrue(
+            $this->db->tableExists('reach_kb_publication_profiles'),
+            'reach_kb_publication_profiles must exist after migrate-up (100081 must succeed)'
+        );
+
+        $row = $this->db->query("
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.referential_constraints rc
+            JOIN information_schema.table_constraints tc
+              ON tc.constraint_name = rc.constraint_name
+             AND tc.constraint_catalog = rc.constraint_catalog
+             AND tc.constraint_schema = rc.constraint_schema
+            WHERE tc.table_name         = 'reach_kb_publication_profiles'
+              AND tc.constraint_type    = 'FOREIGN KEY'
+              AND rc.unique_constraint_name IN (
+                  SELECT constraint_name
+                  FROM information_schema.table_constraints
+                  WHERE table_name      = 'reach_product_modules'
+                    AND constraint_type = 'PRIMARY KEY'
+              )
+        ")->getRowArray();
+
+        $this->assertGreaterThan(
+            0,
+            (int) ($row['cnt'] ?? 0),
+            'reach_kb_publication_profiles must FK to reach_product_modules (not non-existent reach_modules)'
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // Full rollback + reapply lifecycle
     // -------------------------------------------------------------------------
 
@@ -184,29 +290,32 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         // ── Phase 1: roll back all (must complete without FK errors) ────────
         $runner->regress(0, $this->DBGroup);
 
-        $this->assertFalse(
-            $this->db->tableExists('reach_content_items'),
-            'reach_content_items must not exist after regress(0)'
-        );
-        $this->assertFalse(
-            $this->db->tableExists('reach_content_product_map'),
-            'reach_content_product_map must not exist after regress(0)'
-        );
+        foreach (['reach_content_items', 'reach_content_product_map', 'reach_actors', 'reach_content_seo_profiles'] as $t) {
+            $this->assertFalse(
+                $this->db->tableExists($t),
+                "{$t} must not exist after regress(0)"
+            );
+        }
 
         // ── Phase 2: reapply all ─────────────────────────────────────────────
         $runner->latest($this->DBGroup);
 
-        $this->assertTrue(
-            $this->db->tableExists('reach_content_items'),
-            'reach_content_items must be recreated after latest()'
-        );
-        $this->assertTrue(
-            $this->db->tableExists('reach_content_product_map'),
-            'reach_content_product_map must be recreated after latest() (100053.up() must succeed)'
-        );
+        // Core tables that must be re-created (regression: 100050/100053/100065/100075/100081 defects)
+        $recreated = [
+            'reach_content_items',
+            'reach_content_product_map',
+            'reach_actors',
+            'reach_content_seo_profiles',
+            'reach_kb_publication_profiles',
+        ];
+        foreach ($recreated as $t) {
+            $this->assertTrue(
+                $this->db->tableExists($t),
+                "{$t} must be recreated after latest()"
+            );
+        }
 
         // ── Phase 3: verify no unexpected tables were cascade-dropped ────────
-        // All tables that were present before rollback must be present again.
         $keyTables = [
             'reach_content_versions',
             'reach_content_briefs',

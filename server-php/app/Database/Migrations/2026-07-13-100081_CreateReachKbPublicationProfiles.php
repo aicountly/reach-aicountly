@@ -4,6 +4,14 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
+/**
+ * Defect history
+ * --------------
+ * Original file referenced `reach_modules` and `reach_features` as FK targets.
+ * Those tables do not exist; the canonical tables are `reach_product_modules`
+ * and `reach_product_features` (created by 2026-07-12-100034 and -100035).
+ * Corrected 2026-07-14 — same defect class as 2026-07-12-100053.
+ */
 class CreateReachKbPublicationProfiles extends Migration
 {
     public function up(): void
@@ -15,8 +23,8 @@ class CreateReachKbPublicationProfiles extends Migration
                 article_type                    VARCHAR(32) NOT NULL DEFAULT 'concept'
                                                 CHECK (article_type IN ('concept','how_to','troubleshooting','faq','release_guide','configuration','integration','reference','best_practice')),
                 product_id                      BIGINT REFERENCES reach_products(id) ON DELETE SET NULL,
-                module_id                       BIGINT REFERENCES reach_modules(id) ON DELETE SET NULL,
-                feature_id                      BIGINT REFERENCES reach_features(id) ON DELETE SET NULL,
+                module_id                       BIGINT REFERENCES reach_product_modules(id) ON DELETE SET NULL,
+                feature_id                      BIGINT REFERENCES reach_product_features(id) ON DELETE SET NULL,
                 applicable_versions_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
                 prerequisites_json              JSONB NOT NULL DEFAULT '[]'::jsonb,
                 steps_json                      JSONB NOT NULL DEFAULT '[]'::jsonb,
