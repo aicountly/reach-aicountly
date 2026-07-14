@@ -21,7 +21,7 @@ $provider = new MockAiProvider('retryable_error');
 | Scenario | Behaviour |
 |----------|-----------|
 | `success` | Returns structured JSON output with `title`, `body`, etc. |
-| `malformed` | Returns `{{{invalid json` — tests schema validation rejection |
+| `malformed` | Returns `{% raw %}{{{invalid json{% endraw %}` — tests schema validation rejection |
 | `retryable_error` | Throws `AiProviderException` with `CATEGORY_RATE_LIMITED` (retryable) |
 | `terminal_error` | Throws `AiProviderException` with `CATEGORY_AUTHENTICATION` (not retryable) |
 | `timeout` | Throws `AiProviderException` with `CATEGORY_TIMEOUT` (retryable) |

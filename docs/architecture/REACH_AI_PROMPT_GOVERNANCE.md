@@ -13,7 +13,7 @@
 reach_ai_prompt_templates (metadata + pointer to current_version_id)
   ↓
 reach_ai_prompt_versions (immutable; no updated_at column)
-  ├── system_template (Handlebars-style {{variable}} syntax)
+  ├── system_template (Handlebars-style {% raw %}{{variable}}{% endraw %} syntax)
   ├── user_template
   ├── variable_schema_json (expected variables)
   ├── output_schema_json (JSON Schema for output validation)
@@ -33,9 +33,9 @@ create (status: draft)
 
 ## Prompt Rendering
 
-`PromptRenderer` substitutes `{{variable}}` placeholders using simple string replacement. No `eval()` or template engines that execute code.
+`PromptRenderer` substitutes `{% raw %}{{variable}}{% endraw %}` placeholders using simple string replacement. No `eval()` or template engines that execute code.
 
-`PromptVariableValidator::findMissing()` checks that all `{{variables}}` in the template are provided in the context before rendering.
+`PromptVariableValidator::findMissing()` checks that all `{% raw %}{{variables}}{% endraw %}` in the template are provided in the context before rendering.
 
 ## Output Schema Registry
 
