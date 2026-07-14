@@ -352,6 +352,172 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // Phase 6 video tables
+    // -------------------------------------------------------------------------
+
+    public function testVideoIdeasTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->tableLiveExists('reach_video_ideas'),
+            'reach_video_ideas must exist after migrate-up (100106)'
+        );
+    }
+
+    public function testVideoProjectsTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->tableLiveExists('reach_video_projects'),
+            'reach_video_projects must exist after migrate-up (100108)'
+        );
+    }
+
+    public function testVideoScriptVersionsTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->tableLiveExists('reach_video_script_versions'),
+            'reach_video_script_versions must exist after migrate-up (100110)'
+        );
+    }
+
+    public function testVideoRenderJobsTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->tableLiveExists('reach_video_render_jobs'),
+            'reach_video_render_jobs must exist after migrate-up (100116)'
+        );
+    }
+
+    public function testVideoProviderEventsTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->tableLiveExists('reach_video_provider_events'),
+            'reach_video_provider_events must exist after migrate-up (100119)'
+        );
+    }
+
+    public function testVideoPermissionRegistryTableExistsAfterMigrateUp(): void
+    {
+        $this->assertTrue(
+            $this->tableLiveExists('reach_video_permission_registry'),
+            'reach_video_permission_registry must exist after migrate-up (100120)'
+        );
+    }
+
+    public function testAllPhase6VideoTablesExistAfterMigrateUp(): void
+    {
+        $tables = [
+            'reach_video_ideas',
+            'reach_video_idea_sources',
+            'reach_video_projects',
+            'reach_video_scripts',
+            'reach_video_script_versions',
+            'reach_video_segments',
+            'reach_video_caption_tracks',
+            'reach_video_chapter_markers',
+            'reach_video_assets',
+            'reach_video_render_profiles',
+            'reach_video_render_jobs',
+            'reach_video_render_attempts',
+            'reach_video_publication_profiles',
+            'reach_video_provider_events',
+            'reach_video_permission_registry',
+        ];
+        foreach ($tables as $table) {
+            $this->assertTrue(
+                $this->tableLiveExists($table),
+                "{$table} must exist after migrate-up"
+            );
+        }
+    }
+
+    public function testVideoProjectsForeignKeyToVideoIdeasExists(): void
+    {
+        $row = $this->db->query("
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.referential_constraints rc
+            JOIN information_schema.table_constraints tc
+              ON tc.constraint_name = rc.constraint_name
+             AND tc.constraint_catalog = rc.constraint_catalog
+             AND tc.constraint_schema = rc.constraint_schema
+            WHERE tc.table_name         = 'reach_video_projects'
+              AND tc.constraint_type    = 'FOREIGN KEY'
+              AND rc.unique_constraint_name IN (
+                  SELECT constraint_name
+                  FROM information_schema.table_constraints
+                  WHERE table_name      = 'reach_video_ideas'
+                    AND constraint_type = 'PRIMARY KEY'
+              )
+        ")->getRowArray();
+
+        $this->assertGreaterThan(
+            0,
+            (int) ($row['cnt'] ?? 0),
+            'reach_video_projects.idea_id must FK to reach_video_ideas'
+        );
+    }
+
+    public function testVideoScriptVersionsForeignKeyToActorsExists(): void
+    {
+        $row = $this->db->query("
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.referential_constraints rc
+            JOIN information_schema.table_constraints tc
+              ON tc.constraint_name = rc.constraint_name
+             AND tc.constraint_catalog = rc.constraint_catalog
+             AND tc.constraint_schema = rc.constraint_schema
+            WHERE tc.table_name         = 'reach_video_script_versions'
+              AND tc.constraint_type    = 'FOREIGN KEY'
+              AND rc.unique_constraint_name IN (
+                  SELECT constraint_name
+                  FROM information_schema.table_constraints
+                  WHERE table_name      = 'reach_actors'
+                    AND constraint_type = 'PRIMARY KEY'
+              )
+        ")->getRowArray();
+
+        $this->assertGreaterThan(
+            0,
+            (int) ($row['cnt'] ?? 0),
+            'reach_video_script_versions must have FK(s) to reach_actors'
+        );
+    }
+
+    public function testVideoPermissionRegistryHasExpectedSlugs(): void
+    {
+        $slugs = $this->db->query(
+            "SELECT slug FROM reach_video_permission_registry ORDER BY slug"
+        )->getResultArray();
+
+        $slugList = array_column($slugs, 'slug');
+
+        $expected = [
+            'video.approve',
+            'video.cancel',
+            'video.create',
+            'video.generate',
+            'video.publish',
+            'video.read',
+            'video.render',
+            'video.retry',
+            'video.review',
+            'video.submit',
+            'video.update',
+            'video_audit.read',
+            'video_connections.manage',
+            'video_connections.read',
+            'video_operations.read',
+        ];
+
+        foreach ($expected as $slug) {
+            $this->assertContains(
+                $slug,
+                $slugList,
+                "Video permission '{$slug}' must be seeded in reach_video_permission_registry"
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Full rollback + reapply lifecycle
     // -------------------------------------------------------------------------
 
@@ -396,7 +562,14 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         $runner = Services::migrations(config('Migrations'), $this->db, false);
         $runner->setNamespace('App');
 
-        foreach (['reach_content_items', 'reach_content_product_map', 'reach_actors', 'reach_content_seo_profiles'] as $t) {
+        $checkTables = [
+            'reach_content_items', 'reach_content_product_map',
+            'reach_actors', 'reach_content_seo_profiles',
+            'reach_video_ideas', 'reach_video_projects',
+            'reach_video_script_versions', 'reach_video_render_jobs',
+            'reach_video_provider_events',
+        ];
+        foreach ($checkTables as $t) {
             $this->assertFalse(
                 $this->tableLiveExists($t),
                 "{$t} must not exist after regress(0)"
@@ -407,12 +580,20 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         $runner->latest($this->DBGroup);
 
         // Core tables that must be re-created (regression: 100050/100053/100065/100075/100081 defects)
+        // Plus Phase 6 video tables (100106–100122)
         $recreated = [
             'reach_content_items',
             'reach_content_product_map',
             'reach_actors',
             'reach_content_seo_profiles',
             'reach_kb_publication_profiles',
+            'reach_video_ideas',
+            'reach_video_projects',
+            'reach_video_scripts',
+            'reach_video_script_versions',
+            'reach_video_render_jobs',
+            'reach_video_provider_events',
+            'reach_video_permission_registry',
         ];
         foreach ($recreated as $t) {
             $this->assertTrue(
