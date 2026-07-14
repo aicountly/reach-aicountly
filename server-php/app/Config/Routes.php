@@ -664,5 +664,30 @@ $routes->group('v1', static function ($routes) {
         $routes->post('video/provider/render-callback',                      'Api\\V1\\Video\\VideoProviderCallbackController::renderCallback',           ['filter' => 'noauth']);
         $routes->post('video/provider/youtube-callback',                     'Api\\V1\\Video\\VideoProviderCallbackController::youtubeCallback',          ['filter' => 'noauth']);
 
+        // ── Phase 7: Distribution ─────────────────────────────────────────────
+
+        // Audience segments (CP3)
+        $routes->get('distribution/segments',                                'Api\\V1\\Distribution\\AudienceSegmentController::index',    ['filter' => 'permission:distribution.read']);
+        $routes->post('distribution/segments',                               'Api\\V1\\Distribution\\AudienceSegmentController::store',    ['filter' => 'permission:distribution.segment']);
+        $routes->get('distribution/segments/(:segment)',                     'Api\\V1\\Distribution\\AudienceSegmentController::show/$1',  ['filter' => 'permission:distribution.read']);
+        $routes->put('distribution/segments/(:segment)',                     'Api\\V1\\Distribution\\AudienceSegmentController::update/$1',['filter' => 'permission:distribution.segment']);
+        $routes->delete('distribution/segments/(:segment)',                  'Api\\V1\\Distribution\\AudienceSegmentController::destroy/$1',['filter' => 'permission:distribution.segment']);
+        $routes->post('distribution/segments/(:segment)/preview',            'Api\\V1\\Distribution\\AudienceSegmentController::preview/$1',['filter' => 'permission:distribution.preview']);
+
+        // Consents (CP3)
+        $routes->get('distribution/consents',                                'Api\\V1\\Distribution\\ConsentController::index',            ['filter' => 'permission:distribution.consent.read']);
+        $routes->post('distribution/consents',                               'Api\\V1\\Distribution\\ConsentController::store',            ['filter' => 'permission:distribution.consent.manage']);
+        $routes->delete('distribution/consents/(:num)',                      'Api\\V1\\Distribution\\ConsentController::destroy/$1',       ['filter' => 'permission:distribution.consent.manage']);
+
+        // Suppressions (CP3)
+        $routes->get('distribution/suppressions',                            'Api\\V1\\Distribution\\SuppressionController::index',        ['filter' => 'permission:distribution.suppression.read']);
+        $routes->post('distribution/suppressions',                           'Api\\V1\\Distribution\\SuppressionController::store',        ['filter' => 'permission:distribution.suppression.manage']);
+        $routes->delete('distribution/suppressions/(:num)',                  'Api\\V1\\Distribution\\SuppressionController::destroy/$1',   ['filter' => 'permission:distribution.suppression.manage']);
+
+        // Audience snapshots (CP3)
+        $routes->get('distribution/campaigns/(:num)/audience-snapshot',      'Api\\V1\\Distribution\\AudienceSnapshotController::show/$1',  ['filter' => 'permission:distribution.read']);
+        $routes->post('distribution/campaigns/(:num)/audience-snapshot',     'Api\\V1\\Distribution\\AudienceSnapshotController::create/$1',['filter' => 'permission:distribution.segment']);
+        $routes->post('distribution/campaigns/(:num)/audience-snapshot/freeze','Api\\V1\\Distribution\\AudienceSnapshotController::freeze/$1',['filter' => 'permission:distribution.approve']);
+
     });
 });
