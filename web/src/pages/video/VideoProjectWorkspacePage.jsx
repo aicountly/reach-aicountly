@@ -73,7 +73,7 @@ export default function VideoProjectWorkspacePage() {
   );
 }
 
-function ProjectOverviewTab({ project, onRefresh }) {
+function ProjectOverviewTab({ project, onRefresh: _onRefresh }) {
   return (
     <div className="two-col-grid">
       <section className="card">
