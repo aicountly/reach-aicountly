@@ -163,7 +163,7 @@ class DailyMarketingPackService
 
     private function getConfig(): array
     {
-        $setting = $this->settings->where('setting_key', 'daily_pack_config')->first();
+        $setting = $this->settings->where('key', 'daily_pack_config')->first();
         if ($setting && !empty($setting['value_json'])) {
             $decoded = json_decode($setting['value_json'], true);
             if (is_array($decoded)) {

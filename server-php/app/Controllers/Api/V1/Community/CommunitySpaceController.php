@@ -49,7 +49,7 @@ class CommunitySpaceController extends BaseApiController
             'title'                   => $body['title'],
             'description'             => $body['description'] ?? null,
             'visibility'              => $body['visibility'] ?? 'public',
-            'moderation_mode'         => $body['moderation_mode'] ?? 'post_review',
+            'moderation_mode'         => $body['moderation_mode'] ?? 'post',
             'official_answer_policy'  => $body['official_answer_policy'] ?? 'optional',
             'is_active'               => true,
         ];

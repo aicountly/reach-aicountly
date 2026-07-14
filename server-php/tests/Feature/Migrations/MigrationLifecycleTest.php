@@ -88,7 +88,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         $regressOk = $runner->regress(0, 'tests');
         $runner->setSilent(false);
 
-        // Step 2 — if regress failed or left residual records, do a nuclear reset
+        // Step 2 — if regress failed, do a nuclear reset
         if (! $regressOk) {
             // Drop every table in the public schema; CASCADE handles FKs.
             $db->query("
@@ -104,13 +104,12 @@ final class MigrationLifecycleTest extends DatabaseTestCase
                     END LOOP;
                 END \$\$;
             ");
-
-            // Recreate a fresh runner so stale internal state from the failed
-            // regress() call (cached batches, migration history, etc.) does not
-            // interfere with the upcoming latest() run.
-            $runner = \Config\Services::migrations($config, $db, false);
-            $runner->setNamespace('App');
         }
+
+        // ALWAYS recreate the runner after regress (success or failure) to flush
+        // any stale batch/history cache that would cause latest() to be a no-op.
+        $runner = \Config\Services::migrations($config, $db, false);
+        $runner->setNamespace('App');
 
         // Step 3 — apply all migrations from scratch
         $runner->latest('tests');
@@ -372,11 +371,12 @@ final class MigrationLifecycleTest extends DatabaseTestCase
                     END LOOP;
                 END \$\$;
             ");
-
-            // Recreate runner after nuclear reset to clear stale internal state.
-            $runner = Services::migrations(config('Migrations'), $this->db, false);
-            $runner->setNamespace('App');
         }
+
+        // ALWAYS recreate runner after regress (success or failure) to flush
+        // stale batch/history cache before calling latest().
+        $runner = Services::migrations(config('Migrations'), $this->db, false);
+        $runner->setNamespace('App');
 
         foreach (['reach_content_items', 'reach_content_product_map', 'reach_actors', 'reach_content_seo_profiles'] as $t) {
             $this->assertFalse(
