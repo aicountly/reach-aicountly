@@ -116,6 +116,20 @@ import AiBudgetsPage       from './pages/ai/AiBudgetsPage.jsx';
 import AiValidationsPage   from './pages/ai/AiValidationsPage.jsx';
 import AiHealthPage        from './pages/ai/AiHealthPage.jsx';
 
+import DistributionLayout               from './pages/distribution/DistributionLayout.jsx';
+import DistributionOverviewPage         from './pages/distribution/DistributionOverviewPage.jsx';
+import AudienceOverviewPage             from './pages/distribution/AudienceOverviewPage.jsx';
+import AudienceSegmentsPage             from './pages/distribution/AudienceSegmentsPage.jsx';
+import SuppressionPage                  from './pages/distribution/SuppressionPage.jsx';
+import SocialOperationsPage             from './pages/distribution/SocialOperationsPage.jsx';
+import EmailDispatchPage                from './pages/distribution/EmailDispatchPage.jsx';
+import WhatsAppDispatchPage             from './pages/distribution/WhatsAppDispatchPage.jsx';
+import SmsOverviewPage                  from './pages/distribution/SmsOverviewPage.jsx';
+import SmsDispatchPage                  from './pages/distribution/SmsDispatchPage.jsx';
+import CampaignWorkspacePage            from './pages/distribution/CampaignWorkspacePage.jsx';
+import DispatchOrchestrationPage        from './pages/distribution/DispatchOrchestrationPage.jsx';
+import DistributionAnalyticsPage        from './pages/distribution/DistributionAnalyticsPage.jsx';
+
 import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
 import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
 import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
@@ -270,6 +284,22 @@ export default function App() {
           <Route path="budgets" element={<AiBudgetsPage />} />
           <Route path="validations" element={<AiValidationsPage />} />
           <Route path="health" element={<AiHealthPage />} />
+        </Route>
+
+        {/* Phase 7 — Omnichannel Distribution */}
+        <Route path="/distribution" element={<DistributionLayout />}>
+          <Route index element={<DistributionOverviewPage />} />
+          <Route path="campaigns" element={<CampaignWorkspacePage />} />
+          <Route path="audience" element={<AudienceOverviewPage />} />
+          <Route path="audience/segments" element={<AudienceSegmentsPage />} />
+          <Route path="suppressions" element={<SuppressionPage />} />
+          <Route path="social" element={<SocialOperationsPage />} />
+          <Route path="email" element={<EmailDispatchPage />} />
+          <Route path="whatsapp" element={<WhatsAppDispatchPage />} />
+          <Route path="sms" element={<SmsOverviewPage />} />
+          <Route path="sms/dispatch" element={<SmsDispatchPage />} />
+          <Route path="orchestration" element={<DispatchOrchestrationPage />} />
+          <Route path="analytics" element={<DistributionAnalyticsPage />} />
         </Route>
 
         {/* Phase 6 — Video Content Automation */}

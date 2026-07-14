@@ -8,6 +8,7 @@ import {
   Zap, CircleDollarSign, ShieldAlert, HeartPulse,
   Globe, Send, Link2, CheckCircle2, Radio,
   MessagesSquare, BadgeCheck, ShieldQuestion, LineChart,
+  MessageSquare, Smartphone,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -74,6 +75,21 @@ const NAV = [
       { label: 'Verifications',    path: '/publishing/verifications',   icon: CheckCircle2,  requires: 'publishing.view' },
       { label: 'Connections',      path: '/publishing/connections',     icon: Link2,         requires: 'publishing.manage_connections' },
       { label: 'Readiness',        path: '/publishing/readiness',       icon: Radio,         requires: 'publishing.view' },
+    ],
+  },
+  {
+    title: 'Distribution',
+    items: [
+      { label: 'Overview',        path: '/distribution',                   icon: Send,           end: true, requires: 'distribution.read' },
+      { label: 'Campaigns',       path: '/distribution/campaigns',         icon: FileText,       requires: 'distribution.read' },
+      { label: 'Audience',        path: '/distribution/audience',          icon: Users,          requires: 'distribution.read' },
+      { label: 'Suppressions',    path: '/distribution/suppressions',      icon: ShieldCheck,    requires: 'distribution.read' },
+      { label: 'Social',          path: '/distribution/social',            icon: MessagesSquare, requires: 'distribution.read' },
+      { label: 'Email',           path: '/distribution/email',             icon: Mail,           requires: 'distribution.read' },
+      { label: 'WhatsApp',        path: '/distribution/whatsapp',          icon: MessageSquare,  requires: 'distribution.read' },
+      { label: 'SMS',             path: '/distribution/sms',               icon: Smartphone,     requires: 'sms.read' },
+      { label: 'Orchestration',   path: '/distribution/orchestration',     icon: Activity,       requires: 'distribution.read' },
+      { label: 'Analytics',       path: '/distribution/analytics',         icon: LineChart,      requires: 'distribution.read' },
     ],
   },
   {
