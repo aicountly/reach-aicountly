@@ -518,6 +518,98 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // Phase 7 distribution tables
+    // -------------------------------------------------------------------------
+
+    public function testAllPhase7DistributionTablesExistAfterMigrateUp(): void
+    {
+        $tables = [
+            'reach_campaign_versions',
+            'reach_campaign_channel_variants',
+            'reach_audience_segments',
+            'reach_audience_segment_rules',
+            'reach_campaign_audience_snapshots',
+            'reach_campaign_audience_recipients',
+            'reach_channel_consents',
+            'reach_channel_suppressions',
+            'reach_campaign_dispatches',
+            'reach_campaign_delivery_attempts',
+            'reach_sms_campaigns',
+            'reach_campaign_sender_profiles',
+            'reach_campaign_templates',
+            'reach_campaign_template_versions',
+            'reach_campaign_provider_events',
+            'reach_campaign_operational_metrics',
+        ];
+        foreach ($tables as $table) {
+            $this->assertTrue(
+                $this->tableLiveExists($table),
+                "{$table} must exist after migrate-up (Phase 7)"
+            );
+        }
+    }
+
+    public function testCampaignVersionsHasImmutableSchema(): void
+    {
+        $row = $this->db->query(
+            "SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'reach_campaign_versions' AND column_name = 'updated_at'"
+        )->getRowArray();
+        $this->assertNull($row, 'reach_campaign_versions must not have updated_at (immutable)');
+    }
+
+    public function testCampaignDispatchesHasIdempotencyKeyUnique(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_campaign_dispatches' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_campaign_dispatches must have UNIQUE constraints');
+    }
+
+    public function testCampaignDeliveryAttemptsFKToDispatches(): void
+    {
+        $row = $this->db->query("
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.referential_constraints rc
+            JOIN information_schema.table_constraints tc
+              ON tc.constraint_name = rc.constraint_name
+             AND tc.constraint_catalog = rc.constraint_catalog
+             AND tc.constraint_schema  = rc.constraint_schema
+            WHERE tc.table_name         = 'reach_campaign_delivery_attempts'
+              AND tc.constraint_type    = 'FOREIGN KEY'
+              AND rc.unique_constraint_name IN (
+                  SELECT constraint_name
+                  FROM information_schema.table_constraints
+                  WHERE table_name      = 'reach_campaign_dispatches'
+                    AND constraint_type = 'PRIMARY KEY'
+              )
+        ")->getRowArray();
+        $this->assertGreaterThan(
+            0, (int) ($row['cnt'] ?? 0),
+            'reach_campaign_delivery_attempts must FK to reach_campaign_dispatches'
+        );
+    }
+
+    public function testAudienceRecipientsHasDedupKeyUnique(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_campaign_audience_recipients' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_campaign_audience_recipients must have UNIQUE on dedup_key');
+    }
+
+    public function testSuppressionAddressUniqueness(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_channel_suppressions' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_channel_suppressions must have composite UNIQUE on (tenant_id, channel, address_hash)');
+    }
+
+    // -------------------------------------------------------------------------
     // Full rollback + reapply lifecycle
     // -------------------------------------------------------------------------
 
@@ -568,6 +660,10 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             'reach_video_ideas', 'reach_video_projects',
             'reach_video_script_versions', 'reach_video_render_jobs',
             'reach_video_provider_events',
+            // Phase 7
+            'reach_campaign_versions', 'reach_campaign_dispatches',
+            'reach_channel_consents', 'reach_channel_suppressions',
+            'reach_sms_campaigns',
         ];
         foreach ($checkTables as $t) {
             $this->assertFalse(
@@ -580,7 +676,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         $runner->latest($this->DBGroup);
 
         // Core tables that must be re-created (regression: 100050/100053/100065/100075/100081 defects)
-        // Plus Phase 6 video tables (100106–100122)
+        // Plus Phase 6 video tables (100106–100122) and Phase 7 distribution tables (100123–100143)
         $recreated = [
             'reach_content_items',
             'reach_content_product_map',
@@ -594,6 +690,18 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             'reach_video_render_jobs',
             'reach_video_provider_events',
             'reach_video_permission_registry',
+            // Phase 7 distribution
+            'reach_campaign_versions',
+            'reach_campaign_channel_variants',
+            'reach_audience_segments',
+            'reach_channel_consents',
+            'reach_channel_suppressions',
+            'reach_campaign_dispatches',
+            'reach_campaign_delivery_attempts',
+            'reach_sms_campaigns',
+            'reach_campaign_templates',
+            'reach_campaign_provider_events',
+            'reach_campaign_operational_metrics',
         ];
         foreach ($recreated as $t) {
             $this->assertTrue(
