@@ -77,6 +77,18 @@ const NAV = [
     ],
   },
   {
+    title: 'Video Automation',
+    items: [
+      { label: 'Overview',         path: '/video',              icon: MonitorSmartphone, end: true, requires: 'video.read' },
+      { label: 'Idea Backlog',     path: '/video/ideas',        icon: Sparkles,           requires: 'video.read' },
+      { label: 'Projects',         path: '/video/projects',     icon: FileText,           requires: 'video.read' },
+      { label: 'Render Queue',     path: '/video/render-queue', icon: Activity,           requires: 'video.render' },
+      { label: 'Publications',     path: '/video/publications', icon: Send,               requires: 'video.publish' },
+      { label: 'YT Connections',   path: '/video/connections',  icon: Link2,              requires: 'video_connections.read' },
+      { label: 'Operations',       path: '/video/operations',   icon: PlugZap,            requires: 'video_operations.read' },
+    ],
+  },
+  {
     title: 'Community Q&A',
     items: [
       { label: 'Overview',         path: '/community/overview',     icon: MessagesSquare, requires: 'community.view' },

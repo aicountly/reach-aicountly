@@ -590,5 +590,79 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community/analytics/coverage',                         'Api\\V1\\Community\\CommunityAnalyticsController::sourceCoverage',        ['filter' => 'permission:community_analytics.view']);
         $routes->get('community/analytics/cache',                            'Api\\V1\\Community\\CommunityAnalyticsController::cache',                 ['filter' => 'permission:community_analytics.view']);
 
+        // ─────────────────────────────────────────────────────────────────────
+        // Phase 6 — Video Content Automation
+        // ─────────────────────────────────────────────────────────────────────
+
+        // Ideas
+        $routes->get('video/ideas',                                          'Api\\V1\\Video\\VideoIdeaController::index',                              ['filter' => 'permission:video.read']);
+        $routes->post('video/ideas',                                         'Api\\V1\\Video\\VideoIdeaController::store',                              ['filter' => 'permission:video.create']);
+        $routes->get('video/ideas/(:segment)',                               'Api\\V1\\Video\\VideoIdeaController::show/$1',                            ['filter' => 'permission:video.read']);
+        $routes->put('video/ideas/(:segment)',                               'Api\\V1\\Video\\VideoIdeaController::update/$1',                          ['filter' => 'permission:video.update']);
+        $routes->post('video/ideas/(:segment)/accept',                       'Api\\V1\\Video\\VideoIdeaController::accept/$1',                          ['filter' => 'permission:video.update']);
+        $routes->post('video/ideas/(:segment)/reject',                       'Api\\V1\\Video\\VideoIdeaController::reject/$1',                          ['filter' => 'permission:video.update']);
+        $routes->post('video/ideas/(:segment)/convert',                      'Api\\V1\\Video\\VideoIdeaController::convert/$1',                         ['filter' => 'permission:video.create']);
+        $routes->post('video/ideas/(:segment)/sources',                      'Api\\V1\\Video\\VideoIdeaController::addSource/$1',                       ['filter' => 'permission:video.update']);
+
+        // Projects
+        $routes->get('video/projects',                                       'Api\\V1\\Video\\VideoProjectController::index',                           ['filter' => 'permission:video.read']);
+        $routes->post('video/projects',                                      'Api\\V1\\Video\\VideoProjectController::store',                           ['filter' => 'permission:video.create']);
+        $routes->get('video/projects/(:segment)',                            'Api\\V1\\Video\\VideoProjectController::show/$1',                         ['filter' => 'permission:video.read']);
+        $routes->put('video/projects/(:segment)',                            'Api\\V1\\Video\\VideoProjectController::update/$1',                       ['filter' => 'permission:video.update']);
+        $routes->post('video/projects/(:segment)/cancel',                    'Api\\V1\\Video\\VideoProjectController::cancel/$1',                       ['filter' => 'permission:video.cancel']);
+
+        // Script lifecycle (CP4+)
+        $routes->get('video/projects/(:segment)/script',                     'Api\\V1\\Video\\VideoScriptController::show/$1',                          ['filter' => 'permission:video.read']);
+        $routes->post('video/projects/(:segment)/script',                    'Api\\V1\\Video\\VideoScriptController::store/$1',                         ['filter' => 'permission:video.create']);
+        $routes->post('video/projects/(:segment)/script/generate',           'Api\\V1\\Video\\VideoScriptController::generate/$1',                      ['filter' => 'permission:video.generate']);
+        $routes->post('video/projects/(:segment)/script/submit',             'Api\\V1\\Video\\VideoScriptController::submit/$1',                        ['filter' => 'permission:video.submit']);
+        $routes->post('video/projects/(:segment)/script/approve',            'Api\\V1\\Video\\VideoScriptController::approve/$1',                       ['filter' => 'permission:video.approve']);
+        $routes->post('video/projects/(:segment)/script/reject',             'Api\\V1\\Video\\VideoScriptController::reject/$1',                        ['filter' => 'permission:video.review']);
+        $routes->post('video/projects/(:segment)/script/request-changes',    'Api\\V1\\Video\\VideoScriptController::requestChanges/$1',                ['filter' => 'permission:video.review']);
+        $routes->get('video/projects/(:segment)/script/versions',            'Api\\V1\\Video\\VideoScriptController::versions/$1',                      ['filter' => 'permission:video.read']);
+        $routes->get('video/projects/(:segment)/script/versions/(:num)',     'Api\\V1\\Video\\VideoScriptController::versionDetail/$1/$2',              ['filter' => 'permission:video.read']);
+
+        // Assets (CP6)
+        $routes->get('video/projects/(:segment)/assets',                     'Api\\V1\\Video\\VideoAssetController::listForProject/$1',                 ['filter' => 'permission:video.read']);
+        $routes->post('video/projects/(:segment)/assets',                    'Api\\V1\\Video\\VideoAssetController::upload/$1',                         ['filter' => 'permission:video.create']);
+        $routes->get('video/assets/(:segment)',                              'Api\\V1\\Video\\VideoAssetController::show/$1',                            ['filter' => 'permission:video.read']);
+
+        // Render (CP6)
+        $routes->post('video/projects/(:segment)/render',                    'Api\\V1\\Video\\VideoRenderController::queue/$1',                         ['filter' => 'permission:video.render']);
+        $routes->get('video/render-jobs/(:segment)',                         'Api\\V1\\Video\\VideoRenderController::showJob/$1',                        ['filter' => 'permission:video.read']);
+        $routes->delete('video/render-jobs/(:segment)',                      'Api\\V1\\Video\\VideoRenderController::cancel/$1',                         ['filter' => 'permission:video.cancel']);
+        $routes->post('video/render-jobs/(:segment)/retry',                  'Api\\V1\\Video\\VideoRenderController::retry/$1',                          ['filter' => 'permission:video.retry']);
+
+        // Render profiles (CP6)
+        $routes->get('video/render-profiles',                                'Api\\V1\\Video\\VideoRenderController::listProfiles',                      ['filter' => 'permission:video.read']);
+        $routes->post('video/render-profiles',                               'Api\\V1\\Video\\VideoRenderController::createProfile',                     ['filter' => 'permission:video.render']);
+        $routes->get('video/render-profiles/(:segment)',                     'Api\\V1\\Video\\VideoRenderController::showProfile/$1',                    ['filter' => 'permission:video.read']);
+        $routes->put('video/render-profiles/(:segment)',                     'Api\\V1\\Video\\VideoRenderController::updateProfile/$1',                  ['filter' => 'permission:video.render']);
+        $routes->delete('video/render-profiles/(:segment)',                  'Api\\V1\\Video\\VideoRenderController::deleteProfile/$1',                  ['filter' => 'permission:video.render']);
+
+        // YouTube publication (CP8)
+        $routes->get('video/projects/(:segment)/publish',                    'Api\\V1\\Video\\VideoPublicationController::show/$1',                      ['filter' => 'permission:video.read']);
+        $routes->post('video/projects/(:segment)/publish',                   'Api\\V1\\Video\\VideoPublicationController::publish/$1',                   ['filter' => 'permission:video.publish']);
+        $routes->post('video/projects/(:segment)/publish/retry',             'Api\\V1\\Video\\VideoPublicationController::retry/$1',                     ['filter' => 'permission:video.retry']);
+        $routes->post('video/projects/(:segment)/publish/cancel',            'Api\\V1\\Video\\VideoPublicationController::cancel/$1',                    ['filter' => 'permission:video.cancel']);
+
+        // YouTube connections (CP8)
+        $routes->get('video/connections',                                    'Api\\V1\\Video\\VideoConnectionController::index',                          ['filter' => 'permission:video_connections.read']);
+        $routes->post('video/connections',                                   'Api\\V1\\Video\\VideoConnectionController::store',                          ['filter' => 'permission:video_connections.manage']);
+        $routes->get('video/connections/(:segment)',                         'Api\\V1\\Video\\VideoConnectionController::show/$1',                        ['filter' => 'permission:video_connections.read']);
+        $routes->delete('video/connections/(:segment)',                      'Api\\V1\\Video\\VideoConnectionController::revoke/$1',                      ['filter' => 'permission:video_connections.manage']);
+        $routes->get('video/connections/(:segment)/health',                  'Api\\V1\\Video\\VideoConnectionController::health/$1',                      ['filter' => 'permission:video_connections.read']);
+
+        // Publications list + operations (CP8)
+        $routes->get('video/publications',                                   'Api\\V1\\Video\\VideoPublicationController::list',                          ['filter' => 'permission:video.read']);
+        $routes->get('video/operations',                                     'Api\\V1\\Video\\VideoOperationsController::index',                          ['filter' => 'permission:video_operations.read']);
+
+        // Audit (CP8)
+        $routes->get('video/projects/(:segment)/audit',                      'Api\\V1\\Video\\VideoOperationsController::auditForProject/$1',             ['filter' => 'permission:video_audit.read']);
+
+        // Provider callbacks (CP7 — unauthenticated, HMAC-verified)
+        $routes->post('video/provider/render-callback',                      'Api\\V1\\Video\\VideoProviderCallbackController::renderCallback',           ['filter' => 'noauth']);
+        $routes->post('video/provider/youtube-callback',                     'Api\\V1\\Video\\VideoProviderCallbackController::youtubeCallback',          ['filter' => 'noauth']);
+
     });
 });

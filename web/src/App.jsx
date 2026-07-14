@@ -116,6 +116,11 @@ import AiBudgetsPage       from './pages/ai/AiBudgetsPage.jsx';
 import AiValidationsPage   from './pages/ai/AiValidationsPage.jsx';
 import AiHealthPage        from './pages/ai/AiHealthPage.jsx';
 
+import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
+import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
+import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
+import VideoProjectWorkspacePage  from './pages/video/VideoProjectWorkspacePage.jsx';
+
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
 
@@ -262,6 +267,12 @@ export default function App() {
           <Route path="validations" element={<AiValidationsPage />} />
           <Route path="health" element={<AiHealthPage />} />
         </Route>
+
+        {/* Phase 6 — Video Content Automation */}
+        <Route path="/video" element={<VideoOverviewPage />} />
+        <Route path="/video/ideas" element={<VideoIdeaBacklogPage />} />
+        <Route path="/video/projects" element={<VideoProjectListPage />} />
+        <Route path="/video/projects/:id" element={<VideoProjectWorkspacePage />} />
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />
