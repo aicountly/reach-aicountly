@@ -689,5 +689,20 @@ $routes->group('v1', static function ($routes) {
         $routes->post('distribution/campaigns/(:num)/audience-snapshot',     'Api\\V1\\Distribution\\AudienceSnapshotController::create/$1',['filter' => 'permission:distribution.segment']);
         $routes->post('distribution/campaigns/(:num)/audience-snapshot/freeze','Api\\V1\\Distribution\\AudienceSnapshotController::freeze/$1',['filter' => 'permission:distribution.approve']);
 
+        // Campaign versions (CP4)
+        $routes->get('campaigns/(:num)/versions',                            'Api\\V1\\Distribution\\CampaignVersionController::index/$1',         ['filter' => 'permission:distribution.read']);
+        $routes->post('campaigns/(:num)/versions',                           'Api\\V1\\Distribution\\CampaignVersionController::store/$1',         ['filter' => 'permission:distribution.create']);
+        $routes->get('campaigns/(:num)/versions/(:num)',                     'Api\\V1\\Distribution\\CampaignVersionController::show/$1/$2',        ['filter' => 'permission:distribution.read']);
+        $routes->post('campaigns/(:num)/versions/(:num)/submit',             'Api\\V1\\Distribution\\CampaignVersionController::submit/$1/$2',      ['filter' => 'permission:distribution.submit']);
+        $routes->post('campaigns/(:num)/versions/(:num)/approve',            'Api\\V1\\Distribution\\CampaignVersionController::approve/$1/$2',     ['filter' => 'permission:distribution.approve']);
+        $routes->post('campaigns/(:num)/versions/(:num)/reject',             'Api\\V1\\Distribution\\CampaignVersionController::reject/$1/$2',      ['filter' => 'permission:distribution.review']);
+        $routes->post('campaigns/(:num)/versions/(:num)/request-changes',    'Api\\V1\\Distribution\\CampaignVersionController::requestChanges/$1/$2',['filter' => 'permission:distribution.review']);
+        $routes->get('campaigns/(:num)/versions/(:num)/variants',            'Api\\V1\\Distribution\\CampaignVersionController::variants/$1/$2',    ['filter' => 'permission:distribution.read']);
+        $routes->post('campaigns/(:num)/versions/(:num)/variants',           'Api\\V1\\Distribution\\CampaignVersionController::storeVariant/$1/$2',['filter' => 'permission:distribution.create']);
+
+        // Channel variants (CP4)
+        $routes->put('distribution/variants/(:num)',                         'Api\\V1\\Distribution\\ChannelVariantController::update/$1',          ['filter' => 'permission:distribution.update']);
+        $routes->post('distribution/variants/(:num)/validate',               'Api\\V1\\Distribution\\ChannelVariantController::validate/$1',        ['filter' => 'permission:distribution.update']);
+
     });
 });
