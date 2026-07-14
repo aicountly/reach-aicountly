@@ -120,6 +120,7 @@ import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
 import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
 import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
 import VideoProjectWorkspacePage  from './pages/video/VideoProjectWorkspacePage.jsx';
+import VideoRenderQueuePage       from './pages/video/VideoRenderQueuePage.jsx';
 
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
@@ -273,6 +274,7 @@ export default function App() {
         <Route path="/video/ideas" element={<VideoIdeaBacklogPage />} />
         <Route path="/video/projects" element={<VideoProjectListPage />} />
         <Route path="/video/projects/:id" element={<VideoProjectWorkspacePage />} />
+        <Route path="/video/render-queue" element={<VideoRenderQueuePage />} />
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />
