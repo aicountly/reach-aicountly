@@ -38,6 +38,8 @@ class AuditLogger
         'ai_budget.',
         // Phase 5 community events
         'community.',
+        // Phase 6 video events
+        'video.',
     ];
 
     /**
@@ -226,6 +228,60 @@ class AuditLogger
     public const COMMUNITY_MODERATION_RUN               = 'community.moderation.run';
     public const COMMUNITY_DEPLOYMENT_RETRIED           = 'community.deployment.retried';
     public const COMMUNITY_ENGAGEMENT_RECORDED          = 'community.engagement.recorded';
+
+    // =========================================================================
+    // Phase 6 — Video Content Automation audit events
+    // =========================================================================
+
+    public const VIDEO_IDEA_CREATED           = 'video.idea.created';
+    public const VIDEO_IDEA_SCORED            = 'video.idea.scored';
+    public const VIDEO_IDEA_ACCEPTED          = 'video.idea.accepted';
+    public const VIDEO_IDEA_REJECTED          = 'video.idea.rejected';
+    public const VIDEO_IDEA_ARCHIVED          = 'video.idea.archived';
+    public const VIDEO_IDEA_CONVERTED         = 'video.idea.converted';
+    public const VIDEO_IDEA_DUPLICATE_FLAGGED = 'video.idea.duplicate_flagged';
+
+    public const VIDEO_PROJECT_CREATED     = 'video.project.created';
+    public const VIDEO_PROJECT_UPDATED     = 'video.project.updated';
+    public const VIDEO_PROJECT_CANCELLED   = 'video.project.cancelled';
+    public const VIDEO_PROJECT_WITHDRAWN   = 'video.project.withdrawn';
+
+    public const VIDEO_SCRIPT_GENERATED         = 'video.script.generated';
+    public const VIDEO_SCRIPT_GENERATION_FAILED = 'video.script.generation_failed';
+    public const VIDEO_SCRIPT_SUBMITTED         = 'video.script.submitted';
+    public const VIDEO_SCRIPT_APPROVED          = 'video.script.approved';
+    public const VIDEO_SCRIPT_REJECTED          = 'video.script.rejected';
+    public const VIDEO_SCRIPT_CHANGES_REQUESTED = 'video.script.changes_requested';
+    public const VIDEO_SCRIPT_VERSION_CREATED   = 'video.script.version_created';
+
+    public const VIDEO_RENDER_QUEUED       = 'video.render.queued';
+    public const VIDEO_RENDER_STARTED      = 'video.render.started';
+    public const VIDEO_RENDER_COMPLETED    = 'video.render.completed';
+    public const VIDEO_RENDER_FAILED       = 'video.render.failed';
+    public const VIDEO_RENDER_CANCELLED    = 'video.render.cancelled';
+    public const VIDEO_RENDER_RETRIED      = 'video.render.retried';
+    public const VIDEO_RENDER_DEAD_LETTERED = 'video.render.dead_lettered';
+
+    public const VIDEO_PUBLISH_QUEUED     = 'video.publish.queued';
+    public const VIDEO_PUBLISH_STARTED    = 'video.publish.started';
+    public const VIDEO_PUBLISH_PUBLISHED  = 'video.publish.published';
+    public const VIDEO_PUBLISH_FAILED     = 'video.publish.failed';
+    public const VIDEO_PUBLISH_CANCELLED  = 'video.publish.cancelled';
+    public const VIDEO_PUBLISH_RETRIED    = 'video.publish.retried';
+
+    public const VIDEO_CONNECTION_CREATED       = 'video.connection.created';
+    public const VIDEO_CONNECTION_REVOKED       = 'video.connection.revoked';
+    public const VIDEO_CONNECTION_HEALTH_CHECKED = 'video.connection.health_checked';
+
+    public const VIDEO_ASSET_UPLOADED   = 'video.asset.uploaded';
+    public const VIDEO_ASSET_VALIDATED  = 'video.asset.validated';
+    public const VIDEO_ASSET_REJECTED   = 'video.asset.rejected';
+    public const VIDEO_ASSET_DELETED    = 'video.asset.deleted';
+
+    public const VIDEO_PROVIDER_CALLBACK_RECEIVED        = 'video.provider.callback_received';
+    public const VIDEO_PROVIDER_CALLBACK_VERIFIED        = 'video.provider.callback_verified';
+    public const VIDEO_PROVIDER_CALLBACK_REPLAY_REJECTED = 'video.provider.callback_replay_rejected';
+    public const VIDEO_PROVIDER_CALLBACK_INVALID_SIGNATURE = 'video.provider.callback_invalid_signature';
 
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.

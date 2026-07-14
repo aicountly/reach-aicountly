@@ -322,6 +322,33 @@ final class Permissions
     /** Community — engagement */
     public const COMMUNITY_ENGAGEMENT_INGEST = 'community_engagement.ingest';
 
+    // =========================================================================
+    // Phase 6 — Video Content Automation
+    // =========================================================================
+
+    /** Video — core lifecycle */
+    public const VIDEO_READ     = 'video.read';
+    public const VIDEO_CREATE   = 'video.create';
+    public const VIDEO_UPDATE   = 'video.update';
+    public const VIDEO_GENERATE = 'video.generate';
+    public const VIDEO_SUBMIT   = 'video.submit';
+    public const VIDEO_REVIEW   = 'video.review';
+    public const VIDEO_APPROVE  = 'video.approve';
+    public const VIDEO_RENDER   = 'video.render';
+    public const VIDEO_PUBLISH  = 'video.publish';
+    public const VIDEO_CANCEL   = 'video.cancel';
+    public const VIDEO_RETRY    = 'video.retry';
+
+    /** Video — connections */
+    public const VIDEO_CONNECTIONS_READ   = 'video_connections.read';
+    public const VIDEO_CONNECTIONS_MANAGE = 'video_connections.manage';
+
+    /** Video — operations */
+    public const VIDEO_OPERATIONS_READ = 'video_operations.read';
+
+    /** Video — audit */
+    public const VIDEO_AUDIT_READ = 'video_audit.read';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -431,6 +458,15 @@ final class Permissions
             'community_analytics'  => [self::COMMUNITY_ANALYTICS_VIEW],
             'community_audit'      => [self::COMMUNITY_AUDIT_VIEW],
             'community_engagement' => [self::COMMUNITY_ENGAGEMENT_INGEST],
+            // Phase 6: Video Content Automation
+            'video'             => [
+                self::VIDEO_READ, self::VIDEO_CREATE, self::VIDEO_UPDATE, self::VIDEO_GENERATE,
+                self::VIDEO_SUBMIT, self::VIDEO_REVIEW, self::VIDEO_APPROVE,
+                self::VIDEO_RENDER, self::VIDEO_PUBLISH, self::VIDEO_CANCEL, self::VIDEO_RETRY,
+            ],
+            'video_connections' => [self::VIDEO_CONNECTIONS_READ, self::VIDEO_CONNECTIONS_MANAGE],
+            'video_operations'  => [self::VIDEO_OPERATIONS_READ],
+            'video_audit'       => [self::VIDEO_AUDIT_READ],
         ];
     }
 
