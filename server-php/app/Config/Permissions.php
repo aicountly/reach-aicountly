@@ -364,22 +364,23 @@ final class Permissions
     public const DISTRIBUTION_PAUSE                 = 'distribution.pause';
     public const DISTRIBUTION_CANCEL                = 'distribution.cancel';
     public const DISTRIBUTION_RETRY                 = 'distribution.retry';
-    public const DISTRIBUTION_CONNECTIONS_READ      = 'distribution.connections.read';
-    public const DISTRIBUTION_CONNECTIONS_MANAGE    = 'distribution.connections.manage';
-    public const DISTRIBUTION_TEMPLATES_READ        = 'distribution.templates.read';
-    public const DISTRIBUTION_TEMPLATES_MANAGE      = 'distribution.templates.manage';
-    public const DISTRIBUTION_CONSENT_READ          = 'distribution.consent.read';
-    public const DISTRIBUTION_CONSENT_MANAGE        = 'distribution.consent.manage';
-    public const DISTRIBUTION_SUPPRESSION_READ      = 'distribution.suppression.read';
-    public const DISTRIBUTION_SUPPRESSION_MANAGE    = 'distribution.suppression.manage';
-    public const DISTRIBUTION_OPERATIONS_READ       = 'distribution.operations.read';
-    public const DISTRIBUTION_AUDIT_READ            = 'distribution.audit.read';
+    public const DISTRIBUTION_CONNECTIONS_READ      = 'distribution.read_connections';
+    public const DISTRIBUTION_CONNECTIONS_MANAGE    = 'distribution.manage_connections';
+    public const DISTRIBUTION_TEMPLATES_READ        = 'distribution.read_templates';
+    public const DISTRIBUTION_TEMPLATES_MANAGE      = 'distribution.manage_templates';
+    public const DISTRIBUTION_CONSENT_READ          = 'distribution.read_consent';
+    public const DISTRIBUTION_CONSENT_MANAGE        = 'distribution.manage_consent';
+    public const DISTRIBUTION_SUPPRESSION_READ      = 'distribution.read_suppression';
+    public const DISTRIBUTION_SUPPRESSION_MANAGE    = 'distribution.manage_suppression';
+    public const DISTRIBUTION_OPERATIONS_READ       = 'distribution.read_operations';
+    public const DISTRIBUTION_AUDIT_READ            = 'distribution.read_audit';
 
     // Phase 7: SMS
     public const SMS_READ   = 'sms.read';
     public const SMS_CREATE = 'sms.create';
     public const SMS_UPDATE = 'sms.update';
-    public const SMS_SEND   = 'sms.send';
+    public const SMS_SEND     = 'sms.send';
+    public const SMS_DISPATCH = 'sms.dispatch';
 
     /**
      * @return array<string, string[]> group => permission list
@@ -513,7 +514,7 @@ final class Permissions
                 self::DISTRIBUTION_OPERATIONS_READ, self::DISTRIBUTION_AUDIT_READ,
             ],
             'sms' => [
-                self::SMS_READ, self::SMS_CREATE, self::SMS_UPDATE, self::SMS_SEND,
+                self::SMS_READ, self::SMS_CREATE, self::SMS_UPDATE, self::SMS_SEND, self::SMS_DISPATCH,
             ],
         ];
     }

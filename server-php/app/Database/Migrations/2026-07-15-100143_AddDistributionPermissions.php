@@ -14,12 +14,12 @@ class AddDistributionPermissions extends Migration
         'distribution.submit', 'distribution.review', 'distribution.approve',
         'distribution.schedule', 'distribution.dispatch', 'distribution.pause',
         'distribution.cancel', 'distribution.retry',
-        'distribution.connections.read', 'distribution.connections.manage',
-        'distribution.templates.read', 'distribution.templates.manage',
-        'distribution.consent.read', 'distribution.consent.manage',
-        'distribution.suppression.read', 'distribution.suppression.manage',
-        'distribution.operations.read', 'distribution.audit.read',
-        'sms.read', 'sms.create', 'sms.update', 'sms.send',
+        'distribution.read_connections', 'distribution.manage_connections',
+        'distribution.read_templates', 'distribution.manage_templates',
+        'distribution.read_consent', 'distribution.manage_consent',
+        'distribution.read_suppression', 'distribution.manage_suppression',
+        'distribution.read_operations', 'distribution.read_audit',
+        'sms.read', 'sms.create', 'sms.update', 'sms.send', 'sms.dispatch',
     ];
 
     public function up(): void
