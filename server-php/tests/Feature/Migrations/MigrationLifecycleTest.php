@@ -116,13 +116,31 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Check table existence via a live pg_tables query, bypassing CI4's
+     * dataCache['table_names'] which is populated once and never flushed
+     * after DDL, causing false negatives for tables created by migrations.
+     */
+    private function tableLiveExists(string $tableName): bool
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM pg_tables WHERE schemaname = 'public' AND tablename = ?",
+            [$tableName]
+        )->getRowArray();
+        return (int) ($row['cnt'] ?? 0) > 0;
+    }
+
+    // -------------------------------------------------------------------------
     // Post-migrate-up assertions
     // -------------------------------------------------------------------------
 
     public function testContentItemsTableExists(): void
     {
         $this->assertTrue(
-            $this->db->tableExists('reach_content_items'),
+            $this->tableLiveExists('reach_content_items'),
             'reach_content_items must exist after migrate-up'
         );
     }
@@ -130,7 +148,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     public function testContentProductMapTableExists(): void
     {
         $this->assertTrue(
-            $this->db->tableExists('reach_content_product_map'),
+            $this->tableLiveExists('reach_content_product_map'),
             'reach_content_product_map must exist after migrate-up (100053.up() must succeed)'
         );
     }
@@ -155,7 +173,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         ];
         foreach ($maps as $table) {
             $this->assertTrue(
-                $this->db->tableExists($table),
+                $this->tableLiveExists($table),
                 "{$table} must exist after migrate-up"
             );
         }
@@ -247,7 +265,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     public function testActorsTableExistsAfterMigrateUp(): void
     {
         $this->assertTrue(
-            $this->db->tableExists('reach_actors'),
+            $this->tableLiveExists('reach_actors'),
             'reach_actors must exist after migrate-up (created by 2026-07-12-100065)'
         );
     }
@@ -255,7 +273,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     public function testSeoProfilesTableExistsAfterMigrateUp(): void
     {
         $this->assertTrue(
-            $this->db->tableExists('reach_content_seo_profiles'),
+            $this->tableLiveExists('reach_content_seo_profiles'),
             'reach_content_seo_profiles must exist after migrate-up (100075 must succeed)'
         );
     }
@@ -305,7 +323,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     public function testKbPublicationProfilesForeignKeyToProductModulesExists(): void
     {
         $this->assertTrue(
-            $this->db->tableExists('reach_kb_publication_profiles'),
+            $this->tableLiveExists('reach_kb_publication_profiles'),
             'reach_kb_publication_profiles must exist after migrate-up (100081 must succeed)'
         );
 
@@ -380,7 +398,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
 
         foreach (['reach_content_items', 'reach_content_product_map', 'reach_actors', 'reach_content_seo_profiles'] as $t) {
             $this->assertFalse(
-                $this->db->tableExists($t),
+                $this->tableLiveExists($t),
                 "{$t} must not exist after regress(0)"
             );
         }
@@ -398,7 +416,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         ];
         foreach ($recreated as $t) {
             $this->assertTrue(
-                $this->db->tableExists($t),
+                $this->tableLiveExists($t),
                 "{$t} must be recreated after latest()"
             );
         }
@@ -418,7 +436,7 @@ final class MigrationLifecycleTest extends DatabaseTestCase
         ];
         foreach ($keyTables as $table) {
             $this->assertTrue(
-                $this->db->tableExists($table),
+                $this->tableLiveExists($table),
                 "{$table} must exist after migrate-up (no unexpected cascade drops)"
             );
         }
