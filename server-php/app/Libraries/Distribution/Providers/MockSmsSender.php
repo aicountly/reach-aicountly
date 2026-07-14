@@ -26,7 +26,7 @@ class MockSmsSender implements SmsSenderInterface
 
     public function getCapabilities(): array
     {
-        return ['dlt_required' => true, 'char_limit' => 160, 'encoding' => 'GSM7'];
+        return ['dlt_required' => true, 'char_limit' => 160, 'max_body_chars' => 160, 'encoding' => 'GSM7', 'provider_name' => 'mock_sms'];
     }
 
     public function isEnabled(): bool { return true; }

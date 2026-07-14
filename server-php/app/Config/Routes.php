@@ -708,6 +708,12 @@ $routes->group('v1', static function ($routes) {
         $routes->post('distribution/social/dispatch/(:num)',                 'Api\\V1\\Distribution\\SocialDispatchController::dispatch/$1',        ['filter' => 'permission:distribution.dispatch']);
         $routes->get('distribution/social/status/(:num)',                    'Api\\V1\\Distribution\\SocialDispatchController::status/$1',          ['filter' => 'permission:distribution.read']);
 
+        // SMS dispatch (CP8)
+        $routes->post('distribution/sms/dispatch/(:num)',                    'Api\\V1\\Distribution\\SmsController::dispatch/$1',                  ['filter' => 'permission:sms.dispatch']);
+        $routes->get('distribution/sms/status/(:num)',                       'Api\\V1\\Distribution\\SmsController::status/$1',                    ['filter' => 'permission:sms.read']);
+        $routes->get('distribution/sms/capabilities',                        'Api\\V1\\Distribution\\SmsController::capabilities',                 ['filter' => 'permission:sms.read']);
+        $routes->post('distribution/sms/validate-dlt',                       'Api\\V1\\Distribution\\SmsController::validateDlt',                  ['filter' => 'permission:sms.create']);
+
         // WhatsApp dispatch (CP7)
         $routes->post('distribution/whatsapp/dispatch/(:num)',               'Api\\V1\\Distribution\\WhatsAppDispatchController::dispatch/$1',      ['filter' => 'permission:distribution.dispatch']);
         $routes->get('distribution/whatsapp/status/(:num)',                  'Api\\V1\\Distribution\\WhatsAppDispatchController::status/$1',        ['filter' => 'permission:distribution.read']);
