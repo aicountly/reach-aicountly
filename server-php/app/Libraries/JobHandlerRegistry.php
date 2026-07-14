@@ -12,6 +12,11 @@ use App\Jobs\ContentOverdueEscalationJob;
 use App\Jobs\ContentRefreshDetectionJob;
 use App\Jobs\ContentScheduleReadinessJob;
 use App\Jobs\AiGenerationJob;
+use App\Jobs\CommunityQuestionIntakeJob;
+use App\Jobs\CommunityAnswerGenerationJob;
+use App\Jobs\CommunityPublicationVerificationJob;
+use App\Jobs\CommunityDeploymentRetryJob;
+use App\Jobs\CommunityAnalyticsReconciliationJob;
 use RuntimeException;
 
 /**
@@ -37,6 +42,12 @@ class JobHandlerRegistry
         $this->handlers['reach.content_schedule_readiness']      = new ContentScheduleReadinessJob();
         // Phase 3 AI generation
         $this->handlers['reach.ai_generation']                   = new AiGenerationJob();
+        // Phase 5 Community Q&A
+        $this->handlers['reach.community_question_intake']           = new CommunityQuestionIntakeJob();
+        $this->handlers['reach.community_answer_generation']         = new CommunityAnswerGenerationJob();
+        $this->handlers['reach.community_publication_verification']  = new CommunityPublicationVerificationJob();
+        $this->handlers['reach.community_deployment_retry']          = new CommunityDeploymentRetryJob();
+        $this->handlers['reach.community_analytics_reconciliation']  = new CommunityAnalyticsReconciliationJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

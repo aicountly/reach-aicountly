@@ -212,6 +212,21 @@ class AuditLogger
     public const COMMUNITY_PUBLISHING_CHECKSUM_MISMATCH = 'community.publishing.checksum_mismatch';
     public const COMMUNITY_PUBLISHING_ROLLBACK          = 'community.publishing.rollback';
 
+    // Additional Phase 5 events used by controllers and jobs
+    public const COMMUNITY_QUESTION_INGESTED            = 'community.question.ingested';
+    public const COMMUNITY_QUESTION_STATUS_CHANGED      = 'community.question.status_changed';
+    public const COMMUNITY_ANSWER_EDITED                = 'community.answer.edited';
+    public const COMMUNITY_ANSWER_APPROVAL_REJECTED     = 'community.answer.approval_rejected';
+    public const COMMUNITY_ANSWER_VERIFICATION_RUN      = 'community.answer.verification_run';
+    public const COMMUNITY_ANALYTICS_RECONCILED         = 'community.analytics.reconciled';
+    public const COMMUNITY_SPACE_CREATED                = 'community.space.created';
+    public const COMMUNITY_SPACE_UPDATED                = 'community.space.updated';
+    public const COMMUNITY_MODERATION_FINDING_RESOLVED  = 'community.moderation.finding_resolved';
+    public const COMMUNITY_MODERATION_FINDING_ESCALATED = 'community.moderation.finding_escalated';
+    public const COMMUNITY_MODERATION_RUN               = 'community.moderation.run';
+    public const COMMUNITY_DEPLOYMENT_RETRIED           = 'community.deployment.retried';
+    public const COMMUNITY_ENGAGEMENT_RECORDED          = 'community.engagement.recorded';
+
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.
      * @param string  $action       Dotted event slug (see docs/architecture/REACH_SECURITY_CONTROLS.md).
