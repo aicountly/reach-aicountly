@@ -2,7 +2,24 @@
 
 **Prepared by:** Phase 8  
 **Phase 9 capability:** Content Refresh Intelligence and Automation  
-**Status:** Evidence contracts defined. Phase 9 implementation not started.
+**Status:** Evidence contracts **implemented** in `IntelligenceEvidenceService`. Phase 9 implementation not started.
+
+## Canonical Entry Point
+
+Phase 9 **must** consume evidence exclusively through:
+
+```php
+App\Libraries\Intelligence\IntelligenceEvidenceService::getEvidencePacket(
+    contentIdentityId: int,
+    asOf: string,           // ISO-8601 date
+    windowDays: int = 28
+): array
+```
+
+The method returns a typed packet with keys:
+`identity`, `search`, `engagement`, `indexing`, `visibility`, `attribution`, `freshness`, `completeness`
+
+Direct model access bypassing this service is prohibited in Phase 9.
 
 ---
 
