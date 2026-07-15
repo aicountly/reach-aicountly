@@ -32,4 +32,18 @@ class AttributionTouchpointModel extends Model
                     ->orderBy('touched_at', 'ASC')
                     ->findAll();
     }
+
+    public function getForConversion(int $tenantId, int $conversionLinkId): array
+    {
+        $db = $this->db;
+        return $db->query(
+            "SELECT tp.*
+             FROM reach_attribution_touchpoints tp
+             JOIN reach_attribution_conversion_links cl
+               ON cl.first_touchpoint_id = tp.id OR cl.last_touchpoint_id = tp.id
+             WHERE cl.id = ? AND tp.tenant_id = ?
+             ORDER BY tp.touched_at ASC",
+            [$conversionLinkId, $tenantId]
+        )->getResultArray();
+    }
 }
