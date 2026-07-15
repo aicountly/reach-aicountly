@@ -770,6 +770,9 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             'reach_content_identities', 'reach_analytics_connections',
             'reach_search_metric_facts', 'reach_content_metric_facts',
             'reach_ai_visibility_prompts', 'reach_competitors',
+            // Phase 9
+            'reach_refresh_policies', 'reach_refresh_workflows',
+            'reach_attribution_models', 'reach_readiness_audit_runs',
         ];
         foreach ($checkTables as $t) {
             $this->assertFalse(
@@ -834,6 +837,28 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             'reach_competitor_observation_aggregates',
             'reach_connector_health',
             'reach_metric_freshness',
+            // Phase 9 refresh and readiness
+            'reach_refresh_policies',
+            'reach_refresh_policy_versions',
+            'reach_refresh_evidence_snapshots',
+            'reach_refresh_recommendations',
+            'reach_refresh_score_components',
+            'reach_refresh_workflows',
+            'reach_refresh_briefs',
+            'reach_refresh_content_version_links',
+            'reach_refresh_publication_links',
+            'reach_refresh_outcome_windows',
+            'reach_refresh_outcome_metrics',
+            'reach_attribution_models',
+            'reach_attribution_model_versions',
+            'reach_attribution_journey_calculations',
+            'reach_attribution_allocation_facts',
+            'reach_readiness_audit_runs',
+            'reach_readiness_findings',
+            'reach_technical_debt_records',
+            'reach_operational_readiness_checks',
+            'reach_disaster_recovery_tests',
+            'reach_release_acceptance_records',
         ];
         foreach ($recreated as $t) {
             $this->assertTrue(
