@@ -25,8 +25,8 @@ pg_dump -Fc -h $DB_HOST -U $DB_USER $DB_NAME > reach_backup_$(date +%Y%m%d_%H%M%
 pg_restore --list reach_backup_*.dump | head -20
 ```
 
-**Frequency:** Daily minimum; before every deployment  
-**Retention:** 30 days  
+**Frequency:** Daily minimum; before every deployment
+**Retention:** 30 days
 **Location:** Encrypted off-site storage (see infrastructure docs)
 
 ---

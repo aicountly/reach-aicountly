@@ -1,6 +1,6 @@
 # Phase 9 — Discovery Report
 
-**Date:** 2026-07-15  
+**Date:** 2026-07-15
 **Baseline:** `reach-phase-8-complete` @ `eeb6b9ba6519f53a190ba286d6527d2c9853e83e`
 
 ---
@@ -83,7 +83,7 @@
 
 ## Migration Sequence Overview
 
-Current latest migration: `100171_AddIntelligencePermissions`  
+Current latest migration: `100171_AddIntelligencePermissions`
 Phase 9 range: `100172–100193` (22 migrations)
 
 ---

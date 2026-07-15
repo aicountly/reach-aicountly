@@ -1,6 +1,6 @@
 # Runbook: Refresh Publication Failure
 
-**Trigger:** `reach_refresh_publication_links.delivery_status = failed`  
+**Trigger:** `reach_refresh_publication_links.delivery_status = failed`
 **Phase:** 9
 
 ---

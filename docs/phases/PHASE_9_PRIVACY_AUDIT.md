@@ -1,6 +1,6 @@
 # Phase 9 — Final Privacy Audit
 
-**Date:** 2026-07-15  
+**Date:** 2026-07-15
 **Scope:** Phase 1–9 personal data inventory and controls review
 
 ---

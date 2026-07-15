@@ -1,6 +1,6 @@
 # Reach Content Refresh Intelligence
 
-**Phase:** 9  
+**Phase:** 9
 **Status:** Implementation in progress
 
 ---

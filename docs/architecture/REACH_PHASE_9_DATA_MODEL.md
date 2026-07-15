@@ -1,6 +1,6 @@
 # Phase 9 Data Model
 
-**Migration range:** 100172–100193  
+**Migration range:** 100172–100194
 **PostgreSQL compatible**
 
 ---
@@ -21,7 +21,7 @@
 | created_at | TIMESTAMPTZ NOT NULL | |
 | updated_at | TIMESTAMPTZ NOT NULL | |
 
-Unique: `(tenant_id, name)`  
+Unique: `(tenant_id, name)`
 Index: `(tenant_id, content_type, is_active)`
 
 ---
@@ -46,7 +46,7 @@ Index: `(tenant_id, content_type, is_active)`
 | approved_at | TIMESTAMPTZ | |
 | created_at | TIMESTAMPTZ NOT NULL | |
 
-Unique: `(policy_id, version_number)`  
+Unique: `(policy_id, version_number)`
 Immutable fields: all except `approved_by`, `approved_at` after creation
 
 ---
@@ -70,7 +70,7 @@ Immutable. One per content identity per evidence period.
 | freshness_state | JSONB NOT NULL | |
 | created_at | TIMESTAMPTZ NOT NULL | |
 
-Unique: `(content_identity_id, policy_version_id, evidence_date)`  
+Unique: `(content_identity_id, policy_version_id, evidence_date)`
 No UPDATE permitted after creation.
 
 ---
@@ -97,7 +97,7 @@ No UPDATE permitted after creation.
 | created_at | TIMESTAMPTZ NOT NULL | |
 | updated_at | TIMESTAMPTZ NOT NULL | |
 
-Unique: `(content_identity_id, policy_version_id, evidence_snapshot_id)` where status NOT IN ('rejected','superseded','expired')  
+Unique: `(content_identity_id, policy_version_id, evidence_snapshot_id)` where status NOT IN ('rejected','superseded','expired')
 Index: `(tenant_id, status)`, `(content_identity_id, status)`
 
 ---

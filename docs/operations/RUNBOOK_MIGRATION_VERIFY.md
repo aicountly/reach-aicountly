@@ -1,6 +1,6 @@
 # Runbook: Migration Lifecycle Verification
 
-**Phase:** 9  
+**Phase:** 9
 **Test:** `MigrationLifecycleTest::testFullRollbackAndReapplySucceeds`
 
 ---

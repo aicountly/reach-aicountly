@@ -1,6 +1,6 @@
 # Reach Final Product Readiness Framework
 
-**Phase:** 9  
+**Phase:** 9
 **Purpose:** Define the evidence required before a production deployment recommendation can be issued
 
 ---

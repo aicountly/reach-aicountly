@@ -1,6 +1,6 @@
 # Runbook: Readiness Audit Run
 
-**Phase:** 9  
+**Phase:** 9
 **Service:** `ReadinessAuditRunModel`
 
 ---

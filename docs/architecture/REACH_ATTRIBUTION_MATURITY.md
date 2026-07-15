@@ -1,6 +1,6 @@
 # Reach Attribution Maturity
 
-**Phase:** 9  
+**Phase:** 9
 **Extends:** Phase 8 first/last-touch attribution foundations
 
 ---

@@ -1,6 +1,6 @@
 # Runbook: Phase 9 Deployment
 
-**Phase:** 9  
+**Phase:** 9
 **Pre-requisites:** All readiness checks passed, release acceptance record created
 
 ---

@@ -1,6 +1,6 @@
 # Runbook: Attribution Calculation Failure
 
-**Phase:** 9  
+**Phase:** 9
 **Service:** `AttributionModelService`
 
 ---

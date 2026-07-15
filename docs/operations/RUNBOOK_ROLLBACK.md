@@ -1,6 +1,6 @@
 # Runbook: Phase 9 Rollback
 
-**Phase:** 9  
+**Phase:** 9
 **Use when:** Critical defect in production requires reverting to Phase 8
 
 ---

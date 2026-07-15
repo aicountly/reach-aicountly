@@ -1,7 +1,7 @@
 # Runbook: Content Refresh Detection Job
 
-**Job:** `ContentRefreshDetectionJob`  
-**Frequency:** Daily 03:00  
+**Job:** `ContentRefreshDetectionJob`
+**Frequency:** Daily 03:00
 **Phase:** 9
 
 ---
