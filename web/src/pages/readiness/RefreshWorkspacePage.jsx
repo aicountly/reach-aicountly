@@ -39,7 +39,7 @@ function ProgressSteps({ currentStatus }) {
 
 export default function RefreshWorkspacePage() {
   const { id } = useParams();
-  const [workflow, setWorkflow] = useState(null);
+  const [workflow, _setWorkflow] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

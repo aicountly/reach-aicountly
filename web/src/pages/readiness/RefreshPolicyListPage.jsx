@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 export default function RefreshPolicyListPage() {
-  const [policies, setPolicies] = useState([]);
+  const [policies, _setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

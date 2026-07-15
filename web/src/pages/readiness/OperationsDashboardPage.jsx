@@ -16,7 +16,7 @@ function StatCard({ label, value, variant = 'neutral' }) {
 }
 
 export default function OperationsDashboardPage() {
-  const [summary, setSummary] = useState(null);
+  const [summary, _setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

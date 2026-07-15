@@ -8,7 +8,7 @@ const RISK_COLOURS = {
 };
 
 export default function RecommendationBacklogPage() {
-  const [recommendations, setRecommendations] = useState([]);
+  const [recommendations, _setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('recommended');
 
