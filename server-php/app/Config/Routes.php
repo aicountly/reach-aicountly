@@ -725,5 +725,64 @@ $routes->group('v1', static function ($routes) {
         $routes->get('distribution/email/status/(:num)',                     'Api\\V1\\Distribution\\EmailDispatchController::status/$1',           ['filter' => 'permission:distribution.read']);
         $routes->post('distribution/email/test/(:num)',                      'Api\\V1\\Distribution\\EmailDispatchController::test/$1',             ['filter' => 'permission:distribution.dispatch']);
 
+        // Phase 8: Sitemap Intelligence
+        $routes->get('intelligence/sitemap',                                 'Api\\V1\\Intelligence\\SitemapController::index',                     ['filter' => 'permission:sitemap.read']);
+        $routes->post('intelligence/sitemap/generate',                       'Api\\V1\\Intelligence\\SitemapController::generate',                  ['filter' => 'permission:sitemap.manage']);
+        $routes->get('intelligence/sitemap/(:num)/entries',                  'Api\\V1\\Intelligence\\SitemapController::entries/$1',                ['filter' => 'permission:sitemap.read']);
+
+        // Phase 8: IndexNow
+        $routes->post('intelligence/indexnow/submit',                        'Api\\V1\\Intelligence\\IndexNowController::submit',                   ['filter' => 'permission:sitemap.submit']);
+        $routes->post('intelligence/indexnow/submit-batch',                  'Api\\V1\\Intelligence\\IndexNowController::submitBatch',              ['filter' => 'permission:sitemap.submit']);
+        $routes->post('intelligence/indexnow/retry-pending',                 'Api\\V1\\Intelligence\\IndexNowController::retryPending',             ['filter' => 'permission:sitemap.reconcile']);
+
+        // Phase 8: Search Console
+        $routes->get('intelligence/search/connections',                      'Api\\V1\\Intelligence\\SearchConsoleController::connections',         ['filter' => 'permission:search.read']);
+        $routes->post('intelligence/search/connections',                     'Api\\V1\\Intelligence\\SearchConsoleController::createConnection',    ['filter' => 'permission:search.connect']);
+        $routes->get('intelligence/search/connections/(:num)',               'Api\\V1\\Intelligence\\SearchConsoleController::connection/$1',       ['filter' => 'permission:search.read']);
+        $routes->post('intelligence/search/connections/(:num)/ingest',       'Api\\V1\\Intelligence\\SearchConsoleController::ingest/$1',           ['filter' => 'permission:search.ingest']);
+        $routes->post('intelligence/search/connections/(:num)/backfill',     'Api\\V1\\Intelligence\\SearchConsoleController::backfill/$1',         ['filter' => 'permission:search.backfill']);
+        $routes->get('intelligence/search/connections/(:num)/status',        'Api\\V1\\Intelligence\\SearchConsoleController::status/$1',           ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/metrics',                          'Api\\V1\\Intelligence\\SearchConsoleController::metrics',             ['filter' => 'permission:search.read']);
+
+        // Phase 8: Content Analytics
+        $routes->get('intelligence/content/connections',                     'Api\\V1\\Intelligence\\ContentAnalyticsController::connections',      ['filter' => 'permission:analytics.read']);
+        $routes->post('intelligence/content/connections',                    'Api\\V1\\Intelligence\\ContentAnalyticsController::createConnection', ['filter' => 'permission:analytics.connect']);
+        $routes->post('intelligence/content/connections/(:num)/ingest',      'Api\\V1\\Intelligence\\ContentAnalyticsController::ingest/$1',        ['filter' => 'permission:analytics.ingest']);
+        $routes->get('intelligence/content/metrics',                         'Api\\V1\\Intelligence\\ContentAnalyticsController::metrics',          ['filter' => 'permission:analytics.read']);
+        $routes->get('intelligence/content/metrics/(:num)',                  'Api\\V1\\Intelligence\\ContentAnalyticsController::contentMetrics/$1',['filter' => 'permission:analytics.read']);
+
+        // Phase 8: Attribution
+        $routes->get('intelligence/attribution',                             'Api\\V1\\Intelligence\\AttributionController::overview',             ['filter' => 'permission:attribution.read']);
+        $routes->post('intelligence/attribution/touchpoints',                'Api\\V1\\Intelligence\\AttributionController::recordTouchpoint',     ['filter' => 'permission:attribution.manage']);
+        $routes->post('intelligence/attribution/calculate',                  'Api\\V1\\Intelligence\\AttributionController::calculate',            ['filter' => 'permission:attribution.reconcile']);
+        $routes->get('intelligence/attribution/conversions',                 'Api\\V1\\Intelligence\\AttributionController::conversions',          ['filter' => 'permission:attribution.read']);
+        $routes->post('intelligence/attribution/conversions/(:num)/correct', 'Api\\V1\\Intelligence\\AttributionController::correct/$1',          ['filter' => 'permission:attribution.correct']);
+        $routes->get('intelligence/attribution/utm-templates',               'Api\\V1\\Intelligence\\AttributionController::utmTemplates',         ['filter' => 'permission:attribution.read']);
+        $routes->post('intelligence/attribution/utm-templates',              'Api\\V1\\Intelligence\\AttributionController::createUtmTemplate',    ['filter' => 'permission:attribution.manage']);
+
+        // Phase 8: AI Visibility
+        $routes->get('intelligence/visibility/prompts',                      'Api\\V1\\Intelligence\\VisibilityController::prompts',               ['filter' => 'permission:visibility.read']);
+        $routes->post('intelligence/visibility/prompts',                     'Api\\V1\\Intelligence\\VisibilityController::createPrompt',          ['filter' => 'permission:visibility.manage']);
+        $routes->get('intelligence/visibility/prompts/(:num)',               'Api\\V1\\Intelligence\\VisibilityController::prompt/$1',             ['filter' => 'permission:visibility.read']);
+        $routes->post('intelligence/visibility/prompts/(:num)/versions',     'Api\\V1\\Intelligence\\VisibilityController::createVersion/$1',      ['filter' => 'permission:visibility.manage']);
+        $routes->post('intelligence/visibility/prompts/(:num)/versions/(:num)/approve', 'Api\\V1\\Intelligence\\VisibilityController::approveVersion/$1/$2', ['filter' => 'permission:visibility.review']);
+        $routes->post('intelligence/visibility/runs',                        'Api\\V1\\Intelligence\\VisibilityController::queueRun',              ['filter' => 'permission:visibility.execute']);
+        $routes->get('intelligence/visibility/runs',                         'Api\\V1\\Intelligence\\VisibilityController::runs',                  ['filter' => 'permission:visibility.read']);
+        $routes->get('intelligence/visibility/observations',                 'Api\\V1\\Intelligence\\VisibilityController::observations',          ['filter' => 'permission:visibility.read']);
+
+        // Phase 8: Competitors
+        $routes->get('intelligence/competitors',                             'Api\\V1\\Intelligence\\CompetitorController::index',                 ['filter' => 'permission:competitor.read']);
+        $routes->post('intelligence/competitors',                            'Api\\V1\\Intelligence\\CompetitorController::create',                ['filter' => 'permission:competitor.manage']);
+        $routes->get('intelligence/competitors/(:num)',                      'Api\\V1\\Intelligence\\CompetitorController::show/$1',               ['filter' => 'permission:competitor.read']);
+        $routes->put('intelligence/competitors/(:num)',                      'Api\\V1\\Intelligence\\CompetitorController::update/$1',             ['filter' => 'permission:competitor.manage']);
+        $routes->post('intelligence/competitors/(:num)/aliases',             'Api\\V1\\Intelligence\\CompetitorController::addAlias/$1',           ['filter' => 'permission:competitor.manage']);
+        $routes->get('intelligence/competitors/(:num)/observations',         'Api\\V1\\Intelligence\\CompetitorController::observations/$1',       ['filter' => 'permission:competitor.read']);
+
+        // Phase 8: Connector Operations
+        $routes->get('intelligence/connectors',                              'Api\\V1\\Intelligence\\ConnectorController::index',                  ['filter' => 'permission:connector.read']);
+        $routes->get('intelligence/connectors/(:num)',                       'Api\\V1\\Intelligence\\ConnectorController::show/$1',                ['filter' => 'permission:connector.read']);
+        $routes->post('intelligence/connectors/(:num)/health-check',         'Api\\V1\\Intelligence\\ConnectorController::healthCheck/$1',         ['filter' => 'permission:connector.read']);
+        $routes->post('intelligence/connectors/(:num)/disable',              'Api\\V1\\Intelligence\\ConnectorController::disable/$1',             ['filter' => 'permission:connector.manage']);
+
     });
 });
