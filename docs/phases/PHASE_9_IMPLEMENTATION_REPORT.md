@@ -12,7 +12,7 @@
 | CP | Title | Status | Commit |
 |----|-------|--------|--------|
 | CP0 | Baseline, discovery, scope freeze | Complete | `b68dafc` |
-| CP1 | 22 migrations, models, enums | Complete | `20603d5` |
+| CP1 | 23 migrations (100172–100194), models, enums | Complete | `20603d5` |
 | CP2 | Permissions, audits, workflow contracts | Complete | `65ed329` |
 | CP3 | Evidence normalisation + policy engine | Complete | `c94a38d` |
 | CP4 | Recommendation engine | Complete | `c7525a7` |
