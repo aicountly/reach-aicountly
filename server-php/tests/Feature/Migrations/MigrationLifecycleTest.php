@@ -610,6 +610,108 @@ final class MigrationLifecycleTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // Phase 8 intelligence tables (100144–100171)
+    // -------------------------------------------------------------------------
+
+    public function testAllPhase8IntelligenceTablesExistAfterMigrateUp(): void
+    {
+        $tables = [
+            'reach_content_identities',
+            'reach_content_publication_mappings',
+            'reach_sitemap_snapshots',
+            'reach_sitemap_entries',
+            'reach_indexnow_submissions',
+            'reach_indexnow_attempts',
+            'reach_analytics_connections',
+            'reach_analytics_ingestion_cursors',
+            'reach_search_metric_facts',
+            'reach_content_metric_facts',
+            'reach_analytics_ingestion_runs',
+            'reach_content_mapping_findings',
+            'reach_utm_templates',
+            'reach_attribution_touchpoints',
+            'reach_attribution_conversion_links',
+            'reach_attribution_calculation_versions',
+            'reach_ai_visibility_prompts',
+            'reach_ai_visibility_prompt_versions',
+            'reach_ai_visibility_runs',
+            'reach_ai_visibility_responses',
+            'reach_ai_visibility_observations',
+            'reach_ai_visibility_citations',
+            'reach_competitors',
+            'reach_competitor_aliases',
+            'reach_competitor_observation_aggregates',
+            'reach_connector_health',
+            'reach_metric_freshness',
+        ];
+        foreach ($tables as $table) {
+            $this->assertTrue(
+                $this->tableLiveExists($table),
+                "{$table} must exist after migrate-up (Phase 8)"
+            );
+        }
+    }
+
+    public function testContentIdentitiesHasSourceUniqueConstraint(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_content_identities' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_content_identities must have UNIQUE constraints');
+    }
+
+    public function testSearchMetricFactsHasDedupUniqueConstraint(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_search_metric_facts' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_search_metric_facts must have UNIQUE dedup constraint');
+    }
+
+    public function testContentMetricFactsHasDedupUniqueConstraint(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_content_metric_facts' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_content_metric_facts must have UNIQUE dedup constraint');
+    }
+
+    public function testAiVisibilityResponsesImmutableUniqueRunConstraint(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_ai_visibility_responses' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_ai_visibility_responses must have UNIQUE run_id (one response per run)');
+    }
+
+    public function testAiVisibilityPromptsHasPurposeCheckConstraint(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.check_constraints
+             WHERE constraint_name IN (
+                 SELECT constraint_name FROM information_schema.table_constraints
+                 WHERE table_name = 'reach_ai_visibility_prompts' AND constraint_type = 'CHECK'
+             )
+             AND check_clause LIKE '%ai_visibility_monitoring%'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0),
+            'reach_ai_visibility_prompts must CHECK purpose = ai_visibility_monitoring');
+    }
+
+    public function testIngestionCursorHasUniqueConnectionStreamConstraint(): void
+    {
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints
+             WHERE table_name = 'reach_analytics_ingestion_cursors' AND constraint_type = 'UNIQUE'"
+        )->getRowArray();
+        $this->assertGreaterThan(0, (int) ($row['cnt'] ?? 0), 'reach_analytics_ingestion_cursors must have UNIQUE (connection_id, stream_type)');
+    }
+
+    // -------------------------------------------------------------------------
     // Full rollback + reapply lifecycle
     // -------------------------------------------------------------------------
 
@@ -664,6 +766,10 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             'reach_campaign_versions', 'reach_campaign_dispatches',
             'reach_channel_consents', 'reach_channel_suppressions',
             'reach_sms_campaigns',
+            // Phase 8
+            'reach_content_identities', 'reach_analytics_connections',
+            'reach_search_metric_facts', 'reach_content_metric_facts',
+            'reach_ai_visibility_prompts', 'reach_competitors',
         ];
         foreach ($checkTables as $t) {
             $this->assertFalse(
@@ -702,6 +808,32 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             'reach_campaign_templates',
             'reach_campaign_provider_events',
             'reach_campaign_operational_metrics',
+            // Phase 8 intelligence
+            'reach_content_identities',
+            'reach_content_publication_mappings',
+            'reach_sitemap_snapshots',
+            'reach_sitemap_entries',
+            'reach_indexnow_submissions',
+            'reach_analytics_connections',
+            'reach_analytics_ingestion_cursors',
+            'reach_search_metric_facts',
+            'reach_content_metric_facts',
+            'reach_analytics_ingestion_runs',
+            'reach_utm_templates',
+            'reach_attribution_touchpoints',
+            'reach_attribution_conversion_links',
+            'reach_attribution_calculation_versions',
+            'reach_ai_visibility_prompts',
+            'reach_ai_visibility_prompt_versions',
+            'reach_ai_visibility_runs',
+            'reach_ai_visibility_responses',
+            'reach_ai_visibility_observations',
+            'reach_ai_visibility_citations',
+            'reach_competitors',
+            'reach_competitor_aliases',
+            'reach_competitor_observation_aggregates',
+            'reach_connector_health',
+            'reach_metric_freshness',
         ];
         foreach ($recreated as $t) {
             $this->assertTrue(
