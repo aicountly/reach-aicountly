@@ -56,4 +56,13 @@ class ContentIdentityModel extends Model
                     ->where('privacy_class', 'public')
                     ->findAll();
     }
+
+    public function getPublishedBeforeForTenant(int $tenantId, string $beforeDate, string $contentType): array
+    {
+        return $this->where('tenant_id', $tenantId)
+                    ->where('content_type', $contentType)
+                    ->where('publication_status', 'published')
+                    ->where('first_published_at <', $beforeDate)
+                    ->findAll();
+    }
 }
