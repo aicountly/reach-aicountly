@@ -1,7 +1,7 @@
 # Phase 8 — Exit Audit
 
-**Date:** 2026-07-15  
-**Auditor:** Implementation agent  
+**Date:** 2026-07-15
+**Auditor:** Implementation agent
 **Scope:** Security, Privacy, AI Governance
 
 ---

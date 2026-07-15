@@ -1,8 +1,8 @@
 # Phase 8 — Implementation Report
 
-**Phase:** 8 — Search Intelligence, Attribution and AI Visibility  
-**Started:** 2026-07-15  
-**Completed:** 2026-07-15  
+**Phase:** 8 — Search Intelligence, Attribution and AI Visibility
+**Started:** 2026-07-15
+**Completed:** 2026-07-15
 **Status:** COMPLETE
 
 ---
@@ -133,5 +133,5 @@ All under `/intelligence` (nested in `IntelligenceLayout`):
 
 ## Phase 9 Handoff
 
-Phase 9 entry point: `IntelligenceEvidenceService::getEvidencePacket()`  
+Phase 9 entry point: `IntelligenceEvidenceService::getEvidencePacket()`
 Documentation: `docs/architecture/REACH_PHASE_9_EVIDENCE_FOUNDATIONS.md`

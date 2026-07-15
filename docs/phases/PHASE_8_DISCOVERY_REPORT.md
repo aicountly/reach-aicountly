@@ -1,6 +1,6 @@
 # Phase 8 Discovery Report
 
-**Date:** 2026-07-15  
+**Date:** 2026-07-15
 **Baseline:** `reach-phase-7-complete` → `ea09688c527cb6f7f2df78753c5198abd8ed10e8`
 
 ---

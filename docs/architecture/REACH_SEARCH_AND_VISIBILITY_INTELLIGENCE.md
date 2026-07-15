@@ -1,6 +1,6 @@
 # Reach Search and Visibility Intelligence Architecture
 
-**Phase:** 8  
+**Phase:** 8
 **Capabilities:** 29 (Sitemap/IndexNow), 30 (Search Analytics), 31 (Content Analytics), 32 (Attribution), 33 (AI Visibility), 34 (Competitor Visibility)
 
 ---

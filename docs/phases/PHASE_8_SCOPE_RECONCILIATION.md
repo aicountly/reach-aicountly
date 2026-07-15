@@ -1,8 +1,8 @@
 # Phase 8 Scope Reconciliation
 
-**Phase:** 8  
-**Title:** Search Intelligence, Attribution and AI Visibility  
-**Date:** 2026-07-15  
+**Phase:** 8
+**Title:** Search Intelligence, Attribution and AI Visibility
+**Date:** 2026-07-15
 **Baseline tag:** `reach-phase-7-complete` → `ea09688c527cb6f7f2df78753c5198abd8ed10e8`
 
 ---

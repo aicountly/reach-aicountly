@@ -1,7 +1,7 @@
 # Phase 8 Data Model
 
-**Phase:** 8  
-**Baseline:** Migration 100143 (Phase 7 end)  
+**Phase:** 8
+**Baseline:** Migration 100143 (Phase 7 end)
 **Phase 8 migrations:** 100144–100171
 
 ---
@@ -13,7 +13,7 @@ Central pivot for all intelligence. One row per tenant/content_type/source_id co
 
 Key columns: `uuid`, `tenant_id`, `content_type` (blog|kb|community_question|community_answer|video|campaign_variant|page), `source_id` (FK to type-specific table), `canonical_url`, `publication_status`, `first_published_at`, `last_published_at`, `analytics_eligible`, `privacy_class`
 
-Unique constraint: `(tenant_id, content_type, source_id)`  
+Unique constraint: `(tenant_id, content_type, source_id)`
 URL conflict: `canonical_url` unique per tenant with conflict detection
 
 ### `reach_content_publication_mappings` (100145)

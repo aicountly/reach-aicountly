@@ -1,6 +1,6 @@
 # Phase 8 Connector Contracts
 
-**Phase:** 8  
+**Phase:** 8
 **Location:** `server-php/app/Libraries/Intelligence/Connectors/`
 
 ---

@@ -1,9 +1,9 @@
 # Phase 8 Implementation Plan
 
-**Phase:** 8  
-**Title:** Search Intelligence, Attribution and AI Visibility  
-**Roadmap capabilities:** 29, 30, 31, 32, 33, 34  
-**Branch:** main (direct)  
+**Phase:** 8
+**Title:** Search Intelligence, Attribution and AI Visibility
+**Roadmap capabilities:** 29, 30, 31, 32, 33, 34
+**Branch:** main (direct)
 **Baseline:** `reach-phase-7-complete` → `ea09688c527cb6f7f2df78753c5198abd8ed10e8`
 
 ---

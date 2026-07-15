@@ -1,7 +1,7 @@
 # Phase 9 Evidence Foundations
 
-**Prepared by:** Phase 8  
-**Phase 9 capability:** Content Refresh Intelligence and Automation  
+**Prepared by:** Phase 8
+**Phase 9 capability:** Content Refresh Intelligence and Automation
 **Status:** Evidence contracts **implemented** in `IntelligenceEvidenceService`. Phase 9 implementation not started.
 
 ## Canonical Entry Point
