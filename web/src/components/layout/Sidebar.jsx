@@ -10,6 +10,7 @@ import {
   MessagesSquare, BadgeCheck, ShieldQuestion, LineChart,
   MessageSquare, Smartphone,
   Search, MapPin, Eye, Users2, Plug,
+  RefreshCw, Target, Lock, Database, Server, CheckSquare,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -146,6 +147,23 @@ const NAV = [
       { label: 'Competitors',   path: '/intelligence/competitors',        icon: Users2,     requires: 'competitor.read' },
       { label: 'Connectors',    path: '/intelligence/connectors',         icon: Plug,       requires: 'connector.read' },
       { label: 'Operations',    path: '/intelligence/operations',         icon: Activity,   requires: 'intelligence.operations' },
+    ],
+  },
+  {
+    title: 'Product Readiness',
+    items: [
+      { label: 'Overview',           path: '/readiness',                    icon: LayoutDashboard, end: true, requires: 'readiness.read' },
+      { label: 'Recommendations',    path: '/readiness/refresh',            icon: RefreshCw,      requires: 'refresh.read' },
+      { label: 'Outcomes',           path: '/readiness/outcomes',           icon: Target,         requires: 'refresh_outcome.read' },
+      { label: 'Attribution',        path: '/readiness/attribution',        icon: BarChart3,      requires: 'attribution_model.read' },
+      { label: 'Security',           path: '/readiness/security',           icon: ShieldCheck,    requires: 'readiness.read' },
+      { label: 'Privacy',            path: '/readiness/privacy',            icon: Lock,           requires: 'readiness.read' },
+      { label: 'AI Governance',      path: '/readiness/ai-governance',      icon: Bot,            requires: 'readiness.read' },
+      { label: 'Migrations',         path: '/readiness/migrations',         icon: Database,       requires: 'readiness.read' },
+      { label: 'Operations',         path: '/readiness/operations',         icon: Activity,       requires: 'readiness.read' },
+      { label: 'Disaster Recovery',  path: '/readiness/disaster-recovery',  icon: Server,         requires: 'disaster_recovery.read' },
+      { label: 'Technical Debt',     path: '/readiness/technical-debt',     icon: Wrench,         requires: 'technical_debt.read' },
+      { label: 'Release Acceptance', path: '/readiness/release',            icon: CheckSquare,    requires: 'readiness.accept' },
     ],
   },
   {

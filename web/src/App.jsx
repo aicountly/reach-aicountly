@@ -150,6 +150,22 @@ import CompetitorListPage               from './pages/intelligence/CompetitorLis
 import ConnectorConfigPage              from './pages/intelligence/ConnectorConfigPage.jsx';
 import IntelligenceOperationsPage       from './pages/intelligence/IntelligenceOperationsPage.jsx';
 
+// Phase 9: Readiness
+import ReadinessLayout                  from './pages/readiness/ReadinessLayout.jsx';
+import ReadinessOverviewPage            from './pages/readiness/ReadinessOverviewPage.jsx';
+import RecommendationBacklogPage        from './pages/readiness/RecommendationBacklogPage.jsx';
+import RefreshWorkspacePage             from './pages/readiness/RefreshWorkspacePage.jsx';
+import RefreshOutcomePage               from './pages/readiness/RefreshOutcomePage.jsx';
+import AttributionMaturityPage          from './pages/readiness/AttributionMaturityPage.jsx';
+import SecurityStatusPage               from './pages/readiness/SecurityStatusPage.jsx';
+import PrivacyStatusPage                from './pages/readiness/PrivacyStatusPage.jsx';
+import AiGovernancePage                 from './pages/readiness/AiGovernancePage.jsx';
+import MigrationStatusPage              from './pages/readiness/MigrationStatusPage.jsx';
+import OperationsDashboardPage          from './pages/readiness/OperationsDashboardPage.jsx';
+import DisasterRecoveryPage             from './pages/readiness/DisasterRecoveryPage.jsx';
+import TechnicalDebtPage                from './pages/readiness/TechnicalDebtPage.jsx';
+import ReleaseAcceptancePage            from './pages/readiness/ReleaseAcceptancePage.jsx';
+
 import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
 import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
 import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
@@ -342,6 +358,23 @@ export default function App() {
           <Route path="competitors" element={<CompetitorListPage />} />
           <Route path="connectors" element={<ConnectorConfigPage />} />
           <Route path="operations" element={<IntelligenceOperationsPage />} />
+        </Route>
+
+        {/* Phase 9 — Product Readiness Centre */}
+        <Route path="/readiness" element={<ReadinessLayout />}>
+          <Route index element={<ReadinessOverviewPage />} />
+          <Route path="refresh" element={<RecommendationBacklogPage />} />
+          <Route path="refresh/:id" element={<RefreshWorkspacePage />} />
+          <Route path="outcomes" element={<RefreshOutcomePage />} />
+          <Route path="attribution" element={<AttributionMaturityPage />} />
+          <Route path="security" element={<SecurityStatusPage />} />
+          <Route path="privacy" element={<PrivacyStatusPage />} />
+          <Route path="ai-governance" element={<AiGovernancePage />} />
+          <Route path="migrations" element={<MigrationStatusPage />} />
+          <Route path="operations" element={<OperationsDashboardPage />} />
+          <Route path="disaster-recovery" element={<DisasterRecoveryPage />} />
+          <Route path="technical-debt" element={<TechnicalDebtPage />} />
+          <Route path="release" element={<ReleaseAcceptancePage />} />
         </Route>
 
         {/* Phase 6 — Video Content Automation */}
