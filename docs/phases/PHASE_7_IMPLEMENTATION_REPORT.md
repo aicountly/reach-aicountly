@@ -1,9 +1,9 @@
 # Phase 7 — Omnichannel Campaign Distribution: Implementation Report
 
-**Phase:** 7  
-**Title:** Omnichannel Campaign Distribution  
-**Branch:** main  
-**Baseline tag:** reach-phase-6-complete (commit `84704586488b2c343ab5630b8aaf4496aa25e6a8`)  
+**Phase:** 7
+**Title:** Omnichannel Campaign Distribution
+**Branch:** main
+**Baseline tag:** reach-phase-6-complete (commit `84704586488b2c343ab5630b8aaf4496aa25e6a8`)
 **Phase 7 complete tag:** (to be applied after human review)
 
 ---

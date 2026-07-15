@@ -8,11 +8,11 @@
 
 ### `reach_campaigns` (ALTER — migration 100123)
 
-New columns: `uuid UUID UNIQUE`, `tenant_id BIGINT`, `lock_version INT DEFAULT 0`  
+New columns: `uuid UUID UNIQUE`, `tenant_id BIGINT`, `lock_version INT DEFAULT 0`
 Extended status CHECK to include: `preparing`, `ready_for_review`, `in_review`, `dispatching`, `partially_completed`, `completed`, `paused`, `dead_lettered`, `expired`
 
-**Tenant key:** `tenant_id`  
-**Concurrency:** `lock_version` (optimistic)  
+**Tenant key:** `tenant_id`
+**Concurrency:** `lock_version` (optimistic)
 **Phase 8:** canonical campaign ID via `uuid`
 
 ---
@@ -57,7 +57,7 @@ New columns: `uuid UUID UNIQUE`, `tenant_id BIGINT`, `connection_id BIGINT`, `te
 | created_by | BIGINT FK reach_actors | |
 | created_at | TIMESTAMPTZ NOT NULL DEFAULT NOW() | **No updated_at — immutable** |
 
-**Immutable:** once created, rows are never updated  
+**Immutable:** once created, rows are never updated
 **Unique constraint:** `(campaign_id, version_number)`
 
 ---

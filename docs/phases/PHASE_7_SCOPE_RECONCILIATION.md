@@ -1,9 +1,9 @@
 # Phase 7 — Scope Reconciliation
 
-**Phase title (roadmap):** Campaign and Distribution Automation  
-**Phase title (working):** Omnichannel Campaign Distribution  
-**Repository:** reach-aicountly  
-**Date:** 2026-07-15  
+**Phase title (roadmap):** Campaign and Distribution Automation
+**Phase title (working):** Omnichannel Campaign Distribution
+**Repository:** reach-aicountly
+**Date:** 2026-07-15
 **Baseline tag:** `reach-phase-6-complete` → `84704586488b2c343ab5630b8aaf4496aa25e6a8`
 
 > The roadmap title "Campaign and Distribution Automation" is the authoritative title. The working title "Omnichannel Campaign Distribution" is an accurate description of scope and is used in documentation and commit messages.

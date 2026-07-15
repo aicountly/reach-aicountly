@@ -1,6 +1,6 @@
 # Phase 8 Data Foundations — Evidence Contracts
 
-**Scope:** Phase 7 data that Phase 8 (Search Intelligence & Attribution) can consume.  
+**Scope:** Phase 7 data that Phase 8 (Search Intelligence & Attribution) can consume.
 **Status:** Phase 7 complete, Phase 8 not started.
 
 ---
