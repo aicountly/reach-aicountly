@@ -30,7 +30,7 @@ class CreateReachChannelConsents extends Migration
         ]);
         $this->forge->addPrimaryKey('id');
         $this->forge->addUniqueKey('uuid');
-        $this->forge->addKey(['tenant_id', 'subject_type', 'subject_id', 'channel', 'purpose'], 'idx_consents_lookup');
+        $this->forge->addKey(['tenant_id', 'subject_type', 'subject_id', 'channel', 'purpose'], false, false, 'idx_consents_lookup');
         $this->forge->createTable('reach_channel_consents', true);
 
         $this->db->query(
