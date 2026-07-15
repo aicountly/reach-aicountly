@@ -99,4 +99,29 @@ class BlogRefreshService
             ->where('due_at <=', date('Y-m-d H:i:s'))
             ->get()->getResultArray();
     }
+
+    /**
+     * Phase 9: wire a Phase 9 refresh workflow publication to the blog refresh pipeline.
+     * Records the refresh review and links it to the workflow publication idempotency key.
+     */
+    public function publishFromWorkflow(
+        int    $contentItemId,
+        int    $workflowId,
+        string $idempotencyKey,
+        ?int   $actorId = null,
+    ): int {
+        $reviewId = $this->requestRefresh(
+            $contentItemId,
+            'manual_request',
+            "Phase 9 refresh workflow {$workflowId}",
+            $actorId,
+        );
+        AuditLogger::record('refresh.published', [
+            'content_item_id' => $contentItemId,
+            'workflow_id'     => $workflowId,
+            'idempotency_key' => $idempotencyKey,
+            'review_id'       => $reviewId,
+        ], $actorId);
+        return $reviewId;
+    }
 }
