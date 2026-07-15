@@ -9,7 +9,7 @@ const COMPETITORS = [
 ];
 
 export default function CompetitorListPage() {
-  const [showForm, setShowForm] = useState(false);
+  const [_showForm, setShowForm] = useState(false);
 
   return (
     <div className="p-6 space-y-6">

@@ -9,7 +9,7 @@ const SAMPLE_TEMPLATES = [
 ];
 
 export default function UtmTemplatesPage() {
-  const [showForm, setShowForm] = useState(false);
+  const [_showForm, setShowForm] = useState(false);
 
   return (
     <div className="p-6 space-y-6">

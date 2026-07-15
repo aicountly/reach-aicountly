@@ -9,7 +9,7 @@ const SAMPLE_PROMPTS = [
 ];
 
 export default function VisibilityPromptLibraryPage() {
-  const [showForm, setShowForm] = useState(false);
+  const [_showForm, setShowForm] = useState(false);
 
   const statusColors = { active: 'bg-green-100 text-green-700', draft: 'bg-gray-100 text-gray-600', paused: 'bg-yellow-100 text-yellow-700' };
 
