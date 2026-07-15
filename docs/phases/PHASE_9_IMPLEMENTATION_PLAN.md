@@ -10,7 +10,7 @@
 | CP | Title | Key Deliverables | Commit |
 |----|-------|-----------------|--------|
 | CP0 | Baseline, discovery, scope freeze | 7 architecture docs, scope reconciliation, baseline tests | `docs(reach): define Phase 9 refresh and readiness architecture` |
-| CP1 | Refresh and readiness schema | 22 migrations (100172–100193), models, enums | `feat(refresh): add Phase 9 refresh and readiness schema` |
+| CP1 | Refresh and readiness schema | 23 migrations (100172–100194), models, enums | `feat(refresh): add Phase 9 refresh and readiness schema` |
 | CP2 | Permissions, audits, workflow contracts | `Permissions.php`, `AuditLogger.php`, `RefreshWorkflowTransitions.php` | `feat(refresh): add workflow permissions and audit governance` |
 | CP3 | Evidence normalisation + policy engine | `RefreshPolicyService`, `RefreshEvidenceService`, policy frontend | `feat(refresh): implement evidence normalisation and refresh policies` |
 | CP4 | Recommendation + prioritisation engine | `RefreshRecommendationService`, extend `ContentRefreshDetectionJob` | `feat(refresh): add explainable refresh recommendations` |

@@ -84,7 +84,7 @@
 ## Migration Sequence Overview
 
 Current latest migration: `100171_AddIntelligencePermissions`
-Phase 9 range: `100172–100193` (22 migrations)
+Phase 9 range: `100172–100194` (23 migrations: 21 schema/table migrations, permissions, and performance indexes)
 
 ---
 
