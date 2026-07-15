@@ -382,6 +382,54 @@ final class Permissions
     public const SMS_SEND     = 'sms.send';
     public const SMS_DISPATCH = 'sms.dispatch';
 
+    // Phase 8: Intelligence
+    public const INTELLIGENCE_READ       = 'intelligence.read';
+    public const INTELLIGENCE_MANAGE     = 'intelligence.manage';
+    public const INTELLIGENCE_OPERATIONS = 'intelligence.operations';
+    public const INTELLIGENCE_AUDIT      = 'intelligence.audit';
+
+    // Phase 8: Search (GSC)
+    public const SEARCH_READ       = 'search.read';
+    public const SEARCH_CONNECT    = 'search.connect';
+    public const SEARCH_INGEST     = 'search.ingest';
+    public const SEARCH_BACKFILL   = 'search.backfill';
+    public const SEARCH_RECONCILE  = 'search.reconcile';
+
+    // Phase 8: Sitemap / IndexNow
+    public const SITEMAP_READ      = 'sitemap.read';
+    public const SITEMAP_MANAGE    = 'sitemap.manage';
+    public const SITEMAP_SUBMIT    = 'sitemap.submit';
+    public const SITEMAP_RECONCILE = 'sitemap.reconcile';
+
+    // Phase 8: Content Analytics (GA4)
+    public const ANALYTICS_READ      = 'analytics.read';
+    public const ANALYTICS_CONNECT   = 'analytics.connect';
+    public const ANALYTICS_INGEST    = 'analytics.ingest';
+    public const ANALYTICS_BACKFILL  = 'analytics.backfill';
+    public const ANALYTICS_RECONCILE = 'analytics.reconcile';
+
+    // Phase 8: Attribution
+    public const ATTRIBUTION_READ      = 'attribution.read';
+    public const ATTRIBUTION_MANAGE    = 'attribution.manage';
+    public const ATTRIBUTION_RECONCILE = 'attribution.reconcile';
+    public const ATTRIBUTION_CORRECT   = 'attribution.correct';
+
+    // Phase 8: AI Visibility
+    public const VISIBILITY_READ     = 'visibility.read';
+    public const VISIBILITY_MANAGE   = 'visibility.manage';
+    public const VISIBILITY_EXECUTE  = 'visibility.execute';
+    public const VISIBILITY_SCHEDULE = 'visibility.schedule';
+    public const VISIBILITY_REVIEW   = 'visibility.review';
+
+    // Phase 8: Competitor
+    public const COMPETITOR_READ   = 'competitor.read';
+    public const COMPETITOR_MANAGE = 'competitor.manage';
+
+    // Phase 8: Connector
+    public const CONNECTOR_READ   = 'connector.read';
+    public const CONNECTOR_MANAGE = 'connector.manage';
+    public const CONNECTOR_RETRY  = 'connector.retry';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -416,7 +464,11 @@ final class Permissions
             'settings'    => [self::SETTINGS_VIEW, self::SETTINGS_MANAGE],
             'integration' => [self::INTEGRATION_VIEW, self::INTEGRATION_MANAGE],
             'audit'          => [self::AUDIT_VIEW],
-            'analytics'      => [self::ANALYTICS_VIEW],
+            'analytics'      => [
+                self::ANALYTICS_VIEW,
+                self::ANALYTICS_READ, self::ANALYTICS_CONNECT, self::ANALYTICS_INGEST,
+                self::ANALYTICS_BACKFILL, self::ANALYTICS_RECONCILE,
+            ],
             // Phase 1 knowledge groups
             'knowledge'      => [
                 self::KNOWLEDGE_VIEW, self::KNOWLEDGE_CREATE, self::KNOWLEDGE_EDIT,
@@ -516,6 +568,28 @@ final class Permissions
             'sms' => [
                 self::SMS_READ, self::SMS_CREATE, self::SMS_UPDATE, self::SMS_SEND, self::SMS_DISPATCH,
             ],
+            // Phase 8: Intelligence
+            'intelligence' => [
+                self::INTELLIGENCE_READ, self::INTELLIGENCE_MANAGE,
+                self::INTELLIGENCE_OPERATIONS, self::INTELLIGENCE_AUDIT,
+            ],
+            'search' => [
+                self::SEARCH_READ, self::SEARCH_CONNECT, self::SEARCH_INGEST,
+                self::SEARCH_BACKFILL, self::SEARCH_RECONCILE,
+            ],
+            'sitemap' => [
+                self::SITEMAP_READ, self::SITEMAP_MANAGE, self::SITEMAP_SUBMIT, self::SITEMAP_RECONCILE,
+            ],
+            'attribution' => [
+                self::ATTRIBUTION_READ, self::ATTRIBUTION_MANAGE,
+                self::ATTRIBUTION_RECONCILE, self::ATTRIBUTION_CORRECT,
+            ],
+            'visibility' => [
+                self::VISIBILITY_READ, self::VISIBILITY_MANAGE, self::VISIBILITY_EXECUTE,
+                self::VISIBILITY_SCHEDULE, self::VISIBILITY_REVIEW,
+            ],
+            'competitor' => [self::COMPETITOR_READ, self::COMPETITOR_MANAGE],
+            'connector'  => [self::CONNECTOR_READ, self::CONNECTOR_MANAGE, self::CONNECTOR_RETRY],
         ];
     }
 

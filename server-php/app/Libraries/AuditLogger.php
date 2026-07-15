@@ -334,6 +334,74 @@ class AuditLogger
     public const DISTRIBUTION_SMS_CAMPAIGN_CREATED           = 'distribution.sms_campaign.created';
     public const DISTRIBUTION_SMS_CAMPAIGN_UPDATED           = 'distribution.sms_campaign.updated';
 
+    // Phase 8 — Intelligence: Content Identity
+    public const CONTENT_IDENTITY_REGISTERED  = 'content.identity.registered';
+    public const CONTENT_IDENTITY_UPDATED     = 'content.identity.updated';
+    public const CONTENT_IDENTITY_WITHDRAWN   = 'content.identity.withdrawn';
+    public const CONTENT_MAPPING_CONFLICT     = 'content.identity.mapping_conflict';
+
+    // Phase 8 — Intelligence: Sitemap
+    public const SITEMAP_SNAPSHOT_GENERATED   = 'sitemap.snapshot.generated';
+    public const SITEMAP_SNAPSHOT_VALIDATED   = 'sitemap.snapshot.validated';
+    public const SITEMAP_SNAPSHOT_FAILED      = 'sitemap.snapshot.failed';
+
+    // Phase 8 — Intelligence: IndexNow
+    public const INDEXNOW_SUBMITTED           = 'indexnow.submission.submitted';
+    public const INDEXNOW_FAILED              = 'indexnow.submission.failed';
+    public const INDEXNOW_RETRIED             = 'indexnow.submission.retried';
+    public const INDEXNOW_CANCELLED           = 'indexnow.submission.cancelled';
+
+    // Phase 8 — Intelligence: Search Console
+    public const SEARCH_CONNECTION_CREATED    = 'search.connection.created';
+    public const SEARCH_CONNECTION_REVOKED    = 'search.connection.revoked';
+    public const SEARCH_INGESTION_STARTED     = 'search.ingestion.started';
+    public const SEARCH_INGESTION_COMPLETED   = 'search.ingestion.completed';
+    public const SEARCH_INGESTION_FAILED      = 'search.ingestion.failed';
+    public const SEARCH_BACKFILL_STARTED      = 'search.backfill.started';
+    public const SEARCH_UNMAPPED_URL_FOUND    = 'search.mapping.unmapped_url_found';
+    public const SEARCH_MAPPING_RESOLVED      = 'search.mapping.resolved';
+
+    // Phase 8 — Intelligence: Content Analytics
+    public const ANALYTICS_CONNECTION_CREATED = 'analytics.connection.created';
+    public const ANALYTICS_CONNECTION_REVOKED  = 'analytics.connection.revoked';
+    public const ANALYTICS_INGESTION_STARTED   = 'analytics.ingestion.started';
+    public const ANALYTICS_INGESTION_COMPLETED = 'analytics.ingestion.completed';
+    public const ANALYTICS_INGESTION_FAILED    = 'analytics.ingestion.failed';
+
+    // Phase 8 — Intelligence: Attribution
+    public const ATTRIBUTION_TOUCHPOINT_RECORDED    = 'attribution.touchpoint.recorded';
+    public const ATTRIBUTION_CONVERSION_LINKED      = 'attribution.conversion.linked';
+    public const ATTRIBUTION_CALCULATION_RUN        = 'attribution.calculation.run';
+    public const ATTRIBUTION_CORRECTION_APPLIED     = 'attribution.correction.applied';
+    public const ATTRIBUTION_RECONCILIATION_RUN     = 'attribution.reconciliation.run';
+
+    // Phase 8 — Intelligence: AI Visibility
+    public const VISIBILITY_PROMPT_CREATED          = 'visibility.prompt.created';
+    public const VISIBILITY_PROMPT_VERSION_APPROVED = 'visibility.prompt.version_approved';
+    public const VISIBILITY_PROMPT_VERSION_ACTIVE   = 'visibility.prompt.version_activated';
+    public const VISIBILITY_RUN_QUEUED              = 'visibility.run.queued';
+    public const VISIBILITY_RUN_COMPLETED           = 'visibility.run.completed';
+    public const VISIBILITY_RUN_FAILED              = 'visibility.run.failed';
+    public const VISIBILITY_RESPONSE_STORED         = 'visibility.response.stored';
+    public const VISIBILITY_RESPONSE_PARSED         = 'visibility.response.parsed';
+    public const VISIBILITY_BUDGET_REFUSED          = 'visibility.run.budget_refused';
+
+    // Phase 8 — Intelligence: Competitor
+    public const COMPETITOR_CREATED                 = 'competitor.created';
+    public const COMPETITOR_UPDATED                 = 'competitor.updated';
+    public const COMPETITOR_ARCHIVED                = 'competitor.archived';
+    public const COMPETITOR_ALIAS_ADDED             = 'competitor.alias.added';
+    public const COMPETITOR_ALIAS_CONFLICT          = 'competitor.alias.conflict';
+    public const COMPETITOR_OBSERVATION_AGGREGATED  = 'competitor.observation.aggregated';
+
+    // Phase 8 — Intelligence: Connector Health
+    public const CONNECTOR_HEALTH_CHECK_PASSED  = 'connector.health.passed';
+    public const CONNECTOR_HEALTH_CHECK_FAILED  = 'connector.health.failed';
+    public const CONNECTOR_AUTH_FAILURE         = 'connector.auth.failure';
+    public const CONNECTOR_RATE_LIMITED         = 'connector.rate_limited';
+    public const CONNECTOR_QUOTA_EXCEEDED       = 'connector.quota_exceeded';
+    public const CONNECTOR_STALE_ALERT          = 'connector.freshness.stale_alert';
+
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.
      * @param string  $action       Dotted event slug (see docs/architecture/REACH_SECURITY_CONTROLS.md).
