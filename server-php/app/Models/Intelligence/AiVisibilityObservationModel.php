@@ -33,4 +33,16 @@ class AiVisibilityObservationModel extends Model
                     ->where('o.coverage_state', $coverageState)
                     ->findAll();
     }
+
+    public function getForPromptInPeriod(int $promptId, int $tenantId): array
+    {
+        return $this->db->query(
+            "SELECT o.*
+             FROM reach_ai_visibility_observations o
+             JOIN reach_ai_visibility_runs r ON r.id = o.run_id
+             JOIN reach_ai_visibility_prompt_versions pv ON pv.id = r.prompt_version_id
+             WHERE pv.prompt_id = ? AND r.tenant_id = ?",
+            [$promptId, $tenantId]
+        )->getResultArray();
+    }
 }

@@ -9,6 +9,7 @@ import {
   Globe, Send, Link2, CheckCircle2, Radio,
   MessagesSquare, BadgeCheck, ShieldQuestion, LineChart,
   MessageSquare, Smartphone,
+  Search, MapPin, Eye, Users2, Plug,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -130,6 +131,21 @@ const NAV = [
       { label: 'Budgets',        path: ROUTES.AI_BUDGETS,     icon: CircleDollarSign, requires: 'ai_provider.manage' },
       { label: 'Validations',    path: ROUTES.AI_VALIDATIONS, icon: ShieldAlert,  requires: 'ai.generate' },
       { label: 'Health',         path: ROUTES.AI_HEALTH,      icon: HeartPulse,   requires: 'ai_provider.manage' },
+    ],
+  },
+  {
+    title: 'Intelligence',
+    items: [
+      { label: 'Overview',      path: '/intelligence',                    icon: Search,     end: true, requires: 'intelligence.read' },
+      { label: 'Search',        path: '/intelligence/search',             icon: Search,     requires: 'search.read' },
+      { label: 'Content',       path: '/intelligence/content',            icon: BarChart3,  requires: 'analytics.read' },
+      { label: 'Sitemaps',      path: '/intelligence/sitemaps',           icon: MapPin,     requires: 'sitemap.read' },
+      { label: 'IndexNow',      path: '/intelligence/indexnow',           icon: Zap,        requires: 'sitemap.submit' },
+      { label: 'Attribution',   path: '/intelligence/attribution',        icon: Link2,      requires: 'attribution.read' },
+      { label: 'AI Visibility', path: '/intelligence/visibility',         icon: Eye,        requires: 'visibility.read' },
+      { label: 'Competitors',   path: '/intelligence/competitors',        icon: Users2,     requires: 'competitor.read' },
+      { label: 'Connectors',    path: '/intelligence/connectors',         icon: Plug,       requires: 'connector.read' },
+      { label: 'Operations',    path: '/intelligence/operations',         icon: Activity,   requires: 'intelligence.operations' },
     ],
   },
   {

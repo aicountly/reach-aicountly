@@ -130,6 +130,26 @@ import CampaignWorkspacePage            from './pages/distribution/CampaignWorks
 import DispatchOrchestrationPage        from './pages/distribution/DispatchOrchestrationPage.jsx';
 import DistributionAnalyticsPage        from './pages/distribution/DistributionAnalyticsPage.jsx';
 
+import IntelligenceLayout                from './pages/intelligence/IntelligenceLayout.jsx';
+import IntelligenceOverviewPage          from './pages/intelligence/IntelligenceOverviewPage.jsx';
+import SearchIntelligencePage           from './pages/intelligence/SearchIntelligencePage.jsx';
+import SearchQueryPerformancePage       from './pages/intelligence/SearchQueryPerformancePage.jsx';
+import SearchPagePerformancePage        from './pages/intelligence/SearchPagePerformancePage.jsx';
+import ContentPerformancePage           from './pages/intelligence/ContentPerformancePage.jsx';
+import ContentDetailAnalyticsPage       from './pages/intelligence/ContentDetailAnalyticsPage.jsx';
+import SitemapOverviewPage              from './pages/intelligence/SitemapOverviewPage.jsx';
+import IndexNowOperationsPage           from './pages/intelligence/IndexNowOperationsPage.jsx';
+import AttributionOverviewPage          from './pages/intelligence/AttributionOverviewPage.jsx';
+import UtmTemplatesPage                 from './pages/intelligence/UtmTemplatesPage.jsx';
+import UnattributedLeadsPage            from './pages/intelligence/UnattributedLeadsPage.jsx';
+import VisibilityOverviewPage           from './pages/intelligence/VisibilityOverviewPage.jsx';
+import VisibilityPromptLibraryPage      from './pages/intelligence/VisibilityPromptLibraryPage.jsx';
+import VisibilityRunHistoryPage         from './pages/intelligence/VisibilityRunHistoryPage.jsx';
+import VisibilityObservationsPage       from './pages/intelligence/VisibilityObservationsPage.jsx';
+import CompetitorListPage               from './pages/intelligence/CompetitorListPage.jsx';
+import ConnectorConfigPage              from './pages/intelligence/ConnectorConfigPage.jsx';
+import IntelligenceOperationsPage       from './pages/intelligence/IntelligenceOperationsPage.jsx';
+
 import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
 import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
 import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
@@ -300,6 +320,28 @@ export default function App() {
           <Route path="sms/dispatch" element={<SmsDispatchPage />} />
           <Route path="orchestration" element={<DispatchOrchestrationPage />} />
           <Route path="analytics" element={<DistributionAnalyticsPage />} />
+        </Route>
+
+        {/* Phase 8 — Intelligence Control Centre */}
+        <Route path="/intelligence" element={<IntelligenceLayout />}>
+          <Route index element={<IntelligenceOverviewPage />} />
+          <Route path="search" element={<SearchIntelligencePage />} />
+          <Route path="search/queries" element={<SearchQueryPerformancePage />} />
+          <Route path="search/pages" element={<SearchPagePerformancePage />} />
+          <Route path="content" element={<ContentPerformancePage />} />
+          <Route path="content/:id" element={<ContentDetailAnalyticsPage />} />
+          <Route path="sitemaps" element={<SitemapOverviewPage />} />
+          <Route path="indexnow" element={<IndexNowOperationsPage />} />
+          <Route path="attribution" element={<AttributionOverviewPage />} />
+          <Route path="attribution/utm" element={<UtmTemplatesPage />} />
+          <Route path="attribution/unattributed" element={<UnattributedLeadsPage />} />
+          <Route path="visibility" element={<VisibilityOverviewPage />} />
+          <Route path="visibility/prompts" element={<VisibilityPromptLibraryPage />} />
+          <Route path="visibility/runs" element={<VisibilityRunHistoryPage />} />
+          <Route path="visibility/observations" element={<VisibilityObservationsPage />} />
+          <Route path="competitors" element={<CompetitorListPage />} />
+          <Route path="connectors" element={<ConnectorConfigPage />} />
+          <Route path="operations" element={<IntelligenceOperationsPage />} />
         </Route>
 
         {/* Phase 6 — Video Content Automation */}
