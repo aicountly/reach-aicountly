@@ -40,6 +40,12 @@ class AuditLogger
         'community.',
         // Phase 6 video events
         'video.',
+        // Phase 9 refresh and readiness events
+        'refresh.',
+        'readiness.',
+        'attribution_model.',
+        'attribution.journey.',
+        'attribution.allocation.',
     ];
 
     /**
@@ -401,6 +407,50 @@ class AuditLogger
     public const CONNECTOR_RATE_LIMITED         = 'connector.rate_limited';
     public const CONNECTOR_QUOTA_EXCEEDED       = 'connector.quota_exceeded';
     public const CONNECTOR_STALE_ALERT          = 'connector.freshness.stale_alert';
+
+    // =========================================================================
+    // Phase 9 — Content Refresh audit events
+    // =========================================================================
+    public const REFRESH_POLICY_CREATED          = 'refresh.policy.created';
+    public const REFRESH_POLICY_VERSION_CREATED  = 'refresh.policy.version_created';
+    public const REFRESH_POLICY_VERSION_APPROVED = 'refresh.policy.version_approved';
+    public const REFRESH_EVIDENCE_SNAPSHOT       = 'refresh.evidence.snapshot_stored';
+    public const REFRESH_RECOMMENDED             = 'refresh.recommendation.generated';
+    public const REFRESH_TRIAGED                 = 'refresh.recommendation.triaged';
+    public const REFRESH_ACCEPTED                = 'refresh.recommendation.accepted';
+    public const REFRESH_REJECTED                = 'refresh.recommendation.rejected';
+    public const REFRESH_DEFERRED                = 'refresh.recommendation.deferred';
+    public const REFRESH_SUPERSEDED              = 'refresh.recommendation.superseded';
+    public const REFRESH_BRIEF_CREATED           = 'refresh.brief.created';
+    public const REFRESH_DRAFT_GENERATED         = 'refresh.draft.generated';
+    public const REFRESH_DRAFT_REVIEWED          = 'refresh.draft.reviewed';
+    public const REFRESH_DRAFT_APPROVED          = 'refresh.draft.approved';
+    public const REFRESH_DRAFT_REJECTED          = 'refresh.draft.rejected';
+    public const REFRESH_PUBLISHED               = 'refresh.published';
+    public const REFRESH_PUBLICATION_FAILED      = 'refresh.publication.failed';
+    public const REFRESH_CANCELLED               = 'refresh.cancelled';
+    public const REFRESH_WITHDRAWN               = 'refresh.withdrawn';
+    public const REFRESH_OUTCOME_WINDOW_OPENED   = 'refresh.outcome.window_opened';
+    public const REFRESH_OUTCOME_MEASURED        = 'refresh.outcome.measured';
+    public const REFRESH_OUTCOME_INSUFFICIENT    = 'refresh.outcome.insufficient_data';
+
+    // Phase 9 — Attribution maturity
+    public const ATTRIBUTION_MODEL_CREATED      = 'attribution_model.created';
+    public const ATTRIBUTION_MODEL_APPROVED     = 'attribution_model.approved';
+    public const ATTRIBUTION_JOURNEY_CALCULATED = 'attribution.journey.calculated';
+    public const ATTRIBUTION_ALLOCATION_STORED  = 'attribution.allocation.stored';
+    public const ATTRIBUTION_CORRECTION_MANUAL  = 'attribution.correction.manual';
+
+    // Phase 9 — Readiness
+    public const READINESS_AUDIT_STARTED     = 'readiness.audit.started';
+    public const READINESS_AUDIT_COMPLETED   = 'readiness.audit.completed';
+    public const READINESS_FINDING_CREATED   = 'readiness.finding.created';
+    public const READINESS_FINDING_RESOLVED  = 'readiness.finding.resolved';
+    public const READINESS_FINDING_ACCEPTED  = 'readiness.finding.risk_accepted';
+    public const READINESS_RELEASE_ACCEPTED  = 'readiness.release.accepted';
+    public const READINESS_DR_TEST_RECORDED  = 'readiness.dr.test_recorded';
+    public const READINESS_DEBT_RECORDED     = 'readiness.debt.recorded';
+    public const READINESS_DEBT_ACCEPTED     = 'readiness.debt.risk_accepted';
 
     /**
      * @param ?int    $userId       Reach user id, or null for system/anonymous.

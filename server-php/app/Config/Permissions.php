@@ -430,6 +430,43 @@ final class Permissions
     public const CONNECTOR_MANAGE = 'connector.manage';
     public const CONNECTOR_RETRY  = 'connector.retry';
 
+    // Phase 9: Refresh
+    public const REFRESH_READ     = 'refresh.read';
+    public const REFRESH_TRIAGE   = 'refresh.triage';
+    public const REFRESH_ACCEPT   = 'refresh.accept';
+    public const REFRESH_REJECT   = 'refresh.reject';
+    public const REFRESH_DEFER    = 'refresh.defer';
+    public const REFRESH_BRIEF    = 'refresh.brief';
+    public const REFRESH_GENERATE = 'refresh.generate';
+    public const REFRESH_REVIEW   = 'refresh.review';
+    public const REFRESH_APPROVE  = 'refresh.approve';
+    public const REFRESH_PUBLISH  = 'refresh.publish';
+    public const REFRESH_CANCEL   = 'refresh.cancel';
+
+    // Phase 9: Readiness
+    public const READINESS_READ             = 'readiness.read';
+    public const READINESS_MANAGE           = 'readiness.manage';
+    public const READINESS_FINDINGS_MANAGE  = 'readiness.findings_manage';
+    public const READINESS_ACCEPT           = 'readiness.accept';
+
+    // Phase 9: Attribution maturity
+    public const ATTRIBUTION_MODEL_READ    = 'attribution_model.read';
+    public const ATTRIBUTION_MODEL_MANAGE  = 'attribution_model.manage';
+    public const ATTRIBUTION_MODEL_APPROVE = 'attribution_model.approve';
+
+    // Phase 9: Refresh outcomes
+    public const REFRESH_OUTCOME_READ    = 'refresh_outcome.read';
+    public const REFRESH_OUTCOME_TRIGGER = 'refresh_outcome.trigger';
+
+    // Phase 9: Technical debt
+    public const TECHNICAL_DEBT_READ   = 'technical_debt.read';
+    public const TECHNICAL_DEBT_MANAGE = 'technical_debt.manage';
+    public const TECHNICAL_DEBT_ACCEPT = 'technical_debt.accept';
+
+    // Phase 9: Disaster recovery
+    public const DR_READ = 'disaster_recovery.read';
+    public const DR_RUN  = 'disaster_recovery.run';
+
     /**
      * @return array<string, string[]> group => permission list
      */
@@ -590,6 +627,35 @@ final class Permissions
             ],
             'competitor' => [self::COMPETITOR_READ, self::COMPETITOR_MANAGE],
             'connector'  => [self::CONNECTOR_READ, self::CONNECTOR_MANAGE, self::CONNECTOR_RETRY],
+            // Phase 9: Refresh
+            'refresh' => [
+                self::REFRESH_READ, self::REFRESH_TRIAGE, self::REFRESH_ACCEPT,
+                self::REFRESH_REJECT, self::REFRESH_DEFER, self::REFRESH_BRIEF,
+                self::REFRESH_GENERATE, self::REFRESH_REVIEW, self::REFRESH_APPROVE,
+                self::REFRESH_PUBLISH, self::REFRESH_CANCEL,
+            ],
+            // Phase 9: Readiness
+            'readiness' => [
+                self::READINESS_READ, self::READINESS_MANAGE,
+                self::READINESS_FINDINGS_MANAGE, self::READINESS_ACCEPT,
+            ],
+            // Phase 9: Attribution maturity
+            'attribution_model' => [
+                self::ATTRIBUTION_MODEL_READ, self::ATTRIBUTION_MODEL_MANAGE,
+                self::ATTRIBUTION_MODEL_APPROVE,
+            ],
+            // Phase 9: Refresh outcomes
+            'refresh_outcome' => [
+                self::REFRESH_OUTCOME_READ, self::REFRESH_OUTCOME_TRIGGER,
+            ],
+            // Phase 9: Technical debt
+            'technical_debt' => [
+                self::TECHNICAL_DEBT_READ, self::TECHNICAL_DEBT_MANAGE, self::TECHNICAL_DEBT_ACCEPT,
+            ],
+            // Phase 9: DR
+            'disaster_recovery' => [
+                self::DR_READ, self::DR_RUN,
+            ],
         ];
     }
 
