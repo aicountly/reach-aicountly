@@ -46,15 +46,10 @@ class AiUsageController extends BaseApiController
         $db = \Config\Database::connect();
         $rows = $db->query(
             "SELECT b.id, b.scope_type, b.scope_reference, b.period_type,
-                    b.warning_limit, b.hard_limit, b.currency, b.enabled, b.created_at
+                    b.warning_limit, b.hard_limit, b.used_amount, b.currency, b.enabled, b.created_at
              FROM reach_ai_budgets b
-             WHERE b.deleted_at IS NULL
              ORDER BY b.scope_type, b.period_type"
         )->getResultArray();
-
-        foreach ($rows as &$row) {
-            $row['used_amount'] = '0.000000';
-        }
 
         return $this->ok(['budgets' => $rows]);
     }
