@@ -14,7 +14,7 @@ class VideoScriptController extends BaseApiController
     private VideoProjectRepository $projectRepo;
     private VideoScriptRepository  $scriptRepo;
 
-    protected function initController(
+    public function initController(
         \CodeIgniter\HTTP\RequestInterface  $request,
         \CodeIgniter\HTTP\ResponseInterface $response,
         \Psr\Log\LoggerInterface            $logger

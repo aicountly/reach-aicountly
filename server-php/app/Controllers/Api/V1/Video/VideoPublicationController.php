@@ -18,7 +18,7 @@ class VideoPublicationController extends BaseApiController
     private VideoProjectRepository     $projectRepo;
     private VideoPublicationRepository $pubRepo;
 
-    protected function initController(
+    public function initController(
         \CodeIgniter\HTTP\RequestInterface  $request,
         \CodeIgniter\HTTP\ResponseInterface $response,
         \Psr\Log\LoggerInterface            $logger

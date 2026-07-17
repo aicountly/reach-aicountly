@@ -14,7 +14,7 @@ class VideoProjectController extends BaseApiController
     private VideoProjectRepository $repo;
     private VideoProjectService    $service;
 
-    protected function initController(
+    public function initController(
         \CodeIgniter\HTTP\RequestInterface  $request,
         \CodeIgniter\HTTP\ResponseInterface $response,
         \Psr\Log\LoggerInterface            $logger

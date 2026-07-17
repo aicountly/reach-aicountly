@@ -15,7 +15,7 @@ class VideoIdeaController extends BaseApiController
     private VideoIdeaRepository  $repo;
     private VideoIdeationService $service;
 
-    protected function initController(
+    public function initController(
         \CodeIgniter\HTTP\RequestInterface  $request,
         \CodeIgniter\HTTP\ResponseInterface $response,
         \Psr\Log\LoggerInterface            $logger

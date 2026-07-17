@@ -17,7 +17,7 @@ class WhatsAppDispatchController extends BaseApiController
 {
     private WhatsAppSenderService $service;
 
-    protected function initController(
+    public function initController(
         \CodeIgniter\HTTP\RequestInterface  $request,
         \CodeIgniter\HTTP\ResponseInterface $response,
         \Psr\Log\LoggerInterface            $logger
