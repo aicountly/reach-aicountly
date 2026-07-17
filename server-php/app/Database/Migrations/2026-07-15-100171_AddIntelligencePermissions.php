@@ -6,9 +6,15 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
+/**
+ * Documents Phase 8 intelligence permission constants.
+ *
+ * Actual permission enforcement uses Config/Permissions.php and PermissionService.
+ * This migration creates a registry table and inserts the canonical slugs.
+ */
 class AddIntelligencePermissions extends Migration
 {
-    private array $permissions = [
+    private const PERMISSIONS = [
         'intelligence.read',
         'intelligence.manage',
         'intelligence.operations',
@@ -45,25 +51,25 @@ class AddIntelligencePermissions extends Migration
 
     public function up(): void
     {
-        $existing = $this->db->query("SELECT slug FROM reach_permissions")->getResultArray();
-        $existingSlugs = array_column($existing, 'slug');
+        $this->db->query("
+            CREATE TABLE IF NOT EXISTS reach_intelligence_permission_registry (
+                id          BIGSERIAL    PRIMARY KEY,
+                slug        VARCHAR(120) NOT NULL UNIQUE,
+                phase       VARCHAR(20)  NOT NULL DEFAULT 'phase8',
+                created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+            )
+        ");
 
-        foreach ($this->permissions as $slug) {
-            if (!in_array($slug, $existingSlugs, true)) {
-                [$group, $action] = explode('.', $slug, 2);
-                $this->db->query(
-                    "INSERT INTO reach_permissions (slug, group_name, action, description, created_at, updated_at)
-                     VALUES (?, ?, ?, ?, NOW(), NOW())",
-                    [$slug, $group, $action, "Phase 8 intelligence permission: {$slug}"]
-                );
-            }
+        foreach (self::PERMISSIONS as $slug) {
+            $this->db->query(
+                "INSERT INTO reach_intelligence_permission_registry (slug) VALUES (?) ON CONFLICT (slug) DO NOTHING",
+                [$slug]
+            );
         }
     }
 
     public function down(): void
     {
-        foreach ($this->permissions as $slug) {
-            $this->db->query("DELETE FROM reach_permissions WHERE slug = ?", [$slug]);
-        }
+        $this->db->query('DROP TABLE IF EXISTS reach_intelligence_permission_registry CASCADE');
     }
 }
