@@ -22,7 +22,7 @@ export function BusinessProblemListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listBusinessProblems({ page, limit, status, search })
+    knowledgeService.listProblems({ page, limit, status, search })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));

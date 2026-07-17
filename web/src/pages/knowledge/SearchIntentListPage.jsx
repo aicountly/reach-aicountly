@@ -26,7 +26,7 @@ export function SearchIntentListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listSearchIntents({ page, limit, status, intent_type: intentType, funnel_stage: funnelStage, search })
+    knowledgeService.listIntents({ page, limit, status, intent_type: intentType, funnel_stage: funnelStage, search })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));

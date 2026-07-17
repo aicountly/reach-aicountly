@@ -22,7 +22,7 @@ export function TopicClusterListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listTopicClusters({ page, limit, status, search })
+    knowledgeService.listClusters({ page, limit, status, search })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));

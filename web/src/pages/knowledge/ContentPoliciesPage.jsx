@@ -24,7 +24,7 @@ export function ContentPoliciesPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listContentPolicies({ page, limit, status, policy_type: policyType, search })
+    knowledgeService.listPolicies({ page, limit, status, policy_type: policyType, search })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
