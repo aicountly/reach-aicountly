@@ -261,7 +261,7 @@ class BlogController extends BaseApiController
         (new BlogVersionModel())->insert([
             'blog_post_id'  => $blogPostId,
             'version'       => $version,
-            'snapshot'      => json_encode($data, JSON_UNESCAPED_SLASHES),
+            'snapshot'      => $data,
             'changed_by'    => $this->userId(),
             'change_reason' => $reason,
             'created_at'    => date('Y-m-d H:i:s'),

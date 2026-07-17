@@ -42,6 +42,14 @@ final class BlogCrudTest extends ApiTestCase
             'title' => 'Phase 0 test blog (updated)',
         ]);
         $this->assertSame(200, $update->response()->getStatusCode());
+
+        // Version history
+        $versions = $this->withHeaders($headers)->call('GET', 'v1/blog/posts/' . $id . '/versions');
+        $this->assertSame(200, $versions->response()->getStatusCode());
+        $versionBody = json_decode((string) $versions->getJSON(), true);
+        $this->assertTrue($versionBody['ok']);
+        $this->assertNotEmpty($versionBody['data']['items']);
+        $this->assertIsArray($versionBody['data']['items'][0]['snapshot'] ?? null);
     }
 }
 
