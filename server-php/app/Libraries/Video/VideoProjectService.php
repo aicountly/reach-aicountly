@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Video;
 
+use App\Libraries\ActorRegistry;
 use App\Libraries\AuditLogger;
 
 class VideoProjectService
@@ -16,12 +17,13 @@ class VideoProjectService
 
     public function createProject(array $data, int $userId): array
     {
+        $actorId = ActorRegistry::idForUser($userId);
         $id = $this->projectRepo->create([
             'tenant_id'  => (int) ($data['tenant_id'] ?? 0),
             'idea_id'    => $data['idea_id'] ?? null,
             'title'      => $data['title'],
             'status'     => 'draft',
-            'created_by' => $userId,
+            'created_by' => $actorId,
         ]);
         $project = $this->projectRepo->findById($id);
         $this->audit->log($userId, AuditLogger::VIDEO_PROJECT_CREATED, 'video_project', $id);

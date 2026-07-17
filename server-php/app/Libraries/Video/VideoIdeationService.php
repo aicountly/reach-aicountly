@@ -6,6 +6,7 @@ namespace App\Libraries\Video;
 
 use App\Enums\VideoIdeaStatus;
 use App\Enums\VideoProjectStatus;
+use App\Libraries\ActorRegistry;
 use App\Libraries\AuditLogger;
 
 class VideoIdeationService
@@ -19,14 +20,20 @@ class VideoIdeationService
 
     public function createIdea(array $data, int $userId): array
     {
+        $actorId = ActorRegistry::idForUser($userId);
+        $status  = VideoIdeaStatus::tryFrom((string) ($data['status'] ?? '')) ?? VideoIdeaStatus::Draft;
+        if (! in_array($status, [VideoIdeaStatus::Draft, VideoIdeaStatus::Ready], true)) {
+            $status = VideoIdeaStatus::Draft;
+        }
+
         $id = $this->ideaRepo->create([
             'tenant_id'  => (int) ($data['tenant_id'] ?? 0),
             'title'      => $data['title'],
             'summary'    => $data['summary'] ?? null,
             'source_type' => $data['source_type'] ?? null,
             'source_ref_id' => $data['source_ref_id'] ?? null,
-            'status'     => VideoIdeaStatus::Draft->value,
-            'created_by' => $userId,
+            'status'     => $status->value,
+            'created_by' => $actorId,
         ]);
 
         $idea = $this->ideaRepo->findById($id);
@@ -70,12 +77,13 @@ class VideoIdeationService
     {
         $this->validator->assertIdeaTransition($idea['status'], VideoIdeaStatus::Converted->value);
 
+        $actorId = ActorRegistry::idForUser($userId);
         $projectId = $this->projectRepo->create([
             'tenant_id'  => (int) $idea['tenant_id'],
             'idea_id'    => (int) $idea['id'],
             'title'      => $idea['title'],
             'status'     => VideoProjectStatus::Draft->value,
-            'created_by' => $userId,
+            'created_by' => $actorId,
         ]);
 
         $this->ideaRepo->update((int) $idea['id'], ['status' => VideoIdeaStatus::Converted->value]);

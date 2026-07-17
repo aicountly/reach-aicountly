@@ -91,6 +91,7 @@ abstract class ApiTestCase extends DatabaseTestCase
         $model = new UserModel();
         $existing = $model->where('email', $email)->first();
         if ($existing) {
+            \App\Libraries\ActorRegistry::idForUser((int) $existing['id']);
             return (int) $existing['id'];
         }
         $model->insert([
@@ -100,6 +101,8 @@ abstract class ApiTestCase extends DatabaseTestCase
             'role_id'       => $roleId,
             'is_active'     => true,
         ]);
-        return (int) $model->getInsertID();
+        $userId = (int) $model->getInsertID();
+        \App\Libraries\ActorRegistry::idForUser($userId);
+        return $userId;
     }
 }
