@@ -64,14 +64,16 @@ export const knowledgeService = {
   deleteMarket:   (id)   => api.delete(`${K}/markets/${id}`),
 
   // Business Problems
-  listProblems:    (p)    => api.get(`${K}/problems`, p),
+  listProblems:          (p)    => api.get(`${K}/problems`, p),
+  listBusinessProblems:  (p)    => api.get(`${K}/problems`, p), // legacy alias
   getProblem:      (id)   => api.get(`${K}/problems/${id}`),
   createProblem:   (b)    => api.post(`${K}/problems`, b),
   updateProblem:   (id,b) => api.put(`${K}/problems/${id}`, b),
   deleteProblem:   (id)   => api.delete(`${K}/problems/${id}`),
 
   // Search Intents
-  listIntents:    (p)    => api.get(`${K}/search-intents`, p),
+  listIntents:        (p)    => api.get(`${K}/search-intents`, p),
+  listSearchIntents:  (p)    => api.get(`${K}/search-intents`, p), // legacy alias
   getIntent:      (id)   => api.get(`${K}/search-intents/${id}`),
   createIntent:   (b)    => api.post(`${K}/search-intents`, b),
   updateIntent:   (id,b) => api.put(`${K}/search-intents/${id}`, b),
@@ -82,11 +84,12 @@ export const knowledgeService = {
   syncIntentRelations: (id,b) => api.post(`${K}/search-intents/${id}/sync-relations`, b),
 
   // Topic Clusters
-  listClusters:    (p)    => api.get(`${K}/topic-clusters`, p),
-  getCluster:      (id)   => api.get(`${K}/topic-clusters/${id}`),
-  createCluster:   (b)    => api.post(`${K}/topic-clusters`, b),
-  updateCluster:   (id,b) => api.put(`${K}/topic-clusters/${id}`, b),
-  deleteCluster:   (id)   => api.delete(`${K}/topic-clusters/${id}`),
+  listClusters:       (p)    => api.get(`${K}/topic-clusters`, p),
+  listTopicClusters:  (p)    => api.get(`${K}/topic-clusters`, p), // legacy alias
+  getCluster:         (id)   => api.get(`${K}/topic-clusters/${id}`),
+  createCluster:      (b)    => api.post(`${K}/topic-clusters`, b),
+  updateCluster:      (id,b) => api.put(`${K}/topic-clusters/${id}`, b),
+  deleteCluster:      (id)   => api.delete(`${K}/topic-clusters/${id}`),
 
   // Claims
   listClaims:    (p)    => api.get(`${K}/claims`, p),
@@ -126,7 +129,8 @@ export const knowledgeService = {
   rejectBrandRule:   (id,b) => api.post(`${K}/brand-rules/${id}/reject`, b),
 
   // Content Policies
-  listPolicies:    (p)    => api.get(`${K}/content-policies`, p),
+  listPolicies:          (p)    => api.get(`${K}/content-policies`, p),
+  listContentPolicies:   (p)    => api.get(`${K}/content-policies`, p), // legacy alias
   getPolicy:       (id)   => api.get(`${K}/content-policies/${id}`),
   createPolicy:    (b)    => api.post(`${K}/content-policies`, b),
   updatePolicy:    (id,b) => api.put(`${K}/content-policies/${id}`, b),

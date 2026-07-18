@@ -49,7 +49,12 @@ class ContentRefreshDetectionJob implements JobHandlerInterface
                     (int) $item['created_by'],
                     NotificationService::TYPE_REFRESH_DUE,
                     "Content \"{$item['title']}\" is due for a refresh.",
-                    ['entity_type' => 'content_item', 'entity_id' => $item['id'], 'action_url' => "/content/{$item['id']}"],
+                    [
+                        'entity_type' => 'content_item',
+                        'entity_id'   => $item['id'],
+                        'action_url'  => "/content/{$item['id']}",
+                        'data'        => ['content_title' => (string) $item['title']],
+                    ],
                     null
                 );
             }

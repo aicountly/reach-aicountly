@@ -45,7 +45,15 @@ class ContentDueDateReminderJob implements JobHandlerInterface
                     (int) $a['user_id'],
                     NotificationService::TYPE_REVIEW_DUE,
                     "Content \"{$item['title']}\" is due on {$item['due_date']}.",
-                    ['entity_type' => 'content_item', 'entity_id' => $item['id'], 'action_url' => "/content/{$item['id']}"],
+                    [
+                        'entity_type' => 'content_item',
+                        'entity_id'   => $item['id'],
+                        'action_url'  => "/content/{$item['id']}",
+                        'data'        => [
+                            'content_title' => (string) $item['title'],
+                            'due_date'      => (string) $item['due_date'],
+                        ],
+                    ],
                     null
                 );
                 $sent++;

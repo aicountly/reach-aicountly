@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { authService } from '../services/authService';
 import { clearControllerSsoHash, readControllerSsoToken } from '../services/controllerSso';
 import { redirectToConsoleLogin, redirectToConsoleLoginAfterSignOut } from '../services/consoleAuth';
@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const [ssoPending, setSsoPending] = useState(false);
   const [gateReason, setGateReason] = useState(null);
   const [gateMessage, setGateMessage] = useState('');
+  const bootstrapRunRef = useRef(0);
 
   const applySession = useCallback((data) => {
     if (!data?.token) throw new Error('Session succeeded but no token was returned');
@@ -58,53 +59,57 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const bootstrap = useCallback(async () => {
+    const runId = ++bootstrapRunRef.current;
+    const finish = () => {
+      if (runId !== bootstrapRunRef.current) return;
+      setSsoPending(false);
+      setLoading(false);
+    };
+
     setLoading(true);
+    setSsoPending(false);
     setGateReason(null);
     setGateMessage('');
 
-    const ssoToken = readControllerSsoToken();
-    if (ssoToken) {
-      clearControllerSsoHash();
+    try {
+      const ssoToken = readControllerSsoToken();
+      if (ssoToken) {
+        clearControllerSsoHash();
+        setSsoPending(true);
+        try {
+          await loginWithControllerSso(ssoToken);
+        } catch (e) {
+          setGateReason(GATE_ERROR);
+          setGateMessage(e?.message || 'Console SSO login failed');
+        }
+        return;
+      }
+
+      if (localStorage.getItem(TOKEN_KEY)) {
+        const ok = await refresh();
+        if (ok) return;
+      }
+
       setSsoPending(true);
       try {
-        await loginWithControllerSso(ssoToken);
+        await loginWithConsoleSession();
       } catch (e) {
-        setGateReason(GATE_ERROR);
-        setGateMessage(e?.message || 'Console SSO login failed');
-      } finally {
-        setSsoPending(false);
-        setLoading(false);
-      }
-      return;
-    }
-
-    if (localStorage.getItem(TOKEN_KEY)) {
-      const ok = await refresh();
-      if (ok) {
-        setLoading(false);
-        return;
-      }
-    }
-
-    setSsoPending(true);
-    try {
-      await loginWithConsoleSession();
-    } catch (e) {
-      const status = e?.status;
-      const message = e?.message || 'Could not sign in via Console';
-      if (status === 401) {
-        redirectToConsoleLogin();
-        return;
-      } else if (status === 403) {
-        setGateReason(GATE_NO_ACCESS);
-        setGateMessage(message);
-      } else {
-        setGateReason(GATE_ERROR);
-        setGateMessage(message);
+        const status = e?.status;
+        const message = e?.message || 'Could not sign in via Console';
+        if (status === 401) {
+          redirectToConsoleLogin();
+          return;
+        }
+        if (status === 403) {
+          setGateReason(GATE_NO_ACCESS);
+          setGateMessage(message);
+        } else {
+          setGateReason(GATE_ERROR);
+          setGateMessage(message);
+        }
       }
     } finally {
-      setSsoPending(false);
-      setLoading(false);
+      finish();
     }
   }, [loginWithConsoleSession, loginWithControllerSso, refresh]);
 

@@ -15,12 +15,14 @@ class ContentAssignmentService
     private ContentAssignmentModel $assignments;
     private ContentItemModel       $items;
     private AuditLogger            $audit;
+    private NotificationService    $notifications;
 
     public function __construct()
     {
-        $this->assignments = new ContentAssignmentModel();
-        $this->items       = new ContentItemModel();
-        $this->audit       = new AuditLogger();
+        $this->assignments   = new ContentAssignmentModel();
+        $this->items         = new ContentItemModel();
+        $this->audit         = new AuditLogger();
+        $this->notifications = new NotificationService();
     }
 
     public function assign(int $contentItemId, int $userId, string $role, array $options = [], array $actor = []): array
@@ -51,6 +53,22 @@ class ContentAssignmentService
             'user_id' => $userId,
             'role'    => $role,
         ]);
+
+        $this->notifications->dispatch(
+            $userId,
+            NotificationService::TYPE_ASSIGNMENT_CREATED,
+            "You have been assigned as {$role} on \"{$item['title']}\".",
+            [
+                'entity_type' => 'content_item',
+                'entity_id'   => $contentItemId,
+                'action_url'  => "/content/{$contentItemId}",
+                'data'        => [
+                    'content_title' => (string) ($item['title'] ?? ''),
+                    'role'          => $role,
+                ],
+            ],
+            $actor['id'] ?? null,
+        );
 
         return $assignment;
     }

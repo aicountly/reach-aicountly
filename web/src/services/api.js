@@ -31,6 +31,7 @@ async function request(path, options = {}) {
   try {
     response = await fetch(url, {
       credentials: 'include',
+      cache: 'no-store',
       ...options,
       headers,
     });

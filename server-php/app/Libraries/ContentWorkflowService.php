@@ -333,7 +333,15 @@ class ContentWorkflowService
             $recipients,
             $notifType,
             "Content '{$item['title']}' status changed to {$newStatus}.",
-            ['entity_type' => 'content_item', 'entity_id' => $item['id']],
+            [
+                'entity_type' => 'content_item',
+                'entity_id'   => $item['id'],
+                'action_url'  => '/content/' . $item['id'],
+                'data'        => [
+                    'content_title' => (string) ($item['title'] ?? ''),
+                    'status'        => $newStatus,
+                ],
+            ],
             $actorId
         );
     }

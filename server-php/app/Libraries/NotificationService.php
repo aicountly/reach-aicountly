@@ -9,8 +9,8 @@ use App\Models\NotificationDeliveryModel;
 /**
  * In-app notification dispatch and management.
  *
- * Phase 2: in-app delivery only. Email delivery is scaffolded but disabled
- * (controlled by NotificationPreference.email_enabled which defaults to false).
+ * In-app delivery is always attempted (unless disabled in preferences).
+ * Email/SMS delivery is routed via Console notification API when configured.
  */
 class NotificationService
 {
@@ -34,12 +34,14 @@ class NotificationService
     private NotificationModel            $notifications;
     private NotificationPreferenceModel  $preferences;
     private NotificationDeliveryModel    $deliveries;
+    private ReachNotifier                $reachNotifier;
 
     public function __construct()
     {
         $this->notifications = new NotificationModel();
         $this->preferences   = new NotificationPreferenceModel();
         $this->deliveries    = new NotificationDeliveryModel();
+        $this->reachNotifier = new ReachNotifier();
     }
 
     /**
@@ -57,6 +59,7 @@ class NotificationService
         $inAppEnabled = $pref ? (bool) $pref['in_app_enabled'] : true;
 
         if (!$inAppEnabled) {
+            $this->dispatchExternalChannels($recipientId, $type, $message, $options, $pref, null);
             return [];
         }
 
@@ -80,7 +83,37 @@ class NotificationService
             'sent_at'         => date('Y-m-d H:i:s'),
         ]);
 
+        $this->dispatchExternalChannels($recipientId, $type, $message, $options, $pref, $notificationId);
+
         return $this->notifications->find($notificationId);
+    }
+
+    /** @param array<string,mixed> $options */
+    private function dispatchExternalChannels(
+        int $recipientId,
+        string $type,
+        string $message,
+        array $options,
+        ?array $pref,
+        ?int $notificationId,
+    ): void {
+        $channels = $this->reachNotifier->notifyChannels($recipientId, $type, $message, $options, $pref);
+
+        if ($notificationId === null) {
+            return;
+        }
+
+        foreach ($channels as $channel => $sent) {
+            if (!$sent) {
+                continue;
+            }
+            $this->deliveries->insert([
+                'notification_id' => $notificationId,
+                'channel'         => $channel,
+                'status'          => 'sent',
+                'sent_at'         => date('Y-m-d H:i:s'),
+            ]);
+        }
     }
 
     public function markRead(int $notificationId): void

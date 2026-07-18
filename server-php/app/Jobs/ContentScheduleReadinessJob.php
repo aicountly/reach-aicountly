@@ -47,7 +47,12 @@ class ContentScheduleReadinessJob implements JobHandlerInterface
                     (int) $row['created_by'],
                     NotificationService::TYPE_SCHEDULE_CONFIRMED,
                     "Content \"{$row['title']}\" is ready for publication.",
-                    ['entity_type' => 'content_item', 'entity_id' => $row['content_item_id'], 'action_url' => "/content/{$row['content_item_id']}"],
+                    [
+                        'entity_type' => 'content_item',
+                        'entity_id'   => $row['content_item_id'],
+                        'action_url'  => "/content/{$row['content_item_id']}",
+                        'data'        => ['content_title' => (string) $row['title']],
+                    ],
                     null
                 );
             }
