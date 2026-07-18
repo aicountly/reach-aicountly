@@ -1,0 +1,17 @@
+RewriteEngine On
+RewriteBase /
+
+# API: never serve the SPA for /api/* — Apache must handle the api/ folder
+RewriteRule ^api(?:/|$) - [L]
+
+# SPA fallback — every other unmatched URL is served by index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]
+
+# Long-cache the hashed asset bundle
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|gif|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
