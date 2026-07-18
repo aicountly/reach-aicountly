@@ -26,15 +26,11 @@ class ChannelProviderFactory
     {
         $provider = self::env('EMAIL_PROVIDER');
 
-        if ($provider === 'mock') {
+        if ($provider === 'mock' || !Mailer::isConfigured()) {
             return new MockEmailSender();
         }
 
-        if ($provider === '' && !Mailer::isConfigured()) {
-            return new MockEmailSender();
-        }
-
-        if (in_array($provider, ['itwalk', 'gateway', 'infobip'], true) || Mailer::isConfigured()) {
+        if (in_array($provider, ['itwalk', 'gateway', 'infobip', ''], true)) {
             return new GatewayEmailSender();
         }
 
@@ -47,15 +43,11 @@ class ChannelProviderFactory
     {
         $provider = self::env('WHATSAPP_PROVIDER');
 
-        if ($provider === 'mock') {
+        if ($provider === 'mock' || !WhatsappSender::isConfigured()) {
             return new MockWhatsAppSender();
         }
 
-        if ($provider === '' && !WhatsappSender::isConfigured()) {
-            return new MockWhatsAppSender();
-        }
-
-        if (in_array($provider, ['infobip', 'gateway', 'cloudapi'], true) || WhatsappSender::isConfigured()) {
+        if (in_array($provider, ['infobip', 'gateway', 'cloudapi', ''], true)) {
             return new GatewayWhatsAppSender();
         }
 
@@ -68,15 +60,11 @@ class ChannelProviderFactory
     {
         $provider = self::env('SMS_PROVIDER');
 
-        if ($provider === 'mock') {
+        if ($provider === 'mock' || !SmsSender::isConfigured()) {
             return new MockSmsSender();
         }
 
-        if ($provider === '' && !SmsSender::isConfigured()) {
-            return new MockSmsSender();
-        }
-
-        if (in_array($provider, ['aoc-portal', 'digimiles', 'aoc', 'smsgatewayhub'], true) || SmsSender::isConfigured()) {
+        if (in_array($provider, ['aoc-portal', 'digimiles', 'aoc', 'smsgatewayhub', ''], true)) {
             return new AocPortalSmsSender();
         }
 
