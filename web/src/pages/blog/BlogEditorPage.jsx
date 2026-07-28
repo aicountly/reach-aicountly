@@ -66,7 +66,11 @@ export function BlogEditorPage() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete “${form.title || 'untitled'}”? This will archive the post.`)) return;
+    const permanent = form.status === 'archived';
+    const message = permanent
+      ? `Permanently delete “${form.title || 'untitled'}”? This cannot be undone.`
+      : `Delete “${form.title || 'untitled'}”? This will archive the post.`;
+    if (!window.confirm(message)) return;
     setDeleting(true);
     setError(null);
     try {
@@ -167,7 +171,7 @@ export function BlogEditorPage() {
           </Card>
 
           <div className="flex justify-end gap-2" style={{ flexWrap: 'wrap' }}>
-            {!isNew && form.status !== 'archived' && (
+            {!isNew && (
               <button
                 type="button"
                 className="btn btn-danger"
@@ -175,7 +179,7 @@ export function BlogEditorPage() {
                 onClick={handleDelete}
                 style={{ marginRight: 'auto' }}
               >
-                <Trash2 size={14} /> {deleting ? 'Deleting…' : 'Delete'}
+                <Trash2 size={14} /> {deleting ? 'Deleting…' : (form.status === 'archived' ? 'Delete permanently' : 'Delete')}
               </button>
             )}
             <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)} disabled={deleting}>Cancel</button>

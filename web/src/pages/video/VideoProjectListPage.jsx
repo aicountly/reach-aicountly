@@ -38,12 +38,14 @@ export default function VideoProjectListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = new URLSearchParams({ page, per_page: perPage });
-    if (filter) params.set('status', filter);
-    api.get(`/video/projects?${params}`)
+    api.get('v1/video/projects', {
+      page,
+      per_page: perPage,
+      status: filter || undefined,
+    })
       .then(r => {
-        setProjects(r.data?.data?.data ?? []);
-        setTotal(r.data?.data?.total ?? 0);
+        setProjects(r?.data ?? []);
+        setTotal(r?.total ?? 0);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

@@ -9,15 +9,40 @@ class EmailCampaignController extends BaseApiController
 {
     public function index()
     {
-        [$page, $limit, $offset] = $this->pagination();
-        $q = new EmailCampaignModel();
-        $status = trim((string) $this->request->getGet('status'));
-        if ($status !== '') {
-            $q->where('status', $status);
+        try {
+            [$page, $limit, $offset] = $this->pagination();
+            $q = new EmailCampaignModel();
+            $status = trim((string) $this->request->getGet('status'));
+            if ($status !== '' && strtolower($status) !== 'all') {
+                $q->where('status', $status);
+            }
+            $total = $q->countAllResults(false);
+            $rows  = $q->orderBy('updated_at', 'DESC')->findAll($limit, $offset);
+            $items = is_array($rows) ? $rows : [];
+
+            return $this->ok([
+                'items'    => $items,
+                'total'    => $total,
+                'page'     => $page,
+                'limit'    => $limit,
+                'per_page' => $limit,
+                // Nested `data` kept for older EmailDispatchPage response parsing.
+                'data'     => [
+                    'data'  => $items,
+                    'total' => $total,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'EmailCampaignController::index: ' . $e->getMessage());
+            return $this->ok([
+                'items'    => [],
+                'total'    => 0,
+                'page'     => 1,
+                'limit'    => 25,
+                'per_page' => 25,
+                'data'     => ['data' => [], 'total' => 0],
+            ]);
         }
-        $total = $q->countAllResults(false);
-        $rows  = $q->orderBy('updated_at', 'DESC')->findAll($limit, $offset);
-        return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }
 
     public function show(int $id)

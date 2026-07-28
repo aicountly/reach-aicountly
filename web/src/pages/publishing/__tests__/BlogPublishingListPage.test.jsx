@@ -54,6 +54,7 @@ describe('BlogPublishingListPage', () => {
     api.get.mockRejectedValueOnce(new Error('API error'));
     renderWithAuth(<BlogPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/API error/i)).toBeInTheDocument());
+    expect(screen.getByText('Blog Publishing')).toBeInTheDocument();
   });
 
   it('renders page header', async () => {

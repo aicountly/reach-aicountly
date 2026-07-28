@@ -22,8 +22,8 @@ export default function VideoProjectWorkspacePage() {
 
   useEffect(() => {
     setLoading(true);
-    api.get(`/video/projects/${uuid}`)
-      .then(r => setProject(r.data?.data ?? null))
+    api.get(`v1/video/projects/${uuid}`)
+      .then(r => setProject(r ?? null))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [uuid]);
@@ -66,7 +66,7 @@ export default function VideoProjectWorkspacePage() {
 
       <div className="tab-content mt-4">
         <ProjectOverviewTab project={project} onRefresh={() => {
-          api.get(`/video/projects/${uuid}`).then(r => setProject(r.data?.data ?? null));
+          api.get(`v1/video/projects/${uuid}`).then(r => setProject(r ?? null));
         }} />
       </div>
     </div>

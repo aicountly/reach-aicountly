@@ -21,8 +21,8 @@ export default function VideoRenderQueuePage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get('/video/render-jobs?per_page=50')
-      .then(r => setJobs(r.data?.data?.data ?? []))
+    api.get('v1/video/render-jobs', { per_page: 50 })
+      .then(r => setJobs(r?.data ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -31,16 +31,20 @@ export default function VideoRenderQueuePage() {
 
   const handleAction = async (uuid, action) => {
     try {
-      await api.post(`/video/render-jobs/${uuid}/${action}`);
+      if (action === 'cancel') {
+        await api.delete(`v1/video/render-jobs/${uuid}`);
+      } else {
+        await api.post(`v1/video/render-jobs/${uuid}/${action}`);
+      }
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header page-header--stack">
         <h1>Render Queue</h1>
         <p className="page-header__subtitle">AI video render jobs across all projects</p>
       </div>

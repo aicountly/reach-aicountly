@@ -44,4 +44,25 @@ describe('BlogListPage', () => {
     const alert = screen.getByText(/Backend unavailable/).closest('.alert');
     expect(alert).toBeTruthy();
   });
+
+  it('shows Delete for archived posts', async () => {
+    blogService.list.mockResolvedValueOnce({
+      items: [
+        {
+          id: 9,
+          title: 'sxdsd',
+          slug: 'x',
+          status: 'archived',
+          approval_status: 'rejected',
+          publishing_status: 'none',
+          bot_generated: true,
+          updated_at: '2026-07-17T10:40:04Z',
+        },
+      ],
+      total: 1,
+    });
+    renderWithAuth(<BlogListPage />, authAsAdmin);
+    await waitFor(() => expect(screen.getByText('sxdsd')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+  });
 });

@@ -120,12 +120,14 @@ import DistributionLayout               from './pages/distribution/DistributionL
 import DistributionOverviewPage         from './pages/distribution/DistributionOverviewPage.jsx';
 import AudienceOverviewPage             from './pages/distribution/AudienceOverviewPage.jsx';
 import AudienceSegmentsPage             from './pages/distribution/AudienceSegmentsPage.jsx';
+import ConsentListPage                  from './pages/distribution/ConsentListPage.jsx';
 import SuppressionPage                  from './pages/distribution/SuppressionPage.jsx';
 import SocialOperationsPage             from './pages/distribution/SocialOperationsPage.jsx';
 import EmailDispatchPage                from './pages/distribution/EmailDispatchPage.jsx';
 import WhatsAppDispatchPage             from './pages/distribution/WhatsAppDispatchPage.jsx';
 import SmsOverviewPage                  from './pages/distribution/SmsOverviewPage.jsx';
 import SmsDispatchPage                  from './pages/distribution/SmsDispatchPage.jsx';
+import DistributionCampaignListPage     from './pages/distribution/CampaignListPage.jsx';
 import CampaignWorkspacePage            from './pages/distribution/CampaignWorkspacePage.jsx';
 import DispatchOrchestrationPage        from './pages/distribution/DispatchOrchestrationPage.jsx';
 import DistributionAnalyticsPage        from './pages/distribution/DistributionAnalyticsPage.jsx';
@@ -325,9 +327,12 @@ export default function App() {
         {/* Phase 7 — Omnichannel Distribution */}
         <Route path="/distribution" element={<DistributionLayout />}>
           <Route index element={<DistributionOverviewPage />} />
-          <Route path="campaigns" element={<CampaignWorkspacePage />} />
+          <Route path="campaigns" element={<DistributionCampaignListPage />} />
+          <Route path="campaigns/:id" element={<CampaignWorkspacePage />} />
           <Route path="audience" element={<AudienceOverviewPage />} />
           <Route path="audience/segments" element={<AudienceSegmentsPage />} />
+          <Route path="audience/consents" element={<ConsentListPage />} />
+          <Route path="segments" element={<AudienceSegmentsPage />} />
           <Route path="suppressions" element={<SuppressionPage />} />
           <Route path="social" element={<SocialOperationsPage />} />
           <Route path="email" element={<EmailDispatchPage />} />

@@ -21,14 +21,28 @@ export default function BlogPublishingListPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get('v1/publishing/blogs')
-      .then((r) => setDeployments(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-  if (loading) return <p className="muted">Loading blog deployments…</p>;
-  if (error) return <p className="text-error">{error}</p>;
+    api.get('v1/publishing/blogs')
+      .then((r) => {
+        if (!cancelled) {
+          setDeployments(Array.isArray(r) ? r : (r?.items ?? r?.data ?? []));
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e.message || 'Request failed');
+          setDeployments([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div>
@@ -36,43 +50,50 @@ export default function BlogPublishingListPage() {
         <h1>Blog Publishing</h1>
       </div>
 
-      {deployments.length === 0 ? (
+      {loading && <p className="muted">Loading blog deployments…</p>}
+      {error && <p className="text-error" role="alert">{error}</p>}
+
+      {!loading && !error && deployments.length === 0 && (
         <p className="muted">No blog deployments yet.</p>
-      ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Content</th>
-              <th>Status</th>
-              <th>Canonical URL</th>
-              <th>Attempts</th>
-              <th>Updated</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {deployments.map(d => (
-              <tr key={d.id}>
-                <td>
-                  <Link to={`/content/${d.content_item_id}`}>{d.content_title ?? `#${d.content_item_id}`}</Link>
-                </td>
-                <td>
-                  <span className={`badge ${STATUS_BADGES[d.status] ?? 'badge--neutral'}`}>{d.status}</span>
-                </td>
-                <td>
-                  {d.canonical_url
-                    ? <a href={d.canonical_url} target="_blank" rel="noopener noreferrer" className="link-external">{d.canonical_url}</a>
-                    : <span className="muted">—</span>}
-                </td>
-                <td>{d.attempt_count}</td>
-                <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
-                <td>
-                  <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm">View</Link>
-                </td>
+      )}
+
+      {!loading && deployments.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Content</th>
+                <th>Status</th>
+                <th>Canonical URL</th>
+                <th>Attempts</th>
+                <th>Updated</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {deployments.map(d => (
+                <tr key={d.id}>
+                  <td>
+                    <Link to={`/content/${d.content_item_id}`}>{d.content_title ?? `#${d.content_item_id}`}</Link>
+                  </td>
+                  <td>
+                    <span className={`badge ${STATUS_BADGES[d.status] ?? 'badge--neutral'}`}>{d.status}</span>
+                  </td>
+                  <td>
+                    {d.canonical_url
+                      ? <a href={d.canonical_url} target="_blank" rel="noopener noreferrer" className="link-external">{d.canonical_url}</a>
+                      : <span className="muted">—</span>}
+                  </td>
+                  <td>{d.attempt_count}</td>
+                  <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
+                  <td>
+                    <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm">View</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

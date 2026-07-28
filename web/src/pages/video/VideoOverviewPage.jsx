@@ -9,13 +9,13 @@ export default function VideoOverviewPage() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/video/ideas?per_page=1'),
-      api.get('/video/projects?per_page=1'),
+      api.get('v1/video/ideas', { per_page: 1 }),
+      api.get('v1/video/projects', { per_page: 1 }),
     ])
       .then(([ideasRes, projectsRes]) => {
         setStats({
-          total_ideas:    ideasRes.data?.data?.total ?? 0,
-          total_projects: projectsRes.data?.data?.total ?? 0,
+          total_ideas:    ideasRes?.total ?? 0,
+          total_projects: projectsRes?.total ?? 0,
         });
       })
       .catch(e => setError(e.message))
@@ -27,12 +27,12 @@ export default function VideoOverviewPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header page-header--stack">
         <h1>Video Automation</h1>
         <p className="page-header__subtitle">AI-governed video content lifecycle</p>
       </div>
 
-      <div className="stat-grid">
+      <div className="stats-row mb-6">
         <div className="stat-card">
           <div className="stat-card__value">{stats.total_ideas}</div>
           <div className="stat-card__label">Video ideas</div>

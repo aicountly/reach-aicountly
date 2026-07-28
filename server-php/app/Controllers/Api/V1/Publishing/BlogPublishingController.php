@@ -6,23 +6,38 @@ use App\Controllers\Api\V1\BaseApiController;
 
 class BlogPublishingController extends BaseApiController
 {
-    private \CodeIgniter\Database\BaseConnection $db;
-
-    public function __construct()
-    {
-        $this->db = \Config\Database::connect();
-    }
-
     public function index(): \CodeIgniter\HTTP\ResponseInterface
     {
-        $rows = $this->db->table('reach_publication_deployments d')
-            ->select('d.*, ci.title AS content_title')
-            ->join('reach_content_items ci', 'ci.id = d.content_item_id', 'left')
-            ->where('ci.content_type', 'blog')
-            ->orderBy('d.updated_at', 'DESC')
-            ->limit(50)
-            ->get()->getResultArray();
+        try {
+            $db = \Config\Database::connect();
 
-        return $this->ok($rows);
+            if (
+                ! $db->tableExists('reach_publication_deployments')
+                || ! $db->tableExists('reach_content_items')
+            ) {
+                return $this->ok([]);
+            }
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $rows = $db->table('reach_publication_deployments')
+                ->select('reach_publication_deployments.*, reach_content_items.title AS content_title')
+                ->join(
+                    'reach_content_items',
+                    'reach_content_items.id = reach_publication_deployments.content_item_id',
+                    'left'
+                )
+                ->where('reach_content_items.content_type', 'blog')
+                ->orderBy('reach_publication_deployments.updated_at', 'DESC')
+                ->limit(50)
+                ->get()
+                ->getResultArray();
+
+            return $this->ok(is_array($rows) ? $rows : []);
+        } catch (\Throwable $e) {
+            log_message('error', 'BlogPublishingController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Publishing UI.
+            return $this->ok([]);
+        }
     }
 }

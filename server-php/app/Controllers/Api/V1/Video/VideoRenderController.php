@@ -73,6 +73,39 @@ class VideoRenderController extends BaseApiController
         return $this->ok($job, 201);
     }
 
+    /**
+     * GET /video/render-jobs
+     */
+    public function listJobs(): ResponseInterface
+    {
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage = min(100, max(1, (int) ($this->request->getGet('per_page') ?? 50)));
+        $offset  = ($page - 1) * $perPage;
+        $tenantId = $this->tenantId();
+
+        $db = \Config\Database::connect();
+
+        $total = $db->table('reach_video_render_jobs j')
+            ->join('reach_video_projects p', 'p.id = j.project_id')
+            ->where('p.tenant_id', $tenantId)
+            ->countAllResults();
+
+        $rows = $db->table('reach_video_render_jobs j')
+            ->select('j.*')
+            ->join('reach_video_projects p', 'p.id = j.project_id')
+            ->where('p.tenant_id', $tenantId)
+            ->orderBy('j.created_at', 'DESC')
+            ->limit($perPage, $offset)
+            ->get()->getResultArray();
+
+        return $this->ok([
+            'data'     => $rows,
+            'total'    => $total,
+            'page'     => $page,
+            'per_page' => $perPage,
+        ]);
+    }
+
     public function showJob(string $jobUuid): ResponseInterface
     {
         $job = $this->jobRepo->findByUuid($jobUuid);

@@ -49,8 +49,8 @@ export default function VideoConnectionsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get('/video/connections')
-      .then(r => setConnections(r.data?.data ?? []))
+    api.get('v1/video/connections')
+      .then(r => setConnections(r?.data ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -59,29 +59,29 @@ export default function VideoConnectionsPage() {
 
   const handleAdd = async () => {
     try {
-      await api.post('/video/connections', { name: newName });
+      await api.post('v1/video/connections', { name: newName });
       setShowAdd(false);
       setNewName('');
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 
   const handleRevoke = async (uuid) => {
     if (!confirm('Revoke this YouTube connection?')) return;
     try {
-      await api.delete(`/video/connections/${uuid}`);
+      await api.delete(`v1/video/connections/${uuid}`);
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 
   const handleHealthCheck = async (uuid) => {
     try {
-      const res = await api.get(`/video/connections/${uuid}/health`);
-      return res.data?.data ?? { healthy: false };
+      const res = await api.get(`v1/video/connections/${uuid}/health`);
+      return res ?? { healthy: false };
     } catch {
       return { healthy: false, detail: { error: 'Request failed' } };
     }

@@ -32,7 +32,7 @@ class CampaignReconciliationService
         $slaLimit = date('Y-m-d H:i:s', strtotime('-' . self::SLA_MINUTES . ' minutes'));
 
         $staleDispatches = $db->table('reach_campaign_dispatches')
-            ->whereIn('status', ['processing', 'partially_completed'])
+            ->whereIn('status', ['dispatching', 'partially_completed'])
             ->where('updated_at <', $slaLimit)
             ->where('tenant_id', $tenantId)
             ->get()->getResultArray();

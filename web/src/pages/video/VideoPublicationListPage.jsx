@@ -12,10 +12,10 @@ export default function VideoPublicationListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get(`/video/publications?page=${page}&per_page=${perPage}`)
+    api.get('v1/video/publications', { page, per_page: perPage })
       .then(r => {
-        setPubs(r.data?.data?.data ?? []);
-        setTotal(r.data?.data?.total ?? 0);
+        setPubs(r?.data ?? []);
+        setTotal(r?.total ?? 0);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

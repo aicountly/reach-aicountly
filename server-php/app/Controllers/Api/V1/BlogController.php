@@ -131,9 +131,17 @@ class BlogController extends BaseApiController
         if (! $row) {
             return $this->fail('Blog post not found.', 404);
         }
+
+        // Second delete on an already-archived post permanently removes it.
+        if (($row['status'] ?? '') === 'archived') {
+            $blog->delete($id);
+            $this->audit('blog.delete', 'blog', $id, $row, ['deleted' => true]);
+            return $this->ok(['message' => 'Deleted.', 'permanent' => true]);
+        }
+
         $blog->update($id, ['status' => 'archived']);
         $this->audit('blog.archive', 'blog', $id, $row, ['status' => 'archived']);
-        return $this->ok(['message' => 'Archived.']);
+        return $this->ok(['message' => 'Archived.', 'permanent' => false]);
     }
 
     public function transition(int $id)

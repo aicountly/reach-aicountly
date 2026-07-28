@@ -6,23 +6,45 @@ use App\Controllers\Api\V1\BaseApiController;
 
 class PublishingCalendarController extends BaseApiController
 {
-    private \CodeIgniter\Database\BaseConnection $db;
-
-    public function __construct()
-    {
-        $this->db = \Config\Database::connect();
-    }
-
     public function index(): \CodeIgniter\HTTP\ResponseInterface
     {
-        $rows = $this->db->table('reach_publication_deployments d')
-            ->select('d.id, d.status, d.scheduled_at, d.content_item_id, ci.title AS content_title, ci.content_type')
-            ->join('reach_content_items ci', 'ci.id = d.content_item_id', 'left')
-            ->whereIn('d.status', ['scheduled', 'queued', 'published', 'verified'])
-            ->orderBy('d.scheduled_at', 'ASC')
-            ->limit(100)
-            ->get()->getResultArray();
+        try {
+            $db = \Config\Database::connect();
 
-        return $this->ok($rows);
+            if (
+                ! $db->tableExists('reach_publication_deployments')
+                || ! $db->tableExists('reach_content_items')
+            ) {
+                return $this->ok([]);
+            }
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $rows = $db->table('reach_publication_deployments')
+                ->select(
+                    'reach_publication_deployments.id, '
+                    . 'reach_publication_deployments.status, '
+                    . 'reach_publication_deployments.scheduled_at, '
+                    . 'reach_publication_deployments.content_item_id, '
+                    . 'reach_content_items.title AS content_title, '
+                    . 'reach_content_items.content_type'
+                )
+                ->join(
+                    'reach_content_items',
+                    'reach_content_items.id = reach_publication_deployments.content_item_id',
+                    'left'
+                )
+                ->whereIn('reach_publication_deployments.status', ['scheduled', 'queued', 'published', 'verified'])
+                ->orderBy('reach_publication_deployments.scheduled_at', 'ASC')
+                ->limit(100)
+                ->get()
+                ->getResultArray();
+
+            return $this->ok(is_array($rows) ? $rows : []);
+        } catch (\Throwable $e) {
+            log_message('error', 'PublishingCalendarController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Publishing UI.
+            return $this->ok([]);
+        }
     }
 }

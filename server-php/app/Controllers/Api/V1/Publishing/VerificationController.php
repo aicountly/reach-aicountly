@@ -6,21 +6,29 @@ use App\Controllers\Api\V1\BaseApiController;
 
 class VerificationController extends BaseApiController
 {
-    private \CodeIgniter\Database\BaseConnection $db;
-
-    public function __construct()
-    {
-        $this->db = \Config\Database::connect();
-    }
-
     public function index(): \CodeIgniter\HTTP\ResponseInterface
     {
-        $rows = $this->db->table('reach_publication_verifications v')
-            ->select('v.*')
-            ->orderBy('v.id', 'DESC')
-            ->limit(100)
-            ->get()->getResultArray();
+        try {
+            $db = \Config\Database::connect();
 
-        return $this->ok($rows);
+            if (! $db->tableExists('reach_publication_verifications')) {
+                return $this->ok([]);
+            }
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $rows = $db->table('reach_publication_verifications')
+                ->select('reach_publication_verifications.*')
+                ->orderBy('reach_publication_verifications.id', 'DESC')
+                ->limit(100)
+                ->get()
+                ->getResultArray();
+
+            return $this->ok(is_array($rows) ? $rows : []);
+        } catch (\Throwable $e) {
+            log_message('error', 'VerificationController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Publishing UI.
+            return $this->ok([]);
+        }
     }
 }

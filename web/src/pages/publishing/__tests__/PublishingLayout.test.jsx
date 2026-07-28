@@ -11,8 +11,9 @@ const ctx = {
 };
 
 describe('PublishingLayout', () => {
-  it('renders navigation links', () => {
+  it('renders section title and navigation links', () => {
     renderWithAuth(<PublishingLayout />, ctx);
+    expect(screen.getByText('Publishing')).toBeInTheDocument();
     expect(screen.getByText('Blogs')).toBeInTheDocument();
     expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
     expect(screen.getByText('Calendar')).toBeInTheDocument();

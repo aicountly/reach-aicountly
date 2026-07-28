@@ -13,10 +13,14 @@ export default function WhatsAppDispatchPage() {
 
   const loadCampaigns = useCallback(() => {
     setLoading(true);
-    api.get(`/whatsapp-campaigns?status=${filter}&page=${page}&per_page=${perPage}`)
+    api.get('v1/whatsapp/campaigns', {
+      status: filter === 'all' ? undefined : filter,
+      page,
+      limit: perPage,
+    })
       .then(r => {
-        setCampaigns(r.data?.data?.data ?? r.data?.data ?? []);
-        setTotal(r.data?.data?.total ?? 0);
+        setCampaigns(r?.items ?? []);
+        setTotal(r?.total ?? 0);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -25,19 +29,19 @@ export default function WhatsAppDispatchPage() {
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
   useEffect(() => {
-    api.get('/distribution/whatsapp/templates')
-      .then(r => setTemplates(r.data?.data ?? []))
+    api.get('v1/distribution/whatsapp/templates')
+      .then(r => setTemplates(Array.isArray(r) ? r : (r?.data ?? [])))
       .catch(() => {});
   }, []);
 
   const handleDispatch = async (id) => {
     if (!confirm('Dispatch this WhatsApp campaign? All recipients must be opted-in.')) return;
     try {
-      const r = await api.post(`/distribution/whatsapp/dispatch/${id}`);
-      alert(`Dispatch result: ${r.data?.data?.status ?? 'dispatched'}`);
+      const r = await api.post(`v1/distribution/whatsapp/dispatch/${id}`);
+      alert(`Dispatch result: ${r?.status ?? 'dispatched'}`);
       loadCampaigns();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 

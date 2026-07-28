@@ -4,23 +4,28 @@ import api from '../../services/api';
 export default function DistributionAnalyticsPage() {
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
 
   useEffect(() => {
-    api.get('/distribution/analytics')
-      .then(r => setMetrics(r.data?.data ?? []))
-      .catch(() => {})
+    api.get('v1/distribution/analytics')
+      .then(r => setMetrics(Array.isArray(r) ? r : (r?.data ?? [])))
+      .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header page-header--stack">
         <h1>Distribution Analytics</h1>
-        <p className="page-header__subtitle">Delivery, engagement, and compliance metrics across all channels</p>
+        <p className="page-header__subtitle">
+          Delivery, engagement, and compliance metrics across all channels
+        </p>
       </div>
 
+      {error && <p className="text-error">{error}</p>}
       {loading && <p className="muted">Loading analytics…</p>}
-      {!loading && metrics.length === 0 && (
+
+      {!loading && !error && metrics.length === 0 && (
         <p className="muted">No analytics data available yet. Dispatch campaigns to generate metrics.</p>
       )}
 
@@ -39,9 +44,9 @@ export default function DistributionAnalyticsPage() {
             </tr>
           </thead>
           <tbody>
-            {metrics.map((m, i) => (
-              <tr key={i}>
-                <td>{m.campaign_id}</td>
+            {metrics.map((m) => (
+              <tr key={m.id ?? `${m.dispatch_id}-${m.channel}`}>
+                <td>{m.campaign_id ?? '—'}</td>
                 <td><span className="badge badge--neutral">{m.channel}</span></td>
                 <td>{m.sent_count ?? 0}</td>
                 <td>{m.delivered_count ?? 0}</td>

@@ -12,12 +12,22 @@ export default function EmailDispatchPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get(`/email-campaigns?status=${filter}&page=${page}&per_page=${perPage}`)
+    setError(null);
+    api.get('v1/email/campaigns', {
+      status: filter === 'all' ? undefined : filter,
+      page,
+      limit: perPage,
+    })
       .then(r => {
-        setCampaigns(r.data?.data?.data ?? r.data?.data ?? []);
-        setTotal(r.data?.data?.total ?? 0);
+        const items = Array.isArray(r) ? r : (r?.items ?? r?.data ?? []);
+        setCampaigns(items);
+        setTotal(r?.total ?? items.length);
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        setError(e.message);
+        setCampaigns([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
   }, [page, filter]);
 
@@ -26,12 +36,11 @@ export default function EmailDispatchPage() {
   const handleDispatch = async (id) => {
     if (!confirm('Dispatch this email campaign to the provider?')) return;
     try {
-      const r = await api.post(`/distribution/email/dispatch/${id}`);
-      const status = r.data?.data?.status ?? 'dispatched';
-      alert(`Dispatch result: ${status}`);
+      const r = await api.post(`v1/distribution/email/dispatch/${id}`);
+      alert(`Dispatch result: ${r?.status ?? 'dispatched'}`);
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 

@@ -81,7 +81,10 @@ abstract class BaseApiController extends Controller
     protected function pagination(int $defaultLimit = 25, int $maxLimit = 200): array
     {
         $page  = max(1, (int) ($this->request->getGet('page') ?? 1));
-        $limit = (int) ($this->request->getGet('limit') ?? $defaultLimit);
+        // Accept both `limit` (canonical) and `per_page` (legacy clients).
+        $limit = (int) ($this->request->getGet('limit')
+            ?? $this->request->getGet('per_page')
+            ?? $defaultLimit);
         $limit = max(1, min($maxLimit, $limit));
         return [$page, $limit, ($page - 1) * $limit];
     }

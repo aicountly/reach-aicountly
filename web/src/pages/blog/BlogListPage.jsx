@@ -37,8 +37,11 @@ export function BlogListPage() {
 
   const handleDelete = async (e, post) => {
     e.stopPropagation();
-    if (post.status === 'archived') return;
-    if (!window.confirm(`Delete “${post.title || 'untitled'}”? This will archive the post.`)) return;
+    const permanent = post.status === 'archived';
+    const message = permanent
+      ? `Permanently delete “${post.title || 'untitled'}”? This cannot be undone.`
+      : `Delete “${post.title || 'untitled'}”? This will archive the post.`;
+    if (!window.confirm(message)) return;
     setDeletingId(post.id);
     setError(null);
     try {
@@ -64,18 +67,16 @@ export function BlogListPage() {
     { key: 'publishing_status', label: 'Publishing', render: (r) => <StatusBadge status={r.publishing_status || 'none'} /> },
     { key: 'bot_generated', label: 'Bot?', render: (r) => r.bot_generated ? 'Yes' : 'No' },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleString() : '—' },
-    { key: 'actions', label: '', render: (r) => (
-      r.status === 'archived' ? null : (
-        <button
-          type="button"
-          className="btn btn-danger btn-sm"
-          disabled={deletingId === r.id}
-          onClick={(e) => handleDelete(e, r)}
-          title="Delete post"
-        >
-          <Trash2 size={12} /> {deletingId === r.id ? 'Deleting…' : 'Delete'}
-        </button>
-      )
+    { key: 'actions', label: 'Actions', width: 110, render: (r) => (
+      <button
+        type="button"
+        className="btn btn-danger btn-sm"
+        disabled={deletingId === r.id}
+        onClick={(e) => handleDelete(e, r)}
+        title={r.status === 'archived' ? 'Permanently delete post' : 'Archive post'}
+      >
+        <Trash2 size={12} /> {deletingId === r.id ? 'Deleting…' : 'Delete'}
+      </button>
     )},
   ];
 

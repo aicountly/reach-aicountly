@@ -9,15 +9,16 @@ export default function PublishingCalendarPage() {
   useEffect(() => {
     api.get('v1/publishing/calendar')
       .then((r) => setScheduled(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e?.message || 'Failed to load publication calendar.'))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <p className="muted">Loading calendar…</p>;
   if (error) return <p className="text-error">{error}</p>;
 
-  const grouped = scheduled.reduce((acc, item) => {
-    const date = item.scheduled_at ? item.scheduled_at.split('T')[0] : 'Unscheduled';
+  const grouped = (Array.isArray(scheduled) ? scheduled : []).reduce((acc, item) => {
+    const raw = item?.scheduled_at;
+    const date = raw ? String(raw).split(/[T ]/)[0] : 'Unscheduled';
     acc[date] = acc[date] ?? [];
     acc[date].push(item);
     return acc;

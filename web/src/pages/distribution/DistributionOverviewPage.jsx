@@ -8,12 +8,12 @@ export default function DistributionOverviewPage() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/campaigns?per_page=1').catch(() => ({ data: null })),
-      api.get('/distribution/dispatches?per_page=1').catch(() => ({ data: null })),
+      api.get('v1/campaigns', { per_page: 1, limit: 1 }).catch(() => null),
+      api.get('v1/distribution/dispatches', { per_page: 1 }).catch(() => null),
     ]).then(([campaigns, dispatches]) => {
       setStats({
-        totalCampaigns: campaigns.data?.data?.total ?? 0,
-        totalDispatches: dispatches.data?.data?.total ?? 0,
+        totalCampaigns: campaigns?.total ?? 0,
+        totalDispatches: dispatches?.total ?? 0,
       });
     }).finally(() => setLoading(false));
   }, []);

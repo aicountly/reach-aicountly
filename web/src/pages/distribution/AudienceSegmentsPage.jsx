@@ -12,8 +12,8 @@ export default function AudienceSegmentsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get('/distribution/segments')
-      .then(r => setSegments(r.data?.data ?? []))
+    api.get('v1/distribution/segments')
+      .then(r => setSegments(r?.data ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -22,32 +22,32 @@ export default function AudienceSegmentsPage() {
 
   const handleCreate = async () => {
     try {
-      await api.post('/distribution/segments', { name: newName, segment_type: newType });
+      await api.post('v1/distribution/segments', { name: newName, segment_type: newType });
       setCreating(false);
       setNewName('');
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Deactivate this segment?')) return;
     try {
-      await api.delete(`/distribution/segments/${id}`);
+      await api.delete(`v1/distribution/segments/${id}`);
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 
   const handlePreview = async (id) => {
     try {
-      const r = await api.post(`/distribution/segments/${id}/preview`);
-      alert(`Estimated count: ${r.data?.data?.estimated_count ?? 0}`);
+      const r = await api.post(`v1/distribution/segments/${id}/preview`);
+      alert(`Estimated count: ${r?.estimated_count ?? 0}`);
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 

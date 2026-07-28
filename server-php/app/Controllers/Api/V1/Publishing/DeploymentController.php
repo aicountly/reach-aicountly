@@ -9,45 +9,101 @@ use App\Libraries\Publishing\Jobs\PublicationRollbackService;
 
 class DeploymentController extends BaseApiController
 {
-    private \CodeIgniter\Database\BaseConnection $db;
-
-    public function __construct()
+    private function db(): \CodeIgniter\Database\BaseConnection
     {
-        $this->db = \Config\Database::connect();
+        return \Config\Database::connect();
     }
 
     public function index(): \CodeIgniter\HTTP\ResponseInterface
     {
-        $page  = (int) ($this->request->getGet('page') ?? 1);
-        $limit = 25;
+        $page   = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $limit  = 25;
         $offset = ($page - 1) * $limit;
 
-        $total = $this->db->table('reach_publication_deployments')->countAllResults(false);
-
-        $rows = $this->db->table('reach_publication_deployments d')
-            ->select('d.*, ci.title AS content_title, ci.content_type')
-            ->join('reach_content_items ci', 'ci.id = d.content_item_id', 'left')
-            ->orderBy('d.updated_at', 'DESC')
-            ->limit($limit, $offset)
-            ->get()->getResultArray();
-
-        return $this->ok($rows, [
-            'total'     => $total,
+        $emptyMeta = [
+            'total'     => 0,
             'page'      => $page,
             'per_page'  => $limit,
-            'last_page' => max(1, (int) ceil($total / $limit)),
-        ]);
+            'last_page' => 1,
+        ];
+
+        try {
+            $db = $this->db();
+
+            if (
+                ! $db->tableExists('reach_publication_deployments')
+                || ! $db->tableExists('reach_content_items')
+            ) {
+                return $this->ok([], $emptyMeta);
+            }
+
+            $total = $db->table('reach_publication_deployments')->countAllResults();
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $rows = $db->table('reach_publication_deployments')
+                ->select(
+                    'reach_publication_deployments.*, '
+                    . 'reach_content_items.title AS content_title, '
+                    . 'reach_content_items.content_type'
+                )
+                ->join(
+                    'reach_content_items',
+                    'reach_content_items.id = reach_publication_deployments.content_item_id',
+                    'left'
+                )
+                ->orderBy('reach_publication_deployments.updated_at', 'DESC')
+                ->limit($limit, $offset)
+                ->get()
+                ->getResultArray();
+
+            return $this->ok(is_array($rows) ? $rows : [], [
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $limit,
+                'last_page' => max(1, (int) ceil($total / $limit)),
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'DeploymentController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Publishing UI.
+            return $this->ok([], $emptyMeta);
+        }
     }
 
     public function show(int $id): \CodeIgniter\HTTP\ResponseInterface
     {
-        $row = $this->db->table('reach_publication_deployments d')
-            ->select('d.*, ci.title AS content_title, ci.content_type')
-            ->join('reach_content_items ci', 'ci.id = d.content_item_id', 'left')
-            ->where('d.id', $id)
-            ->get()->getRowArray();
+        try {
+            $db = $this->db();
 
-        if (!$row) {
+            if (
+                ! $db->tableExists('reach_publication_deployments')
+                || ! $db->tableExists('reach_content_items')
+            ) {
+                return $this->notFound('Deployment not found');
+            }
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $row = $db->table('reach_publication_deployments')
+                ->select(
+                    'reach_publication_deployments.*, '
+                    . 'reach_content_items.title AS content_title, '
+                    . 'reach_content_items.content_type'
+                )
+                ->join(
+                    'reach_content_items',
+                    'reach_content_items.id = reach_publication_deployments.content_item_id',
+                    'left'
+                )
+                ->where('reach_publication_deployments.id', $id)
+                ->get()
+                ->getRowArray();
+        } catch (\Throwable $e) {
+            log_message('error', 'DeploymentController::show: ' . $e->getMessage());
+            return $this->notFound('Deployment not found');
+        }
+
+        if (! $row) {
             return $this->notFound('Deployment not found');
         }
 
@@ -56,12 +112,23 @@ class DeploymentController extends BaseApiController
 
     public function verifications(int $id): \CodeIgniter\HTTP\ResponseInterface
     {
-        $rows = $this->db->table('reach_publication_verifications')
-            ->where('deployment_id', $id)
-            ->orderBy('id', 'ASC')
-            ->get()->getResultArray();
+        try {
+            $db = $this->db();
+            if (! $db->tableExists('reach_publication_verifications')) {
+                return $this->ok([]);
+            }
 
-        return $this->ok($rows);
+            $rows = $db->table('reach_publication_verifications')
+                ->where('deployment_id', $id)
+                ->orderBy('id', 'ASC')
+                ->get()
+                ->getResultArray();
+
+            return $this->ok(is_array($rows) ? $rows : []);
+        } catch (\Throwable $e) {
+            log_message('error', 'DeploymentController::verifications: ' . $e->getMessage());
+            return $this->ok([]);
+        }
     }
 
     public function retry(int $id): \CodeIgniter\HTTP\ResponseInterface

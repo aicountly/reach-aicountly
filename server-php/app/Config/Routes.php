@@ -39,6 +39,18 @@ $routes->get('health', static function () {
 
 /*
  * -----------------------------------------------------------------------------
+ * Legacy path aliases (pre-/v1 distribution UI).
+ * Keep until production frontend is fully on /api/v1/... paths.
+ * -----------------------------------------------------------------------------
+ */
+$routes->group('', ['filter' => 'jwt'], static function ($routes) {
+    $routes->get('email-campaigns',    'Api\\V1\\EmailCampaignController::index',  ['filter' => 'permission:email.view']);
+    $routes->get('whatsapp-campaigns', 'Api\\V1\\WhatsAppCampaignController::index', ['filter' => 'permission:whatsapp.view']);
+    $routes->get('social-posts',       'Api\\V1\\SocialPostController::index',     ['filter' => 'permission:social.view']);
+});
+
+/*
+ * -----------------------------------------------------------------------------
  * Reach API v1 routes.
  *
  * Filter model (Phase 0):
@@ -629,6 +641,7 @@ $routes->group('v1', static function ($routes) {
 
         // Render (CP6)
         $routes->post('video/projects/(:segment)/render',                    'Api\\V1\\Video\\VideoRenderController::queue/$1',                         ['filter' => 'permission:video.render']);
+        $routes->get('video/render-jobs',                                    'Api\\V1\\Video\\VideoRenderController::listJobs',                          ['filter' => 'permission:video.read']);
         $routes->get('video/render-jobs/(:segment)',                         'Api\\V1\\Video\\VideoRenderController::showJob/$1',                        ['filter' => 'permission:video.read']);
         $routes->delete('video/render-jobs/(:segment)',                      'Api\\V1\\Video\\VideoRenderController::cancel/$1',                         ['filter' => 'permission:video.cancel']);
         $routes->post('video/render-jobs/(:segment)/retry',                  'Api\\V1\\Video\\VideoRenderController::retry/$1',                          ['filter' => 'permission:video.retry']);
@@ -675,14 +688,14 @@ $routes->group('v1', static function ($routes) {
         $routes->post('distribution/segments/(:segment)/preview',            'Api\\V1\\Distribution\\AudienceSegmentController::preview/$1',['filter' => 'permission:distribution.preview']);
 
         // Consents (CP3)
-        $routes->get('distribution/consents',                                'Api\\V1\\Distribution\\ConsentController::index',            ['filter' => 'permission:distribution.consent.read']);
-        $routes->post('distribution/consents',                               'Api\\V1\\Distribution\\ConsentController::store',            ['filter' => 'permission:distribution.consent.manage']);
-        $routes->delete('distribution/consents/(:num)',                      'Api\\V1\\Distribution\\ConsentController::destroy/$1',       ['filter' => 'permission:distribution.consent.manage']);
+        $routes->get('distribution/consents',                                'Api\\V1\\Distribution\\ConsentController::index',            ['filter' => 'permission:distribution.read_consent']);
+        $routes->post('distribution/consents',                               'Api\\V1\\Distribution\\ConsentController::store',            ['filter' => 'permission:distribution.manage_consent']);
+        $routes->delete('distribution/consents/(:num)',                      'Api\\V1\\Distribution\\ConsentController::destroy/$1',       ['filter' => 'permission:distribution.manage_consent']);
 
         // Suppressions (CP3)
-        $routes->get('distribution/suppressions',                            'Api\\V1\\Distribution\\SuppressionController::index',        ['filter' => 'permission:distribution.suppression.read']);
-        $routes->post('distribution/suppressions',                           'Api\\V1\\Distribution\\SuppressionController::store',        ['filter' => 'permission:distribution.suppression.manage']);
-        $routes->delete('distribution/suppressions/(:num)',                  'Api\\V1\\Distribution\\SuppressionController::destroy/$1',   ['filter' => 'permission:distribution.suppression.manage']);
+        $routes->get('distribution/suppressions',                            'Api\\V1\\Distribution\\SuppressionController::index',        ['filter' => 'permission:distribution.read_suppression']);
+        $routes->post('distribution/suppressions',                           'Api\\V1\\Distribution\\SuppressionController::store',        ['filter' => 'permission:distribution.manage_suppression']);
+        $routes->delete('distribution/suppressions/(:num)',                  'Api\\V1\\Distribution\\SuppressionController::destroy/$1',   ['filter' => 'permission:distribution.manage_suppression']);
 
         // Audience snapshots (CP3)
         $routes->get('distribution/campaigns/(:num)/audience-snapshot',      'Api\\V1\\Distribution\\AudienceSnapshotController::show/$1',  ['filter' => 'permission:distribution.read']);
@@ -703,6 +716,14 @@ $routes->group('v1', static function ($routes) {
         // Channel variants (CP4)
         $routes->put('distribution/variants/(:num)',                         'Api\\V1\\Distribution\\ChannelVariantController::update/$1',          ['filter' => 'permission:distribution.update']);
         $routes->post('distribution/variants/(:num)/validate',               'Api\\V1\\Distribution\\ChannelVariantController::validate/$1',        ['filter' => 'permission:distribution.update']);
+
+        // Dispatch orchestration (list / inspect / reconcile)
+        $routes->get('distribution/dispatches',                              'Api\\V1\\Distribution\\DispatchController::index',                    ['filter' => 'permission:distribution.read']);
+        $routes->get('distribution/dispatches/(:num)',                       'Api\\V1\\Distribution\\DispatchController::show/$1',                  ['filter' => 'permission:distribution.read']);
+        $routes->post('distribution/dispatches/(:num)/reconcile',            'Api\\V1\\Distribution\\DispatchController::reconcile/$1',             ['filter' => 'permission:distribution.retry']);
+
+        // Analytics
+        $routes->get('distribution/analytics',                               'Api\\V1\\Distribution\\AnalyticsController::index',                   ['filter' => 'permission:distribution.read']);
 
         // Social dispatch (CP5)
         $routes->post('distribution/social/dispatch/(:num)',                 'Api\\V1\\Distribution\\SocialDispatchController::dispatch/$1',        ['filter' => 'permission:distribution.dispatch']);

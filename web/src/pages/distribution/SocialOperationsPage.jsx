@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
+const FILTERS = ['all', 'approved', 'posted', 'failed', 'scheduled'];
+
 export default function SocialOperationsPage() {
   const [posts, setPosts]     = useState([]);
   const [total, setTotal]     = useState(0);
@@ -12,12 +14,22 @@ export default function SocialOperationsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get(`/social-posts?status=${filter}&page=${page}&per_page=${perPage}`)
-      .then(r => {
-        setPosts(r.data?.data?.data ?? r.data?.data ?? []);
-        setTotal(r.data?.data?.total ?? 0);
+    setError(null);
+    api.get('v1/social/posts', {
+      status: filter === 'all' ? undefined : filter,
+      page,
+      limit: perPage,
+    })
+      .then((r) => {
+        const items = Array.isArray(r) ? r : (r?.items ?? r?.data ?? []);
+        setPosts(items);
+        setTotal(r?.total ?? items.length);
       })
-      .catch(e => setError(e.message))
+      .catch((e) => {
+        setError(e.message);
+        setPosts([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
   }, [page, filter]);
 
@@ -26,16 +38,13 @@ export default function SocialOperationsPage() {
   const handleDispatch = async (postId) => {
     if (!confirm('Dispatch this post to the social provider?')) return;
     try {
-      const r = await api.post(`/distribution/social/dispatch/${postId}`);
-      const status = r.data?.data?.status ?? 'dispatched';
-      alert(`Dispatch result: ${status}`);
+      const r = await api.post(`v1/distribution/social/dispatch/${postId}`);
+      alert(`Dispatch result: ${r?.status ?? 'dispatched'}`);
       load();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
-
-  const FILTERS = ['all', 'approved', 'posted', 'failed', 'scheduled'];
 
   return (
     <div>
@@ -45,9 +54,10 @@ export default function SocialOperationsPage() {
       </div>
 
       <div className="filter-bar mb-4">
-        {FILTERS.map(f => (
+        {FILTERS.map((f) => (
           <button
             key={f}
+            type="button"
             className={`btn btn--sm mr-1 ${filter === f ? 'btn--primary' : 'btn--outline'}`}
             onClick={() => { setFilter(f); setPage(1); }}
           >
@@ -56,10 +66,10 @@ export default function SocialOperationsPage() {
         ))}
       </div>
 
-      {error && <p className="text-error">{error}</p>}
+      {error && <p className="text-error" role="alert">{error}</p>}
       {loading && <p className="muted">Loading social posts…</p>}
 
-      {!loading && posts.length === 0 && (
+      {!loading && !error && posts.length === 0 && (
         <p className="muted">No social posts found for the selected filter.</p>
       )}
 
@@ -75,15 +85,17 @@ export default function SocialOperationsPage() {
             </tr>
           </thead>
           <tbody>
-            {posts.map(p => (
+            {posts.map((p) => (
               <tr key={p.id}>
                 <td><span className="badge badge--neutral">{p.channel}</span></td>
-                <td className="text-truncate" style={{maxWidth:'300px'}}>{p.content?.slice(0, 80)}…</td>
+                <td className="text-truncate" style={{ maxWidth: '300px' }}>
+                  {(p.content || '').slice(0, 80)}{(p.content || '').length > 80 ? '…' : ''}
+                </td>
                 <td><span className="badge badge--neutral">{p.status}</span></td>
                 <td>{p.provider ?? '—'}</td>
                 <td>
                   {p.status === 'approved' && (
-                    <button className="btn btn--sm btn--primary" onClick={() => handleDispatch(p.id)}>
+                    <button type="button" className="btn btn--sm btn--primary" onClick={() => handleDispatch(p.id)}>
                       Dispatch
                     </button>
                   )}
@@ -101,9 +113,9 @@ export default function SocialOperationsPage() {
 
       {total > perPage && (
         <div className="pagination mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="btn btn--sm">Previous</button>
+          <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="btn btn--sm">Previous</button>
           <span className="mx-2">Page {page} of {Math.ceil(total / perPage)}</span>
-          <button disabled={page * perPage >= total} onClick={() => setPage(p => p + 1)} className="btn btn--sm">Next</button>
+          <button type="button" disabled={page * perPage >= total} onClick={() => setPage((p) => p + 1)} className="btn btn--sm">Next</button>
         </div>
       )}
     </div>

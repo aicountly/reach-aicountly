@@ -16,7 +16,7 @@ function renderPage() {
 
 describe('DistributionOverviewPage', () => {
   beforeEach(() => {
-    api.get.mockResolvedValue({ data: { data: { total: 0 } } });
+    api.get.mockResolvedValue({ total: 0, data: [] });
   });
 
   it('renders the page title', async () => {
@@ -30,5 +30,11 @@ describe('DistributionOverviewPage', () => {
     expect(screen.getByText('Email Dispatch')).toBeTruthy();
     expect(screen.getByText('WhatsApp')).toBeTruthy();
     expect(screen.getByText('SMS')).toBeTruthy();
+  });
+
+  it('requests campaigns and dispatches under v1/', async () => {
+    renderPage();
+    expect(api.get).toHaveBeenCalledWith('v1/campaigns', { per_page: 1, limit: 1 });
+    expect(api.get).toHaveBeenCalledWith('v1/distribution/dispatches', { per_page: 1 });
   });
 });

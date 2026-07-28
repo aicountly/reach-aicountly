@@ -13,10 +13,15 @@ export default function SmsDispatchPage() {
 
   const loadCampaigns = useCallback(() => {
     setLoading(true);
-    api.get(`/campaigns?channel=sms&status=${filter}&page=${page}&per_page=${perPage}`)
+    api.get('v1/campaigns', {
+      channel: 'sms',
+      status: filter === 'all' ? undefined : filter,
+      page,
+      limit: perPage,
+    })
       .then(r => {
-        setCampaigns(r.data?.data?.data ?? r.data?.data ?? []);
-        setTotal(r.data?.data?.total ?? 0);
+        setCampaigns(r?.items ?? []);
+        setTotal(r?.total ?? 0);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -25,19 +30,19 @@ export default function SmsDispatchPage() {
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
   useEffect(() => {
-    api.get('/distribution/sms/capabilities')
-      .then(r => setCaps(r.data?.data))
+    api.get('v1/distribution/sms/capabilities')
+      .then(r => setCaps(r))
       .catch(() => {});
   }, []);
 
   const handleDispatch = async (id) => {
     if (!confirm('Dispatch this SMS campaign? Ensure DLT registration is valid.')) return;
     try {
-      const r = await api.post(`/distribution/sms/dispatch/${id}`);
-      alert(`Dispatch result: ${r.data?.data?.status ?? 'dispatched'}`);
+      const r = await api.post(`v1/distribution/sms/dispatch/${id}`);
+      alert(`Dispatch result: ${r?.status ?? 'dispatched'}`);
       loadCampaigns();
     } catch (e) {
-      alert(e.response?.data?.message ?? e.message);
+      alert(e.message);
     }
   };
 
