@@ -7,8 +7,8 @@ export default function VideoOperationsDashboardPage() {
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    api.get('/video/operations')
-      .then(r => setOps(r.data?.data ?? {}))
+    api.get('v1/video/operations')
+      .then(r => setOps(r ?? {}))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

@@ -15,16 +15,26 @@ const ctx = {
   },
 };
 
-const mockIdeas    = { data: { data: { total: 3 } } };
-const mockProjects = { data: { data: { total: 5 } } };
-
 beforeEach(() => { api.get.mockReset(); });
 
 describe('VideoOverviewPage', () => {
   it('renders the page heading', async () => {
-    api.get.mockResolvedValueOnce(mockIdeas).mockResolvedValueOnce(mockProjects);
+    api.get
+      .mockResolvedValueOnce({ data: [], total: 3 })
+      .mockResolvedValueOnce({ data: [], total: 5 });
     renderWithAuth(<VideoOverviewPage />, ctx);
     await waitFor(() => expect(screen.getByText('Video Automation')).toBeInTheDocument());
+  });
+
+  it('requests ideas and projects under v1/', async () => {
+    api.get
+      .mockResolvedValueOnce({ data: [], total: 0 })
+      .mockResolvedValueOnce({ data: [], total: 0 });
+    renderWithAuth(<VideoOverviewPage />, ctx);
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('v1/video/ideas', { per_page: 1 });
+      expect(api.get).toHaveBeenCalledWith('v1/video/projects', { per_page: 1 });
+    });
   });
 
   it('shows loading state initially', () => {

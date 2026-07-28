@@ -15,7 +15,7 @@ const ctx = {
   },
 };
 
-const emptyResponse = { data: { data: { data: [], total: 0 } } };
+const emptyResponse = { data: [], total: 0 };
 
 beforeEach(() => { api.get.mockReset(); });
 
