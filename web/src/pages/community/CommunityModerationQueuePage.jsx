@@ -21,9 +21,9 @@ export default function CommunityModerationQueuePage() {
 
   function load() {
     setLoading(true);
-    api.get('/community/moderation/queue', { params: { page } })
+    api.get('v1/community/moderation/queue', { page })
       .then(r => {
-        setFindings(r.data?.data ?? []);
+        setFindings(Array.isArray(r) ? r : (r?.data ?? []));
         setTotalPages(r.data?.meta?.last_page ?? 1);
       })
       .catch(e => setError(e.message))
@@ -35,7 +35,7 @@ export default function CommunityModerationQueuePage() {
   async function handleResolve(id) {
     const note = prompt('Resolution note:') || '';
     try {
-      await api.post(`/community/moderation/${id}/resolve`, { resolution_note: note });
+      await api.post(`v1/community/moderation/${id}/resolve`, { resolution_note: note });
       setActionMsg(`Finding #${id} resolved.`);
       load();
     } catch (e) {
@@ -46,7 +46,7 @@ export default function CommunityModerationQueuePage() {
   async function handleEscalate(id) {
     const note = prompt('Escalation note:') || '';
     try {
-      await api.post(`/community/moderation/${id}/escalate`, { note });
+      await api.post(`v1/community/moderation/${id}/escalate`, { note });
       setActionMsg(`Finding #${id} escalated.`);
       load();
     } catch (e) {

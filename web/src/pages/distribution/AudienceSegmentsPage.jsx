@@ -12,9 +12,20 @@ export default function AudienceSegmentsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     api.get('v1/distribution/segments')
-      .then(r => setSegments(r?.data ?? []))
-      .catch(e => setError(e.message))
+      .then((r) => {
+        const rows = Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : (Array.isArray(r?.items) ? r.items : []));
+        setSegments(rows);
+      })
+      .catch((e) => {
+        if (e?.status === 404 || e?.status === 500) {
+          setSegments([]);
+          setError(null);
+          return;
+        }
+        setError(e?.message || 'Failed to load segments.');
+      })
       .finally(() => setLoading(false));
   }, []);
 

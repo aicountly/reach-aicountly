@@ -36,15 +36,30 @@ class VideoProjectController extends BaseApiController
 
     public function index(): ResponseInterface
     {
-        $page    = (int) ($this->request->getGet('page') ?? 1);
-        $perPage = min((int) ($this->request->getGet('per_page') ?? 25), 100);
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage = min(max(1, (int) ($this->request->getGet('per_page') ?? 25)), 100);
         $filters = [
             'status' => $this->request->getGet('status') ?? '',
             'search' => $this->request->getGet('search') ?? '',
         ];
+        $empty = ['data' => [], 'total' => 0, 'page' => $page, 'per_page' => $perPage];
 
-        $result = $this->repo->listForTenant($this->tenantId(), $filters, $page, $perPage);
-        return $this->ok($result);
+        try {
+            $db = \Config\Database::connect();
+            if (
+                ! $db->tableExists('reach_video_projects')
+                || ! $db->tableExists('reach_video_ideas')
+            ) {
+                return $this->ok($empty);
+            }
+
+            $result = $this->repo->listForTenant($this->tenantId(), $filters, $page, $perPage);
+            return $this->ok($result);
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoProjectController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Video UI.
+            return $this->ok($empty);
+        }
     }
 
     public function show(string $uuid): ResponseInterface

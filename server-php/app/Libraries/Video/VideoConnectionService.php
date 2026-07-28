@@ -12,6 +12,12 @@ use App\Libraries\AuditLogger;
  * Reuses the Phase 4 `reach_publication_connections` table with
  * `connection_type = 'youtube'` and `authentication_type = 'oauth2'`.
  *
+ * Column mapping (Phase 4 schema + Phase 6 extensions):
+ * - display_name  → API "name"
+ * - enabled       → active flag (is_active in older drafts)
+ * - connection_key → stable unique key (youtube-{uuid})
+ * - uuid / tenant_id / credentials → added by 100195
+ *
  * Security contract:
  * - OAuth2 tokens are stored in the existing encrypted credential store.
  * - Access tokens are NEVER returned in API responses (masked).
@@ -22,6 +28,7 @@ class VideoConnectionService
 {
     private const CONNECTION_TYPE = 'youtube';
     private const AUTH_TYPE       = 'oauth2';
+    private const YOUTUBE_BASE    = 'https://www.googleapis.com/youtube/v3';
 
     public function __construct(
         private readonly \App\Libraries\Video\VideoPublicationRepository $repo,
@@ -32,15 +39,23 @@ class VideoConnectionService
      */
     public function listConnections(int $tenantId): array
     {
-        $rows = \Config\Database::connect()
-            ->table('reach_publication_connections')
-            ->where('tenant_id', $tenantId)
-            ->where('connection_type', self::CONNECTION_TYPE)
-            ->where('is_active', true)
-            ->orderBy('created_at', 'DESC')
-            ->get()->getResultArray();
+        $db = \Config\Database::connect();
+        if (! $db->tableExists('reach_publication_connections')) {
+            return [];
+        }
 
-        return array_map([$this, 'maskConnection'], $rows);
+        $builder = $db->table('reach_publication_connections')
+            ->where('connection_type', self::CONNECTION_TYPE)
+            ->where('enabled', true)
+            ->orderBy('created_at', 'DESC');
+
+        if ($db->fieldExists('tenant_id', 'reach_publication_connections')) {
+            $builder->where('tenant_id', $tenantId);
+        }
+
+        $rows = $builder->get()->getResultArray();
+
+        return array_map([$this, 'maskConnection'], is_array($rows) ? $rows : []);
     }
 
     /**
@@ -51,29 +66,54 @@ class VideoConnectionService
     public function create(int $tenantId, array $data, ?int $actorId = null): array
     {
         $db = \Config\Database::connect();
-        $db->table('reach_publication_connections')->insert([
-            'tenant_id'          => $tenantId,
-            'connection_type'    => self::CONNECTION_TYPE,
-            'authentication_type'=> self::AUTH_TYPE,
-            'name'               => $data['name'] ?? 'YouTube Connection',
-            'credentials'        => json_encode([
+        if (! $db->tableExists('reach_publication_connections')) {
+            throw new \RuntimeException('Publication connections table is not available');
+        }
+
+        $uuid = $this->newUuid();
+        $name = trim((string) ($data['name'] ?? 'YouTube Connection'));
+        if ($name === '') {
+            $name = 'YouTube Connection';
+        }
+
+        $row = [
+            'connection_key'      => 'youtube-' . $uuid,
+            'display_name'        => $name,
+            'base_url'            => self::YOUTUBE_BASE,
+            'authentication_type' => self::AUTH_TYPE,
+            'connection_type'     => self::CONNECTION_TYPE,
+            'enabled'             => true,
+            'supported_content_types' => json_encode(['video']),
+        ];
+
+        if ($db->fieldExists('uuid', 'reach_publication_connections')) {
+            $row['uuid'] = $uuid;
+        }
+        if ($db->fieldExists('tenant_id', 'reach_publication_connections')) {
+            $row['tenant_id'] = $tenantId;
+        }
+        if ($db->fieldExists('credentials', 'reach_publication_connections')) {
+            $row['credentials'] = json_encode([
                 'channel_id'    => $data['channel_id'] ?? '',
                 'access_token'  => '[REDACTED]',
                 'refresh_token' => '[REDACTED]',
-            ]),
-            'is_active'          => true,
-            'created_by'         => $actorId,
-        ]);
+            ]);
+        }
+        if ($db->fieldExists('created_by', 'reach_publication_connections') && $actorId !== null) {
+            $row['created_by'] = $actorId;
+        }
 
-        $id  = (int) $db->insertID();
-        $row = $db->table('reach_publication_connections')->where('id', $id)->get()->getRowArray();
+        $db->table('reach_publication_connections')->insert($row);
 
-        AuditLogger::record(AuditLogger::VIDEO_IDEA_CREATED, [
-            'event'      => 'youtube_connection_created',
+        $id      = (int) $db->insertID();
+        $created = $db->table('reach_publication_connections')->where('id', $id)->get()->getRowArray();
+
+        AuditLogger::record(AuditLogger::VIDEO_CONNECTION_CREATED, [
+            'event'         => 'youtube_connection_created',
             'connection_id' => $id,
         ], $actorId);
 
-        return $this->maskConnection($row);
+        return $this->maskConnection($created);
     }
 
     /**
@@ -98,9 +138,9 @@ class VideoConnectionService
         \Config\Database::connect()
             ->table('reach_publication_connections')
             ->where('id', $connectionId)
-            ->update(['is_active' => false]);
+            ->update(['enabled' => false]);
 
-        AuditLogger::record(AuditLogger::VIDEO_IDEA_CREATED, [
+        AuditLogger::record(AuditLogger::VIDEO_CONNECTION_REVOKED, [
             'event'         => 'youtube_connection_revoked',
             'connection_id' => $connectionId,
         ], $actorId);
@@ -108,12 +148,63 @@ class VideoConnectionService
         return true;
     }
 
+    /**
+     * Find a YouTube connection by uuid for the tenant.
+     */
+    public function findByUuid(string $uuid, int $tenantId): ?array
+    {
+        $db = \Config\Database::connect();
+        if (! $db->tableExists('reach_publication_connections')) {
+            return null;
+        }
+
+        $builder = $db->table('reach_publication_connections')
+            ->where('connection_type', self::CONNECTION_TYPE);
+
+        if ($db->fieldExists('uuid', 'reach_publication_connections')) {
+            $builder->groupStart()
+                ->where('uuid', $uuid)
+                ->orWhere('connection_key', $uuid)
+                ->groupEnd();
+        } else {
+            $builder->where('connection_key', $uuid);
+        }
+
+        if ($db->fieldExists('tenant_id', 'reach_publication_connections')) {
+            $builder->where('tenant_id', $tenantId);
+        }
+
+        $row = $builder->get()->getRowArray();
+        return is_array($row) ? $row : null;
+    }
+
     private function maskConnection(?array $row): array
     {
         if ($row === null) {
             return [];
         }
-        unset($row['credentials']);
+        unset($row['credentials'], $row['secret_env_reference'], $row['signing_key_env_reference'], $row['key_id_env_reference']);
+
+        // Frontend expects `name`; Phase 4 schema uses display_name.
+        if (! isset($row['name']) && isset($row['display_name'])) {
+            $row['name'] = $row['display_name'];
+        }
+        if (! isset($row['uuid']) && isset($row['connection_key'])) {
+            $row['uuid'] = $row['connection_key'];
+        }
+        if (! isset($row['is_active']) && array_key_exists('enabled', $row)) {
+            $row['is_active'] = (bool) $row['enabled'];
+        }
+
         return $row;
+    }
+
+    private function newUuid(): string
+    {
+        $data = random_bytes(16);
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 }

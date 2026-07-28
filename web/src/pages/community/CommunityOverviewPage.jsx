@@ -8,8 +8,8 @@ export default function CommunityOverviewPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get('/community/analytics/overview')
-      .then(r => setStats(r.data?.data ?? {}))
+    api.get('v1/community/analytics/overview')
+      .then(r => setStats(r?.data ?? r ?? {}))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

@@ -79,6 +79,15 @@ describe('VideoIdeaBacklogPage', () => {
     expect(screen.queryByText(/Request failed with status 404/i)).not.toBeInTheDocument();
   });
 
+  it('shows empty state on 500 instead of hard error', async () => {
+    const err = new Error('Request failed with status 500');
+    err.status = 500;
+    api.get.mockRejectedValueOnce(err);
+    renderWithAuth(<VideoIdeaBacklogPage />, ctx);
+    await waitFor(() => expect(screen.getByText(/No video ideas found/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Request failed with status 500/i)).not.toBeInTheDocument();
+  });
+
   it('shows loading state initially', () => {
     api.get.mockReturnValue(new Promise(() => {}));
     renderWithAuth(<VideoIdeaBacklogPage />, ctx);

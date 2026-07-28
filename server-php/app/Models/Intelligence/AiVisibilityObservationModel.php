@@ -27,10 +27,15 @@ class AiVisibilityObservationModel extends Model
 
     public function getByCoverage(int $tenantId, string $coverageState): array
     {
-        return $this->select('o.*')
-                    ->join('reach_ai_visibility_runs r', 'r.id = o.run_id')
-                    ->where('r.tenant_id', $tenantId)
-                    ->where('o.coverage_state', $coverageState)
+        // Avoid table aliases in Query Builder — some CI4/Postgres
+        // identifier escaping paths quote "table alias" as one name.
+        return $this->select('reach_ai_visibility_observations.*')
+                    ->join(
+                        'reach_ai_visibility_runs',
+                        'reach_ai_visibility_runs.id = reach_ai_visibility_observations.run_id'
+                    )
+                    ->where('reach_ai_visibility_runs.tenant_id', $tenantId)
+                    ->where('reach_ai_visibility_observations.coverage_state', $coverageState)
                     ->findAll();
     }
 

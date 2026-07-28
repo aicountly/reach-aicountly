@@ -28,14 +28,28 @@ class OfficialAnswerController extends BaseApiController
         $status  = (string) ($this->request->getGet('status') ?? '');
         $perPage = min((int) ($this->request->getGet('per_page') ?? 100), 100);
 
-        $items = $status !== ''
-            ? $this->repo->listByStatus($status, $perPage)
-            : $this->repo->listByStatus('draft', $perPage);
+        try {
+            $db = db_connect();
+            if (! $db->tableExists('reach_community_official_answers')) {
+                return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
+            }
 
-        return $this->response->setJSON([
-            'data' => $items,
-            'meta' => ['total' => count($items)],
-        ]);
+            $items = $status !== ''
+                ? $this->repo->listByStatus($status, $perPage)
+                : $this->repo->listByStatus('draft', $perPage);
+
+            if (! is_array($items)) {
+                $items = [];
+            }
+
+            return $this->response->setJSON([
+                'data' => $items,
+                'meta' => ['total' => count($items)],
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'OfficialAnswerController::index: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
+        }
     }
 
     /** GET /community/answers/(:segment) */

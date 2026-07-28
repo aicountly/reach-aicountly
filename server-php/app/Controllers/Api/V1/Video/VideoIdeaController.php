@@ -7,7 +7,6 @@ namespace App\Controllers\Api\V1\Video;
 use App\Controllers\BaseApiController;
 use App\Libraries\Video\VideoIdeaRepository;
 use App\Libraries\Video\VideoIdeationService;
-use App\Libraries\Video\VideoScoringService;
 use CodeIgniter\HTTP\ResponseInterface;
 
 class VideoIdeaController extends BaseApiController
@@ -44,18 +43,34 @@ class VideoIdeaController extends BaseApiController
         return (int) ($this->user()['tenant_id'] ?? 0);
     }
 
+    private function emptyList(int $page, int $perPage): array
+    {
+        return ['data' => [], 'total' => 0, 'page' => $page, 'per_page' => $perPage];
+    }
+
     public function index(): ResponseInterface
     {
-        $page    = (int) ($this->request->getGet('page') ?? 1);
-        $perPage = min((int) ($this->request->getGet('per_page') ?? 25), 100);
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage = min(max(1, (int) ($this->request->getGet('per_page') ?? 25)), 100);
         $filters = [
             'status'    => $this->request->getGet('status') ?? '',
             'min_score' => $this->request->getGet('min_score'),
             'search'    => $this->request->getGet('search') ?? '',
         ];
 
-        $result = $this->repo->listForTenant($this->tenantId(), $filters, $page, $perPage);
-        return $this->ok($result);
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_video_ideas')) {
+                return $this->ok($this->emptyList($page, $perPage));
+            }
+
+            $result = $this->repo->listForTenant($this->tenantId(), $filters, $page, $perPage);
+            return $this->ok($result);
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoIdeaController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Video UI.
+            return $this->ok($this->emptyList($page, $perPage));
+        }
     }
 
     public function show(string $uuid): ResponseInterface

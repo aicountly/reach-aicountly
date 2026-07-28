@@ -32,8 +32,19 @@ class VideoConnectionController extends BaseApiController
 
     public function index(): ResponseInterface
     {
-        $connections = $this->service->listConnections($this->tenantId());
-        return $this->ok(['data' => $connections]);
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_publication_connections')) {
+                return $this->ok(['data' => []]);
+            }
+
+            $connections = $this->service->listConnections($this->tenantId());
+            return $this->ok(['data' => is_array($connections) ? $connections : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoConnectionController::index: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Video UI.
+            return $this->ok(['data' => []]);
+        }
     }
 
     public function store(): ResponseInterface
@@ -52,25 +63,30 @@ class VideoConnectionController extends BaseApiController
 
     public function show(string $uuid): ResponseInterface
     {
-        $db  = \Config\Database::connect();
-        $row = $db->table('reach_publication_connections')
-            ->where('uuid', $uuid)
-            ->where('tenant_id', $this->tenantId())
-            ->get()->getRowArray();
+        try {
+            $row = $this->service->findByUuid($uuid, $this->tenantId());
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoConnectionController::show: ' . $e->getMessage());
+            return $this->fail('Not found', 404);
+        }
         if ($row === null) {
             return $this->fail('Not found', 404);
         }
-        unset($row['credentials']);
+        unset($row['credentials'], $row['secret_env_reference'], $row['signing_key_env_reference'], $row['key_id_env_reference']);
+        if (! isset($row['name']) && isset($row['display_name'])) {
+            $row['name'] = $row['display_name'];
+        }
         return $this->ok($row);
     }
 
     public function revoke(string $uuid): ResponseInterface
     {
-        $db  = \Config\Database::connect();
-        $row = $db->table('reach_publication_connections')
-            ->where('uuid', $uuid)
-            ->where('tenant_id', $this->tenantId())
-            ->get()->getRowArray();
+        try {
+            $row = $this->service->findByUuid($uuid, $this->tenantId());
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoConnectionController::revoke: ' . $e->getMessage());
+            return $this->fail('Not found', 404);
+        }
         if ($row === null) {
             return $this->fail('Not found', 404);
         }
@@ -80,11 +96,12 @@ class VideoConnectionController extends BaseApiController
 
     public function health(string $uuid): ResponseInterface
     {
-        $db  = \Config\Database::connect();
-        $row = $db->table('reach_publication_connections')
-            ->where('uuid', $uuid)
-            ->where('tenant_id', $this->tenantId())
-            ->get()->getRowArray();
+        try {
+            $row = $this->service->findByUuid($uuid, $this->tenantId());
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoConnectionController::health: ' . $e->getMessage());
+            return $this->fail('Not found', 404);
+        }
         if ($row === null) {
             return $this->fail('Not found', 404);
         }

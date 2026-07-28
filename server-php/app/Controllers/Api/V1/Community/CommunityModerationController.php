@@ -23,29 +23,61 @@ class CommunityModerationController extends BaseApiController
         $page    = (int) ($this->request->getGet('page') ?? 1);
         $perPage = min((int) ($this->request->getGet('per_page') ?? 25), 100);
         $offset  = ($page - 1) * $perPage;
-
-        $db      = db_connect();
-        $total   = (int) $db->table('reach_community_moderation_findings')
-            ->where('status', 'open')
-            ->countAllResults();
-
-        $rows = $db->table('reach_community_moderation_findings f')
-            ->select('f.*, av.answer_id, av.version_number')
-            ->join('reach_community_answer_versions av', 'av.id = f.answer_version_id', 'left')
-            ->where('f.status', 'open')
-            ->orderBy('f.created_at', 'ASC')
-            ->limit($perPage, $offset)
-            ->get()->getResultArray();
-
-        return $this->response->setJSON([
-            'data' => $rows,
+        $empty   = [
+            'data' => [],
             'meta' => [
                 'current_page' => $page,
                 'per_page'     => $perPage,
-                'total'        => $total,
-                'last_page'    => (int) ceil($total / $perPage),
+                'total'        => 0,
+                'last_page'    => 0,
             ],
-        ]);
+        ];
+
+        try {
+            $db = db_connect();
+            if (! $db->tableExists('reach_community_moderation_findings')) {
+                return $this->response->setJSON($empty);
+            }
+
+            $total = (int) $db->table('reach_community_moderation_findings')
+                ->where('status', 'open')
+                ->countAllResults();
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $builder = $db->table('reach_community_moderation_findings')
+                ->select('reach_community_moderation_findings.*')
+                ->where('reach_community_moderation_findings.status', 'open')
+                ->orderBy('reach_community_moderation_findings.created_at', 'ASC')
+                ->limit($perPage, $offset);
+
+            if ($db->tableExists('reach_community_answer_versions')) {
+                $builder->select(
+                    'reach_community_moderation_findings.*, '
+                    . 'reach_community_answer_versions.answer_id, '
+                    . 'reach_community_answer_versions.version_number'
+                )->join(
+                    'reach_community_answer_versions',
+                    'reach_community_answer_versions.id = reach_community_moderation_findings.answer_version_id',
+                    'left'
+                );
+            }
+
+            $rows = $builder->get()->getResultArray();
+
+            return $this->response->setJSON([
+                'data' => is_array($rows) ? $rows : [],
+                'meta' => [
+                    'current_page' => $page,
+                    'per_page'     => $perPage,
+                    'total'        => $total,
+                    'last_page'    => (int) ceil($total / max($perPage, 1)),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'CommunityModerationController::queue: ' . $e->getMessage());
+            return $this->response->setJSON($empty);
+        }
     }
 
     /** POST /community/moderation/(:num)/resolve */

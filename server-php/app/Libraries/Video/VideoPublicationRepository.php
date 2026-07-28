@@ -49,18 +49,35 @@ class VideoPublicationRepository
     public function listDeployments(int $tenantId, int $page = 1, int $perPage = 25): array
     {
         $db = \Config\Database::connect();
-        $builder = $db->table('reach_publication_deployments d')
-            ->select('d.*, p.title AS project_title, p.uuid AS project_uuid')
-            ->join('reach_video_projects p', 'p.id = d.subject_id', 'left')
-            ->where('d.subject_type', 'video_project')
-            ->where('p.tenant_id', $tenantId);
+
+        // Avoid table aliases in Query Builder — some CI4/Postgres
+        // identifier escaping paths quote "table alias" as one name.
+        $builder = $db->table('reach_publication_deployments')
+            ->select(
+                'reach_publication_deployments.*, '
+                . 'reach_video_projects.title AS project_title, '
+                . 'reach_video_projects.uuid AS project_uuid'
+            )
+            ->join(
+                'reach_video_projects',
+                'reach_video_projects.id = reach_publication_deployments.subject_id',
+                'left'
+            )
+            ->where('reach_publication_deployments.subject_type', 'video_project')
+            ->where('reach_video_projects.tenant_id', $tenantId);
 
         $total  = $builder->countAllResults(false);
         $offset = ($page - 1) * $perPage;
-        $rows   = $builder->orderBy('d.created_at', 'DESC')
+        $rows   = $builder->orderBy('reach_publication_deployments.created_at', 'DESC')
             ->limit($perPage, $offset)
-            ->get()->getResultArray();
+            ->get()
+            ->getResultArray();
 
-        return ['data' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+        return [
+            'data'     => is_array($rows) ? $rows : [],
+            'total'    => $total,
+            'page'     => $page,
+            'per_page' => $perPage,
+        ];
     }
 }

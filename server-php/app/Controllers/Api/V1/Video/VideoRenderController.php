@@ -78,32 +78,59 @@ class VideoRenderController extends BaseApiController
      */
     public function listJobs(): ResponseInterface
     {
-        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
-        $perPage = min(100, max(1, (int) ($this->request->getGet('per_page') ?? 50)));
-        $offset  = ($page - 1) * $perPage;
+        $page     = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage  = min(100, max(1, (int) ($this->request->getGet('per_page') ?? 50)));
+        $offset   = ($page - 1) * $perPage;
         $tenantId = $this->tenantId();
-
-        $db = \Config\Database::connect();
-
-        $total = $db->table('reach_video_render_jobs j')
-            ->join('reach_video_projects p', 'p.id = j.project_id')
-            ->where('p.tenant_id', $tenantId)
-            ->countAllResults();
-
-        $rows = $db->table('reach_video_render_jobs j')
-            ->select('j.*')
-            ->join('reach_video_projects p', 'p.id = j.project_id')
-            ->where('p.tenant_id', $tenantId)
-            ->orderBy('j.created_at', 'DESC')
-            ->limit($perPage, $offset)
-            ->get()->getResultArray();
-
-        return $this->ok([
-            'data'     => $rows,
-            'total'    => $total,
+        $empty    = [
+            'data'     => [],
+            'total'    => 0,
             'page'     => $page,
             'per_page' => $perPage,
-        ]);
+        ];
+
+        try {
+            $db = \Config\Database::connect();
+            if (
+                ! $db->tableExists('reach_video_render_jobs')
+                || ! $db->tableExists('reach_video_projects')
+            ) {
+                return $this->ok($empty);
+            }
+
+            // Avoid table aliases in Query Builder — some CI4/Postgres
+            // identifier escaping paths quote "table alias" as one name.
+            $total = $db->table('reach_video_render_jobs')
+                ->join(
+                    'reach_video_projects',
+                    'reach_video_projects.id = reach_video_render_jobs.project_id'
+                )
+                ->where('reach_video_projects.tenant_id', $tenantId)
+                ->countAllResults();
+
+            $rows = $db->table('reach_video_render_jobs')
+                ->select('reach_video_render_jobs.*')
+                ->join(
+                    'reach_video_projects',
+                    'reach_video_projects.id = reach_video_render_jobs.project_id'
+                )
+                ->where('reach_video_projects.tenant_id', $tenantId)
+                ->orderBy('reach_video_render_jobs.created_at', 'DESC')
+                ->limit($perPage, $offset)
+                ->get()
+                ->getResultArray();
+
+            return $this->ok([
+                'data'     => is_array($rows) ? $rows : [],
+                'total'    => $total,
+                'page'     => $page,
+                'per_page' => $perPage,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoRenderController::listJobs: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Video UI.
+            return $this->ok($empty);
+        }
     }
 
     public function showJob(string $jobUuid): ResponseInterface

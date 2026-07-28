@@ -118,8 +118,24 @@ class VisibilityController extends BaseController
     public function observations(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $model    = new AiVisibilityObservationModel();
-        $obs      = $model->getByCoverage($tenantId, $this->request->getGet('coverage_state') ?? 'mentioned');
-        return $this->response->setJSON(['data' => $obs]);
+        try {
+            $db = \Config\Database::connect();
+            if (
+                ! $db->tableExists('reach_ai_visibility_observations')
+                || ! $db->tableExists('reach_ai_visibility_runs')
+            ) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $model = new AiVisibilityObservationModel();
+            $obs   = $model->getByCoverage(
+                $tenantId,
+                $this->request->getGet('coverage_state') ?? 'mentioned'
+            );
+            return $this->response->setJSON(['data' => is_array($obs) ? $obs : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'VisibilityController::observations: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 }

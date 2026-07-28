@@ -19,12 +19,22 @@ class OfficialIdentityController extends BaseApiController
     /** GET /community/identities */
     public function index(): ResponseInterface
     {
-        $includeInactive = (bool) $this->request->getGet('include_inactive');
-        $identities = $includeInactive
-            ? $this->model->findAll()
-            : $this->model->listActive();
+        try {
+            $db = db_connect();
+            if (! $db->tableExists('reach_community_official_identities')) {
+                return $this->response->setJSON(['data' => []]);
+            }
 
-        return $this->response->setJSON(['data' => $identities]);
+            $includeInactive = (bool) $this->request->getGet('include_inactive');
+            $identities = $includeInactive
+                ? $this->model->findAll()
+                : $this->model->listActive();
+
+            return $this->response->setJSON(['data' => is_array($identities) ? $identities : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'OfficialIdentityController::index: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     /** GET /community/identities/(:segment) */

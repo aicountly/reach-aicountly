@@ -27,14 +27,14 @@ export default function OfficialAnswerEditorPage() {
   function load() {
     setLoading(true);
     Promise.all([
-      api.get(`/community/answers/${uuid}`),
-      api.get(`/community/answers/${uuid}/versions`),
+      api.get(`v1/community/answers/${uuid}`),
+      api.get(`v1/community/answers/${uuid}/versions`),
     ])
       .then(([ar, vr]) => {
-        const a = ar.data?.data;
+        const a = ar?.data ?? ar ?? null;
         setAnswer(a);
         setBody(a?.current_body ?? '');
-        setVersions(vr.data?.data ?? []);
+        setVersions(Array.isArray(vr) ? vr : (vr?.data ?? []));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -47,32 +47,32 @@ export default function OfficialAnswerEditorPage() {
     try {
       if (action === 'save') {
         setSaving(true);
-        await api.put(`/community/answers/${uuid}`, { content: { body } });
+        await api.put(`v1/community/answers/${uuid}`, { content: { body } });
         setActionMsg('Saved.');
       } else if (action === 'generate') {
-        await api.post(`/community/answers/${uuid}/generate`, {});
+        await api.post(`v1/community/answers/${uuid}/generate`, {});
         setActionMsg('AI generation triggered. Refresh to see result.');
       } else if (action === 'run_moderation') {
-        await api.post(`/community/answers/${uuid}/run-moderation`, {});
+        await api.post(`v1/community/answers/${uuid}/run-moderation`, {});
         setActionMsg('Moderation run complete.');
       } else if (action === 'approve') {
-        await api.post(`/community/answers/${uuid}/approve`, { note: approvalNote });
+        await api.post(`v1/community/answers/${uuid}/approve`, { note: approvalNote });
         setActionMsg('Approved.');
       } else if (action === 'reject') {
         const reason = prompt('Rejection reason:') || '';
-        await api.post(`/community/answers/${uuid}/reject`, { reason });
+        await api.post(`v1/community/answers/${uuid}/reject`, { reason });
         setActionMsg('Rejected.');
       } else if (action === 'publish') {
-        await api.post(`/community/answers/${uuid}/publish`, {});
+        await api.post(`v1/community/answers/${uuid}/publish`, {});
         setActionMsg('Published.');
       } else if (action === 'withdraw') {
-        await api.post(`/community/answers/${uuid}/withdraw`, { reason: withdrawReason });
+        await api.post(`v1/community/answers/${uuid}/withdraw`, { reason: withdrawReason });
         setActionMsg('Withdrawn.');
       } else if (action === 'restore') {
-        await api.post(`/community/answers/${uuid}/restore`, {});
+        await api.post(`v1/community/answers/${uuid}/restore`, {});
         setActionMsg('Restored.');
       } else if (action === 'correct') {
-        await api.post(`/community/answers/${uuid}/correct`, { content: { body }, correction_note: correctionNote });
+        await api.post(`v1/community/answers/${uuid}/correct`, { content: { body }, correction_note: correctionNote });
         setActionMsg('Correction saved.');
       }
       await load();

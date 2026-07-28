@@ -43,7 +43,8 @@ class VideoIdeaModel extends Model
         if (! empty($filters['status'])) {
             $builder->where('status', $filters['status']);
         }
-        if (isset($filters['min_score'])) {
+        // Only apply when a real score filter is provided (null/'' must not coerce to 0).
+        if (isset($filters['min_score']) && $filters['min_score'] !== '' && $filters['min_score'] !== null) {
             $builder->where('score_total >=', (int) $filters['min_score']);
         }
         if (! empty($filters['search'])) {
@@ -55,7 +56,9 @@ class VideoIdeaModel extends Model
 
         $total  = $builder->countAllResults(false);
         $offset = ($page - 1) * $perPage;
-        $rows   = $builder->orderBy('score_total', 'DESC NULLS LAST')
+        // CI4 orderBy only accepts ASC|DESC; use IS NULL so unscored ideas sort last.
+        $rows   = $builder->orderBy('score_total IS NULL', 'ASC', false)
+            ->orderBy('score_total', 'DESC')
             ->orderBy('created_at', 'DESC')
             ->limit($perPage, $offset)
             ->get()->getResultArray();

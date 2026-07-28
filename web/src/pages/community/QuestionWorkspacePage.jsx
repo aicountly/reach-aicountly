@@ -19,12 +19,12 @@ export default function QuestionWorkspacePage() {
   function load() {
     setLoading(true);
     Promise.all([
-      api.get(`/community/questions/${uuid}`),
-      api.get('/community/answers', { params: { question_uuid: uuid } }),
+      api.get(`v1/community/questions/${uuid}`),
+      api.get('v1/community/answers', { question_uuid: uuid }),
     ])
       .then(([qr, ar]) => {
-        setQuestion(qr.data?.data);
-        setAnswers(ar.data?.data ?? []);
+        setQuestion(qr?.data ?? qr ?? null);
+        setAnswers(Array.isArray(ar) ? ar : (ar?.data ?? []));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -36,7 +36,7 @@ export default function QuestionWorkspacePage() {
     e.preventDefault();
     if (!newStatus) return;
     setTransitioning(true);
-    api.put(`/community/questions/${uuid}/status`, { status: newStatus, note: statusNote })
+    api.put(`v1/community/questions/${uuid}/status`, { status: newStatus, note: statusNote })
       .then(() => load())
       .catch(e => alert(e.message))
       .finally(() => setTransitioning(false));
@@ -44,9 +44,9 @@ export default function QuestionWorkspacePage() {
 
   function handleGenerateAnswer() {
     setGenerating(true);
-    api.post('/community/answers', { question_uuid: uuid })
+    api.post('v1/community/answers', { question_uuid: uuid })
       .then(r => {
-        const answerUuid = r.data?.data?.external_id;
+        const answerUuid = r?.external_id ?? r?.data?.external_id;
         if (answerUuid) navigate(`/community/answers/${answerUuid}`);
       })
       .catch(e => alert(e.message))

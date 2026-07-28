@@ -25,9 +25,9 @@ export default function QuestionInboxPage() {
 
   function load() {
     setLoading(true);
-    api.get('/community/questions', { params: { status: status || undefined, sort, page } })
+    api.get('v1/community/questions', { status: status || undefined, sort, page })
       .then(r => {
-        setQuestions(r.data?.data ?? []);
+        setQuestions(Array.isArray(r) ? r : (r?.data ?? []));
         setTotalPages(r.data?.meta?.last_page ?? 1);
       })
       .catch(e => setError(e.message))

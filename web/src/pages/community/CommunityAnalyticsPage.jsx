@@ -12,14 +12,14 @@ export default function CommunityAnalyticsPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.get('/community/analytics/overview'),
-      api.get('/community/analytics/engagement', { params: { days } }),
-      api.get('/community/analytics/coverage'),
+      api.get('v1/community/analytics/overview'),
+      api.get('v1/community/analytics/engagement', { days }),
+      api.get('v1/community/analytics/coverage'),
     ])
       .then(([o, e, c]) => {
-        setOverview(o.data?.data);
-        setEngagement(e.data?.data ?? []);
-        setCoverage(c.data?.data ?? []);
+        setOverview(o?.data ?? o ?? null);
+        setEngagement(Array.isArray(e) ? e : (e?.data ?? []));
+        setCoverage(Array.isArray(c) ? c : (c?.data ?? []));
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));

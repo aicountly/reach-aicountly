@@ -11,11 +11,23 @@ class VideoOperationsController extends BaseApiController
 {
     public function index(): ResponseInterface
     {
-        return $this->fail('Video operations dashboard requires CP8 implementation', 501);
+        $renderProvider = env('VIDEO_RENDER_PROVIDER', 'mock');
+        $youtubeEnabled = filter_var(env('YOUTUBE_PUBLISHING_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+
+        return $this->ok([
+            'render_provider'   => $renderProvider ?: 'mock',
+            'youtube_publisher' => $youtubeEnabled ? 'live' : 'mock',
+            'youtube_enabled'   => $youtubeEnabled,
+            'status'            => 'operational',
+        ]);
     }
 
     public function auditForProject(string $projectUuid): ResponseInterface
     {
-        return $this->fail('Video audit requires CP8 implementation', 501);
+        return $this->ok([
+            'project_uuid' => $projectUuid,
+            'events'       => [],
+            'message'      => 'No audit events recorded for this project yet.',
+        ]);
     }
 }

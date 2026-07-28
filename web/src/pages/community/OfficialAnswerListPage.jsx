@@ -22,9 +22,9 @@ export default function OfficialAnswerListPage() {
 
   useEffect(() => {
     setLoading(true);
-    api.get('/community/answers', { params: { status: status || undefined, page } })
+    api.get('v1/community/answers', { status: status || undefined, page })
       .then(r => {
-        setAnswers(r.data?.data ?? []);
+        setAnswers(Array.isArray(r) ? r : (r?.data ?? []));
         setTotalPages(r.data?.meta?.last_page ?? 1);
       })
       .catch(e => setError(e.message))

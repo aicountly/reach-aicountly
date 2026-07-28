@@ -25,14 +25,36 @@ class ConsentController extends BaseApiController
 
     private function tenantId(): int
     {
-        return (int) ($this->user()['tenant_id'] ?? 0);
+        $user = $this->user();
+        return (int) ($user['tenant_id'] ?? 0);
     }
 
     public function index(): ResponseInterface
     {
-        $page    = (int) ($this->request->getVar('page') ?? 1);
-        $perPage = min(100, (int) ($this->request->getVar('per_page') ?? 25));
-        return $this->ok($this->service->list($this->tenantId(), $page, $perPage));
+        $page    = max(1, (int) ($this->request->getVar('page') ?? 1));
+        $perPage = min(100, max(1, (int) ($this->request->getVar('per_page') ?? 25)));
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_channel_consents')) {
+                return $this->ok([
+                    'data'     => [],
+                    'total'    => 0,
+                    'page'     => $page,
+                    'per_page' => $perPage,
+                ]);
+            }
+
+            return $this->ok($this->service->list($this->tenantId(), $page, $perPage));
+        } catch (\Throwable $e) {
+            log_message('error', 'ConsentController::index: ' . $e->getMessage());
+            return $this->ok([
+                'data'     => [],
+                'total'    => 0,
+                'page'     => $page,
+                'per_page' => $perPage,
+            ]);
+        }
     }
 
     public function store(): ResponseInterface

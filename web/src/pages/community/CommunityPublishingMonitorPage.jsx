@@ -21,9 +21,9 @@ export default function CommunityPublishingMonitorPage() {
 
   function load() {
     setLoading(true);
-    api.get('/community/deployments', { params: { page } })
+    api.get('v1/community/deployments', { page })
       .then(r => {
-        setDeployments(r.data?.data ?? []);
+        setDeployments(Array.isArray(r) ? r : (r?.data ?? []));
         setTotalPages(r.data?.meta?.last_page ?? 1);
       })
       .catch(e => setError(e.message))
@@ -34,7 +34,7 @@ export default function CommunityPublishingMonitorPage() {
 
   async function handleRetry(uuid) {
     try {
-      await api.post(`/community/deployments/${uuid}/retry`, {});
+      await api.post(`v1/community/deployments/${uuid}/retry`, {});
       setActionMsg(`Deployment ${uuid} retried.`);
       load();
     } catch (e) {
@@ -44,7 +44,7 @@ export default function CommunityPublishingMonitorPage() {
 
   async function handleVerify(uuid) {
     try {
-      await api.post(`/community/deployments/${uuid}/verify`, {});
+      await api.post(`v1/community/deployments/${uuid}/verify`, {});
       setActionMsg(`Verification triggered for ${uuid}.`);
       load();
     } catch (e) {

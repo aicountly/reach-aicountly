@@ -18,12 +18,20 @@ const ctx = {
 beforeEach(() => { api.get.mockReset(); });
 
 describe('VideoOverviewPage', () => {
-  it('renders the page heading', async () => {
+  it('renders the page heading and section cards', async () => {
     api.get
       .mockResolvedValueOnce({ data: [], total: 3 })
       .mockResolvedValueOnce({ data: [], total: 5 });
     renderWithAuth(<VideoOverviewPage />, ctx);
-    await waitFor(() => expect(screen.getByText('Video Automation')).toBeInTheDocument());
+    expect(screen.getByText('Video Automation')).toBeInTheDocument();
+    expect(screen.getByText('Idea Backlog')).toBeInTheDocument();
+    expect(screen.getByText('Projects')).toBeInTheDocument();
+    expect(screen.getByText('Render Queue')).toBeInTheDocument();
+    expect(screen.getByText('Publications')).toBeInTheDocument();
+    expect(screen.getByText('YouTube Connections')).toBeInTheDocument();
+    expect(screen.getByText('Operations')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument());
+    expect(screen.getByText('5')).toBeInTheDocument();
   });
 
   it('requests ideas and projects under v1/', async () => {
@@ -37,9 +45,21 @@ describe('VideoOverviewPage', () => {
     });
   });
 
-  it('shows loading state initially', () => {
+  it('keeps section cards visible while stats load', () => {
     api.get.mockReturnValue(new Promise(() => {}));
     renderWithAuth(<VideoOverviewPage />, ctx);
-    expect(screen.getByText(/loading video overview/i)).toBeInTheDocument();
+    expect(screen.getByText('Video Automation')).toBeInTheDocument();
+    expect(screen.getByText('Idea Backlog')).toBeInTheDocument();
+    expect(screen.getAllByText('…').length).toBeGreaterThan(0);
+  });
+
+  it('links Open backlog to the ideas route', async () => {
+    api.get
+      .mockResolvedValueOnce({ data: [], total: 0 })
+      .mockResolvedValueOnce({ data: [], total: 0 });
+    renderWithAuth(<VideoOverviewPage />, ctx);
+    const link = screen.getByText('Open backlog').closest('a');
+    expect(link?.getAttribute('href')).toBe('/video/ideas');
+    await waitFor(() => expect(api.get).toHaveBeenCalled());
   });
 });

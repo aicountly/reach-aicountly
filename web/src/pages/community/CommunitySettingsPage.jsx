@@ -15,8 +15,8 @@ export default function CommunitySettingsPage() {
 
   function load() {
     setLoading(true);
-    api.get('/community/spaces')
-      .then(r => setSpaces(r.data?.data ?? []))
+    api.get('v1/community/spaces')
+      .then(r => setSpaces(Array.isArray(r) ? r : (r?.data ?? [])))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }
@@ -26,7 +26,7 @@ export default function CommunitySettingsPage() {
   function handleCreate(e) {
     e.preventDefault();
     setSaving(true);
-    api.post('/community/spaces', form)
+    api.post('v1/community/spaces', form)
       .then(() => { setMsg('Space created.'); setShowForm(false); load(); })
       .catch(e => setMsg('Error: ' + (e.response?.data?.error ?? e.message)))
       .finally(() => setSaving(false));

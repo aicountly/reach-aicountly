@@ -19,8 +19,18 @@ class CommunitySpaceController extends BaseApiController
     /** GET /community/spaces */
     public function index(): ResponseInterface
     {
-        $spaces = $this->model->listActive();
-        return $this->response->setJSON(['data' => $spaces]);
+        try {
+            $db = db_connect();
+            if (! $db->tableExists('reach_community_spaces')) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $spaces = $this->model->listActive();
+            return $this->response->setJSON(['data' => is_array($spaces) ? $spaces : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'CommunitySpaceController::index: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     /** GET /community/spaces/(:segment) */

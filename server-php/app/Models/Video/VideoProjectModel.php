@@ -31,21 +31,27 @@ class VideoProjectModel extends Model
 
     public function listForTenant(int $tenantId, array $filters = [], int $page = 1, int $perPage = 25): array
     {
-        $builder = $this->db->table($this->table . ' p')
-            ->select('p.*, i.title AS idea_title')
-            ->join('reach_video_ideas i', 'i.id = p.idea_id', 'left')
-            ->where('p.tenant_id', $tenantId);
+        // Avoid table aliases in Query Builder — some CI4/Postgres
+        // identifier escaping paths quote "table alias" as one name.
+        $builder = $this->db->table($this->table)
+            ->select('reach_video_projects.*, reach_video_ideas.title AS idea_title')
+            ->join(
+                'reach_video_ideas',
+                'reach_video_ideas.id = reach_video_projects.idea_id',
+                'left'
+            )
+            ->where('reach_video_projects.tenant_id', $tenantId);
 
         if (! empty($filters['status'])) {
-            $builder->where('p.status', $filters['status']);
+            $builder->where('reach_video_projects.status', $filters['status']);
         }
         if (! empty($filters['search'])) {
-            $builder->like('p.title', $filters['search']);
+            $builder->like('reach_video_projects.title', $filters['search']);
         }
 
         $total  = $builder->countAllResults(false);
         $offset = ($page - 1) * $perPage;
-        $rows   = $builder->orderBy('p.updated_at', 'DESC')
+        $rows   = $builder->orderBy('reach_video_projects.updated_at', 'DESC')
             ->limit($perPage, $offset)
             ->get()->getResultArray();
 

@@ -125,9 +125,25 @@ class VideoPublicationController extends BaseApiController
 
     public function list(): ResponseInterface
     {
-        $page    = (int) ($this->request->getVar('page') ?? 1);
-        $perPage = (int) ($this->request->getVar('per_page') ?? 25);
-        $result  = $this->service->listPublications($this->tenantId(), $page, $perPage);
-        return $this->ok($result);
+        $page    = max(1, (int) ($this->request->getVar('page') ?? 1));
+        $perPage = min(100, max(1, (int) ($this->request->getVar('per_page') ?? 25)));
+        $empty   = ['data' => [], 'total' => 0, 'page' => $page, 'per_page' => $perPage];
+
+        try {
+            $db = \Config\Database::connect();
+            if (
+                ! $db->tableExists('reach_publication_deployments')
+                || ! $db->tableExists('reach_video_projects')
+            ) {
+                return $this->ok($empty);
+            }
+
+            $result = $this->service->listPublications($this->tenantId(), $page, $perPage);
+            return $this->ok($result);
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoPublicationController::list: ' . $e->getMessage());
+            // List endpoints must not hard-fail the Video UI.
+            return $this->ok($empty);
+        }
     }
 }

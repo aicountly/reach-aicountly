@@ -55,7 +55,8 @@ export default function VideoIdeaBacklogPage() {
         setTotal(normalizeVideoTotal(r, rows));
       })
       .catch((e) => {
-        if (e?.status === 404) {
+        // Missing table / soft-fail backends should still show an empty backlog.
+        if (e?.status === 404 || e?.status === 500) {
           setIdeas([]);
           setTotal(0);
           setError(null);

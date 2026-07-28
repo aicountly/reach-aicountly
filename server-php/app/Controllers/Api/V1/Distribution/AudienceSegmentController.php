@@ -30,13 +30,24 @@ class AudienceSegmentController extends BaseApiController
 
     private function tenantId(): int
     {
-        return (int) ($this->user()['tenant_id'] ?? 0);
+        $user = $this->user();
+        return (int) ($user['tenant_id'] ?? 0);
     }
 
     public function index(): ResponseInterface
     {
-        $segments = $this->service->list($this->tenantId());
-        return $this->ok(['data' => $segments]);
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_audience_segments')) {
+                return $this->ok(['data' => []]);
+            }
+
+            $segments = $this->service->list($this->tenantId());
+            return $this->ok(['data' => is_array($segments) ? $segments : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'AudienceSegmentController::index: ' . $e->getMessage());
+            return $this->ok(['data' => []]);
+        }
     }
 
     public function store(): ResponseInterface

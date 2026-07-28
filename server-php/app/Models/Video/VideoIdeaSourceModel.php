@@ -20,7 +20,8 @@ class VideoIdeaSourceModel extends Model
     public function listForIdea(int $ideaId): array
     {
         return $this->where('idea_id', $ideaId)
-            ->orderBy('relevance', 'DESC NULLS LAST')
+            ->orderBy('relevance IS NULL', 'ASC', false)
+            ->orderBy('relevance', 'DESC')
             ->findAll();
     }
 }

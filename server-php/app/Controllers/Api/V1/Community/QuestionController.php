@@ -24,22 +24,41 @@ class QuestionController extends BaseApiController
         $perPage = min((int) ($this->request->getGet('per_page') ?? 25), 100);
         $status  = $this->request->getGet('status');
         $spaceId = $this->request->getGet('space_id');
-
-        $result = $this->repo->listForInbox(
-            filters: array_filter(compact('status', 'spaceId')),
-            page: $page,
-            perPage: $perPage,
-        );
-
-        return $this->response->setJSON([
-            'data' => $result['data'],
+        $empty   = [
+            'data' => [],
             'meta' => [
                 'current_page' => $page,
                 'per_page'     => $perPage,
-                'total'        => $result['total'],
-                'last_page'    => (int) ceil($result['total'] / $perPage),
+                'total'        => 0,
+                'last_page'    => 0,
             ],
-        ]);
+        ];
+
+        try {
+            $db = db_connect();
+            if (! $db->tableExists('reach_community_questions')) {
+                return $this->response->setJSON($empty);
+            }
+
+            $result = $this->repo->listForInbox(
+                filters: array_filter(compact('status', 'spaceId')),
+                page: $page,
+                perPage: $perPage,
+            );
+
+            return $this->response->setJSON([
+                'data' => $result['data'] ?? [],
+                'meta' => [
+                    'current_page' => $page,
+                    'per_page'     => $perPage,
+                    'total'        => $result['total'] ?? 0,
+                    'last_page'    => (int) ceil(($result['total'] ?? 0) / max($perPage, 1)),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'QuestionController::index: ' . $e->getMessage());
+            return $this->response->setJSON($empty);
+        }
     }
 
     /** GET /community/questions/(:segment) */

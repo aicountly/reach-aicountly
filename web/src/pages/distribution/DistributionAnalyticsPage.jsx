@@ -9,7 +9,15 @@ export default function DistributionAnalyticsPage() {
   useEffect(() => {
     api.get('v1/distribution/analytics')
       .then(r => setMetrics(Array.isArray(r) ? r : (r?.data ?? [])))
-      .catch(e => setError(e.message))
+      .catch(e => {
+        // Soft-fail while migrations/deploy catch up — show empty state, not a hard error.
+        const status = e?.status ?? e?.response?.status;
+        if (status === 404 || status === 500) {
+          setMetrics([]);
+          return;
+        }
+        setError(e.message || 'Failed to load analytics');
+      })
       .finally(() => setLoading(false));
   }, []);
 

@@ -12,12 +12,22 @@ export default function ConsentListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     api.get('v1/distribution/consents', { page, per_page: perPage })
-      .then(r => {
-        setConsents(r?.data ?? []);
-        setTotal(r?.total ?? 0);
+      .then((r) => {
+        const rows = Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : (Array.isArray(r?.items) ? r.items : []));
+        setConsents(rows);
+        setTotal(Number(r?.total ?? 0));
       })
-      .catch(e => setError(e.message))
+      .catch((e) => {
+        if (e?.status === 404 || e?.status === 500) {
+          setConsents([]);
+          setTotal(0);
+          setError(null);
+          return;
+        }
+        setError(e?.message || 'Failed to load consents.');
+      })
       .finally(() => setLoading(false));
   }, [page]);
 

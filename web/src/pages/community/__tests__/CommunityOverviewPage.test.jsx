@@ -26,15 +26,11 @@ describe('CommunityOverviewPage', () => {
 
   it('renders stat cards when data loads', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          questions_by_status: { new: 5 },
-          answers_by_status: { draft: 2, published: 10 },
-          published_answers: 10,
-          pending_approval: 3,
-          open_moderation_flags: 1,
-        },
-      },
+      questions_by_status: { new: 5 },
+      answers_by_status: { draft: 2, published: 10 },
+      published_answers: 10,
+      pending_approval: 3,
+      open_moderation_flags: 1,
     });
     renderWithAuth(<CommunityOverviewPage />, ctx);
     // '10' may appear in multiple stat cards (e.g. published_answers and answers_by_status)
@@ -51,7 +47,7 @@ describe('CommunityOverviewPage', () => {
   });
 
   it('renders page heading', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<CommunityOverviewPage />, ctx);
     await waitFor(() => expect(screen.getByText('Community Control Centre')).toBeInTheDocument());
   });

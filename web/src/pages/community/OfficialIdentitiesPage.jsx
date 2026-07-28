@@ -12,8 +12,8 @@ export default function OfficialIdentitiesPage() {
 
   function load() {
     setLoading(true);
-    api.get('/community/identities', { params: { include_inactive: 1 } })
-      .then(r => setIdentities(r.data?.data ?? []))
+    api.get('v1/community/identities', { include_inactive: 1 })
+      .then(r => setIdentities(Array.isArray(r) ? r : (r?.data ?? [])))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }
@@ -23,7 +23,7 @@ export default function OfficialIdentitiesPage() {
   function handleCreate(e) {
     e.preventDefault();
     setSaving(true);
-    api.post('/community/identities', form)
+    api.post('v1/community/identities', form)
       .then(() => { setMsg('Identity created.'); setShowForm(false); setForm({ slug: '', display_name: '', department: '', badge_type: 'official', disclosure_template: '' }); load(); })
       .catch(e => setMsg('Error: ' + (e.response?.data?.error ?? e.message)))
       .finally(() => setSaving(false));
@@ -31,7 +31,7 @@ export default function OfficialIdentitiesPage() {
 
   function handleDeactivate(slug) {
     if (!confirm(`Deactivate identity "${slug}"?`)) return;
-    api.delete(`/community/identities/${slug}`)
+    api.delete(`v1/community/identities/${slug}`)
       .then(() => load())
       .catch(e => alert(e.message));
   }

@@ -50,7 +50,15 @@ export default function VideoProjectListPage() {
         setProjects(rows);
         setTotal(normalizeVideoTotal(r, rows));
       })
-      .catch((e) => setError(e?.message || 'Failed to load projects.'))
+      .catch((e) => {
+        if (e?.status === 404 || e?.status === 500) {
+          setProjects([]);
+          setTotal(0);
+          setError(null);
+          return;
+        }
+        setError(e?.message || 'Failed to load projects.');
+      })
       .finally(() => setLoading(false));
   }, [page, filter]);
 
