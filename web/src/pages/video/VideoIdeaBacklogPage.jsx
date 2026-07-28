@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-
-function normalizeList(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
-}
+import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
 
 function VideoStatusBadge({ status }) {
   const colorMap = {
@@ -56,8 +50,9 @@ export default function VideoIdeaBacklogPage() {
 
     api.get('v1/video/ideas', params)
       .then((r) => {
-        setIdeas(normalizeList(r));
-        setTotal(Number(r?.total ?? 0));
+        const rows = normalizeVideoList(r);
+        setIdeas(rows);
+        setTotal(normalizeVideoTotal(r, rows));
       })
       .catch((e) => {
         if (e?.status === 404) {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { normalizeVideoList } from './videoListUtils';
 
 function ConnectionCard({ connection, onRevoke, onHealthCheck }) {
   const [health, setHealth] = useState(null);
@@ -49,9 +50,10 @@ export default function VideoConnectionsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     api.get('v1/video/connections')
-      .then(r => setConnections(r?.data ?? []))
-      .catch(e => setError(e.message))
+      .then((r) => setConnections(normalizeVideoList(r)))
+      .catch((e) => setError(e?.message || 'Failed to load connections.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -124,7 +126,7 @@ export default function VideoConnectionsPage() {
         <p className="muted">No YouTube connections configured. Add one to enable video publication.</p>
       )}
 
-      {connections.map(conn => (
+      {!loading && connections.map((conn) => (
         <ConnectionCard
           key={conn.uuid ?? conn.id}
           connection={conn}

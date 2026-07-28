@@ -19,13 +19,13 @@ beforeEach(() => { api.get.mockReset(); });
 
 describe('VideoConnectionsPage', () => {
   it('renders the page heading', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce({ data: [] });
     renderWithAuth(<VideoConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText('YouTube Connections')).toBeInTheDocument());
   });
 
   it('shows empty state when no connections', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce({ data: [] });
     renderWithAuth(<VideoConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText(/no youtube connections configured/i)).toBeInTheDocument());
   });

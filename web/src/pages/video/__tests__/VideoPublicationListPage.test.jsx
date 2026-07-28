@@ -18,14 +18,31 @@ const ctx = {
 beforeEach(() => { api.get.mockReset(); });
 
 describe('VideoPublicationListPage', () => {
+  it('calls the v1 publications endpoint', async () => {
+    api.get.mockResolvedValueOnce({ data: [], total: 0 });
+    renderWithAuth(<VideoPublicationListPage />, ctx);
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('v1/video/publications', {
+        page: 1,
+        per_page: 25,
+      }),
+    );
+  });
+
   it('renders the page heading', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: { data: [], total: 0 } } });
+    api.get.mockResolvedValueOnce({ data: [], total: 0 });
     renderWithAuth(<VideoPublicationListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Video Publications')).toBeInTheDocument());
   });
 
   it('shows empty state when no publications', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: { data: [], total: 0 } } });
+    api.get.mockResolvedValueOnce({ data: [], total: 0 });
+    renderWithAuth(<VideoPublicationListPage />, ctx);
+    await waitFor(() => expect(screen.getByText(/no publications yet/i)).toBeInTheDocument());
+  });
+
+  it('shows empty state for nested legacy payloads', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: [], total: 0 } });
     renderWithAuth(<VideoPublicationListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/no publications yet/i)).toBeInTheDocument());
   });

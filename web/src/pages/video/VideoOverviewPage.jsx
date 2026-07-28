@@ -9,16 +9,16 @@ export default function VideoOverviewPage() {
 
   useEffect(() => {
     Promise.all([
-      api.get('v1/video/ideas', { per_page: 1 }),
-      api.get('v1/video/projects', { per_page: 1 }),
+      api.get('v1/video/ideas', { per_page: 1 }).catch(() => null),
+      api.get('v1/video/projects', { per_page: 1 }).catch(() => null),
     ])
       .then(([ideasRes, projectsRes]) => {
         setStats({
-          total_ideas:    ideasRes?.total ?? 0,
+          total_ideas: ideasRes?.total ?? 0,
           total_projects: projectsRes?.total ?? 0,
         });
       })
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e?.message || 'Failed to load video overview.'))
       .finally(() => setLoading(false));
   }, []);
 

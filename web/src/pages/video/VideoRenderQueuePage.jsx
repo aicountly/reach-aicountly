@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { normalizeVideoList } from './videoListUtils';
 
 function RenderJobStatusBadge({ status }) {
   const map = {
@@ -21,9 +22,10 @@ export default function VideoRenderQueuePage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     api.get('v1/video/render-jobs', { per_page: 50 })
-      .then(r => setJobs(r?.data ?? []))
-      .catch(e => setError(e.message))
+      .then((r) => setJobs(normalizeVideoList(r)))
+      .catch((e) => setError(e?.message || 'Failed to load render queue.'))
       .finally(() => setLoading(false));
   }, []);
 

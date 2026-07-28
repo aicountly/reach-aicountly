@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
 
 export default function VideoPublicationListPage() {
   const [pubs, setPubs]       = useState([]);
@@ -12,12 +13,14 @@ export default function VideoPublicationListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     api.get('v1/video/publications', { page, per_page: perPage })
-      .then(r => {
-        setPubs(r?.data ?? []);
-        setTotal(r?.total ?? 0);
+      .then((r) => {
+        const rows = normalizeVideoList(r);
+        setPubs(rows);
+        setTotal(normalizeVideoTotal(r, rows));
       })
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e?.message || 'Failed to load publications.'))
       .finally(() => setLoading(false));
   }, [page]);
 

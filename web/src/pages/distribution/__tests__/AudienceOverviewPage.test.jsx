@@ -10,7 +10,7 @@ function renderPage() {
   return render(
     <MemoryRouter>
       <AudienceOverviewPage />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -36,6 +36,7 @@ describe('AudienceOverviewPage', () => {
     expect(screen.getByText('Audience Segments')).toBeTruthy();
     expect(screen.getByText('Suppression List')).toBeTruthy();
     expect(screen.getByText('Channel Consents')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('2')).toBeTruthy());
   });
 
   it('loads counts from v1 distribution endpoints', async () => {
@@ -50,9 +51,10 @@ describe('AudienceOverviewPage', () => {
     expect(api.get).toHaveBeenCalledWith('v1/distribution/consents', { page: 1, per_page: 1 });
   });
 
-  it('links View Segments to the audience segments route', () => {
+  it('links View Segments to the audience segments route', async () => {
     renderPage();
     const link = screen.getByText('View Segments').closest('a');
     expect(link?.getAttribute('href')).toBe('/distribution/audience/segments');
+    await waitFor(() => expect(screen.getByText('2')).toBeTruthy());
   });
 });

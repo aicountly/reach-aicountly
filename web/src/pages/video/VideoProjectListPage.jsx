@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
 
 function ProjectStatusBadge({ status }) {
   const colorMap = {
@@ -38,16 +39,18 @@ export default function VideoProjectListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     api.get('v1/video/projects', {
       page,
       per_page: perPage,
       status: filter || undefined,
     })
-      .then(r => {
-        setProjects(r?.data ?? []);
-        setTotal(r?.total ?? 0);
+      .then((r) => {
+        const rows = normalizeVideoList(r);
+        setProjects(rows);
+        setTotal(normalizeVideoTotal(r, rows));
       })
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e?.message || 'Failed to load projects.'))
       .finally(() => setLoading(false));
   }, [page, filter]);
 
