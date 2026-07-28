@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Tag, Users, ShieldAlert } from 'lucide-react';
 import { knowledgeService } from '../../services/knowledgeService';
@@ -28,26 +28,43 @@ function StatCard({ icon, label, count, to, color = '#3b82f6' }) {
   );
 }
 
+function totalOrNull(result) {
+  return result.status === 'fulfilled' && result.value ? (result.value.total ?? 0) : null;
+}
+
 export function KnowledgeIndexPage() {
   const { has } = usePermission();
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const canProducts = has('product.view');
+  const canPersonas = has('persona.view');
+  const canClaims = has('claim.view');
+  const canSources = has('source.view');
+
+  const loadStats = useCallback(() => {
+    let cancelled = false;
+    setLoading(true);
     Promise.allSettled([
-      has('product.view')  && knowledgeService.listProducts({ limit: 1 }),
-      has('persona.view')  && knowledgeService.listPersonas({ limit: 1 }),
-      has('claim.view')    && knowledgeService.listClaims({ limit: 1 }),
-      has('source.view')   && knowledgeService.listSources({ limit: 1 }),
+      canProducts ? knowledgeService.listProducts({ limit: 1 }) : Promise.resolve(null),
+      canPersonas ? knowledgeService.listPersonas({ limit: 1 }) : Promise.resolve(null),
+      canClaims ? knowledgeService.listClaims({ limit: 1 }) : Promise.resolve(null),
+      canSources ? knowledgeService.listSources({ limit: 1 }) : Promise.resolve(null),
     ]).then(([p, ps, c, s]) => {
+      if (cancelled) return;
       setStats({
-        products: p.status === 'fulfilled' && p.value ? (p.value.total ?? 0) : null,
-        personas: ps.status === 'fulfilled' && ps.value ? (ps.value.total ?? 0) : null,
-        claims:   c.status === 'fulfilled' && c.value ? (c.value.total ?? 0) : null,
-        sources:  s.status === 'fulfilled' && s.value ? (s.value.total ?? 0) : null,
+        products: totalOrNull(p),
+        personas: totalOrNull(ps),
+        claims: totalOrNull(c),
+        sources: totalOrNull(s),
       });
-    }).finally(() => setLoading(false));
-  }, [has]);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [canProducts, canPersonas, canClaims, canSources]);
+
+  useEffect(() => loadStats(), [loadStats]);
 
   return (
     <div>
