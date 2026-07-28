@@ -18,7 +18,10 @@ export default function KbPublishingListPage() {
 
   useEffect(() => {
     api.get('v1/publishing/knowledge-bases')
-      .then((r) => setDeployments(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
+      .then((r) => {
+        const list = Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : (Array.isArray(r?.data) ? r.data : []));
+        setDeployments(list);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

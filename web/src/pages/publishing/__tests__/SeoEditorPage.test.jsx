@@ -41,17 +41,13 @@ describe('SeoEditorPage', () => {
 
   it('renders SEO form after loading', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          primary_keyword: 'bank reconciliation',
-          meta_title: 'Bank Reconciliation in AICOUNTLY',
-          meta_description: 'Learn how to reconcile bank statements.',
-          slug: 'bank-reconciliation-guide',
-          canonical_preference: 'self_canonical',
-          robots_directive: 'index,follow',
-          focus_language: 'en',
-        },
-      },
+      primary_keyword: 'bank reconciliation',
+      meta_title: 'Bank Reconciliation in AICOUNTLY',
+      meta_description: 'Learn how to reconcile bank statements.',
+      slug: 'bank-reconciliation-guide',
+      canonical_preference: 'self_canonical',
+      robots_directive: 'index,follow',
+      focus_language: 'en',
     });
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument());
@@ -59,21 +55,21 @@ describe('SeoEditorPage', () => {
   });
 
   it('shows canonical preference dropdown', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument());
     expect(screen.getByText(/Self canonical/i)).toBeInTheDocument();
   });
 
   it('shows Save SEO Profile button', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.getByRole('button', { name: /Save SEO Profile/i })).toBeInTheDocument());
   });
 
   it('shows success message after save', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
-    api.put.mockResolvedValueOnce({ data: {} });
+    api.get.mockResolvedValueOnce({});
+    api.put.mockResolvedValueOnce({});
 
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.getByRole('button', { name: /Save SEO Profile/i })).toBeInTheDocument());

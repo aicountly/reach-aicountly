@@ -33,14 +33,10 @@ describe('ReadinessPage additional scenarios', () => {
 
   it('shows READY status when checks pass', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          content_item_id: 10,
-          status: 'ready',
-          blocking: [],
-          warnings: ['Image alt text missing'],
-        },
-      },
+      content_item_id: 10,
+      status: 'ready',
+      blocking: [],
+      warnings: ['Image alt text missing'],
     });
     renderWithAuth(<ReadinessPage />, ctx);
     const input = screen.getByPlaceholderText(/e\.g\. 123/i);
@@ -51,14 +47,10 @@ describe('ReadinessPage additional scenarios', () => {
 
   it('shows blockers when blocked', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          content_item_id: 15,
-          status: 'blocked',
-          blocking: ['Missing meta title', 'Unapproved content', 'No slug defined'],
-          warnings: [],
-        },
-      },
+      content_item_id: 15,
+      status: 'blocked',
+      blocking: ['Missing meta title', 'Unapproved content', 'No slug defined'],
+      warnings: [],
     });
     renderWithAuth(<ReadinessPage />, ctx);
     const input = screen.getByPlaceholderText(/e\.g\. 123/i);
@@ -71,13 +63,9 @@ describe('ReadinessPage additional scenarios', () => {
 
   it('shows Blocking Issues section header when blockers present', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          status: 'blocked',
-          blocking: ['No SEO profile defined'],
-          warnings: [],
-        },
-      },
+      status: 'blocked',
+      blocking: ['No SEO profile defined'],
+      warnings: [],
     });
     renderWithAuth(<ReadinessPage />, ctx);
     const input = screen.getByPlaceholderText(/e\.g\. 123/i);

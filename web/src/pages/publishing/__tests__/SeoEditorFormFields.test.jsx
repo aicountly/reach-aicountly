@@ -34,13 +34,13 @@ beforeEach(() => {
 
 describe('SeoEditorPage form fields', () => {
   it('renders Primary Keyword field', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.getByText('Primary Keyword')).toBeInTheDocument());
   });
 
   it('renders Meta Title field', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => {
       const labels = screen.getAllByText(/Meta Title/i);
@@ -49,7 +49,7 @@ describe('SeoEditorPage form fields', () => {
   });
 
   it('renders Meta Description field', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => {
       const labels = screen.getAllByText(/Meta Description/i);
@@ -58,14 +58,14 @@ describe('SeoEditorPage form fields', () => {
   });
 
   it('renders Slug field', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.getByText('Slug')).toBeInTheDocument());
   });
 
   it('shows save error message on failure', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
-    api.put.mockRejectedValueOnce({ response: { data: { message: 'Validation failed' } } });
+    api.get.mockResolvedValueOnce({});
+    api.put.mockRejectedValueOnce({ response: { data: { message: 'Validation failed' } }, message: 'Validation failed' });
 
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => screen.getByRole('button', { name: /Save SEO Profile/i }));
@@ -74,7 +74,7 @@ describe('SeoEditorPage form fields', () => {
   });
 
   it('Run SEO Check button is present', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    api.get.mockResolvedValueOnce({});
     renderWithAuth(<SeoEditorPage />, ctx);
     await waitFor(() => expect(screen.getByRole('button', { name: /Run SEO Check/i })).toBeInTheDocument());
   });

@@ -30,7 +30,10 @@ export default function SeoEditorPage() {
   useEffect(() => {
     api.get(`v1/publishing/seo/${contentId}`)
       .then(r => {
-        const p = r?.data && typeof r.data === 'object' && !Array.isArray(r.data) ? r.data : (r ?? {});
+        // api client unwraps { ok, data }; prefer the SEO fields object itself.
+        const p = (r && typeof r === 'object' && !Array.isArray(r) && (r.primary_keyword !== undefined || r.slug !== undefined || r.meta_title !== undefined || r.canonical_preference !== undefined || Object.keys(r).length === 0))
+          ? r
+          : (r?.data && typeof r.data === 'object' ? r.data : {});
         setProfile(p);
         setForm(f => ({
           ...f,

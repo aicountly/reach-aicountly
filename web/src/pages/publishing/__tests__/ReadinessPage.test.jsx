@@ -38,17 +38,13 @@ describe('ReadinessPage', () => {
 
   it('shows result with BLOCKED status', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          status: 'blocked',
-          content_type: 'blog',
-          blocking: ['SEO profile not ready', 'Missing author'],
-          warnings: [],
-          domain_check: { status: 'blocked' },
-          seo_check: { status: 'blocked' },
-          aeo_check: { status: 'warning' },
-        },
-      },
+      status: 'blocked',
+      content_type: 'blog',
+      blocking: ['SEO profile not ready', 'Missing author'],
+      warnings: [],
+      domain_check: { status: 'blocked' },
+      seo_check: { status: 'blocked' },
+      aeo_check: { status: 'warning' },
     });
 
     renderWithAuth(<ReadinessPage />, ctx);
@@ -57,21 +53,18 @@ describe('ReadinessPage', () => {
 
     await waitFor(() => expect(screen.getByText('BLOCKED')).toBeInTheDocument());
     expect(screen.getByText('SEO profile not ready')).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith('v1/publishing/readiness/42');
   });
 
   it('shows warnings section when warnings present', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          status: 'warning',
-          content_type: 'blog',
-          blocking: [],
-          warnings: ['No internal links found'],
-          domain_check: { status: 'ready' },
-          seo_check: { status: 'warning' },
-          aeo_check: { status: 'ready' },
-        },
-      },
+      status: 'warning',
+      content_type: 'blog',
+      blocking: [],
+      warnings: ['No internal links found'],
+      domain_check: { status: 'ready' },
+      seo_check: { status: 'warning' },
+      aeo_check: { status: 'ready' },
     });
 
     renderWithAuth(<ReadinessPage />, ctx);

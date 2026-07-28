@@ -21,16 +21,15 @@ beforeEach(() => {
 
 describe('DeploymentListPage additional', () => {
   it('shows Deployments heading', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce({ items: [], last_page: 1 });
     renderWithAuth(<DeploymentListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Deployments')).toBeInTheDocument());
   });
 
   it('shows deployment operation field', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: [{ id: 1, content_item_id: 1, content_title: 'Test', status: 'published', operation: 'publish', attempt_count: 1, updated_at: null }],
-      },
+      items: [{ id: 1, content_item_id: 1, content_title: 'Test', status: 'published', operation: 'publish', attempt_count: 1, updated_at: null }],
+      last_page: 1,
     });
     renderWithAuth(<DeploymentListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Test')).toBeInTheDocument());
@@ -38,9 +37,8 @@ describe('DeploymentListPage additional', () => {
 
   it('shows attempt count', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: [{ id: 7, content_item_id: 2, content_title: 'Another', status: 'failed', operation: 'publish', attempt_count: 3, updated_at: null }],
-      },
+      items: [{ id: 7, content_item_id: 2, content_title: 'Another', status: 'failed', operation: 'publish', attempt_count: 3, updated_at: null }],
+      last_page: 1,
     });
     renderWithAuth(<DeploymentListPage />, ctx);
     await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument());

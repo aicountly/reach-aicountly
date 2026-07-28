@@ -41,7 +41,8 @@ export default function DeploymentListPage() {
     setLoading(true);
     api.get('v1/publishing/deployments', { page })
       .then((r) => {
-        setDeployments(Array.isArray(r) ? r : (r?.items ?? r?.data ?? []));
+        const list = Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : (Array.isArray(r?.data) ? r.data : []));
+        setDeployments(list);
         setTotalPages(r?.last_page ?? r?.meta?.last_page ?? 1);
       })
       .catch(e => setError(e.message))

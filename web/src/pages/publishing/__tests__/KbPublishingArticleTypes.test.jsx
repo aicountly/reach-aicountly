@@ -38,28 +38,24 @@ describe('KbPublishingListPage article types', () => {
     ['concept'],
     ['tutorial'],
   ])('displays article type %s', async (type) => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeKbRow(type)] } });
+    api.get.mockResolvedValueOnce([makeKbRow(type)]);
     const { unmount } = renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(type)).toBeInTheDocument());
     unmount();
   });
 
   it('shows KB page header', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/Knowledge Base Publishing/i)).toBeInTheDocument());
   });
 
   it('shows multiple KB items', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          makeKbRow('how_to'),
-          makeKbRow('concept'),
-          makeKbRow('reference'),
-        ],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      makeKbRow('how_to'),
+      makeKbRow('concept'),
+      makeKbRow('reference'),
+    ]);
     renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getAllByText('published').length).toBeGreaterThanOrEqual(1));
   });

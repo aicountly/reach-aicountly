@@ -9,7 +9,10 @@ export default function VerificationListPage() {
 
   useEffect(() => {
     api.get('v1/publishing/verifications')
-      .then((r) => setVerifications(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
+      .then((r) => {
+        const list = Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : (Array.isArray(r?.data) ? r.data : []));
+        setVerifications(list);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

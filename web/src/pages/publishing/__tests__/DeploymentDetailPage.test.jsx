@@ -12,7 +12,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
-    useParams: () => ({ deploymentId: '5' }),
+    useParams: () => ({ id: '5' }),
   };
 });
 import api from '../../../services/api';
@@ -51,8 +51,8 @@ describe('DeploymentDetailPage', () => {
 
   it('renders deployment detail after loading', async () => {
     api.get
-      .mockResolvedValueOnce({ data: { data: makeDeployment() } })
-      .mockResolvedValueOnce({ data: { data: [] } });
+      .mockResolvedValueOnce(makeDeployment())
+      .mockResolvedValueOnce([]);
 
     renderWithAuth(<DeploymentDetailPage />, ctx);
     await waitFor(() => expect(screen.getByText(/Deployment #5/i)).toBeInTheDocument());
@@ -60,8 +60,8 @@ describe('DeploymentDetailPage', () => {
 
   it('shows deployment status badge', async () => {
     api.get
-      .mockResolvedValueOnce({ data: { data: makeDeployment() } })
-      .mockResolvedValueOnce({ data: { data: [] } });
+      .mockResolvedValueOnce(makeDeployment())
+      .mockResolvedValueOnce([]);
 
     renderWithAuth(<DeploymentDetailPage />, ctx);
     await waitFor(() => expect(screen.getByText('verified')).toBeInTheDocument());
@@ -69,8 +69,8 @@ describe('DeploymentDetailPage', () => {
 
   it('shows canonical URL when present', async () => {
     api.get
-      .mockResolvedValueOnce({ data: { data: makeDeployment() } })
-      .mockResolvedValueOnce({ data: { data: [] } });
+      .mockResolvedValueOnce(makeDeployment())
+      .mockResolvedValueOnce([]);
 
     renderWithAuth(<DeploymentDetailPage />, ctx);
     await waitFor(() => expect(screen.getByText('https://aicountly.com/blog/test')).toBeInTheDocument());

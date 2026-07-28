@@ -34,32 +34,26 @@ describe('VerificationListPage status scenarios', () => {
     ['pending'],
     ['skipped'],
   ])('renders verification status: %s', async (status) => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeVerification(status)] } });
+    api.get.mockResolvedValueOnce([makeVerification(status)]);
     const { unmount } = renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText(status)).toBeInTheDocument());
     unmount();
   });
 
   it('shows check time column', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [{ id: 1, deployment_id: 1, status: 'verified', http_status_code: 200, checked_at: '2026-07-13T10:00:00Z' }],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      { id: 1, deployment_id: 1, status: 'verified', http_status_code: 200, checked_at: '2026-07-13T10:00:00Z' },
+    ]);
     renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/2026/)).toBeInTheDocument());
   });
 
   it('shows multiple verification rows', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          makeVerification('verified'),
-          makeVerification('failed'),
-          makeVerification('pending'),
-        ],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      makeVerification('verified'),
+      makeVerification('failed'),
+      makeVerification('pending'),
+    ]);
     renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText('verified')).toBeInTheDocument());
     expect(screen.getByText('failed')).toBeInTheDocument();

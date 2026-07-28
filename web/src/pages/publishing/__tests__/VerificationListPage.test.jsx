@@ -38,26 +38,26 @@ describe('VerificationListPage', () => {
   });
 
   it('renders page header', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Verification Results')).toBeInTheDocument());
   });
 
   it('shows empty state message', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/No verification results/i)).toBeInTheDocument());
   });
 
   it('renders verification row', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeVerification()] } });
+    api.get.mockResolvedValueOnce([makeVerification()]);
     renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText('public_status')).toBeInTheDocument());
     expect(screen.getByText('passed')).toBeInTheDocument();
   });
 
   it('renders failed verification with error badge', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeVerification({ status: 'failed', actual_value: 'draft' })] } });
+    api.get.mockResolvedValueOnce([makeVerification({ status: 'failed', actual_value: 'draft' })]);
     renderWithAuth(<VerificationListPage />, ctx);
     await waitFor(() => expect(screen.getByText('failed')).toBeInTheDocument());
   });

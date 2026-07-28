@@ -27,27 +27,23 @@ describe('KbPublishingListPage', () => {
   });
 
   it('shows empty state when no deployments', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/No knowledge-base deployments/i)).toBeInTheDocument());
   });
 
   it('renders KB deployment with article type', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          {
-            id: 3,
-            content_item_id: 55,
-            content_title: 'Bank Reconciliation Setup',
-            status: 'verified',
-            article_type: 'how_to',
-            attempt_count: 1,
-            updated_at: '2026-07-13T10:00:00Z',
-          },
-        ],
+    api.get.mockResolvedValueOnce([
+      {
+        id: 3,
+        content_item_id: 55,
+        content_title: 'Bank Reconciliation Setup',
+        status: 'verified',
+        article_type: 'how_to',
+        attempt_count: 1,
+        updated_at: '2026-07-13T10:00:00Z',
       },
-    });
+    ]);
     renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Bank Reconciliation Setup')).toBeInTheDocument());
     expect(screen.getByText('how_to')).toBeInTheDocument();
@@ -55,7 +51,7 @@ describe('KbPublishingListPage', () => {
   });
 
   it('renders page header', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Knowledge Base Publishing')).toBeInTheDocument());
   });

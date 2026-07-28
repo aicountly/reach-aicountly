@@ -39,6 +39,7 @@ class Jwt
             'iat'   => $now,
             'nbf'   => $now,
             'exp'   => $now + $this->ttlSeconds,
+            'jti'   => bin2hex(random_bytes(16)),
             'sub'   => (string) $userId,
             'email' => $email,
             'name'  => $name,

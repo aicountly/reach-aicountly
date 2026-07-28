@@ -70,7 +70,8 @@ class NotificationService
             'entity_id'         => $options['entity_id'] ?? null,
             'message'           => $message,
             'action_url'        => $options['action_url'] ?? null,
-            'data'              => isset($options['data']) ? json_encode($options['data']) : null,
+            // Model casts `data` as json-array — pass the array, do not pre-encode.
+            'data'              => $options['data'] ?? null,
             'created_by'        => $createdBy,
             'created_at'        => date('Y-m-d H:i:s'),
         ], true);

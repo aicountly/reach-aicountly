@@ -9,7 +9,10 @@ export default function ConnectionsPage() {
 
   useEffect(() => {
     api.get('v1/publishing/connections')
-      .then((r) => setConnections(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
+      .then((r) => {
+        const list = Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : (Array.isArray(r?.data) ? r.data : []));
+        setConnections(list);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

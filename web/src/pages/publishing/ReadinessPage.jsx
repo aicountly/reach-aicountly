@@ -22,7 +22,10 @@ export default function ReadinessPage() {
     setResult(null);
     try {
       const r = await api.get(`v1/publishing/readiness/${contentId}`);
-      setResult(r?.data ?? r ?? null);
+      // api client already unwraps { ok, data }; accept a bare result object.
+      setResult(r && typeof r === 'object' && !Array.isArray(r) && (r.status != null || r.data?.status != null)
+        ? (r.status != null ? r : r.data)
+        : null);
     } catch (e) {
       setError(e.response?.data?.message ?? e.message);
     } finally {

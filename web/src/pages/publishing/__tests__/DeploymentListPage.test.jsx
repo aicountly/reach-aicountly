@@ -39,14 +39,15 @@ describe('DeploymentListPage', () => {
   });
 
   it('shows empty state', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [], meta: { last_page: 1 } } });
+    api.get.mockResolvedValueOnce({ items: [], last_page: 1 });
     renderWithAuth(<DeploymentListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/No deployments/i)).toBeInTheDocument());
   });
 
   it('renders deployment rows', async () => {
     api.get.mockResolvedValueOnce({
-      data: { data: [makeDeployment()], meta: { last_page: 1 } },
+      items: [makeDeployment()],
+      last_page: 1,
     });
     renderWithAuth(<DeploymentListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Test Article')).toBeInTheDocument());
@@ -54,10 +55,8 @@ describe('DeploymentListPage', () => {
 
   it('shows all status labels defined', async () => {
     api.get.mockResolvedValueOnce({
-      data: {
-        data: [makeDeployment({ status: 'verified' })],
-        meta: { last_page: 1 },
-      },
+      items: [makeDeployment({ status: 'verified' })],
+      last_page: 1,
     });
     renderWithAuth(<DeploymentListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Verified')).toBeInTheDocument());
