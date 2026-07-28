@@ -8,8 +8,8 @@ export default function VerificationListPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get('/publishing/verifications')
-      .then(r => setVerifications(r.data?.data ?? []))
+    api.get('v1/publishing/verifications')
+      .then((r) => setVerifications(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

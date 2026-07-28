@@ -28,9 +28,9 @@ export default function SeoEditorPage() {
   const [seoResult, setSeoResult] = useState(null);
 
   useEffect(() => {
-    api.get(`/publishing/seo/${contentId}`)
+    api.get(`v1/publishing/seo/${contentId}`)
       .then(r => {
-        const p = r.data?.data ?? {};
+        const p = r?.data && typeof r.data === 'object' && !Array.isArray(r.data) ? r.data : (r ?? {});
         setProfile(p);
         setForm(f => ({
           ...f,
@@ -51,7 +51,7 @@ export default function SeoEditorPage() {
     setSaving(true);
     setMsg(null);
     try {
-      await api.put(`/publishing/seo/${contentId}`, form);
+      await api.put(`v1/publishing/seo/${contentId}`, form);
       setMsg('SEO profile saved.');
     } catch (e) {
       setMsg('Save failed: ' + (e.response?.data?.message ?? e.message));
@@ -63,8 +63,8 @@ export default function SeoEditorPage() {
   const runSeoCheck = async () => {
     setSeoResult(null);
     try {
-      const r = await api.post(`/publishing/seo/${contentId}/evaluate`);
-      setSeoResult(r.data?.data ?? null);
+      const r = await api.post(`v1/publishing/seo/${contentId}/evaluate`);
+      setSeoResult(r?.data ?? r ?? null);
     } catch {
       setMsg('SEO evaluation failed.');
     }

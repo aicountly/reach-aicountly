@@ -5,6 +5,7 @@ import { renderWithAuth } from '../../../test/renderWithAuth';
 vi.mock('../../../services/blogService', () => ({
   blogService: {
     list: vi.fn(),
+    archive: vi.fn(),
   },
 }));
 

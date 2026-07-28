@@ -1,59 +1,152 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, BarChart3, Zap, Eye, Link2, Users2, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  getAttributionOverview,
+  listCompetitors,
+  listConnectors,
+  listVisibilityRuns,
+} from '../../services/intelligenceService.js';
 
-const CARDS = [
-  { label: 'Search Queries Tracked', value: '1,248', sub: '+112 this week', icon: Search, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Content Identities', value: '94', sub: '91 published', icon: BarChart3, color: 'text-green-600', bg: 'bg-green-50' },
-  { label: 'IndexNow Submitted', value: '67', sub: 'last 7 days', icon: Zap, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-  { label: 'AI Visibility Runs', value: '14', sub: '2 this week', icon: Eye, color: 'text-purple-600', bg: 'bg-purple-50' },
-  { label: 'Attributed Conversions', value: '238', sub: '84% attribution rate', icon: Link2, color: 'text-orange-600', bg: 'bg-orange-50' },
-  { label: 'Competitors Tracked', value: '4', sub: 'active monitoring', icon: Users2, color: 'text-red-600', bg: 'bg-red-50' },
-];
-
-const STATUS = [
-  { name: 'GSC Connector', status: 'healthy' },
-  { name: 'GA4 Connector', status: 'healthy' },
-  { name: 'IndexNow', status: 'idle' },
+const LINKS = [
+  { to: '/intelligence/search', label: 'Search Intelligence', desc: 'GSC queries, pages, and performance', icon: Search },
+  { to: '/intelligence/content', label: 'Content Performance', desc: 'GA4 content analytics', icon: BarChart3 },
+  { to: '/intelligence/indexnow', label: 'IndexNow', desc: 'URL submission operations', icon: Zap },
+  { to: '/intelligence/visibility', label: 'AI Visibility', desc: 'Prompt runs and brand mentions', icon: Eye },
+  { to: '/intelligence/attribution', label: 'Attribution', desc: 'First/last-touch conversion links', icon: Link2 },
+  { to: '/intelligence/competitors', label: 'Competitors', desc: 'Tracked competitor observations', icon: Users2 },
 ];
 
 export default function IntelligenceOverviewPage() {
+  const [tiles, setTiles] = useState([
+    { label: 'Attributed Conversions', value: '—', sub: 'Live attribution', icon: Link2 },
+    { label: 'AI Visibility Runs', value: '—', sub: 'Recent runs', icon: Eye },
+    { label: 'Competitors Tracked', value: '—', sub: 'Active monitoring', icon: Users2 },
+    { label: 'Connectors', value: '—', sub: 'Configured integrations', icon: Zap },
+  ]);
+  const [connectors, setConnectors] = useState([]);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([
+      getAttributionOverview(),
+      listVisibilityRuns(),
+      listCompetitors(),
+      listConnectors(),
+    ]).then(([attrRes, runsRes, compsRes, connRes]) => {
+      if (cancelled) return;
+
+      const next = [...tiles];
+      if (attrRes.status === 'fulfilled') {
+        const s = attrRes.value?.stats || {};
+        next[0] = {
+          ...next[0],
+          value: String(s.attributed ?? 0),
+          sub: `${s.attribution_rate ?? 0}% attribution rate`,
+        };
+      }
+      if (runsRes.status === 'fulfilled') {
+        const runs = Array.isArray(runsRes.value) ? runsRes.value : (runsRes.value?.runs || runsRes.value?.data || []);
+        next[1] = { ...next[1], value: String(runs.length), sub: 'Loaded from API' };
+      }
+      if (compsRes.status === 'fulfilled') {
+        const comps = Array.isArray(compsRes.value) ? compsRes.value : (compsRes.value?.competitors || compsRes.value?.data || []);
+        next[2] = { ...next[2], value: String(comps.length), sub: 'Active monitoring' };
+      }
+      if (connRes.status === 'fulfilled') {
+        const conns = Array.isArray(connRes.value) ? connRes.value : (connRes.value?.connectors || connRes.value?.data || []);
+        next[3] = { ...next[3], value: String(conns.length), sub: 'Configured integrations' };
+        setConnectors(conns);
+      }
+
+      const failed = [attrRes, runsRes, compsRes, connRes].filter((r) => r.status === 'rejected');
+      if (failed.length === 4) {
+        setError(failed[0].reason?.message || 'Failed to load intelligence overview');
+      }
+      setTiles(next);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Intelligence Control Centre</h1>
-        <p className="text-sm text-gray-500 mt-1">Phase 8 — Search Intelligence, Attribution &amp; AI Visibility</p>
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ marginBottom: '1.25rem' }}>
+        <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Intelligence Control Centre</h1>
+        <p className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>
+          Phase 8 — Search Intelligence, Attribution &amp; AI Visibility
+        </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {CARDS.map(c => (
-          <div key={c.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex items-start gap-4">
-            <div className={`p-2.5 rounded-lg ${c.bg}`}>
-              <c.icon className={`h-5 w-5 ${c.color}`} />
-            </div>
+      {error && <div className="alert alert-danger">{error}</div>}
+
+      <div className="grid grid-4" style={{ marginBottom: '1.25rem' }}>
+        {tiles.map((c) => (
+          <div key={c.label} className="stat-tile" style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+            <c.icon size={18} style={{ color: 'var(--color-primary)', marginTop: 2, flexShrink: 0 }} />
             <div>
-              <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
-              <p className="text-sm font-medium text-gray-700">{c.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{c.sub}</p>
+              <div className="stat-tile__value">{c.value}</div>
+              <div className="stat-tile__label">{c.label}</div>
+              <div className="stat-tile__hint">{c.sub}</div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Connector Health</h2>
-        <div className="space-y-3">
-          {STATUS.map(s => (
-            <div key={s.name} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-              <span className="text-sm text-gray-700">{s.name}</span>
-              <div className="flex items-center gap-1.5">
-                {s.status === 'healthy' ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-yellow-500" />
-                )}
-                <span className="text-sm text-gray-600 capitalize">{s.status}</span>
-              </div>
+      <div className="grid grid-3" style={{ marginBottom: '1.25rem' }}>
+        {LINKS.map((l) => (
+          <Link
+            key={l.to}
+            to={l.to}
+            className="card"
+            style={{ display: 'block', padding: '1rem', textDecoration: 'none', color: 'inherit' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <l.icon size={16} style={{ color: 'var(--color-primary)' }} />
+              <span style={{ fontWeight: 600 }}>{l.label}</span>
             </div>
-          ))}
+            <p className="text-sm text-muted" style={{ margin: 0 }}>{l.desc}</p>
+          </Link>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-header">Connector Health</div>
+        <div className="card-body">
+          {connectors.length === 0 ? (
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              No connectors configured yet. Add connectors under Intelligence → Connectors.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {connectors.map((s) => {
+                const name = s.name || s.connector_key || s.provider || `Connector #${s.id}`;
+                const status = (s.health_status || s.status || 'unknown').toLowerCase();
+                const healthy = status === 'healthy' || status === 'ok';
+                return (
+                  <div
+                    key={s.id || name}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.4rem 0',
+                      borderBottom: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <span className="text-sm">{name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      {healthy
+                        ? <CheckCircle size={14} style={{ color: 'var(--color-success)' }} />
+                        : <AlertCircle size={14} style={{ color: 'var(--color-warning)' }} />}
+                      <span className="text-sm text-muted" style={{ textTransform: 'capitalize' }}>{status}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

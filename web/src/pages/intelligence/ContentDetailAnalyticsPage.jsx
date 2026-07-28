@@ -1,57 +1,102 @@
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { BarChart2, TrendingUp, Clock, Eye } from 'lucide-react';
+import { BarChart2 } from 'lucide-react';
+import api from '../../services/api.js';
 
 export default function ContentDetailAnalyticsPage() {
   const { id } = useParams();
+  const [facts, setFacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const metrics = [
-    { label: '30-Day Sessions', value: '2,340', icon: Eye },
-    { label: 'Engagement Rate', value: '68%', icon: TrendingUp },
-    { label: 'Avg Session Time', value: '3m 4s', icon: Clock },
-    { label: 'Organic Entrances', value: '1,890', icon: BarChart2 },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.get(`v1/intelligence/content/metrics/${id}`)
+      .then((data) => {
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? data : (data?.facts || data?.data || []);
+        setFacts(rows);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load content analytics');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const sessions = facts.reduce((n, f) => n + Number(f.sessions || f.session_count || 0), 0);
+  const engagementVals = facts.map((f) => Number(f.engagement_rate)).filter((n) => Number.isFinite(n));
+  const avgEngagement = engagementVals.length
+    ? engagementVals.reduce((a, b) => a + b, 0) / engagementVals.length
+    : null;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <BarChart2 className="h-7 w-7 text-purple-600" />
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <BarChart2 size={26} style={{ color: 'var(--color-primary)' }} />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Content Analytics</h1>
-          <p className="text-sm text-gray-500">Identity #{id} performance detail</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Content Analytics</h1>
+          <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
+            Identity #{id} performance detail
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {metrics.map(m => (
-          <div key={m.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <m.icon className="h-4 w-4 text-purple-500" />
-              <p className="text-xs text-gray-500">{m.label}</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{m.value}</p>
+      {error && <div className="alert alert-danger">{error}</div>}
+
+      <div className="grid grid-2" style={{ marginBottom: '1.25rem' }}>
+        <div className="stat-tile">
+          <div className="stat-tile__label">Sessions (loaded facts)</div>
+          <div className="stat-tile__value">{loading ? '…' : sessions.toLocaleString()}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-tile__label">Avg Engagement Rate</div>
+          <div className="stat-tile__value">
+            {loading || avgEngagement == null
+              ? '—'
+              : `${(avgEngagement <= 1 ? avgEngagement * 100 : avgEngagement).toFixed(0)}%`}
           </div>
-        ))}
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Traffic by Source (30 days)</h2>
-        <div className="space-y-3">
-          {[
-            { source: 'Organic Search', pct: 62, color: 'bg-blue-500' },
-            { source: 'Direct', pct: 18, color: 'bg-purple-500' },
-            { source: 'Social', pct: 12, color: 'bg-pink-500' },
-            { source: 'Referral', pct: 8, color: 'bg-yellow-500' },
-          ].map(s => (
-            <div key={s.source}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-700">{s.source}</span>
-                <span className="font-medium text-gray-800">{s.pct}%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className={`${s.color} h-2 rounded-full`} style={{ width: `${s.pct}%` }} />
-              </div>
+      <div className="card">
+        <div className="card-header">Metric Facts</div>
+        <div className="card-body">
+          {loading && <p className="text-sm text-muted" style={{ margin: 0 }}>Loading…</p>}
+          {!loading && facts.length === 0 && !error && (
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              No analytics facts for this content identity yet.
+            </p>
+          )}
+          {!loading && facts.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th style={{ textAlign: 'right' }}>Sessions</th>
+                    <th style={{ textAlign: 'right' }}>Engagement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {facts.map((f, i) => (
+                    <tr key={f.id || i}>
+                      <td>{f.metric_date || f.date || '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{Number(f.sessions || f.session_count || 0).toLocaleString()}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {f.engagement_rate == null
+                          ? '—'
+                          : `${(Number(f.engagement_rate) <= 1 ? Number(f.engagement_rate) * 100 : Number(f.engagement_rate)).toFixed(0)}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

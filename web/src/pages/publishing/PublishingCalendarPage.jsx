@@ -7,8 +7,8 @@ export default function PublishingCalendarPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get('/publishing/calendar')
-      .then(r => setScheduled(r.data?.data ?? []))
+    api.get('v1/publishing/calendar')
+      .then((r) => setScheduled(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

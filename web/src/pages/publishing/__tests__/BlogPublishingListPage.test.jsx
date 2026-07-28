@@ -27,30 +27,27 @@ describe('BlogPublishingListPage', () => {
   });
 
   it('shows empty state when no deployments', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<BlogPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/No blog deployments/i)).toBeInTheDocument());
   });
 
   it('renders deployment rows when data available', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          {
-            id: 1,
-            content_item_id: 42,
-            content_title: 'GST Filing Guide',
-            status: 'published',
-            canonical_url: 'https://aicountly.com/blog/gst-filing',
-            attempt_count: 1,
-            updated_at: '2026-07-13T10:00:00Z',
-          },
-        ],
+    api.get.mockResolvedValueOnce([
+      {
+        id: 1,
+        content_item_id: 42,
+        content_title: 'GST Filing Guide',
+        status: 'published',
+        canonical_url: 'https://aicountly.com/blog/gst-filing',
+        attempt_count: 1,
+        updated_at: '2026-07-13T10:00:00Z',
       },
-    });
+    ]);
     renderWithAuth(<BlogPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText('GST Filing Guide')).toBeInTheDocument());
     expect(screen.getByText('published')).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith('v1/publishing/blogs');
   });
 
   it('shows error message when API fails', async () => {
@@ -60,7 +57,7 @@ describe('BlogPublishingListPage', () => {
   });
 
   it('renders page header', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<BlogPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText('Blog Publishing')).toBeInTheDocument());
   });

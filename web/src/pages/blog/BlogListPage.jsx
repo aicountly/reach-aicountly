@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { blogService } from '../../services/blogService';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
@@ -23,6 +23,7 @@ export function BlogListPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading]= useState(true);
   const [error, setError]   = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(() => {
@@ -33,6 +34,22 @@ export function BlogListPage() {
       .finally(() => setLoading(false));
   }, [page, limit, status, search]);
   useEffect(() => { load(); }, [page, limit, status, load]);
+
+  const handleDelete = async (e, post) => {
+    e.stopPropagation();
+    if (post.status === 'archived') return;
+    if (!window.confirm(`Delete “${post.title || 'untitled'}”? This will archive the post.`)) return;
+    setDeletingId(post.id);
+    setError(null);
+    try {
+      await blogService.archive(post.id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const columns = [
     { key: 'title', label: 'Title', render: (r) => (
@@ -47,6 +64,19 @@ export function BlogListPage() {
     { key: 'publishing_status', label: 'Publishing', render: (r) => <StatusBadge status={r.publishing_status || 'none'} /> },
     { key: 'bot_generated', label: 'Bot?', render: (r) => r.bot_generated ? 'Yes' : 'No' },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleString() : '—' },
+    { key: 'actions', label: '', render: (r) => (
+      r.status === 'archived' ? null : (
+        <button
+          type="button"
+          className="btn btn-danger btn-sm"
+          disabled={deletingId === r.id}
+          onClick={(e) => handleDelete(e, r)}
+          title="Delete post"
+        >
+          <Trash2 size={12} /> {deletingId === r.id ? 'Deleting…' : 'Delete'}
+        </button>
+      )
+    )},
   ];
 
   return (

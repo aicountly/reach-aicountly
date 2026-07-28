@@ -21,26 +21,18 @@ beforeEach(() => {
 
 describe('PublishingCalendarPage grouping', () => {
   it('shows Unscheduled group for items without scheduled_at', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 1, content_type: 'blog', content_title: 'Draft Post', status: 'queued', scheduled_at: null },
-        ],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      { id: 1, content_type: 'blog', content_title: 'Draft Post', status: 'queued', scheduled_at: null },
+    ]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => expect(screen.getByText('Unscheduled')).toBeInTheDocument());
   });
 
   it('sorts dates ascending', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 2, content_type: 'blog', content_title: 'Later Article', status: 'scheduled', scheduled_at: '2026-09-01T09:00:00Z' },
-          { id: 1, content_type: 'blog', content_title: 'Earlier Article', status: 'scheduled', scheduled_at: '2026-08-01T09:00:00Z' },
-        ],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      { id: 2, content_type: 'blog', content_title: 'Later Article', status: 'scheduled', scheduled_at: '2026-09-01T09:00:00Z' },
+      { id: 1, content_type: 'blog', content_title: 'Earlier Article', status: 'scheduled', scheduled_at: '2026-08-01T09:00:00Z' },
+    ]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => {
       const dateHeaders = document.querySelectorAll('.calendar-group__date');
@@ -50,14 +42,10 @@ describe('PublishingCalendarPage grouping', () => {
   });
 
   it('groups multiple items on the same date', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 1, content_type: 'blog', content_title: 'Morning Post', status: 'scheduled', scheduled_at: '2026-08-15T09:00:00Z' },
-          { id: 2, content_type: 'knowledge_base', content_title: 'KB Article', status: 'queued', scheduled_at: '2026-08-15T14:00:00Z' },
-        ],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      { id: 1, content_type: 'blog', content_title: 'Morning Post', status: 'scheduled', scheduled_at: '2026-08-15T09:00:00Z' },
+      { id: 2, content_type: 'knowledge_base', content_title: 'KB Article', status: 'queued', scheduled_at: '2026-08-15T14:00:00Z' },
+    ]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => {
       const groups = document.querySelectorAll('.calendar-group');

@@ -39,10 +39,10 @@ export default function DeploymentListPage() {
 
   useEffect(() => {
     setLoading(true);
-    api.get('/publishing/deployments', { params: { page } })
-      .then(r => {
-        setDeployments(r.data?.data ?? []);
-        setTotalPages(r.data?.meta?.last_page ?? 1);
+    api.get('v1/publishing/deployments', { page })
+      .then((r) => {
+        setDeployments(Array.isArray(r) ? r : (r?.items ?? r?.data ?? []));
+        setTotalPages(r?.last_page ?? r?.meta?.last_page ?? 1);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

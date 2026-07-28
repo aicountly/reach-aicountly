@@ -17,31 +17,65 @@ const NAV_ITEMS = [
 ];
 
 export default function AiLayout() {
-  const { has } = usePermission();
+  const { has, hasAny } = usePermission();
+  const canSeeProviders = hasAny(['ai_provider.view', 'ai_provider.manage']);
+
+  const visible = NAV_ITEMS.filter((item) => {
+    if (item.to === ROUTES.AI_PROVIDERS || item.to === ROUTES.AI_MODELS || item.to === ROUTES.AI_ROUTING || item.to === ROUTES.AI_HEALTH) {
+      return canSeeProviders;
+    }
+    return has(item.perm);
+  });
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg font-bold text-gray-900">AI Control Centre</span>
-          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">Phase 3</span>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+      <div style={{
+        background: 'var(--color-surface)',
+        borderBottom: '1px solid var(--color-border)',
+        padding: '0.85rem 1.25rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text)' }}>
+            AI Control Centre
+          </span>
+          <span className="badge badge-primary">Phase 3</span>
         </div>
-        <p className="text-xs text-gray-500">Manage AI providers, prompts, generation requests, usage and budgets.</p>
+        <p className="text-xs text-muted">
+          Manage AI providers, prompts, generation requests, usage and budgets.
+        </p>
       </div>
 
-      <div className="border-b border-gray-200 bg-gray-50">
-        <nav className="flex gap-0 overflow-x-auto px-4" aria-label="AI navigation">
-          {NAV_ITEMS.filter(item => has(item.perm)).map(item => (
+      <div style={{
+        borderBottom: '1px solid var(--color-border)',
+        background: 'var(--color-bg)',
+      }}>
+        <nav
+          aria-label="AI navigation"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.15rem 0.25rem',
+            padding: '0 0.75rem',
+            overflowX: 'auto',
+          }}
+        >
+          {visible.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              className={({ isActive }) =>
-                `px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  isActive
-                    ? 'border-purple-600 text-purple-700'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-                }`
-              }
+              style={({ isActive }) => ({
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '0.65rem 0.9rem',
+                fontSize: '0.85rem',
+                fontWeight: isActive ? 600 : 500,
+                whiteSpace: 'nowrap',
+                borderBottom: isActive
+                  ? '2px solid var(--color-primary)'
+                  : '2px solid transparent',
+                color: isActive ? 'var(--color-primary-hover)' : 'var(--color-text-secondary)',
+                textDecoration: 'none',
+              })}
             >
               {item.label}
             </NavLink>
@@ -49,7 +83,7 @@ export default function AiLayout() {
         </nav>
       </div>
 
-      <div className="flex-1 p-4 md:p-6">
+      <div style={{ flex: 1, padding: '1.25rem 1.5rem' }}>
         <Outlet />
       </div>
     </div>

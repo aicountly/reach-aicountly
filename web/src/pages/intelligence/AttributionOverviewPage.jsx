@@ -1,61 +1,115 @@
+import { useEffect, useState } from 'react';
 import { Target, Users, CheckCircle, AlertCircle } from 'lucide-react';
+import { getAttributionOverview } from '../../services/intelligenceService.js';
+
+const EMPTY_STATS = {
+  total_conversions: 0,
+  attributed: 0,
+  unattributed: 0,
+  attribution_rate: 0,
+};
 
 export default function AttributionOverviewPage() {
-  const stats = [
-    { label: 'Total Conversions', value: '347', icon: Target, color: 'text-blue-600' },
-    { label: 'Attributed', value: '289', icon: CheckCircle, color: 'text-green-600' },
-    { label: 'Unattributed', value: '58', icon: AlertCircle, color: 'text-yellow-600' },
-    { label: 'Attribution Rate', value: '83.3%', icon: Users, color: 'text-purple-600' },
-  ];
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [breakdown, setBreakdown] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const breakdown = [
-    { channel: 'Organic Search', conversions: 142, pct: 49 },
-    { channel: 'Email Campaign', conversions: 87, pct: 30 },
-    { channel: 'Social Media', conversions: 38, pct: 13 },
-    { channel: 'Direct', conversions: 22, pct: 8 },
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getAttributionOverview()
+      .then((data) => {
+        if (cancelled) return;
+        setStats(data?.stats || EMPTY_STATS);
+        setBreakdown(Array.isArray(data?.first_touch_breakdown) ? data.first_touch_breakdown : []);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load attribution data');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const tiles = [
+    { label: 'Total Conversions', value: stats.total_conversions, icon: Target, color: 'var(--color-info)' },
+    { label: 'Attributed', value: stats.attributed, icon: CheckCircle, color: 'var(--color-success)' },
+    { label: 'Unattributed', value: stats.unattributed, icon: AlertCircle, color: 'var(--color-warning)' },
+    { label: 'Attribution Rate', value: `${stats.attribution_rate ?? 0}%`, icon: Users, color: 'var(--color-primary-hover)' },
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Target className="h-7 w-7 text-blue-600" />
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <Target size={28} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attribution Overview</h1>
-          <p className="text-sm text-gray-500">First-touch and last-touch lead attribution foundations</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Attribution Overview</h1>
+          <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
+            First-touch and last-touch lead attribution foundations
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <s.icon className={`h-5 w-5 ${s.color} mb-2`} />
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+      {error && (
+        <div className="alert alert-danger">{error}</div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-muted">Loading attribution metrics…</p>
+      ) : (
+        <>
+          <div className="grid grid-4" style={{ marginBottom: '1.25rem' }}>
+            {tiles.map((s) => (
+              <div key={s.label} className="stat-tile">
+                <s.icon size={18} style={{ color: s.color, marginBottom: '0.35rem' }} />
+                <div className="stat-tile__value" style={{ color: s.color }}>{s.value}</div>
+                <div className="stat-tile__label">{s.label}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Conversions by First-Touch Channel</h2>
-        <div className="space-y-3">
-          {breakdown.map(b => (
-            <div key={b.channel}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-700">{b.channel}</span>
-                <span className="font-medium text-gray-800">{b.conversions} ({b.pct}%)</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${b.pct}%` }} />
-              </div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-header">Conversions by First-Touch Channel</div>
+            <div className="card-body">
+              {breakdown.length === 0 ? (
+                <p className="text-sm text-muted" style={{ margin: 0 }}>
+                  No attributed conversions yet. Channel breakdown appears after conversion links
+                  are calculated from live touchpoints.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {breakdown.map((b) => (
+                    <div key={b.channel}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                        <span>{b.channel}</span>
+                        <span style={{ fontWeight: 600 }}>{b.conversions} ({b.pct}%)</span>
+                      </div>
+                      <div style={{ width: '100%', background: 'var(--color-border)', borderRadius: 999, height: 8 }}>
+                        <div
+                          style={{
+                            width: `${Math.min(100, b.pct || 0)}%`,
+                            background: 'var(--color-primary)',
+                            height: 8,
+                            borderRadius: 999,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-        <strong>Phase 8 Attribution:</strong> First-touch and last-touch attribution only.
-        Multi-touch weighting and revenue attribution are planned for Phase 9.
-      </div>
+          <div className="alert alert-warning" style={{ marginBottom: 0 }}>
+            <strong>Phase 8 Attribution:</strong> First-touch and last-touch attribution only.
+            Multi-touch weighting and revenue attribution are planned for Phase 9.
+          </div>
+        </>
+      )}
     </div>
   );
 }

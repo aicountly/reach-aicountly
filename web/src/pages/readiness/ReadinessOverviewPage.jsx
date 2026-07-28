@@ -11,27 +11,36 @@ const SECTIONS = [
   { path: '/readiness/operations',        label: 'Operations',              desc: 'Job reliability and pipeline health' },
   { path: '/readiness/disaster-recovery', label: 'Disaster Recovery',       desc: 'DR test evidence and runbooks' },
   { path: '/readiness/technical-debt',    label: 'Technical Debt',          desc: 'Classified debt items' },
-  { path: '/readiness/release',          label: 'Release Acceptance',      desc: 'Final go/no-go decision record' },
+  { path: '/readiness/release',           label: 'Release Acceptance',      desc: 'Final go/no-go decision record' },
 ];
 
 export default function ReadinessOverviewPage() {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-2">Product Readiness Centre</h1>
-      <p className="text-sm text-gray-500 mb-6">
+    <div style={{ padding: '1.5rem' }}>
+      <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 0.35rem' }}>
+        Product Readiness Centre
+      </h1>
+      <p className="text-sm text-muted" style={{ marginBottom: '1.25rem', maxWidth: 720 }}>
         Phase 1–9 product readiness status. A release acceptance record must be
         created before any production deployment recommendation can be issued.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-3">
         {SECTIONS.map(({ path, label, desc }) => (
           <Link
             key={path}
             to={path}
-            className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all group"
+            className="card"
+            style={{
+              display: 'block',
+              padding: '1rem 1.1rem',
+              textDecoration: 'none',
+              color: 'inherit',
+              transition: 'border-color var(--transition), box-shadow var(--transition)',
+            }}
           >
-            <p className="font-medium text-gray-900 group-hover:text-blue-700">{label}</p>
-            <p className="text-sm text-gray-500 mt-1">{desc}</p>
+            <p style={{ fontWeight: 600, margin: 0, color: 'var(--color-text)' }}>{label}</p>
+            <p className="text-sm text-muted" style={{ margin: '0.35rem 0 0' }}>{desc}</p>
           </Link>
         ))}
       </div>

@@ -26,28 +26,30 @@ describe('PublishingCalendarPage', () => {
     expect(screen.getByText(/Loading calendar/i)).toBeInTheDocument();
   });
 
+  it('calls the v1 publishing calendar endpoint', async () => {
+    api.get.mockResolvedValueOnce([]);
+    renderWithAuth(<PublishingCalendarPage />, ctx);
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('v1/publishing/calendar'));
+  });
+
   it('renders page header', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => expect(screen.getByText('Publication Calendar')).toBeInTheDocument());
   });
 
   it('shows empty state', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => expect(screen.getByText(/No scheduled publications/i)).toBeInTheDocument());
   });
 
   it('groups items by date', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          { id: 1, content_type: 'blog', content_title: 'GST Article', status: 'scheduled', scheduled_at: '2026-08-01T09:00:00Z' },
-          { id: 2, content_type: 'knowledge_base', content_title: 'GST KB', status: 'queued', scheduled_at: '2026-08-01T14:00:00Z' },
-          { id: 3, content_type: 'blog', content_title: 'TDS Article', status: 'scheduled', scheduled_at: '2026-08-02T09:00:00Z' },
-        ],
-      },
-    });
+    api.get.mockResolvedValueOnce([
+      { id: 1, content_type: 'blog', content_title: 'GST Article', status: 'scheduled', scheduled_at: '2026-08-01T09:00:00Z' },
+      { id: 2, content_type: 'knowledge_base', content_title: 'GST KB', status: 'queued', scheduled_at: '2026-08-01T14:00:00Z' },
+      { id: 3, content_type: 'blog', content_title: 'TDS Article', status: 'scheduled', scheduled_at: '2026-08-02T09:00:00Z' },
+    ]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => expect(screen.getByText('2026-08-01')).toBeInTheDocument());
     expect(screen.getByText('2026-08-02')).toBeInTheDocument();

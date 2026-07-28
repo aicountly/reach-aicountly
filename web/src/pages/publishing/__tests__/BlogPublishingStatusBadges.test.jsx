@@ -40,7 +40,7 @@ describe('BlogPublishingListPage status badges', () => {
     ['cancelled', 'badge--neutral'],
     ['draft', 'badge--neutral'],
   ])('status %s renders with %s class', async (status, expectedClass) => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeDeployment(status)] } });
+    api.get.mockResolvedValueOnce([makeDeployment(status)]);
     const { unmount } = renderWithAuth(<BlogPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(status)).toBeInTheDocument());
     const badge = screen.getByText(status);

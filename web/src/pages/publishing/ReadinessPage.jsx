@@ -21,8 +21,8 @@ export default function ReadinessPage() {
     setError(null);
     setResult(null);
     try {
-      const r = await api.get(`/publishing/readiness/${contentId}`);
-      setResult(r.data?.data ?? null);
+      const r = await api.get(`v1/publishing/readiness/${contentId}`);
+      setResult(r?.data ?? r ?? null);
     } catch (e) {
       setError(e.response?.data?.message ?? e.message);
     } finally {

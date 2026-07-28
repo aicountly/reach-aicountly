@@ -1,51 +1,85 @@
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
-
-const SAMPLE_QUERIES = [
-  { query: 'accounting software for small business', clicks: 234, impressions: 4820, ctr: 0.049, position: 3.2 },
-  { query: 'best bookkeeping tools', clicks: 187, impressions: 3640, ctr: 0.051, position: 4.1 },
-  { query: 'aicountly pricing', clicks: 162, impressions: 1240, ctr: 0.131, position: 1.8 },
-  { query: 'invoice management software', clicks: 98, impressions: 2870, ctr: 0.034, position: 7.4 },
-  { query: 'gst accounting india', clicks: 76, impressions: 1920, ctr: 0.040, position: 6.2 },
-];
+import { listSearchMetrics } from '../../services/intelligenceService.js';
 
 export default function SearchQueryPerformancePage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listSearchMetrics({ dimension: 'query' })
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : (data?.metrics || data?.data || []);
+        setRows(list);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load query metrics');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Search className="h-7 w-7 text-indigo-600" />
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <Search size={26} style={{ color: 'var(--color-primary)' }} />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Query Performance</h1>
-          <p className="text-sm text-gray-500">Search queries driving traffic to your content</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Query Performance</h1>
+          <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
+            Search queries driving traffic to your content
+          </p>
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">Query</th>
-              <th className="px-4 py-3 text-right">Clicks</th>
-              <th className="px-4 py-3 text-right">Impressions</th>
-              <th className="px-4 py-3 text-right">CTR</th>
-              <th className="px-4 py-3 text-right">Avg Position</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {SAMPLE_QUERIES.map((q, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-800 font-medium">{q.query}</td>
-                <td className="px-4 py-3 text-right text-gray-700">{q.clicks.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right text-gray-500">{q.impressions.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right text-blue-600">{(q.ctr * 100).toFixed(1)}%</td>
-                <td className="px-4 py-3 text-right">
-                  <span className={`font-medium ${q.position <= 3 ? 'text-green-600' : q.position <= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
-                    {q.position.toFixed(1)}
-                  </span>
-                </td>
+
+      {error && <div className="alert alert-danger">{error}</div>}
+      {loading && <p className="text-sm text-muted">Loading query metrics…</p>}
+
+      {!loading && rows.length === 0 && !error && (
+        <div className="card">
+          <div className="card-body" style={{ textAlign: 'center' }}>
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              No query metrics available yet. Connect Google Search Console and run an ingest job to populate live data.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Query</th>
+                <th style={{ textAlign: 'right' }}>Clicks</th>
+                <th style={{ textAlign: 'right' }}>Impressions</th>
+                <th style={{ textAlign: 'right' }}>CTR</th>
+                <th style={{ textAlign: 'right' }}>Avg Position</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((q, i) => {
+                const ctr = Number(q.ctr ?? 0);
+                const position = Number(q.position ?? q.avg_position ?? 0);
+                return (
+                  <tr key={q.query || i}>
+                    <td style={{ fontWeight: 500 }}>{q.query || q.dimension_value || '—'}</td>
+                    <td style={{ textAlign: 'right' }}>{Number(q.clicks || 0).toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }}>{Number(q.impressions || 0).toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }}>{(ctr <= 1 ? ctr * 100 : ctr).toFixed(1)}%</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{position.toFixed(1)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

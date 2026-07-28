@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, Trash2 } from 'lucide-react';
 import { blogService } from '../../services/blogService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
+import { ROUTES } from '../../constants/routes';
 
 const EMPTY = {
   title: '', slug: '', excerpt: '', content: '', category: '', tags: '',
@@ -25,6 +26,7 @@ export function BlogEditorPage() {
   const [form, setForm]   = useState(EMPTY);
   const [error, setError] = useState(null);
   const [saving, setSaving]= useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(!isNew);
 
   useEffect(() => {
@@ -60,6 +62,20 @@ export function BlogEditorPage() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete “${form.title || 'untitled'}”? This will archive the post.`)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await blogService.archive(id);
+      navigate(ROUTES.BLOG_LIST);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -150,9 +166,20 @@ export function BlogEditorPage() {
             <input type="datetime-local" value={form.scheduled_at} onChange={set('scheduled_at')} />
           </Card>
 
-          <div className="flex justify-end gap-2">
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+          <div className="flex justify-end gap-2" style={{ flexWrap: 'wrap' }}>
+            {!isNew && form.status !== 'archived' && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={saving || deleting}
+                onClick={handleDelete}
+                style={{ marginRight: 'auto' }}
+              >
+                <Trash2 size={14} /> {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            )}
+            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)} disabled={deleting}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || deleting}>
               <Save size={14} /> {saving ? 'Saving…' : 'Save'}
             </button>
           </div>

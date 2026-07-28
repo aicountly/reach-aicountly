@@ -1,49 +1,82 @@
-import { FileText, TrendingUp, TrendingDown } from 'lucide-react';
-
-const SAMPLE_PAGES = [
-  { url: '/blog/accounting-software-guide', clicks: 892, impressions: 18400, position: 2.1 },
-  { url: '/blog/bookkeeping-tips', clicks: 634, impressions: 12800, position: 3.8 },
-  { url: '/features/invoicing', clicks: 412, impressions: 5600, position: 4.2 },
-  { url: '/pricing', clicks: 387, impressions: 2100, position: 1.4 },
-  { url: '/blog/gst-guide-india', clicks: 298, impressions: 7200, position: 5.7 },
-];
+import { useEffect, useState } from 'react';
+import { FileText } from 'lucide-react';
+import { listSearchMetrics } from '../../services/intelligenceService.js';
 
 export default function SearchPagePerformancePage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listSearchMetrics({ dimension: 'page' })
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : (data?.metrics || data?.data || []);
+        setRows(list);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load page metrics');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <FileText className="h-7 w-7 text-blue-600" />
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <FileText size={26} style={{ color: 'var(--color-info)' }} />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Page Performance</h1>
-          <p className="text-sm text-gray-500">How individual pages perform in search results</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Page Performance</h1>
+          <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
+            How individual pages perform in search results
+          </p>
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">Page</th>
-              <th className="px-4 py-3 text-right">Clicks</th>
-              <th className="px-4 py-3 text-right">Impressions</th>
-              <th className="px-4 py-3 text-right">Avg Position</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {SAMPLE_PAGES.map((p, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs text-gray-700">{p.url}</td>
-                <td className="px-4 py-3 text-right font-medium text-gray-800">{p.clicks.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right text-gray-500">{p.impressions.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right">
-                  <span className={`font-medium ${p.position <= 3 ? 'text-green-600' : p.position <= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
-                    {p.position.toFixed(1)}
-                  </span>
-                </td>
+
+      {error && <div className="alert alert-danger">{error}</div>}
+      {loading && <p className="text-sm text-muted">Loading page metrics…</p>}
+
+      {!loading && rows.length === 0 && !error && (
+        <div className="card">
+          <div className="card-body" style={{ textAlign: 'center' }}>
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              No page metrics available yet. Connect Google Search Console and run an ingest job to populate live data.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Page</th>
+                <th style={{ textAlign: 'right' }}>Clicks</th>
+                <th style={{ textAlign: 'right' }}>Impressions</th>
+                <th style={{ textAlign: 'right' }}>Avg Position</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((p, i) => {
+                const position = Number(p.position ?? p.avg_position ?? 0);
+                return (
+                  <tr key={p.url || p.page || i}>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{p.url || p.page || p.dimension_value || '—'}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{Number(p.clicks || 0).toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }}>{Number(p.impressions || 0).toLocaleString()}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{position.toFixed(1)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

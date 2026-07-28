@@ -23,7 +23,6 @@ class AiCircuitBreaker
 {
     private const FAILURE_THRESHOLD   = 5;   // consecutive failures to trip
     private const COOLDOWN_SECONDS    = 120; // seconds before half-open probe
-    private const HALF_OPEN_PROBE_TTL = 30;  // seconds the half-open window stays open
 
     /**
      * Check if the circuit is open (should block the call).
@@ -36,14 +35,25 @@ class AiCircuitBreaker
             return false;
         }
 
-        if (!$row['is_circuit_open']) {
+        $state = $row['circuit_state'] ?? 'closed';
+        if ($state !== 'open') {
             return false;
         }
 
-        // Check if cooldown has elapsed → half-open
-        $openedAt = strtotime($row['circuit_opened_at'] ?? '1970-01-01');
-        if ((time() - $openedAt) >= self::COOLDOWN_SECONDS) {
-            return false; // Allow a probe attempt
+        // Check if cooldown has elapsed → half-open (allow probe)
+        $cooldownUntil = $row['cooldown_until'] ?? null;
+        if ($cooldownUntil !== null && strtotime((string) $cooldownUntil) <= time()) {
+            $this->setState($db, $providerKey, 'half_open', (int) ($row['failure_count'] ?? 0));
+            return false;
+        }
+
+        // Fallback: if cooldown_until missing, use last_failure_at + COOLDOWN
+        if ($cooldownUntil === null) {
+            $failedAt = strtotime($row['last_failure_at'] ?? '1970-01-01');
+            if ((time() - $failedAt) >= self::COOLDOWN_SECONDS) {
+                $this->setState($db, $providerKey, 'half_open', (int) ($row['failure_count'] ?? 0));
+                return false;
+            }
         }
 
         return true;
@@ -57,8 +67,13 @@ class AiCircuitBreaker
         $db = \Config\Database::connect();
         $db->query(
             "UPDATE reach_ai_provider_health
-             SET consecutive_failures = 0, is_circuit_open = FALSE,
-                 circuit_opened_at = NULL, last_success_at = NOW(), updated_at = NOW()
+             SET failure_count = 0,
+                 circuit_state = 'closed',
+                 cooldown_until = NULL,
+                 health_status = 'healthy',
+                 checked_at = NOW(),
+                 error_message = NULL,
+                 updated_at = NOW()
              WHERE provider_id = (SELECT id FROM reach_ai_providers WHERE provider_key = ? LIMIT 1)",
             [$providerKey]
         );
@@ -76,19 +91,30 @@ class AiCircuitBreaker
             return;
         }
 
-        $newCount = ((int) $row['consecutive_failures']) + 1;
+        $newCount = ((int) ($row['failure_count'] ?? 0)) + 1;
         $shouldOpen = $newCount >= self::FAILURE_THRESHOLD;
+        $state = $shouldOpen ? 'open' : ($row['circuit_state'] ?? 'closed');
+        $cooldownSql = $shouldOpen
+            ? 'NOW() + INTERVAL \'' . self::COOLDOWN_SECONDS . ' seconds\''
+            : 'cooldown_until';
 
         $db->query(
             "UPDATE reach_ai_provider_health
-             SET consecutive_failures = ?,
-                 is_circuit_open = ?,
-                 circuit_opened_at = CASE WHEN ? THEN NOW() ELSE circuit_opened_at END,
+             SET failure_count = ?,
+                 circuit_state = ?,
+                 cooldown_until = {$cooldownSql},
                  last_failure_at = NOW(),
-                 last_error_category = ?,
+                 health_status = 'unhealthy',
+                 error_message = ?,
+                 checked_at = NOW(),
                  updated_at = NOW()
              WHERE provider_id = (SELECT id FROM reach_ai_providers WHERE provider_key = ? LIMIT 1)",
-            [$newCount, $shouldOpen ? 'true' : 'false', $shouldOpen ? 'true' : 'false', $errorCategory, $providerKey]
+            [
+                $newCount,
+                $state,
+                $errorCategory,
+                $providerKey,
+            ]
         );
     }
 
@@ -102,14 +128,39 @@ class AiCircuitBreaker
         if (!$row) {
             return 'closed';
         }
-        if (!$row['is_circuit_open']) {
-            return 'closed';
+
+        $state = $row['circuit_state'] ?? 'closed';
+        if ($state !== 'open') {
+            return $state;
         }
-        $openedAt = strtotime($row['circuit_opened_at'] ?? '1970-01-01');
-        if ((time() - $openedAt) >= self::COOLDOWN_SECONDS) {
+
+        $cooldownUntil = $row['cooldown_until'] ?? null;
+        if ($cooldownUntil !== null && strtotime((string) $cooldownUntil) <= time()) {
             return 'half_open';
         }
+
+        if ($cooldownUntil === null) {
+            $failedAt = strtotime($row['last_failure_at'] ?? '1970-01-01');
+            if ((time() - $failedAt) >= self::COOLDOWN_SECONDS) {
+                return 'half_open';
+            }
+        }
+
         return 'open';
+    }
+
+    private function setState(
+        \CodeIgniter\Database\ConnectionInterface $db,
+        string $providerKey,
+        string $state,
+        int $failureCount
+    ): void {
+        $db->query(
+            "UPDATE reach_ai_provider_health
+             SET circuit_state = ?, failure_count = ?, updated_at = NOW()
+             WHERE provider_id = (SELECT id FROM reach_ai_providers WHERE provider_key = ? LIMIT 1)",
+            [$state, $failureCount, $providerKey]
+        );
     }
 
     private function getRow(\CodeIgniter\Database\ConnectionInterface $db, string $providerKey): ?array

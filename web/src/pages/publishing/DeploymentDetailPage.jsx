@@ -13,12 +13,12 @@ export default function DeploymentDetailPage() {
   const load = () => {
     setLoading(true);
     Promise.all([
-      api.get(`/publishing/deployments/${id}`),
-      api.get(`/publishing/deployments/${id}/verifications`),
+      api.get(`v1/publishing/deployments/${id}`),
+      api.get(`v1/publishing/deployments/${id}/verifications`),
     ])
       .then(([dep, ver]) => {
-        setDeployment(dep.data?.data ?? null);
-        setVerifications(ver.data?.data ?? []);
+        setDeployment(dep && typeof dep === 'object' && !Array.isArray(dep) ? dep : null);
+        setVerifications(Array.isArray(ver) ? ver : (ver?.items ?? ver?.data ?? []));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -29,7 +29,7 @@ export default function DeploymentDetailPage() {
   const handleAction = async (action) => {
     setActionMsg(null);
     try {
-      await api.post(`/publishing/deployments/${id}/${action}`);
+      await api.post(`v1/publishing/deployments/${id}/${action}`);
       setActionMsg(`${action} succeeded`);
       load();
     } catch (e) {

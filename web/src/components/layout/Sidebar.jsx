@@ -195,21 +195,22 @@ export function Sidebar() {
       width: 'var(--sidebar-width)', height: '100vh', position: 'fixed', top: 0, left: 0,
       zIndex: 200,
       background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)',
-      display: 'flex', flexDirection: 'column', overflow: 'auto',
+      display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: 'auto',
+      boxSizing: 'border-box',
     }}>
-      <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+      <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
         <ReachLogo height={32} />
         <div className="text-xs text-muted mt-1">Superadmin</div>
         <div className="mt-2"><BotModeBadge /></div>
       </div>
 
-      <nav style={{ flex: 1, padding: '0.6rem' }}>
+      <nav style={{ flex: 1, padding: '0.65rem 0.75rem', minWidth: 0 }}>
         {visibleSections.map((section) => (
           <div key={section.title} style={{ marginBottom: '1rem' }}>
             <p style={{
               fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
               letterSpacing: '0.05em', color: 'var(--color-text-muted)',
-              padding: '0 0.6rem', marginBottom: '0.25rem',
+              padding: '0 0.5rem', marginBottom: '0.25rem',
             }}>
               {section.title}
             </p>
@@ -220,16 +221,17 @@ export function Sidebar() {
                 end={!!item.end}
                 style={({ isActive }) => ({
                   display: 'flex', alignItems: 'center', gap: '0.55rem',
-                  padding: '0.4rem 0.6rem', borderRadius: 'var(--radius)',
+                  padding: '0.4rem 0.5rem', borderRadius: 'var(--radius)',
                   fontSize: '0.83rem', fontWeight: isActive ? 600 : 500,
                   color: isActive ? 'var(--color-primary-hover)' : 'var(--color-text)',
                   background: isActive ? 'var(--color-primary-light)' : 'transparent',
                   textDecoration: 'none', marginBottom: '0.1rem',
                   transition: 'background var(--transition)',
+                  minWidth: 0,
                 })}
               >
-                <item.icon size={15} />
-                <span style={{ flex: 1 }}>{item.label}</span>
+                <item.icon size={15} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
                 {item.countKey != null && counts[item.countKey] > 0 && (
                   <span
                     style={{

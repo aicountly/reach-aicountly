@@ -43,13 +43,13 @@ describe('ConnectionsPage', () => {
   });
 
   it('shows empty state when no connections', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.get.mockResolvedValueOnce([]);
     renderWithAuth(<ConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText(/No connections configured/i)).toBeInTheDocument());
   });
 
   it('renders connection card', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeConnection()] } });
+    api.get.mockResolvedValueOnce([makeConnection()]);
     renderWithAuth(<ConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText('aicountly.com Production')).toBeInTheDocument());
     expect(screen.getByText('aicountly-production')).toBeInTheDocument();
@@ -57,33 +57,33 @@ describe('ConnectionsPage', () => {
   });
 
   it('shows health badge', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeConnection()] } });
+    api.get.mockResolvedValueOnce([makeConnection()]);
     renderWithAuth(<ConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText('healthy')).toBeInTheDocument());
   });
 
   it('note about credentials from environment', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeConnection()] } });
+    api.get.mockResolvedValueOnce([makeConnection()]);
     renderWithAuth(<ConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText(/environment variables/i)).toBeInTheDocument());
   });
 
   it('shows Check Health button', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeConnection()] } });
+    api.get.mockResolvedValueOnce([makeConnection()]);
     renderWithAuth(<ConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText('Check Health')).toBeInTheDocument());
   });
 
   it('calls health check API on button click', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [makeConnection()] } });
-    api.post.mockResolvedValueOnce({ data: { data: { health_status: 'healthy' } } });
+    api.get.mockResolvedValueOnce([makeConnection()]);
+    api.post.mockResolvedValueOnce({ health_status: 'healthy' });
 
     renderWithAuth(<ConnectionsPage />, ctx);
     await waitFor(() => expect(screen.getByText('Check Health')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Check Health'));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith(
-      '/publishing/connections/aicountly-production/health-check'
+      'v1/publishing/connections/aicountly-production/health-check'
     ));
   });
 });

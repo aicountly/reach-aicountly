@@ -1,78 +1,136 @@
-import { Eye, Zap, CheckCircle, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Eye, CheckCircle, XCircle } from 'lucide-react';
+import {
+  listVisibilityPrompts,
+  listVisibilityRuns,
+  listVisibilityObservations,
+} from '../../services/intelligenceService.js';
 
 export default function VisibilityOverviewPage() {
-  const cards = [
-    { label: 'Active Prompts', value: '4', color: 'text-blue-600' },
-    { label: 'Runs (30 days)', value: '28', color: 'text-purple-600' },
-    { label: 'Brand Mentions', value: '22', color: 'text-green-600' },
-    { label: 'Not Mentioned', value: '6', color: 'text-red-600' },
-  ];
+  const [cards, setCards] = useState([
+    { label: 'Active Prompts', value: '—' },
+    { label: 'Runs loaded', value: '—' },
+    { label: 'Brand Mentions', value: '—' },
+    { label: 'Not Mentioned', value: '—' },
+  ]);
+  const [recentRuns, setRecentRuns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const recentRuns = [
-    { id: 1, prompt: '"Best accounting software" (India)', status: 'completed', mentioned: true, ran_at: '2026-07-15T07:30:00Z' },
-    { id: 2, prompt: '"GST filing tools"', status: 'completed', mentioned: true, ran_at: '2026-07-14T18:00:00Z' },
-    { id: 3, prompt: '"Bookkeeping software for startups"', status: 'completed', mentioned: false, ran_at: '2026-07-14T12:00:00Z' },
-    { id: 4, prompt: '"Invoice management India"', status: 'failed', mentioned: null, ran_at: '2026-07-13T20:00:00Z' },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.allSettled([
+      listVisibilityPrompts(),
+      listVisibilityRuns(),
+      listVisibilityObservations(),
+    ]).then(([promptsRes, runsRes, obsRes]) => {
+      if (cancelled) return;
+
+      const prompts = promptsRes.status === 'fulfilled'
+        ? (Array.isArray(promptsRes.value) ? promptsRes.value : (promptsRes.value?.prompts || promptsRes.value?.data || []))
+        : [];
+      const runs = runsRes.status === 'fulfilled'
+        ? (Array.isArray(runsRes.value) ? runsRes.value : (runsRes.value?.runs || runsRes.value?.data || []))
+        : [];
+      const observations = obsRes.status === 'fulfilled'
+        ? (Array.isArray(obsRes.value) ? obsRes.value : (obsRes.value?.observations || obsRes.value?.data || []))
+        : [];
+
+      const activePrompts = prompts.filter((p) => (p.status || '').toLowerCase() === 'active').length || prompts.length;
+      const mentioned = observations.filter((o) => o.brand_mentioned === true || o.mentioned === true).length;
+      const notMentioned = observations.filter((o) => o.brand_mentioned === false || o.mentioned === false).length;
+
+      setCards([
+        { label: 'Active Prompts', value: String(activePrompts) },
+        { label: 'Runs loaded', value: String(runs.length) },
+        { label: 'Brand Mentions', value: String(mentioned) },
+        { label: 'Not Mentioned', value: String(notMentioned) },
+      ]);
+      setRecentRuns(runs.slice(0, 20));
+
+      if (promptsRes.status === 'rejected' && runsRes.status === 'rejected' && obsRes.status === 'rejected') {
+        setError(promptsRes.reason?.message || 'Failed to load visibility data');
+      }
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Eye className="h-7 w-7 text-purple-600" />
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <Eye size={26} style={{ color: 'var(--color-primary)' }} />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">AI Visibility Monitoring</h1>
-          <p className="text-sm text-gray-500">Track how AI assistants mention your brand</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>AI Visibility Monitoring</h1>
+          <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
+            Track how AI assistants mention your brand
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {cards.map(c => (
-          <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm text-center">
-            <p className={`text-3xl font-bold ${c.color}`}>{c.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{c.label}</p>
+      {error && <div className="alert alert-danger">{error}</div>}
+
+      <div className="grid grid-4" style={{ marginBottom: '1.25rem' }}>
+        {cards.map((c) => (
+          <div key={c.label} className="stat-tile" style={{ textAlign: 'center' }}>
+            <div className="stat-tile__value">{loading ? '…' : c.value}</div>
+            <div className="stat-tile__label">{c.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">Recent Visibility Runs</h2>
-          <button className="flex items-center gap-1 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700">
-            <Zap className="h-3 w-3" /> Run Now
-          </button>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-header">Recent Visibility Runs</div>
+        <div className="card-body" style={{ padding: 0 }}>
+          {!loading && recentRuns.length === 0 ? (
+            <p className="text-sm text-muted" style={{ margin: 0, padding: '1.25rem', textAlign: 'center' }}>
+              No visibility runs recorded yet.
+            </p>
+          ) : (
+            <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Prompt / Run</th>
+                    <th>Status</th>
+                    <th>Brand Mentioned</th>
+                    <th>Ran At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentRuns.map((r) => {
+                    const mentioned = r.brand_mentioned ?? r.mentioned ?? null;
+                    return (
+                      <tr key={r.id || r.uuid}>
+                        <td>{r.prompt_name || r.prompt || `Run #${r.id}`}</td>
+                        <td>
+                          <span className={`badge ${r.status === 'completed' ? 'badge-success' : r.status === 'failed' ? 'badge-danger' : 'badge-secondary'}`}>
+                            {r.status || 'unknown'}
+                          </span>
+                        </td>
+                        <td>
+                          {mentioned === true && <CheckCircle size={16} style={{ color: 'var(--color-success)' }} />}
+                          {mentioned === false && <XCircle size={16} style={{ color: 'var(--color-danger)' }} />}
+                          {mentioned == null && <span className="text-muted text-xs">—</span>}
+                        </td>
+                        <td className="text-xs text-muted">
+                          {r.ran_at || r.created_at ? new Date(r.ran_at || r.created_at).toLocaleString() : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">Prompt</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Brand Mentioned</th>
-              <th className="px-4 py-3 text-left">Ran At</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {recentRuns.map(r => (
-              <tr key={r.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-700">{r.prompt}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${r.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {r.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {r.mentioned === true && <CheckCircle className="h-4 w-4 text-green-500" />}
-                  {r.mentioned === false && <XCircle className="h-4 w-4 text-red-500" />}
-                  {r.mentioned === null && <span className="text-gray-300 text-xs">—</span>}
-                </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{new Date(r.ran_at).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-        <strong>Governance:</strong> All prompts must be explicitly approved before execution. Raw AI responses are stored immutably for audit purposes. Budget limits are enforced per run.
+      <div className="alert alert-warning" style={{ marginBottom: 0 }}>
+        <strong>Governance:</strong> All prompts must be explicitly approved before execution.
+        Raw AI responses are stored immutably for audit purposes. Budget limits are enforced per run.
       </div>
     </div>
   );

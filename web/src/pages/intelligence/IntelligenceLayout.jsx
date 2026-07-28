@@ -2,45 +2,68 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { Search, BarChart3, MapPin, Zap, Link2, Eye, Users2, Plug, Activity, LayoutDashboard } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { label: 'Overview',     path: '/intelligence',                  icon: LayoutDashboard, end: true },
+  { label: 'Overview',      path: '/intelligence',                     icon: LayoutDashboard, end: true },
   { section: 'Search' },
-  { label: 'Search',       path: '/intelligence/search',           icon: Search,   end: true },
-  { label: 'Queries',      path: '/intelligence/search/queries',   icon: Search },
-  { label: 'Pages',        path: '/intelligence/search/pages',     icon: BarChart3 },
+  { label: 'Search',        path: '/intelligence/search',              icon: Search, end: true },
+  { label: 'Queries',       path: '/intelligence/search/queries',      icon: Search },
+  { label: 'Pages',         path: '/intelligence/search/pages',        icon: BarChart3 },
   { section: 'Content' },
-  { label: 'Performance',  path: '/intelligence/content',          icon: BarChart3, end: true },
+  { label: 'Performance',   path: '/intelligence/content',             icon: BarChart3, end: true },
   { section: 'Sitemaps & Index' },
-  { label: 'Sitemaps',     path: '/intelligence/sitemaps',         icon: MapPin },
-  { label: 'IndexNow',     path: '/intelligence/indexnow',         icon: Zap },
+  { label: 'Sitemaps',      path: '/intelligence/sitemaps',            icon: MapPin },
+  { label: 'IndexNow',      path: '/intelligence/indexnow',            icon: Zap },
   { section: 'Attribution' },
-  { label: 'Attribution',  path: '/intelligence/attribution',      icon: Link2,    end: true },
-  { label: 'UTM Templates',path: '/intelligence/attribution/utm',  icon: Link2 },
+  { label: 'Attribution',   path: '/intelligence/attribution',         icon: Link2, end: true },
+  { label: 'UTM Templates', path: '/intelligence/attribution/utm',     icon: Link2 },
   { section: 'Visibility' },
-  { label: 'AI Visibility', path: '/intelligence/visibility',      icon: Eye,      end: true },
-  { label: 'Prompt Library',path: '/intelligence/visibility/prompts', icon: Eye },
-  { label: 'Run History',  path: '/intelligence/visibility/runs',  icon: Eye },
+  { label: 'AI Visibility', path: '/intelligence/visibility',          icon: Eye, end: true },
+  { label: 'Prompt Library', path: '/intelligence/visibility/prompts', icon: Eye },
+  { label: 'Run History',   path: '/intelligence/visibility/runs',     icon: Eye },
   { section: 'Competitors' },
-  { label: 'Competitors',  path: '/intelligence/competitors',      icon: Users2 },
+  { label: 'Competitors',   path: '/intelligence/competitors',         icon: Users2 },
   { section: 'Operations' },
-  { label: 'Connectors',   path: '/intelligence/connectors',       icon: Plug },
-  { label: 'Operations',   path: '/intelligence/operations',       icon: Activity },
+  { label: 'Connectors',    path: '/intelligence/connectors',          icon: Plug },
+  { label: 'Operations',    path: '/intelligence/operations',          icon: Activity },
 ];
 
 export default function IntelligenceLayout() {
   return (
-    <div className="flex h-full min-h-screen bg-gray-50">
-      <aside className="w-56 shrink-0 bg-white border-r border-gray-200 overflow-y-auto">
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Search className="h-5 w-5 text-blue-600" />
-            <span className="font-semibold text-gray-800 text-sm">Intelligence</span>
-          </div>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - var(--header-height) - 2.5rem)', background: 'var(--color-bg)' }}>
+      <aside style={{
+        width: 220,
+        flexShrink: 0,
+        background: 'var(--color-surface)',
+        borderRight: '1px solid var(--color-border)',
+        overflowY: 'auto',
+      }}>
+        <div style={{
+          padding: '0.85rem 1rem',
+          borderBottom: '1px solid var(--color-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}>
+          <Search size={18} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+          <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text)' }}>
+            Intelligence
+          </span>
         </div>
-        <nav className="p-3">
+        <nav style={{ padding: '0.6rem' }}>
           {NAV_ITEMS.map((item, i) => {
             if (item.section) {
               return (
-                <p key={i} className="text-xs font-bold uppercase tracking-wider text-gray-400 px-2 pt-4 pb-1">
+                <p
+                  key={`section-${i}`}
+                  style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--color-text-muted)',
+                    padding: '0.85rem 0.6rem 0.25rem',
+                    margin: 0,
+                  }}
+                >
                   {item.section}
                 </p>
               );
@@ -50,20 +73,28 @@ export default function IntelligenceLayout() {
                 key={item.path}
                 to={item.path}
                 end={!!item.end}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-1.5 rounded-md text-sm mb-0.5 transition-colors ${
-                    isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
-                  }`
-                }
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.55rem',
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '0.83rem',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? 'var(--color-primary-hover)' : 'var(--color-text)',
+                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
+                  textDecoration: 'none',
+                  marginBottom: '0.1rem',
+                })}
               >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {item.label}
+                <item.icon size={15} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>{item.label}</span>
               </NavLink>
             );
           })}
         </nav>
       </aside>
-      <main className="flex-1 overflow-y-auto">
+      <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
         <Outlet />
       </main>
     </div>

@@ -1,46 +1,76 @@
-import { Search, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, RefreshCw } from 'lucide-react';
+import { listSearchMetrics } from '../../services/intelligenceService.js';
 
 export default function SearchIntelligencePage() {
-  const stats = [
-    { label: 'Total Queries', value: '3,847', trend: '+12%', up: true },
-    { label: 'Avg Position', value: '8.4', trend: '-0.6', up: true },
-    { label: 'Total Clicks', value: '12,340', trend: '+8%', up: true },
-    { label: 'Impressions', value: '284,000', trend: '+15%', up: true },
-    { label: 'Avg CTR', value: '4.3%', trend: '-0.2%', up: false },
-    { label: 'Indexed Pages', value: '138', trend: '+3', up: true },
-  ];
+  const [stats, setStats] = useState([
+    { label: 'Total Queries', value: '—' },
+    { label: 'Avg Position', value: '—' },
+    { label: 'Total Clicks', value: '—' },
+    { label: 'Impressions', value: '—' },
+    { label: 'Avg CTR', value: '—' },
+    { label: 'Rows Loaded', value: '—' },
+  ]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    listSearchMetrics()
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : (data?.metrics || data?.data || []);
+        const clicks = rows.reduce((n, r) => n + Number(r.clicks || 0), 0);
+        const impressions = rows.reduce((n, r) => n + Number(r.impressions || 0), 0);
+        const positions = rows.map((r) => Number(r.position ?? r.avg_position)).filter((n) => Number.isFinite(n) && n > 0);
+        const avgPos = positions.length ? (positions.reduce((a, b) => a + b, 0) / positions.length) : null;
+        const ctr = impressions > 0 ? (clicks / impressions) * 100 : null;
+        setStats([
+          { label: 'Total Queries', value: String(rows.length) },
+          { label: 'Avg Position', value: avgPos == null ? '—' : avgPos.toFixed(1) },
+          { label: 'Total Clicks', value: clicks.toLocaleString() },
+          { label: 'Impressions', value: impressions.toLocaleString() },
+          { label: 'Avg CTR', value: ctr == null ? '—' : `${ctr.toFixed(1)}%` },
+          { label: 'Rows Loaded', value: String(rows.length) },
+        ]);
+      })
+      .catch((e) => setError(e.message || 'Failed to load search metrics'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Search className="h-7 w-7 text-blue-600" />
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Search size={26} style={{ color: 'var(--color-info)' }} />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Search Console Intelligence</h1>
-            <p className="text-sm text-gray-500">Google Search Console performance analytics</p>
+            <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Search Console Intelligence</h1>
+            <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
+              Google Search Console performance analytics
+            </p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-          <RefreshCw className="h-4 w-4" /> Ingest Now
+        <button type="button" className="btn btn-secondary btn-sm" onClick={load} disabled={loading}>
+          <RefreshCw size={14} /> Refresh
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-sm text-gray-500">{s.label}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{s.value}</p>
-            <div className="flex items-center gap-1 mt-1">
-              {s.up ? <TrendingUp className="h-3 w-3 text-green-500" /> : <TrendingDown className="h-3 w-3 text-red-500" />}
-              <span className={`text-xs font-medium ${s.up ? 'text-green-600' : 'text-red-600'}`}>{s.trend}</span>
-              <span className="text-xs text-gray-400">vs last period</span>
-            </div>
+      {error && <div className="alert alert-danger">{error}</div>}
+
+      <div className="grid grid-3" style={{ marginBottom: '1.25rem' }}>
+        {stats.map((s) => (
+          <div key={s.label} className="stat-tile">
+            <div className="stat-tile__label">{s.label}</div>
+            <div className="stat-tile__value">{loading ? '…' : s.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-        Connect a Google Search Console property via <strong>Settings → Connectors</strong> to populate live data.
+      <div className="alert alert-info" style={{ marginBottom: 0 }}>
+        Connect a Google Search Console property via <strong>Intelligence → Connectors</strong> and ingest data to populate live metrics.
+        Empty zeros mean no live facts have been ingested yet.
       </div>
     </div>
   );

@@ -8,8 +8,8 @@ export default function ConnectionsPage() {
   const [healthMsg, setHealthMsg] = useState({});
 
   useEffect(() => {
-    api.get('/publishing/connections')
-      .then(r => setConnections(r.data?.data ?? []))
+    api.get('v1/publishing/connections')
+      .then((r) => setConnections(Array.isArray(r) ? r : (r?.items ?? r?.data ?? [])))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -17,8 +17,8 @@ export default function ConnectionsPage() {
   const checkHealth = async (connectionKey) => {
     setHealthMsg(m => ({ ...m, [connectionKey]: 'Checking…' }));
     try {
-      const r = await api.post(`/publishing/connections/${connectionKey}/health-check`);
-      const status = r.data?.data?.health_status ?? 'unknown';
+      const r = await api.post(`v1/publishing/connections/${connectionKey}/health-check`);
+      const status = r?.health_status ?? r?.data?.health_status ?? 'unknown';
       setHealthMsg(m => ({ ...m, [connectionKey]: `Health: ${status}` }));
     } catch {
       setHealthMsg(m => ({ ...m, [connectionKey]: 'Health check failed' }));
