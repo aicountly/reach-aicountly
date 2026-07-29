@@ -76,11 +76,11 @@ export function retryIndexNowPending() {
 }
 
 export function getLatestSitemap(params = {}) {
-  return api.get('v1/intelligence/sitemaps', params);
+  return api.get('v1/intelligence/sitemap', params);
 }
 
 export function generateSitemapSnapshot(body = {}) {
-  return api.post('v1/intelligence/sitemaps/generate', body);
+  return api.post('v1/intelligence/sitemap/generate', body);
 }
 
 export function listSearchMetrics(params = {}) {
