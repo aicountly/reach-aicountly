@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\Intelligence;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Models\Intelligence\AnalyticsConnectionModel;
 use App\Models\Intelligence\SearchMetricFactModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class SearchConsoleController extends BaseController
+class SearchConsoleController extends BaseApiController
 {
     public function connections(): ResponseInterface
     {

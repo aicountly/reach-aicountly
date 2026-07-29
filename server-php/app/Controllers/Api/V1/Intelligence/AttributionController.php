@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\Intelligence;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
 use App\Models\Intelligence\UtmTemplateModel;
 use App\Models\Intelligence\AttributionTouchpointModel;
@@ -12,7 +12,7 @@ use App\Models\Intelligence\AttributionConversionLinkModel;
 use App\Models\Intelligence\AttributionCalculationVersionModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class AttributionController extends BaseController
+class AttributionController extends BaseApiController
 {
     public function overview(): ResponseInterface
     {
@@ -148,9 +148,20 @@ class AttributionController extends BaseController
     public function conversions(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $model    = new AttributionConversionLinkModel();
-        $data     = $model->where('tenant_id', $tenantId)->orderBy('converted_at', 'DESC')->findAll(50);
-        return $this->response->setJSON(['data' => $data]);
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_attribution_conversion_links')) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $model = new AttributionConversionLinkModel();
+            $data  = $model->where('tenant_id', $tenantId)->orderBy('converted_at', 'DESC')->findAll(50);
+            return $this->response->setJSON(['data' => is_array($data) ? $data : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'AttributionController::conversions: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     public function correct(int $id): ResponseInterface
@@ -185,8 +196,20 @@ class AttributionController extends BaseController
     public function utmTemplates(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $model    = new UtmTemplateModel();
-        return $this->response->setJSON(['data' => $model->getActiveForTenant($tenantId)]);
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_utm_templates')) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $model = new UtmTemplateModel();
+            $rows  = $model->getActiveForTenant($tenantId);
+            return $this->response->setJSON(['data' => is_array($rows) ? $rows : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'AttributionController::utmTemplates: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     public function createUtmTemplate(): ResponseInterface

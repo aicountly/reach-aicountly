@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\Intelligence;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
 use App\Models\Intelligence\AnalyticsConnectionModel;
 use App\Models\Intelligence\ConnectorHealthModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class ConnectorController extends BaseController
+class ConnectorController extends BaseApiController
 {
     public function index(): ResponseInterface
     {

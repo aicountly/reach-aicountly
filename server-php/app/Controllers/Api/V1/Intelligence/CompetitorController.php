@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\Intelligence;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
 use App\Models\Intelligence\CompetitorModel;
 use App\Models\Intelligence\CompetitorAliasModel;
 use App\Models\Intelligence\CompetitorObservationAggregateModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class CompetitorController extends BaseController
+class CompetitorController extends BaseApiController
 {
     public function index(): ResponseInterface
     {

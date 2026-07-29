@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\Intelligence;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
 use App\Models\Intelligence\AiVisibilityPromptModel;
 use App\Models\Intelligence\AiVisibilityPromptVersionModel;
@@ -12,7 +12,7 @@ use App\Models\Intelligence\AiVisibilityRunModel;
 use App\Models\Intelligence\AiVisibilityObservationModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class VisibilityController extends BaseController
+class VisibilityController extends BaseApiController
 {
     public function prompts(): ResponseInterface
     {

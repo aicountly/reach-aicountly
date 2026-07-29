@@ -4,35 +4,56 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\Intelligence;
 
-use App\Controllers\BaseController;
+use App\Controllers\BaseApiController;
 use App\Libraries\Intelligence\SitemapSnapshotService;
 use App\Models\Intelligence\ContentIdentityModel;
 use App\Models\Intelligence\SitemapSnapshotModel;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class SitemapController extends BaseController
+class SitemapController extends BaseApiController
 {
-    private SitemapSnapshotService $sitemapService;
+    private ?SitemapSnapshotService $sitemapService = null;
 
-    public function __construct()
+    private function service(): SitemapSnapshotService
     {
-        $this->sitemapService = new SitemapSnapshotService(
-            new ContentIdentityModel(),
-            new SitemapSnapshotModel(),
-            new AuditLogger()
-        );
+        if ($this->sitemapService === null) {
+            $this->sitemapService = new SitemapSnapshotService(
+                new ContentIdentityModel(),
+                new SitemapSnapshotModel(),
+                new AuditLogger()
+            );
+        }
+
+        return $this->sitemapService;
     }
 
     public function index(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $snapshot = $this->sitemapService->getLatestSnapshot($tenantId);
 
-        return $this->response->setJSON([
-            'data'    => $snapshot,
-            'message' => $snapshot ? 'Latest sitemap snapshot retrieved' : 'No snapshot found',
-        ]);
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_sitemap_snapshots')) {
+                return $this->response->setJSON([
+                    'data'    => null,
+                    'message' => 'No snapshot found',
+                ]);
+            }
+
+            $snapshot = $this->service()->getLatestSnapshot($tenantId);
+
+            return $this->response->setJSON([
+                'data'    => $snapshot,
+                'message' => $snapshot ? 'Latest sitemap snapshot retrieved' : 'No snapshot found',
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'SitemapController::index: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'data'    => null,
+                'message' => 'No snapshot found',
+            ]);
+        }
     }
 
     public function generate(): ResponseInterface
@@ -40,7 +61,7 @@ class SitemapController extends BaseController
         $tenantId = (int) ($this->request->getJSON(true)['tenant_id'] ?? 1);
 
         try {
-            $snapshot = $this->sitemapService->generateSnapshot($tenantId, 'manual');
+            $snapshot = $this->service()->generateSnapshot($tenantId, 'manual');
             return $this->response->setStatusCode(201)->setJSON(['data' => $snapshot, 'message' => 'Snapshot generated']);
         } catch (\Throwable $e) {
             return $this->response->setStatusCode(500)->setJSON(['error' => $e->getMessage()]);
@@ -49,12 +70,20 @@ class SitemapController extends BaseController
 
     public function entries(int $snapshotId): ResponseInterface
     {
-        $includedOnly = $this->request->getGet('included_only') !== 'false';
-        $entries      = $this->sitemapService->getSnapshotEntries($snapshotId, $includedOnly);
+        try {
+            $includedOnly = $this->request->getGet('included_only') !== 'false';
+            $entries      = $this->service()->getSnapshotEntries($snapshotId, $includedOnly);
+            if (! is_array($entries)) {
+                $entries = [];
+            }
 
-        return $this->response->setJSON([
-            'data'  => $entries,
-            'count' => count($entries),
-        ]);
+            return $this->response->setJSON([
+                'data'  => $entries,
+                'count' => count($entries),
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'SitemapController::entries: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => [], 'count' => 0]);
+        }
     }
 }
