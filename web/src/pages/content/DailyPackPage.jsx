@@ -136,14 +136,12 @@ export function DailyPackPage() {
   const progress = totalSlots > 0 ? Math.round((approvedCount / totalSlots) * 100) : 0;
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1>Daily Marketing Pack</h1>
-          <p className="text-sm text-muted">Content slots planned for each day.</p>
-        </div>
+    <div style={{ maxWidth: 960 }}>
+      <div className="page-header page-header--stack">
+        <h1>Daily Marketing Pack</h1>
+        <p className="page-header__subtitle">Content slots planned for each day.</p>
         {canManage && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="page-header__actions" style={{ marginLeft: 0, marginTop: 8 }}>
             <button className="btn btn-ghost btn-sm" onClick={() => setShowConfig((v) => !v)}>
               {showConfig ? 'Hide Config' : 'Pack Config'}
             </button>
@@ -160,85 +158,94 @@ export function DailyPackPage() {
 
       {showConfig && canManage && <PackConfigPanel onClose={() => setShowConfig(false)} />}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
-        {/* Pack list */}
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Packs</div>
-          {packs.map((p) => (
-            <div key={p.id}
-              onClick={() => setSelected(p.id)}
-              style={{
-                padding: '8px 10px',
-                borderRadius: 6,
-                marginBottom: 4,
-                background: selected === p.id ? '#dbeafe' : '#f9fafb',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 600,
-                border: '1px solid ' + (selected === p.id ? '#bfdbfe' : '#e5e7eb'),
-              }}
-            >
-              {p.pack_date}
-              <div style={{ fontSize: 10, color: '#6b7280' }}>{p.pack_status}</div>
-            </div>
-          ))}
-          {packs.length === 0 && <div style={{ color: '#9ca3af', fontSize: 12 }}>No packs yet.</div>}
-        </div>
+      {packs.length === 0 ? (
+        <Card>
+          <div style={{ padding: '28px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
+            No packs yet. Pick a date above and generate a new one.
+          </div>
+        </Card>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+          {/* Pack list */}
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Packs</div>
+            {packs.map((p) => (
+              <div key={p.id}
+                onClick={() => setSelected(p.id)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  marginBottom: 4,
+                  background: selected === p.id ? '#dbeafe' : '#f9fafb',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '1px solid ' + (selected === p.id ? '#bfdbfe' : '#e5e7eb'),
+                }}
+              >
+                {p.pack_date}
+                <div style={{ fontSize: 10, color: '#6b7280' }}>{p.pack_status}</div>
+              </div>
+            ))}
+          </div>
 
-        {/* Pack detail */}
-        <div>
-          {packDetail && (
-            <>
-              {/* Approval progress summary */}
-              <Card style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>Pack for {packDetail.pack_date}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{packDetail.pack_status}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+          {/* Pack detail */}
+          <div style={{ minWidth: 0 }}>
+            {packDetail && (
+              <>
+                {/* Approval progress summary */}
+                <Card style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <div>
-                      Approved: <strong style={{ color: approvedCount === totalSlots && totalSlots > 0 ? '#10b981' : '#f59e0b' }}>
-                        {approvedCount}/{totalSlots}
-                      </strong>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>Pack for {packDetail.pack_date}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280' }}>{packDetail.pack_status}</div>
                     </div>
-                    {placeholderCount > 0 && (
-                      <div style={{ color: '#ef4444' }}>
-                        Missing: <strong>{placeholderCount}</strong>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+                      <div>
+                        Approved: <strong style={{ color: approvedCount === totalSlots && totalSlots > 0 ? '#10b981' : '#f59e0b' }}>
+                          {approvedCount}/{totalSlots}
+                        </strong>
                       </div>
-                    )}
+                      {placeholderCount > 0 && (
+                        <div style={{ color: '#ef4444' }}>
+                          Missing: <strong>{placeholderCount}</strong>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {/* Progress bar */}
+                  <div style={{ height: 6, borderRadius: 3, background: '#e5e7eb', marginTop: 10, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${progress}%`,
+                      background: progress === 100 ? '#10b981' : '#3b82f6',
+                      transition: 'width 0.3s',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                    {progress}% approved
+                  </div>
+                </Card>
+
+                {/* Slot grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+                  {slots.map((slot) => (
+                    <DailyPackSlot key={slot.id} slot={slot} canManage={canManage} onAssign={handleAssign} />
+                  ))}
+                  {slots.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No slots in this pack.</div>}
                 </div>
-                {/* Progress bar */}
-                <div style={{ height: 6, borderRadius: 3, background: '#e5e7eb', marginTop: 10, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${progress}%`,
-                    background: progress === 100 ? '#10b981' : '#3b82f6',
-                    transition: 'width 0.3s',
-                  }} />
-                </div>
-                <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
-                  {progress}% approved
+              </>
+            )}
+            {!packDetail && !loading && (
+              <Card>
+                <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 13 }}>
+                  Select a pack from the list.
                 </div>
               </Card>
-
-              {/* Slot grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
-                {slots.map((slot) => (
-                  <DailyPackSlot key={slot.id} slot={slot} canManage={canManage} onAssign={handleAssign} />
-                ))}
-                {slots.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No slots in this pack.</div>}
-              </div>
-            </>
-          )}
-          {!packDetail && !loading && (
-            <div style={{ color: '#9ca3af', fontSize: 13, padding: 20 }}>
-              Select a pack from the list or generate a new one.
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
