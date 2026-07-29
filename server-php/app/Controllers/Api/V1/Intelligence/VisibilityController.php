@@ -110,9 +110,20 @@ class VisibilityController extends BaseController
     public function runs(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $model    = new AiVisibilityRunModel();
-        $runs     = $model->where('tenant_id', $tenantId)->orderBy('queued_at', 'DESC')->findAll(50);
-        return $this->response->setJSON(['data' => $runs]);
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_ai_visibility_runs')) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $model = new AiVisibilityRunModel();
+            $runs  = $model->where('tenant_id', $tenantId)->orderBy('queued_at', 'DESC')->findAll(50);
+            return $this->response->setJSON(['data' => is_array($runs) ? $runs : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'VisibilityController::runs: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     public function observations(): ResponseInterface

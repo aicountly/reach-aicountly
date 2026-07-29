@@ -13,10 +13,21 @@ class ContentAnalyticsController extends BaseController
 {
     public function connections(): ResponseInterface
     {
-        $tenantId   = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $model      = new AnalyticsConnectionModel();
-        $connections = $model->where('tenant_id', $tenantId)->where('provider', 'ga4')->findAll();
-        return $this->response->setJSON(['data' => $connections]);
+        $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_analytics_connections')) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $model       = new AnalyticsConnectionModel();
+            $connections = $model->where('tenant_id', $tenantId)->where('provider', 'ga4')->findAll();
+            return $this->response->setJSON(['data' => is_array($connections) ? $connections : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'ContentAnalyticsController::connections: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     public function createConnection(): ResponseInterface

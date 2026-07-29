@@ -16,8 +16,20 @@ class CompetitorController extends BaseController
     public function index(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
-        $model    = new CompetitorModel();
-        return $this->response->setJSON(['data' => $model->getActiveForTenant($tenantId)]);
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_competitors')) {
+                return $this->response->setJSON(['data' => []]);
+            }
+
+            $model = new CompetitorModel();
+            $rows  = $model->getActiveForTenant($tenantId);
+            return $this->response->setJSON(['data' => is_array($rows) ? $rows : []]);
+        } catch (\Throwable $e) {
+            log_message('error', 'CompetitorController::index: ' . $e->getMessage());
+            return $this->response->setJSON(['data' => []]);
+        }
     }
 
     public function create(): ResponseInterface
