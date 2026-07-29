@@ -36,7 +36,11 @@ export default function AiPromptsPage() {
       </div>
 
       {templates.length === 0 ? (
-        <p className="muted">No prompt templates found.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>No prompt templates found.</p>
+          </div>
+        </div>
       ) : (
         <div className="table-wrap">
           <table className="data-table">

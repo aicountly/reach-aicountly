@@ -67,67 +67,81 @@ export default function VideoProjectListPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Video Projects</h1>
-        <p className="page-header__subtitle">Manage video production from script to publication</p>
+        <div>
+          <h1>Video Projects</h1>
+          <p className="page-header__subtitle">Manage video production from script to publication</p>
+        </div>
         <div className="page-header__actions">
           <Link to="/video/ideas" className="btn btn--outline">View ideas</Link>
         </div>
       </div>
 
       <div className="toolbar mb-4">
-        <select
-          value={filter}
-          onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="select"
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          {['draft','script_draft','script_in_review','script_approved','rendering','rendered','published','cancelled'].map(s => (
-            <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
-          ))}
-        </select>
+        <label className="toolbar__label">
+          Status
+          <select
+            value={filter}
+            onChange={e => { setFilter(e.target.value); setPage(1); }}
+            className="form-select"
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            {['draft','script_draft','script_in_review','script_approved','rendering','rendered','published','cancelled'].map(s => (
+              <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {error && <p className="text-error">{error}</p>}
       {loading && <p className="muted">Loading projects…</p>}
 
       {!loading && projects.length === 0 && (
-        <p className="muted">No video projects found. Convert an accepted idea to get started.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
+              No video projects found. Convert an accepted idea to get started.
+            </p>
+            <Link to="/video/ideas" className="stat-card__link">Open idea backlog →</Link>
+          </div>
+        </div>
       )}
 
       {!loading && projects.length > 0 && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Status</th>
-              <th>Updated</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map(p => (
-              <tr key={p.uuid}>
-                <td>
-                  <Link to={`/video/projects/${p.uuid}`}>{p.title}</Link>
-                  {p.idea_title && <span className="text-muted ml-2 text-sm">from: {p.idea_title}</span>}
-                </td>
-                <td><ProjectStatusBadge status={p.status} /></td>
-                <td>{p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '—'}</td>
-                <td>
-                  <Link to={`/video/projects/${p.uuid}`} className="btn btn--sm">Open →</Link>
-                </td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Updated</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {projects.map(p => (
+                <tr key={p.uuid}>
+                  <td>
+                    <Link to={`/video/projects/${p.uuid}`}>{p.title}</Link>
+                    {p.idea_title && <span className="text-muted ml-2 text-sm">from: {p.idea_title}</span>}
+                  </td>
+                  <td><ProjectStatusBadge status={p.status} /></td>
+                  <td>{p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '—'}</td>
+                  <td>
+                    <Link to={`/video/projects/${p.uuid}`} className="btn btn--sm btn--secondary">Open →</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {total > perPage && (
         <div className="pagination mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="btn btn--sm">Previous</button>
-          <span className="mx-2">Page {page} of {Math.ceil(total / perPage)}</span>
-          <button disabled={page * perPage >= total} onClick={() => setPage(p => p + 1)} className="btn btn--sm">Next</button>
+          <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="btn btn--sm btn--secondary">Previous</button>
+          <span className="pagination__info">Page {page} of {Math.ceil(total / perPage)}</span>
+          <button type="button" disabled={page * perPage >= total} onClick={() => setPage(p => p + 1)} className="btn btn--sm btn--secondary">Next</button>
         </div>
       )}
     </div>

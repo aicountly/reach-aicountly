@@ -29,12 +29,165 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  width: 100%;
+  height: 100%;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 body {
   font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   color: var(--color-text);
   background: var(--color-bg);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* App shell — in-flow sidebar + content column (no fixed + marginLeft double accounting) */
+.reach-shell {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  box-sizing: border-box;
+}
+
+.reach-sidebar {
+  flex: 0 0 var(--sidebar-width);
+  width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
+  height: 100vh;
+  height: 100dvh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  z-index: 200;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.reach-sidebar__brand {
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.reach-sidebar__nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  padding: 0.65rem 0.65rem 0.65rem 0.75rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.reach-sidebar__section {
+  margin-bottom: 1rem;
+}
+
+.reach-sidebar__section-title {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  padding: 0 0.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.reach-sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  text-decoration: none;
+  margin-bottom: 0.1rem;
+  transition: background var(--transition);
+  min-width: 0;
+}
+
+.reach-sidebar__link:hover {
+  background: var(--color-primary-light);
+  text-decoration: none;
+}
+
+.reach-sidebar__link--active {
+  font-weight: 600;
+  color: var(--color-primary-hover);
+  background: var(--color-primary-light);
+}
+
+.reach-sidebar__link-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reach-sidebar__count {
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.reach-shell__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  background: var(--color-bg);
+  box-sizing: border-box;
+}
+
+.reach-shell__content {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  box-sizing: border-box;
+  overflow-x: clip;
 }
 
 a { color: var(--color-primary); text-decoration: none; }
@@ -489,12 +642,15 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
   min-width: 0;
 }
 /* Cancel ReachLayout <main> padding so section chrome is full-bleed in the content column.
-   Negative horizontal margins + width:auto expand the block into the padding gutters
-   without an explicit calc() that can overflow and create a phantom scrollbar. */
+   Negative margins pull into the gutters; width stays auto so we don't create a phantom
+   horizontal scrollbar. Parent .reach-shell__content uses overflow-x: clip. */
 .page-layout--flush {
   margin: -1.25rem -1.5rem;
+  width: auto;
   max-width: none;
   box-sizing: border-box;
+  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100dvh - var(--header-height));
 }
 .page-layout__header {
   background: var(--color-surface);

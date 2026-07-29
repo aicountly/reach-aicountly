@@ -13,38 +13,48 @@ export default function AiModelsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-sm text-gray-500 p-4">Loading models…</div>;
-  if (error)   return <div className="text-sm text-red-600 p-4">Error: {error}</div>;
+  if (loading) return <p className="muted">Loading models…</p>;
+  if (error)   return <p className="text-error">Error: {error}</p>;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold text-gray-900">AI Models</h1>
+    <div>
+      <div className="page-header page-header--stack">
+        <h1>AI Models</h1>
+        <p className="page-header__subtitle">
+          Models available for generation routes, with cost and context limits.
+        </p>
+      </div>
+
       {models.length === 0 ? (
-        <p className="text-sm text-gray-500">No models configured.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>No models configured.</p>
+          </div>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
               <tr>
                 {['Model Key', 'Provider', 'Enabled', 'Approval', 'Context', 'Input Cost', 'Output Cost'].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-gray-600">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {models.map(m => (
-                <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 font-mono text-xs">{m.model_key}</td>
-                  <td className="px-3 py-2 text-gray-600">{m.provider_id}</td>
-                  <td className="px-3 py-2">
-                    <span className={`text-xs px-1 rounded ${m.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                <tr key={m.id}>
+                  <td><code className="text-xs">{m.model_key}</code></td>
+                  <td className="text-muted">{m.provider_id}</td>
+                  <td>
+                    <span className={`badge ${m.enabled ? 'badge--success' : 'badge--neutral'}`}>
                       {m.enabled ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{m.approval_status}</td>
-                  <td className="px-3 py-2 text-gray-600">{m.context_limit?.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-gray-600">${m.input_cost_per_unit}</td>
-                  <td className="px-3 py-2 text-gray-600">${m.output_cost_per_unit}</td>
+                  <td>{m.approval_status}</td>
+                  <td className="text-muted">{m.context_limit?.toLocaleString() ?? '—'}</td>
+                  <td className="text-muted">${m.input_cost_per_unit}</td>
+                  <td className="text-muted">${m.output_cost_per_unit}</td>
                 </tr>
               ))}
             </tbody>

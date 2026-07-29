@@ -13,10 +13,13 @@ export function Header() {
   return (
     <header style={{
       height: 'var(--header-height)',
+      width: '100%',
+      boxSizing: 'border-box',
       background: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 1.25rem', position: 'sticky', top: 0, zIndex: 100,
+      padding: '0 1.5rem', position: 'sticky', top: 0, zIndex: 100,
+      flexShrink: 0,
     }}>
       <div className="flex items-center gap-3">
         <ReachLogo height={28} />

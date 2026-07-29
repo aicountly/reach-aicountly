@@ -32,42 +32,52 @@ export default function KbPublishingListPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Knowledge Base Publishing</h1>
+        <div>
+          <h1>Knowledge Base Publishing</h1>
+          <p className="page-header__subtitle">KB article deployments queued for the public site.</p>
+        </div>
       </div>
 
       {deployments.length === 0 ? (
-        <p className="muted">No knowledge-base deployments yet.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>No knowledge-base deployments yet.</p>
+            <Link to="/publishing/deployments" className="stat-card__link">Open all deployments →</Link>
+          </div>
+        </div>
       ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Content</th>
-              <th>Article Type</th>
-              <th>Status</th>
-              <th>Attempts</th>
-              <th>Updated</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {deployments.map(d => (
-              <tr key={d.id}>
-                <td>
-                  <Link to={`/content/${d.content_item_id}`}>{d.content_title ?? `#${d.content_item_id}`}</Link>
-                </td>
-                <td>{d.article_type ?? '—'}</td>
-                <td>
-                  <span className={`badge ${STATUS_BADGES[d.status] ?? 'badge--neutral'}`}>{d.status}</span>
-                </td>
-                <td>{d.attempt_count}</td>
-                <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
-                <td>
-                  <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm">View</Link>
-                </td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Content</th>
+                <th>Article Type</th>
+                <th>Status</th>
+                <th>Attempts</th>
+                <th>Updated</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {deployments.map(d => (
+                <tr key={d.id}>
+                  <td>
+                    <Link to={`/content/${d.content_item_id}`}>{d.content_title ?? `#${d.content_item_id}`}</Link>
+                  </td>
+                  <td>{d.article_type ?? '—'}</td>
+                  <td>
+                    <span className={`badge ${STATUS_BADGES[d.status] ?? 'badge--neutral'}`}>{d.status}</span>
+                  </td>
+                  <td>{d.attempt_count}</td>
+                  <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
+                  <td>
+                    <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm btn--secondary">View</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { getPrompt, listPromptVersions, approvePromptVersion } from '../../services/aiService.js';
 import { usePermission } from '../../hooks/usePermission.js';
+import { ROUTES } from '../../constants/routes.js';
 
 export default function AiPromptDetailPage() {
   const { id } = useParams();
@@ -36,70 +37,101 @@ export default function AiPromptDetailPage() {
     }
   };
 
-  if (error)     return <div className="text-sm text-red-600 p-4">Error: {error}</div>;
-  if (!template) return <div className="text-sm text-gray-500 p-4">Loading…</div>;
+  if (error)     return <p className="text-error">Error: {error}</p>;
+  if (!template) return <p className="muted">Loading…</p>;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">{template.name}</h1>
-        <p className="text-xs text-gray-500 font-mono">{template.slug}</p>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 text-sm">
-        <div><dt className="text-gray-500">Task Type</dt><dd>{template.task_type}</dd></div>
-        <div><dt className="text-gray-500">Content Type</dt><dd>{template.content_type || '—'}</dd></div>
-        <div><dt className="text-gray-500">Status</dt><dd>{template.status}</dd></div>
-      </div>
-
-      <div>
-        <h2 className="text-base font-semibold text-gray-800 mb-3">Versions</h2>
-        <p className="text-xs text-gray-400 mb-3">
-          Prompt versions are immutable after creation. AI cannot approve versions.
+    <div>
+      <div className="page-header page-header--stack">
+        <p className="text-xs text-muted mb-2">
+          <Link to={ROUTES.AI_PROMPTS}>← Prompt Templates</Link>
         </p>
+        <h1>{template.name}</h1>
+        <p className="page-header__subtitle"><code>{template.slug}</code></p>
+      </div>
+
+      <div className="card mb-4" style={{ maxWidth: 720 }}>
+        <div className="card__body">
+          <dl className="definition-list" style={{ margin: 0 }}>
+            <dt>Task Type</dt>
+            <dd>{template.task_type}</dd>
+            <dt>Content Type</dt>
+            <dd>{template.content_type || '—'}</dd>
+            <dt>Status</dt>
+            <dd>
+              <span className="badge badge--neutral">{template.status}</span>
+            </dd>
+          </dl>
+        </div>
+      </div>
+
+      <section>
+        <div className="page-header page-header--stack" style={{ marginBottom: '0.75rem' }}>
+          <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Versions</h2>
+          <p className="page-header__subtitle">
+            Prompt versions are immutable after creation. AI cannot approve versions.
+          </p>
+        </div>
 
         {versions.length === 0 ? (
-          <p className="text-sm text-gray-500">No versions found.</p>
+          <div className="card">
+            <div className="card__body">
+              <p className="muted" style={{ margin: 0, padding: 0 }}>No versions found.</p>
+            </div>
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {versions.map(v => (
-              <div key={v.id} className="border border-gray-200 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">v{v.version_number}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${v.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {v.status}
-                    </span>
-                    {template.current_version_id === v.id && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">current</span>
+              <div key={v.id} className="card">
+                <div className="card__body">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="btn-group">
+                      <span className="font-semibold">v{v.version_number}</span>
+                      <span className={`badge ${v.status === 'approved' ? 'badge--success' : 'badge--warning'}`}>
+                        {v.status}
+                      </span>
+                      {template.current_version_id === v.id && (
+                        <span className="badge badge-primary">current</span>
+                      )}
+                    </div>
+                    {canApprove && v.status !== 'approved' && (
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--primary"
+                        onClick={() => handleApprove(v.id)}
+                        disabled={approving === v.id}
+                      >
+                        {approving === v.id ? 'Approving…' : 'Approve'}
+                      </button>
                     )}
                   </div>
-                  {canApprove && v.status !== 'approved' && (
-                    <button
-                      onClick={() => handleApprove(v.id)}
-                      disabled={approving === v.id}
-                      className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                    >
-                      {approving === v.id ? 'Approving…' : 'Approve'}
-                    </button>
-                  )}
-                </div>
-                {v.change_summary && <p className="text-xs text-gray-500">{v.change_summary}</p>}
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1">System Prompt</p>
-                    <pre className="text-xs bg-gray-50 rounded p-2 overflow-auto max-h-20 text-gray-700">{v.system_template?.slice(0, 200)}</pre>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1">User Prompt</p>
-                    <pre className="text-xs bg-gray-50 rounded p-2 overflow-auto max-h-20 text-gray-700">{v.user_template?.slice(0, 200)}</pre>
+                  {v.change_summary && <p className="muted text-xs mb-2">{v.change_summary}</p>}
+                  <div className="two-col-grid">
+                    <div>
+                      <p className="text-xs font-semibold text-secondary mb-1">System Prompt</p>
+                      <pre className="text-xs" style={{
+                        background: 'var(--color-bg)', borderRadius: 'var(--radius)',
+                        padding: '0.5rem', overflow: 'auto', maxHeight: 80, margin: 0,
+                      }}>
+                        {v.system_template?.slice(0, 200)}
+                      </pre>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-secondary mb-1">User Prompt</p>
+                      <pre className="text-xs" style={{
+                        background: 'var(--color-bg)', borderRadius: 'var(--radius)',
+                        padding: '0.5rem', overflow: 'auto', maxHeight: 80, margin: 0,
+                      }}>
+                        {v.user_template?.slice(0, 200)}
+                      </pre>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -47,14 +47,22 @@ export default function BlogPublishingListPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Blog Publishing</h1>
+        <div>
+          <h1>Blog Publishing</h1>
+          <p className="page-header__subtitle">Blog deployments queued for the public site.</p>
+        </div>
       </div>
 
       {loading && <p className="muted">Loading blog deployments…</p>}
       {error && <p className="text-error" role="alert">{error}</p>}
 
       {!loading && !error && deployments.length === 0 && (
-        <p className="muted">No blog deployments yet.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>No blog deployments yet.</p>
+            <Link to="/publishing/deployments" className="stat-card__link">Open all deployments →</Link>
+          </div>
+        </div>
       )}
 
       {!loading && deployments.length > 0 && (
@@ -87,7 +95,7 @@ export default function BlogPublishingListPage() {
                   <td>{d.attempt_count}</td>
                   <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
                   <td>
-                    <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm">View</Link>
+                    <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm btn--secondary">View</Link>
                   </td>
                 </tr>
               ))}

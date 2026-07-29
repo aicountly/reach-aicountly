@@ -92,7 +92,7 @@ export default function VideoOverviewPage() {
   return (
     <div>
       <div className="page-header page-header--stack">
-        <h1>Video Automation</h1>
+        <h1>Overview</h1>
         <p className="page-header__subtitle">
           AI-governed video content lifecycle — ideation through YouTube publish
         </p>

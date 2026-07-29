@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { getGeneration, cancelGeneration } from '../../services/aiService.js';
 import AiGenerationBadge from '../../components/ai/AiGenerationBadge.jsx';
-import ValidationFindings from '../../components/ai/ValidationFindings.jsx';
+import { ROUTES } from '../../constants/routes.js';
 
 export default function AiGenerationDetailPage() {
   const { uuid } = useParams();
@@ -26,80 +26,117 @@ export default function AiGenerationDetailPage() {
     }
   };
 
-  if (error) return <div className="text-sm text-red-600 p-4">Error: {error}</div>;
-  if (!data)  return <div className="text-sm text-gray-500 p-4">Loading…</div>;
+  if (error) return <p className="text-error">Error: {error}</p>;
+  if (!data)  return <p className="muted">Loading…</p>;
 
   const { request, runs = [], artifact } = data;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-start justify-between">
+    <div>
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Generation Request</h1>
-          <p className="text-xs font-mono text-gray-500">{request?.uuid}</p>
+          <p className="text-xs text-muted mb-2">
+            <Link to={ROUTES.AI_GENERATIONS}>← Generation Requests</Link>
+          </p>
+          <h1>Generation Request</h1>
+          <p className="page-header__subtitle"><code>{request?.uuid}</code></p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="page-header__actions">
           {request && <AiGenerationBadge status={request.status} />}
           {request && ['pending', 'grounding', 'queued'].includes(request.status) && (
-            <button onClick={handleCancel} disabled={cancelling} className="text-xs px-2 py-1 border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50">
+            <button
+              type="button"
+              className="btn btn--sm btn--danger"
+              onClick={handleCancel}
+              disabled={cancelling}
+            >
               {cancelling ? 'Cancelling…' : 'Cancel'}
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-        <div><span className="text-gray-500">Task Type</span><p>{request?.task_type}</p></div>
-        <div><span className="text-gray-500">Content Type</span><p>{request?.content_type}</p></div>
-        <div><span className="text-gray-500">Status</span><p>{request?.status}</p></div>
-        <div><span className="text-gray-500">Requested By</span><p>{request?.requested_actor_type}</p></div>
-        <div><span className="text-gray-500">Created</span><p>{request?.created_at?.slice(0, 19)}</p></div>
-        {request?.completed_at && <div><span className="text-gray-500">Completed</span><p>{request.completed_at?.slice(0, 19)}</p></div>}
+      <div className="card mb-4">
+        <div className="card__body">
+          <dl className="definition-list" style={{ margin: 0 }}>
+            <dt>Task Type</dt>
+            <dd>{request?.task_type}</dd>
+            <dt>Content Type</dt>
+            <dd>{request?.content_type}</dd>
+            <dt>Status</dt>
+            <dd>{request?.status}</dd>
+            <dt>Requested By</dt>
+            <dd>{request?.requested_actor_type}</dd>
+            <dt>Created</dt>
+            <dd>{request?.created_at?.slice(0, 19)}</dd>
+            {request?.completed_at && (
+              <>
+                <dt>Completed</dt>
+                <dd>{request.completed_at?.slice(0, 19)}</dd>
+              </>
+            )}
+          </dl>
+        </div>
       </div>
 
       {runs.length > 0 && (
-        <div>
-          <h2 className="text-base font-semibold text-gray-800 mb-2">Provider Attempts ({runs.length})</h2>
-          <div className="space-y-2">
+        <section className="mb-4">
+          <h2 className="card__title mb-2">Provider Attempts ({runs.length})</h2>
+          <div className="flex flex-col gap-2">
             {runs.map(run => (
-              <div key={run.id} className="border border-gray-200 rounded p-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Attempt #{run.attempt_number}</span>
-                  <span className={`px-1.5 py-0.5 rounded ${run.status === 'completed' ? 'bg-green-100 text-green-700' : run.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {run.status}
-                  </span>
-                </div>
-                <div className="mt-1 text-gray-500">
-                  {run.total_tokens && <span>Tokens: {run.total_tokens} • </span>}
-                  {run.duration_ms && <span>Duration: {run.duration_ms}ms • </span>}
-                  {run.error_category && <span className="text-red-600">Error: {run.error_category}</span>}
+              <div key={run.id} className="card">
+                <div className="card__body">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-sm">Attempt #{run.attempt_number}</span>
+                    <span className={`badge ${
+                      run.status === 'completed' ? 'badge--success'
+                        : run.status === 'failed' ? 'badge--danger'
+                          : 'badge--neutral'
+                    }`}>
+                      {run.status}
+                    </span>
+                  </div>
+                  <p className="muted text-xs mt-1" style={{ marginBottom: 0 }}>
+                    {run.total_tokens != null && <span>Tokens: {run.total_tokens} · </span>}
+                    {run.duration_ms != null && <span>Duration: {run.duration_ms}ms · </span>}
+                    {run.error_category && <span className="text-error">Error: {run.error_category}</span>}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {artifact && (
-        <div>
-          <h2 className="text-base font-semibold text-gray-800 mb-2">Artifact</h2>
-          <div className="border border-gray-200 rounded-lg p-3 text-xs space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500">Schema Validation:</span>
-              <span className={`px-1.5 py-0.5 rounded ${artifact.schema_validation_status === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        <section className="card">
+          <div className="card__header">
+            <h2 className="card__title">Artifact</h2>
+          </div>
+          <div className="card__body">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-muted text-sm">Schema Validation:</span>
+              <span className={`badge ${
+                artifact.schema_validation_status === 'passed' ? 'badge--success' : 'badge--danger'
+              }`}>
                 {artifact.schema_validation_status}
               </span>
             </div>
             {artifact.sanitised_output_json && (
               <details>
-                <summary className="cursor-pointer text-gray-600">View sanitised output</summary>
-                <pre className="mt-2 bg-gray-50 rounded p-2 overflow-auto max-h-64 text-gray-700">
+                <summary className="text-sm text-secondary" style={{ cursor: 'pointer' }}>
+                  View sanitised output
+                </summary>
+                <pre className="text-xs mt-2" style={{
+                  background: 'var(--color-bg)', borderRadius: 'var(--radius)',
+                  padding: '0.75rem', overflow: 'auto', maxHeight: 256, margin: 0,
+                }}>
                   {JSON.stringify(JSON.parse(artifact.sanitised_output_json), null, 2)}
                 </pre>
               </details>
             )}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

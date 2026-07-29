@@ -24,18 +24,22 @@ export default function AiGenerationsPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1>Generation Requests</h1>
-          <p className="page-header__subtitle">{total} total</p>
-        </div>
+      <div className="page-header page-header--stack">
+        <h1>Generation Requests</h1>
+        <p className="page-header__subtitle">{total} total</p>
       </div>
 
-      {error && <p className="text-error">Error: {error}</p>}
+      {error && <p className="text-error mb-3">Error: {error}</p>}
       {loading && <p className="muted">Loading…</p>}
 
       {!loading && requests.length === 0 && (
-        <p className="muted">No generation requests found.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
+              No generation requests found.
+            </p>
+          </div>
+        </div>
       )}
 
       {!loading && requests.length > 0 && (
@@ -68,25 +72,27 @@ export default function AiGenerationsPage() {
         </div>
       )}
 
-      <div className="pagination">
-        <button
-          type="button"
-          className="btn btn--sm btn--secondary"
-          onClick={() => setPage(p => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          Prev
-        </button>
-        <span className="pagination__info">Page {page} / {totalPages}</span>
-        <button
-          type="button"
-          className="btn btn--sm btn--secondary"
-          onClick={() => setPage(p => p + 1)}
-          disabled={page >= totalPages || requests.length < perPage}
-        >
-          Next
-        </button>
-      </div>
+      {!loading && total > 0 && (
+        <div className="pagination">
+          <button
+            type="button"
+            className="btn btn--sm btn--secondary"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Prev
+          </button>
+          <span className="pagination__info">Page {page} / {totalPages}</span>
+          <button
+            type="button"
+            className="btn btn--sm btn--secondary"
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= totalPages || requests.length < perPage}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { listAiBudgets } from '../../services/aiService.js';
 
+function BudgetBar({ used, hard }) {
+  const hardLimit = parseFloat(hard) || 0;
+  const usedAmount = parseFloat(used) || 0;
+  const pct = hardLimit > 0 ? Math.min(100, (usedAmount / hardLimit) * 100) : 0;
+  const barColor = pct >= 90
+    ? 'var(--color-danger)'
+    : pct >= 70
+      ? 'var(--color-warning)'
+      : 'var(--color-success)';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+      <span>${usedAmount.toFixed(4)}</span>
+      {hardLimit > 0 && (
+        <div
+          style={{
+            width: 64, height: 6, borderRadius: 999,
+            background: 'var(--color-border)', overflow: 'hidden', flexShrink: 0,
+          }}
+          aria-hidden="true"
+        >
+          <div style={{ width: `${pct}%`, height: '100%', background: barColor }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AiBudgetsPage() {
   const [budgets, setBudgets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,58 +41,54 @@ export default function AiBudgetsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-sm text-gray-500 p-4">Loading budgets…</div>;
-  if (error)   return <div className="text-sm text-red-600 p-4">Error: {error}</div>;
+  if (loading) return <p className="muted">Loading budgets…</p>;
+  if (error)   return <p className="text-error">Error: {error}</p>;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold text-gray-900">AI Budgets</h1>
-      <p className="text-xs text-gray-500">
-        Budgets enforce daily and monthly cost limits. Hard limits block generation; warning limits send alerts.
-        Requires <code>ai_provider.manage</code> permission to modify.
-      </p>
+    <div>
+      <div className="page-header page-header--stack">
+        <h1>AI Budgets</h1>
+        <p className="page-header__subtitle">
+          Budgets enforce daily and monthly cost limits. Hard limits block generation; warning limits send alerts.
+          Requires <code>ai_provider.manage</code> to modify.
+        </p>
+      </div>
+
       {budgets.length === 0 ? (
-        <p className="text-sm text-gray-500">No budgets configured. Default: unlimited.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
+              No budgets configured. Default: unlimited.
+            </p>
+          </div>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
               <tr>
                 {['Scope', 'Reference', 'Period', 'Warning Limit', 'Hard Limit', 'Used', 'Currency', 'Status'].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-gray-600">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {budgets.map(b => {
-                const pct = b.hard_limit > 0 ? Math.min(100, (b.used_amount / b.hard_limit) * 100) : 0;
-                const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-green-500';
-                return (
-                  <tr key={b.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-gray-700">{b.scope_type}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600">{b.scope_reference}</td>
-                    <td className="px-3 py-2 text-gray-600">{b.period_type}</td>
-                    <td className="px-3 py-2 text-gray-600">${parseFloat(b.warning_limit).toFixed(2)}</td>
-                    <td className="px-3 py-2 text-gray-600">${parseFloat(b.hard_limit).toFixed(2)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-700">${parseFloat(b.used_amount).toFixed(4)}</span>
-                        {b.hard_limit > 0 && (
-                          <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-gray-500">{b.currency}</td>
-                    <td className="px-3 py-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${b.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                        {b.enabled ? 'Active' : 'Disabled'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+            <tbody>
+              {budgets.map(b => (
+                <tr key={b.id}>
+                  <td>{b.scope_type}</td>
+                  <td><code className="text-xs">{b.scope_reference}</code></td>
+                  <td className="text-muted">{b.period_type}</td>
+                  <td className="text-muted">${parseFloat(b.warning_limit).toFixed(2)}</td>
+                  <td className="text-muted">${parseFloat(b.hard_limit).toFixed(2)}</td>
+                  <td><BudgetBar used={b.used_amount} hard={b.hard_limit} /></td>
+                  <td className="text-muted">{b.currency}</td>
+                  <td>
+                    <span className={`badge ${b.enabled ? 'badge--success' : 'badge--neutral'}`}>
+                      {b.enabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

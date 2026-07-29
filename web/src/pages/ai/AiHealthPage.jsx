@@ -43,8 +43,14 @@ export default function AiHealthPage() {
         System Status: {overall}
       </div>
 
-      {providers.length > 0 && (
-        <div className="flex flex-col gap-3">
+      {providers.length === 0 ? (
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>No providers reported health status.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="operations-panels">
           {providers.map(p => (
             <div key={p.provider_key} className="card">
               <div className="card__body">

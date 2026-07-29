@@ -31,8 +31,9 @@ describe('Sidebar', () => {
     expect(screen.getByText('Job Monitor')).toBeInTheDocument();
     expect(screen.getAllByText('Community Q&A').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('AI Control Centre').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Video Automation').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Settings')).toBeInTheDocument();
-    expect(screen.queryByText('YT Connections')).toBeInTheDocument();
+    expect(screen.queryByText('YT Connections')).not.toBeInTheDocument();
     expect(screen.queryByText('Question Inbox')).not.toBeInTheDocument();
   });
 

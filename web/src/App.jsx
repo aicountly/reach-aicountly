@@ -168,6 +168,7 @@ import DisasterRecoveryPage             from './pages/readiness/DisasterRecovery
 import TechnicalDebtPage                from './pages/readiness/TechnicalDebtPage.jsx';
 import ReleaseAcceptancePage            from './pages/readiness/ReleaseAcceptancePage.jsx';
 
+import VideoLayout                from './pages/video/VideoLayout.jsx';
 import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
 import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
 import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
@@ -279,7 +280,7 @@ export default function App() {
 
         {/* Phase 4 — Publishing */}
         <Route path="/publishing" element={<PublishingLayout />}>
-          <Route index element={<DeploymentListPage />} />
+          <Route index element={<Navigate to="deployments" replace />} />
           <Route path="blogs" element={<BlogPublishingListPage />} />
           <Route path="knowledge-bases" element={<KbPublishingListPage />} />
           <Route path="calendar" element={<PublishingCalendarPage />} />
@@ -383,14 +384,16 @@ export default function App() {
         </Route>
 
         {/* Phase 6 — Video Content Automation */}
-        <Route path="/video" element={<VideoOverviewPage />} />
-        <Route path="/video/ideas" element={<VideoIdeaBacklogPage />} />
-        <Route path="/video/projects" element={<VideoProjectListPage />} />
-        <Route path="/video/projects/:id" element={<VideoProjectWorkspacePage />} />
-        <Route path="/video/render-queue" element={<VideoRenderQueuePage />} />
-        <Route path="/video/publications" element={<VideoPublicationListPage />} />
-        <Route path="/video/connections" element={<VideoConnectionsPage />} />
-        <Route path="/video/operations" element={<VideoOperationsDashboardPage />} />
+        <Route path="/video" element={<VideoLayout />}>
+          <Route index element={<VideoOverviewPage />} />
+          <Route path="ideas" element={<VideoIdeaBacklogPage />} />
+          <Route path="projects" element={<VideoProjectListPage />} />
+          <Route path="projects/:id" element={<VideoProjectWorkspacePage />} />
+          <Route path="render-queue" element={<VideoRenderQueuePage />} />
+          <Route path="publications" element={<VideoPublicationListPage />} />
+          <Route path="connections" element={<VideoConnectionsPage />} />
+          <Route path="operations" element={<VideoOperationsDashboardPage />} />
+        </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />

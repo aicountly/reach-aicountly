@@ -55,43 +55,51 @@ export default function VideoRenderQueuePage() {
       {loading && <p className="muted">Loading render queue…</p>}
 
       {!loading && jobs.length === 0 && (
-        <p className="muted">No render jobs found. Approve a script and queue a render.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
+              No render jobs found. Approve a script and queue a render.
+            </p>
+          </div>
+        </div>
       )}
 
       {!loading && jobs.length > 0 && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Job UUID</th>
-              <th>Provider</th>
-              <th>Status</th>
-              <th>Attempts</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map(job => (
-              <tr key={job.uuid}>
-                <td className="font-mono text-sm">{job.uuid?.slice(0, 12)}…</td>
-                <td>{job.provider ?? '—'}</td>
-                <td><RenderJobStatusBadge status={job.status} /></td>
-                <td>{job.attempt_count ?? 0}/{job.max_attempts ?? 3}</td>
-                <td>
-                  {['failed', 'dead_letter'].includes(job.status) && (
-                    <button className="btn btn--sm btn--primary" onClick={() => handleAction(job.uuid, 'retry')}>
-                      Retry
-                    </button>
-                  )}
-                  {['queued', 'reserved', 'rendering'].includes(job.status) && (
-                    <button className="btn btn--sm btn--error ml-2" onClick={() => handleAction(job.uuid, 'cancel')}>
-                      Cancel
-                    </button>
-                  )}
-                </td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Job UUID</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Attempts</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {jobs.map(job => (
+                <tr key={job.uuid}>
+                  <td className="font-mono text-sm">{job.uuid?.slice(0, 12)}…</td>
+                  <td>{job.provider ?? '—'}</td>
+                  <td><RenderJobStatusBadge status={job.status} /></td>
+                  <td>{job.attempt_count ?? 0}/{job.max_attempts ?? 3}</td>
+                  <td>
+                    {['failed', 'dead_letter'].includes(job.status) && (
+                      <button type="button" className="btn btn--sm btn--primary" onClick={() => handleAction(job.uuid, 'retry')}>
+                        Retry
+                      </button>
+                    )}
+                    {['queued', 'reserved', 'rendering'].includes(job.status) && (
+                      <button type="button" className="btn btn--sm btn--error ml-2" onClick={() => handleAction(job.uuid, 'cancel')}>
+                        Cancel
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

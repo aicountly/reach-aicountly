@@ -93,35 +93,48 @@ export default function VideoIdeaBacklogPage() {
 
   return (
     <div>
-      <div className="page-header page-header--stack">
-        <h1>Video Idea Backlog</h1>
-        <p className="page-header__subtitle">AI-scored video ideas awaiting editorial decision</p>
+      <div className="page-header">
+        <div>
+          <h1>Video Idea Backlog</h1>
+          <p className="page-header__subtitle">AI-scored video ideas awaiting editorial decision</p>
+        </div>
         <div className="page-header__actions">
           <Link to="/video/projects" className="btn btn--primary">View projects</Link>
         </div>
       </div>
 
-      <div className="filter-bar mb-4">
-        <select
-          value={filter}
-          onChange={(e) => { setFilter(e.target.value); setPage(1); }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          {['draft', 'ready', 'accepted', 'rejected', 'archived', 'converted'].map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+      <div className="toolbar mb-4">
+        <label className="toolbar__label">
+          Status
+          <select
+            value={filter}
+            onChange={(e) => { setFilter(e.target.value); setPage(1); }}
+            className="form-select"
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            {['draft', 'ready', 'accepted', 'rejected', 'archived', 'converted'].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {error && <p className="text-error">{error}</p>}
       {loading && <p className="muted">Loading ideas…</p>}
 
       {!loading && ideas.length === 0 && !error && (
-        <p className="muted">No video ideas found. Ideas can be generated from the AI generation panel.</p>
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
+              No video ideas found. Ideas can be generated from the AI generation panel.
+            </p>
+          </div>
+        </div>
       )}
 
       {!loading && ideas.length > 0 && (
+        <div className="table-wrap">
         <table className="data-table">
           <thead>
             <tr>
@@ -175,6 +188,7 @@ export default function VideoIdeaBacklogPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {total > perPage && (

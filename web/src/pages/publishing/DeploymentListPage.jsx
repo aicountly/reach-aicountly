@@ -55,53 +55,76 @@ export default function DeploymentListPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Deployments</h1>
+        <div>
+          <h1>Deployments</h1>
+          <p className="page-header__subtitle">
+            Track publish, unpublish, and rollback jobs across blogs and knowledge base.
+          </p>
+        </div>
+        <div className="page-header__actions">
+          <Link to="/publishing/blogs" className="btn btn--sm btn--secondary">View blogs</Link>
+          <Link to="/publishing/knowledge-bases" className="btn btn--sm btn--secondary">View KB</Link>
+        </div>
       </div>
 
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Content</th>
-            <th>Type</th>
-            <th>Operation</th>
-            <th>Status</th>
-            <th>Attempts</th>
-            <th>Updated</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {deployments.length === 0 ? (
-            <tr><td colSpan={8} className="muted">No deployments.</td></tr>
-          ) : deployments.map(d => (
-            <tr key={d.id}>
-              <td>{d.id}</td>
-              <td>
-                <Link to={`/content/${d.content_item_id}`}>{d.content_title ?? `#${d.content_item_id}`}</Link>
-              </td>
-              <td>{d.content_type}</td>
-              <td><code>{d.operation}</code></td>
-              <td>
-                <span className={`badge ${STATUS_CLASS[d.status] ?? 'badge--neutral'}`}>
-                  {STATUS_LABELS[d.status] ?? d.status}
-                </span>
-              </td>
-              <td>{d.attempt_count}</td>
-              <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
-              <td>
-                <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm">View</Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {deployments.length === 0 ? (
+        <div className="card">
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
+              No deployments yet. Publish blog or knowledge-base content to see jobs here.
+            </p>
+            <div className="btn-group mt-3">
+              <Link to="/publishing/blogs" className="btn btn--sm btn--secondary">Open blog publishing</Link>
+              <Link to="/publishing/readiness" className="btn btn--sm btn--secondary">Check readiness</Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Content</th>
+                <th>Type</th>
+                <th>Operation</th>
+                <th>Status</th>
+                <th>Attempts</th>
+                <th>Updated</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {deployments.map(d => (
+                <tr key={d.id}>
+                  <td>{d.id}</td>
+                  <td>
+                    <Link to={`/content/${d.content_item_id}`}>{d.content_title ?? `#${d.content_item_id}`}</Link>
+                  </td>
+                  <td>{d.content_type}</td>
+                  <td><code>{d.operation}</code></td>
+                  <td>
+                    <span className={`badge ${STATUS_CLASS[d.status] ?? 'badge--neutral'}`}>
+                      {STATUS_LABELS[d.status] ?? d.status}
+                    </span>
+                  </td>
+                  <td>{d.attempt_count}</td>
+                  <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
+                  <td>
+                    <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm btn--secondary">View</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div className="pagination">
-          <button className="btn btn--sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</button>
+          <button type="button" className="btn btn--sm btn--secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</button>
           <span className="pagination__info">Page {page} / {totalPages}</span>
-          <button className="btn btn--sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+          <button type="button" className="btn btn--sm btn--secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
         </div>
       )}
     </div>

@@ -1,17 +1,21 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Globe } from 'lucide-react';
 
 const navItems = [
   { to: '/publishing/blogs', label: 'Blogs' },
   { to: '/publishing/knowledge-bases', label: 'Knowledge Base' },
   { to: '/publishing/calendar', label: 'Calendar' },
-  { to: '/publishing/deployments', label: 'Deployments' },
+  { to: '/publishing/deployments', label: 'Deployments', deployments: true },
   { to: '/publishing/verifications', label: 'Verifications' },
   { to: '/publishing/connections', label: 'Connections' },
   { to: '/publishing/readiness', label: 'Readiness' },
 ];
 
 export default function PublishingLayout() {
+  const { pathname } = useLocation();
+  const onDeployments =
+    pathname === '/publishing' || pathname.startsWith('/publishing/deployments');
+
   return (
     <div className="page-layout page-layout--flush">
       <div className="page-layout__header">
@@ -26,12 +30,12 @@ export default function PublishingLayout() {
       </div>
 
       <nav className="sub-nav" aria-label="Publishing navigation">
-        {navItems.map(({ to, label }) => (
+        {navItems.map(({ to, label, deployments }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `sub-nav__link${isActive ? ' sub-nav__link--active' : ''}`
+              `sub-nav__link${(deployments ? onDeployments : isActive) ? ' sub-nav__link--active' : ''}`
             }
           >
             {label}

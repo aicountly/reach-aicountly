@@ -22,11 +22,13 @@ export default function AiProvidersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-sm text-muted">Loading providers…</p>;
+  if (loading) return <p className="muted">Loading providers…</p>;
   if (error) {
     return (
       <div>
-        <h1 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.75rem' }}>AI Providers</h1>
+        <div className="page-header page-header--stack">
+          <h1>AI Providers</h1>
+        </div>
         <div className="alert alert-danger">Error: {error}</div>
       </div>
     );
@@ -34,17 +36,21 @@ export default function AiProvidersPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
-        <h1 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>AI Providers</h1>
+      <div className="page-header page-header--stack">
+        <h1>AI Providers</h1>
+        <p className="page-header__subtitle">
+          Connected model providers and their configuration health.
+        </p>
       </div>
-      <div className="alert alert-warning">
+
+      <div className="alert alert-warning mb-3">
         Provider API keys are never stored in the database. Configure keys via environment variables only.
       </div>
 
       {providers.length === 0 ? (
         <div className="card">
-          <div className="card-body" style={{ textAlign: 'center' }}>
-            <p className="text-sm text-muted" style={{ margin: 0 }}>
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0, padding: 0 }}>
               No providers configured in the database yet.
             </p>
           </div>
@@ -65,7 +71,7 @@ export default function AiProvidersPage() {
             <tbody>
               {providers.map((p) => (
                 <tr key={p.id}>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{p.provider_key}</td>
+                  <td><code className="text-xs">{p.provider_key}</code></td>
                   <td>{p.display_name}</td>
                   <td>
                     <span className={`badge ${STATUS_BADGE[p.status] || 'badge-secondary'}`}>

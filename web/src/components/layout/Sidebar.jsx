@@ -5,7 +5,7 @@ import {
   Paintbrush, BarChart3, Users, ArrowRightCircle, Bot, ScrollText,
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
   BookOpen, PenTool, Package, BrainCircuit,
-  Globe, Send, Link2,
+  Globe, Send,
   MessagesSquare,
   Search,
 } from 'lucide-react';
@@ -75,13 +75,7 @@ const NAV = [
   {
     title: 'Video Automation',
     items: [
-      { label: 'Overview',         path: '/video',              icon: MonitorSmartphone, end: true, requires: 'video.read' },
-      { label: 'Idea Backlog',     path: '/video/ideas',        icon: Sparkles,           requires: 'video.read' },
-      { label: 'Projects',         path: '/video/projects',     icon: FileText,           requires: 'video.read' },
-      { label: 'Render Queue',     path: '/video/render-queue', icon: Activity,           requires: 'video.render' },
-      { label: 'Publications',     path: '/video/publications', icon: Send,               requires: 'video.publish' },
-      { label: 'YT Connections',   path: '/video/connections',  icon: Link2,              requires: 'video_connections.read' },
-      { label: 'Operations',       path: '/video/operations',   icon: PlugZap,            requires: 'video_operations.read' },
+      { label: 'Video Automation', path: '/video', icon: MonitorSmartphone, requires: 'video.read' },
     ],
   },
   {
@@ -133,61 +127,30 @@ export function Sidebar() {
     }))
     .filter((section) => section.items.length > 0);
   return (
-    <aside style={{
-      width: 'var(--sidebar-width)', height: '100vh', position: 'fixed', top: 0, left: 0,
-      zIndex: 200,
-      background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)',
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      boxSizing: 'border-box',
-    }}>
-      <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+    <aside className="reach-sidebar" aria-label="Primary">
+      <div className="reach-sidebar__brand">
         <ReachLogo height={32} />
         <div className="text-xs text-muted mt-1">Superadmin</div>
         <div className="mt-2"><BotModeBadge /></div>
       </div>
 
-      <nav style={{
-        flex: 1, minHeight: 0, minWidth: 0,
-        padding: '0.65rem 0.65rem 0.65rem 0.75rem',
-        overflowX: 'hidden', overflowY: 'auto',
-        scrollbarGutter: 'stable',
-      }}>
+      <nav className="reach-sidebar__nav">
         {visibleSections.map((section) => (
-          <div key={section.title} style={{ marginBottom: '1rem' }}>
-            <p style={{
-              fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '0.05em', color: 'var(--color-text-muted)',
-              padding: '0 0.5rem', marginBottom: '0.25rem',
-            }}>
-              {section.title}
-            </p>
+          <div key={section.title} className="reach-sidebar__section">
+            <p className="reach-sidebar__section-title">{section.title}</p>
             {section.items.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={!!item.end}
-                style={({ isActive }) => ({
-                  display: 'flex', alignItems: 'center', gap: '0.55rem',
-                  padding: '0.4rem 0.5rem', borderRadius: 'var(--radius)',
-                  fontSize: '0.83rem', fontWeight: isActive ? 600 : 500,
-                  color: isActive ? 'var(--color-primary-hover)' : 'var(--color-text)',
-                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                  textDecoration: 'none', marginBottom: '0.1rem',
-                  transition: 'background var(--transition)',
-                  minWidth: 0,
-                })}
+                className={({ isActive }) =>
+                  `reach-sidebar__link${isActive ? ' reach-sidebar__link--active' : ''}`
+                }
               >
-                <item.icon size={15} style={{ flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                <item.icon size={15} style={{ flexShrink: 0 }} aria-hidden="true" />
+                <span className="reach-sidebar__link-label">{item.label}</span>
                 {item.countKey != null && counts[item.countKey] > 0 && (
-                  <span
-                    style={{
-                      minWidth: '1.25rem', padding: '0 0.35rem',
-                      borderRadius: '999px', fontSize: '0.65rem', fontWeight: 600,
-                      lineHeight: 1.35, textAlign: 'center',
-                      background: 'var(--color-primary)', color: '#fff',
-                    }}
-                  >
+                  <span className="reach-sidebar__count">
                     {counts[item.countKey]}
                   </span>
                 )}

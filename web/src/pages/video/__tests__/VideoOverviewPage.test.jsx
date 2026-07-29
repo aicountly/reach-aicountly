@@ -23,7 +23,7 @@ describe('VideoOverviewPage', () => {
       .mockResolvedValueOnce({ data: [], total: 3 })
       .mockResolvedValueOnce({ data: [], total: 5 });
     renderWithAuth(<VideoOverviewPage />, ctx);
-    expect(screen.getByText('Video Automation')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByText('Idea Backlog')).toBeInTheDocument();
     expect(screen.getByText('Projects')).toBeInTheDocument();
     expect(screen.getByText('Render Queue')).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe('VideoOverviewPage', () => {
   it('keeps section cards visible while stats load', () => {
     api.get.mockReturnValue(new Promise(() => {}));
     renderWithAuth(<VideoOverviewPage />, ctx);
-    expect(screen.getByText('Video Automation')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByText('Idea Backlog')).toBeInTheDocument();
     expect(screen.getAllByText('…').length).toBeGreaterThan(0);
   });
