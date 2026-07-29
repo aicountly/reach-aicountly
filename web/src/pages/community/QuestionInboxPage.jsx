@@ -3,8 +3,20 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
-const STATUS_OPTS = ['', 'new', 'triaged', 'in_progress', 'answered', 'closed', 'spam'];
-const SORT_OPTS   = ['triage_score_desc', 'newest', 'oldest'];
+const STATUS_OPTS = [
+  { value: '', label: 'All' },
+  { value: 'new', label: 'New' },
+  { value: 'triaged', label: 'Triaged' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'answered', label: 'Answered' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'spam', label: 'Spam' },
+];
+const SORT_OPTS = [
+  { value: 'triage_score_desc', label: 'Triage score' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+];
 
 const STATUS_CLASS = {
   new: 'badge--info',
@@ -47,13 +59,13 @@ export default function QuestionInboxPage() {
         <label className="toolbar__label">
           Status
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="form-select form-select--sm">
-            {STATUS_OPTS.map(s => <option key={s} value={s}>{s || 'All'}</option>)}
+            {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
           </select>
         </label>
         <label className="toolbar__label">
           Sort
           <select value={sort} onChange={e => setSort(e.target.value)} className="form-select form-select--sm">
-            {SORT_OPTS.map(s => <option key={s} value={s}>{s}</option>)}
+            {SORT_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
       </div>

@@ -38,9 +38,14 @@ export default function CommunityAnalyticsPage() {
     <div>
       <div className="page-header">
         <h1>Community Analytics</h1>
-        <label className="toolbar__label ml-auto">
+        <label className="toolbar__label page-header__actions">
           Days
-          <select value={days} onChange={e => setDays(Number(e.target.value))} className="form-select form-select--sm">
+          <select
+            value={days}
+            onChange={e => setDays(Number(e.target.value))}
+            className="form-select form-select--sm"
+            aria-label="Analytics date range in days"
+          >
             {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d}d</option>)}
           </select>
         </label>

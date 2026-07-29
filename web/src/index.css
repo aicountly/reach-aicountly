@@ -168,20 +168,9 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
 .stats-row,
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* auto-fit so 3-card pages (Analytics) fill the row; 4-card pages stay even */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 0.85rem;
-}
-@media (max-width: 1100px) {
-  .stats-row,
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 600px) {
-  .stats-row,
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
 }
 .stat-card {
   background: var(--color-surface);
@@ -443,16 +432,48 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
 }
 .filter-bar select, .filter-bar input { width: auto; min-width: 140px; }
 
+/* Compact filter toolbars (Community, Video, etc.) — override global select { width: 100% } */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+.toolbar__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.toolbar select,
+.toolbar__label select,
+.toolbar .form-select,
+.form-select,
+.select {
+  width: auto;
+  min-width: 140px;
+  max-width: 100%;
+}
+.form-select--sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  min-width: 120px;
+}
+.ml-auto { margin-left: auto; }
+
 /* Section layouts (Publishing, Community, etc.) */
 .page-layout {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-width: 0;
 }
-/* Cancel ReachLayout <main> padding so section chrome is full-bleed in the content column */
+/* Cancel ReachLayout <main> padding so section chrome is full-bleed in the content column.
+   Negative horizontal margins + width:auto expand the block into the padding gutters
+   without an explicit calc() that can overflow and create a phantom scrollbar. */
 .page-layout--flush {
   margin: -1.25rem -1.5rem;
-  width: calc(100% + 3rem);
   max-width: none;
   box-sizing: border-box;
 }
@@ -480,8 +501,15 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
   margin: 0;
 }
 .page-layout__body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 1.25rem 1.5rem;
+}
+/* Compact labeled control inside a page-header row (e.g. Analytics Days) */
+.page-header .toolbar__label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sub-nav {

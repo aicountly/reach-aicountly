@@ -3,7 +3,15 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
-const STATUS_OPTS = ['', 'draft', 'generated', 'pending_approval', 'approved', 'published', 'withdrawn'];
+const STATUS_OPTS = [
+  { value: '', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'generated', label: 'Generated' },
+  { value: 'pending_approval', label: 'Pending approval' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'published', label: 'Published' },
+  { value: 'withdrawn', label: 'Withdrawn' },
+];
 const STATUS_CLASS = {
   draft: 'badge--neutral',
   generated: 'badge--info',
@@ -42,7 +50,7 @@ export default function OfficialAnswerListPage() {
         <label className="toolbar__label">
           Status
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="form-select form-select--sm">
-            {STATUS_OPTS.map(s => <option key={s} value={s}>{s || 'All'}</option>)}
+            {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
           </select>
         </label>
       </div>
