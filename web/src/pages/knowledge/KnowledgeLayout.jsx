@@ -1,63 +1,59 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { usePermission } from '../../hooks/usePermission';
 import { ROUTES } from '../../constants/routes';
-import {
-  BookOpen, Users, Building2, Globe2, HelpCircle,
-  Search, Layers, Link2, Quote, ShieldAlert, FileText, Tag, Activity,
-} from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 
 const KNOWLEDGE_NAV = [
-  { label: 'Overview',          path: ROUTES.KNOWLEDGE,            icon: BookOpen,    end: true, requires: 'knowledge.view' },
-  { label: 'Products',          path: ROUTES.KNOWLEDGE_PRODUCTS,   icon: Tag,         requires: 'product.view' },
-  { label: 'Personas',          path: ROUTES.KNOWLEDGE_PERSONAS,   icon: Users,       requires: 'persona.view' },
-  { label: 'Industries',        path: ROUTES.KNOWLEDGE_INDUSTRIES, icon: Building2,   requires: 'industry.view' },
-  { label: 'Markets',           path: ROUTES.KNOWLEDGE_MARKETS,    icon: Globe2,      requires: 'knowledge.view' },
-  { label: 'Business Problems', path: ROUTES.KNOWLEDGE_PROBLEMS,   icon: HelpCircle,  requires: 'knowledge.view' },
-  { label: 'Search Intents',    path: ROUTES.KNOWLEDGE_INTENTS,    icon: Search,      requires: 'intent.view' },
-  { label: 'Topic Clusters',    path: ROUTES.KNOWLEDGE_CLUSTERS,   icon: Layers,      requires: 'knowledge.view' },
-  { label: 'Sources',           path: ROUTES.KNOWLEDGE_SOURCES,    icon: Link2,       requires: 'source.view' },
-  { label: 'Citations',         path: ROUTES.KNOWLEDGE_CITATIONS,  icon: Quote,       requires: 'citation.view' },
-  { label: 'Claims',            path: ROUTES.KNOWLEDGE_CLAIMS,     icon: ShieldAlert, requires: 'claim.view' },
-  { label: 'Brand Rules',       path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: FileText,    requires: 'brand_rules.view' },
-  { label: 'Content Policies',  path: ROUTES.KNOWLEDGE_POLICIES,      icon: FileText,  requires: 'content_policy.view' },
-  { label: 'Completeness',      path: ROUTES.KNOWLEDGE_COMPLETENESS,  icon: Activity,  requires: 'knowledge.view' },
+  { label: 'Overview',          path: ROUTES.KNOWLEDGE,              end: true, requires: 'knowledge.view' },
+  { label: 'Products',          path: ROUTES.KNOWLEDGE_PRODUCTS,     requires: 'product.view' },
+  { label: 'Personas',          path: ROUTES.KNOWLEDGE_PERSONAS,     requires: 'persona.view' },
+  { label: 'Industries',        path: ROUTES.KNOWLEDGE_INDUSTRIES,   requires: 'industry.view' },
+  { label: 'Markets',           path: ROUTES.KNOWLEDGE_MARKETS,      requires: 'knowledge.view' },
+  { label: 'Business Problems', path: ROUTES.KNOWLEDGE_PROBLEMS,     requires: 'knowledge.view' },
+  { label: 'Search Intents',    path: ROUTES.KNOWLEDGE_INTENTS,      requires: 'intent.view' },
+  { label: 'Topic Clusters',    path: ROUTES.KNOWLEDGE_CLUSTERS,     requires: 'knowledge.view' },
+  { label: 'Sources',           path: ROUTES.KNOWLEDGE_SOURCES,      requires: 'source.view' },
+  { label: 'Citations',         path: ROUTES.KNOWLEDGE_CITATIONS,    requires: 'citation.view' },
+  { label: 'Claims',            path: ROUTES.KNOWLEDGE_CLAIMS,       requires: 'claim.view' },
+  { label: 'Brand Rules',       path: ROUTES.KNOWLEDGE_BRAND_RULES,  requires: 'brand_rules.view' },
+  { label: 'Content Policies',  path: ROUTES.KNOWLEDGE_POLICIES,     requires: 'content_policy.view' },
+  { label: 'Completeness',      path: ROUTES.KNOWLEDGE_COMPLETENESS, requires: 'knowledge.view' },
 ];
 
 export function KnowledgeLayout() {
   const { has } = usePermission();
+  const visible = KNOWLEDGE_NAV.filter((n) => !n.requires || has(n.requires));
+
   return (
-    <div style={{ display: 'flex', gap: 0, minHeight: '100%' }}>
-      <aside style={{
-        width: 200, flexShrink: 0, borderRight: '1px solid var(--color-border)',
-        padding: '1rem 0',
-      }}>
-        <div style={{ padding: '0 1rem 0.5rem', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#6b7280' }}>
-          Knowledge
+    <div className="page-layout page-layout--flush">
+      <div className="page-layout__header">
+        <div className="page-layout__title-row">
+          <BookOpen size={18} className="page-layout__icon" aria-hidden="true" />
+          <h1 className="page-layout__title">Knowledge Foundation</h1>
         </div>
-        {KNOWLEDGE_NAV.filter(n => !n.requires || has(n.requires)).map(n => (
+        <p className="page-layout__subtitle">
+          Products, personas, claims, brand rules, and knowledge completeness.
+        </p>
+      </div>
+
+      <nav className="sub-nav" aria-label="Knowledge navigation">
+        {visible.map(({ path, label, end }) => (
           <NavLink
-            key={n.path}
-            to={n.path}
-            end={n.end}
-            style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '0.45rem 1rem',
-              fontSize: 13,
-              color: isActive ? 'var(--color-primary, #3b82f6)' : 'var(--color-text, #111)',
-              background: isActive ? 'var(--color-primary-light, #eff6ff)' : 'transparent',
-              textDecoration: 'none',
-              borderRadius: 6,
-              margin: '1px 6px',
-            })}
+            key={path}
+            to={path}
+            end={end}
+            className={({ isActive }) =>
+              `sub-nav__link${isActive ? ' sub-nav__link--active' : ''}`
+            }
           >
-            <n.icon size={14} />
-            {n.label}
+            {label}
           </NavLink>
         ))}
-      </aside>
-      <main style={{ flex: 1, padding: '1.5rem', overflow: 'auto' }}>
+      </nav>
+
+      <div className="page-layout__body">
         <Outlet />
-      </main>
+      </div>
     </div>
   );
 }

@@ -9,12 +9,9 @@ const STATUS_ORDER = [
 function StatusBadge({ status }) {
   const terminal = ['rejected', 'cancelled', 'withdrawn', 'outcome_recorded', 'failed'].includes(status);
   const active = ['in_review', 'approved'].includes(status);
+  const cls = terminal ? 'badge badge--muted' : active ? 'badge badge--info' : 'badge badge--success';
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-      terminal ? 'bg-gray-100 text-gray-500' :
-      active   ? 'bg-blue-100 text-blue-700' :
-                 'bg-green-100 text-green-700'
-    }`}>
+    <span className={cls}>
       {status.replace(/_/g, ' ')}
     </span>
   );
@@ -23,15 +20,19 @@ function StatusBadge({ status }) {
 function ProgressSteps({ currentStatus }) {
   const idx = STATUS_ORDER.indexOf(currentStatus);
   return (
-    <div className="flex items-center gap-1 flex-wrap mb-6">
+    <div className="btn-group mb-4" style={{ gap: '0.5rem' }} aria-label="Workflow progress">
       {STATUS_ORDER.map((s, i) => (
-        <div key={s} className="flex items-center">
-          <div className={`w-2 h-2 rounded-full ${i < idx ? 'bg-green-500' : i === idx ? 'bg-blue-600' : 'bg-gray-200'}`} />
-          <span className={`text-xs ml-1 mr-2 ${i === idx ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
-            {s.replace(/_/g, ' ')}
-          </span>
-          {i < STATUS_ORDER.length - 1 && <span className="text-gray-200 mr-1">›</span>}
-        </div>
+        <span
+          key={s}
+          className="text-sm"
+          style={{
+            color: i === idx ? 'var(--color-primary-hover)' : i < idx ? 'var(--color-success)' : 'var(--color-text-muted)',
+            fontWeight: i === idx ? 600 : 400,
+          }}
+        >
+          {i > 0 && <span style={{ color: 'var(--color-border)', marginRight: '0.5rem' }}>›</span>}
+          {s.replace(/_/g, ' ')}
+        </span>
       ))}
     </div>
   );
@@ -47,44 +48,56 @@ export default function RefreshWorkspacePage() {
     setLoading(false);
   }, [id]);
 
-  if (loading) return <div className="p-6 text-gray-500">Loading…</div>;
-  if (! workflow) return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-4">Refresh Workspace</h1>
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-        <p className="text-gray-500 text-sm">
-          Enter a workflow ID in the URL to view a refresh workspace, or select a
-          recommendation from the backlog to create a workflow.
-        </p>
+  if (loading) return <p className="muted">Loading…</p>;
+  if (!workflow) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1>Refresh Workspace</h1>
+        </div>
+        <div className="card">
+          <div className="card__body" style={{ textAlign: 'center', padding: '2rem 1.25rem' }}>
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              Enter a workflow ID in the URL to view a refresh workspace, or select a
+              recommendation from the backlog to create a workflow.
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-2xl font-semibold text-gray-900">Refresh Workspace</h1>
-        <StatusBadge status={workflow.status} />
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <h1>Refresh Workspace</h1>
+          <StatusBadge status={workflow.status} />
+        </div>
       </div>
 
       <ProgressSteps currentStatus={workflow.status} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h2 className="font-medium text-gray-900 mb-2">Objective</h2>
-          <p className="text-sm text-gray-600">{workflow.refresh_objective}</p>
+      <div className="grid grid-2">
+        <div className="card">
+          <div className="card__header">Objective</div>
+          <div className="card__body">
+            <p className="text-sm" style={{ margin: 0 }}>{workflow.refresh_objective}</p>
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h2 className="font-medium text-gray-900 mb-2">Evidence Snapshot</h2>
-          <p className="text-sm text-gray-500">
-            Completeness: —
-          </p>
+        <div className="card">
+          <div className="card__header">Evidence Snapshot</div>
+          <div className="card__body">
+            <p className="text-sm text-muted" style={{ margin: 0 }}>Completeness: —</p>
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 lg:col-span-2">
-          <h2 className="font-medium text-gray-900 mb-2">Brief</h2>
-          <p className="text-sm text-gray-500">No brief prepared yet.</p>
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
+          <div className="card__header">Brief</div>
+          <div className="card__body">
+            <p className="text-sm text-muted" style={{ margin: 0 }}>No brief prepared yet.</p>
+          </div>
         </div>
       </div>
     </div>

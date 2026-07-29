@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
+import { Send } from 'lucide-react';
 
-const NAV_ITEMS = [
+const navItems = [
   { to: '/distribution',                   label: 'Overview',     end: true },
   { to: '/distribution/campaigns',         label: 'Campaigns' },
   { to: '/distribution/audience',          label: 'Audience',     end: true },
@@ -15,76 +16,37 @@ const NAV_ITEMS = [
   { to: '/distribution/analytics',         label: 'Analytics' },
 ];
 
-const layoutStyle = {
-  display: 'flex',
-  alignItems: 'stretch',
-  minHeight: 'calc(100vh - var(--header-height) - 2.5rem)',
-  background: 'var(--color-bg)',
-};
-
-const navStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  width: 200,
-  flexShrink: 0,
-  background: 'var(--color-surface)',
-  borderRight: '1px solid var(--color-border)',
-  padding: '0.75rem',
-  overflowY: 'auto',
-};
-
-const titleStyle = {
-  display: 'block',
-  fontSize: '0.85rem',
-  fontWeight: 700,
-  padding: '0.4rem 0.6rem 0.75rem',
-  color: 'var(--color-text)',
-};
-
-const contentStyle = {
-  flex: 1,
-  minWidth: 0,
-  padding: '1.25rem 1.5rem',
-  overflowY: 'auto',
-};
-
-function itemStyle(isActive) {
-  return {
-    display: 'block',
-    padding: '0.4rem 0.6rem',
-    borderRadius: 'var(--radius)',
-    fontSize: '0.83rem',
-    fontWeight: isActive ? 600 : 500,
-    color: isActive ? 'var(--color-primary-hover)' : 'var(--color-text)',
-    background: isActive ? 'var(--color-primary-light)' : 'transparent',
-    textDecoration: 'none',
-    marginBottom: '0.1rem',
-    whiteSpace: 'nowrap',
-  };
-}
-
 export default function DistributionLayout() {
   return (
-    <div className="section-layout" style={layoutStyle}>
-      <nav className="section-nav" aria-label="Distribution navigation" style={navStyle}>
-        <div className="section-nav__title" style={titleStyle}>Distribution</div>
-        {NAV_ITEMS.map(({ to, label, end }) => (
+    <div className="page-layout page-layout--flush">
+      <div className="page-layout__header">
+        <div className="page-layout__title-row">
+          <Send size={18} className="page-layout__icon" aria-hidden="true" />
+          <h1 className="page-layout__title">Distribution</h1>
+        </div>
+        <p className="page-layout__subtitle">
+          Campaigns, audience, channels, orchestration, and analytics.
+        </p>
+      </div>
+
+      <nav className="sub-nav" aria-label="Distribution navigation">
+        {navItems.map(({ to, label, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             className={({ isActive }) =>
-              `section-nav__item${isActive ? ' section-nav__item--active' : ''}`
+              `sub-nav__link${isActive ? ' sub-nav__link--active' : ''}`
             }
-            style={({ isActive }) => itemStyle(isActive)}
           >
             {label}
           </NavLink>
         ))}
       </nav>
-      <main className="section-content" style={contentStyle}>
+
+      <div className="page-layout__body">
         <Outlet />
-      </main>
+      </div>
     </div>
   );
 }

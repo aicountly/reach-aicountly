@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 
-const RISK_COLOURS = {
-  critical: 'bg-red-100 text-red-700',
-  high:     'bg-orange-100 text-orange-700',
-  medium:   'bg-yellow-100 text-yellow-700',
-  low:      'bg-green-100 text-green-700',
+const RISK_BADGE = {
+  critical: 'badge badge--danger',
+  high:     'badge badge--warning',
+  medium:   'badge badge--info',
+  low:      'badge badge--success',
 };
 
 export default function RecommendationBacklogPage() {
@@ -20,21 +20,21 @@ export default function RecommendationBacklogPage() {
   const statusTabs = ['recommended', 'triaged', 'accepted', 'deferred'];
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Refresh Recommendation Backlog</h1>
+    <div>
+      <div className="page-header">
+        <h1>Refresh Recommendation Backlog</h1>
       </div>
 
-      <div className="flex gap-2 mb-4 border-b border-gray-200">
+      <div className="btn-group mb-4" role="tablist" aria-label="Recommendation status filter">
         {statusTabs.map((s) => (
           <button
             key={s}
+            type="button"
+            role="tab"
+            aria-selected={filter === s}
             onClick={() => setFilter(s)}
-            className={`px-4 py-2 text-sm capitalize -mb-px border-b-2 transition-colors ${
-              filter === s
-                ? 'border-blue-600 text-blue-600 font-medium'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`btn btn--sm ${filter === s ? 'btn--primary' : 'btn--secondary'}`}
+            style={{ textTransform: 'capitalize' }}
           >
             {s}
           </button>
@@ -42,42 +42,40 @@ export default function RecommendationBacklogPage() {
       </div>
 
       {loading ? (
-        <div className="text-gray-500 text-sm">Loading…</div>
+        <p className="muted">Loading…</p>
       ) : recommendations.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-500 text-sm">
-            No {filter} recommendations. Run the content refresh detection job to generate recommendations.
-          </p>
+        <div className="card">
+          <div className="card__body" style={{ textAlign: 'center', padding: '2rem 1.25rem' }}>
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              No {filter} recommendations. Run the content refresh detection job to generate recommendations.
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        <div className="card">
           {recommendations.map((rec) => (
-            <div key={rec.uuid} className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{rec.content_identity_id}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+            <div key={rec.uuid} className="card__body" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <div className="section-header">
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontWeight: 600, margin: 0 }}>{rec.content_identity_id}</p>
+                  <p className="text-sm text-muted" style={{ margin: '0.25rem 0 0' }}>
                     Confidence: {(rec.confidence * 100).toFixed(0)}% ·
                     Effort: {rec.effort_estimate}
                   </p>
                 </div>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${RISK_COLOURS[rec.risk_classification] ?? 'bg-gray-100 text-gray-600'}`}>
+                <span className={RISK_BADGE[rec.risk_classification] ?? 'badge badge--muted'}>
                   {rec.risk_classification}
                 </span>
               </div>
               {rec.triage_notes && (
-                <p className="text-xs text-gray-500 mt-2 italic">{rec.triage_notes}</p>
+                <p className="text-sm text-muted" style={{ margin: '0.5rem 0 0', fontStyle: 'italic' }}>
+                  {rec.triage_notes}
+                </p>
               )}
-              <div className="flex gap-2 mt-3">
-                <button className="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">
-                  Accept
-                </button>
-                <button className="text-xs px-3 py-1 bg-gray-50 text-gray-700 rounded hover:bg-gray-100">
-                  Defer
-                </button>
-                <button className="text-xs px-3 py-1 bg-red-50 text-red-700 rounded hover:bg-red-100">
-                  Reject
-                </button>
+              <div className="btn-group" style={{ marginTop: '0.75rem' }}>
+                <button type="button" className="btn btn--sm btn--primary">Accept</button>
+                <button type="button" className="btn btn--sm btn--secondary">Defer</button>
+                <button type="button" className="btn btn--sm btn--danger">Reject</button>
               </div>
             </div>
           ))}

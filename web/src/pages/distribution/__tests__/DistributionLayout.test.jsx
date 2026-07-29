@@ -19,14 +19,12 @@ describe('DistributionLayout', () => {
     expect(screen.queryByText(/OverviewCampaignsAudience/i)).not.toBeInTheDocument();
   });
 
-  it('uses section-layout structure with inline flex styles', () => {
+  it('uses page-layout with horizontal sub-nav', () => {
     renderWithAuth(<DistributionLayout />, ctx);
-    const layout = document.querySelector('.section-layout');
-    expect(layout).toBeTruthy();
-    expect(layout.style.display).toBe('flex');
-    const nav = document.querySelector('.section-nav');
-    expect(nav).toBeTruthy();
-    expect(nav.style.flexDirection).toBe('column');
+    expect(document.querySelector('.page-layout')).toBeTruthy();
+    expect(document.querySelector('.sub-nav')).toBeTruthy();
+    expect(document.querySelector('.page-layout__body')).toBeTruthy();
+    expect(document.querySelectorAll('.sub-nav__link').length).toBeGreaterThan(0);
   });
 
   it('links SMS to /distribution/sms', () => {

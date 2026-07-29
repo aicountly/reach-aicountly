@@ -16,14 +16,14 @@ const SECTIONS = [
 
 export default function ReadinessOverviewPage() {
   return (
-    <div style={{ padding: '1.5rem' }}>
-      <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 0.35rem' }}>
-        Product Readiness Centre
-      </h1>
-      <p className="text-sm text-muted" style={{ marginBottom: '1.25rem', maxWidth: 720 }}>
-        Phase 1–9 product readiness status. A release acceptance record must be
-        created before any production deployment recommendation can be issued.
-      </p>
+    <div>
+      <div className="page-header page-header--stack">
+        <h1>Product Readiness Centre</h1>
+        <p className="page-header__subtitle">
+          Phase 1–9 product readiness status. A release acceptance record must be
+          created before any production deployment recommendation can be issued.
+        </p>
+      </div>
 
       <div className="grid grid-3">
         {SECTIONS.map(({ path, label, desc }) => (

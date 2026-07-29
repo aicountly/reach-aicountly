@@ -27,27 +27,26 @@ export default function AttributionMaturityPage() {
   const model = MODELS.find((m) => m.name === activeModel);
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-2">Attribution Maturity</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Multi-touch attribution models for understanding content contribution to conversions.
-      </p>
+    <div>
+      <div className="page-header page-header--stack">
+        <h1>Attribution Maturity</h1>
+        <p className="page-header__subtitle">
+          Multi-touch attribution models for understanding content contribution to conversions.
+        </p>
+      </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-sm text-amber-800">
+      <div className="alert alert-warning mb-4">
         <strong>Important:</strong> Attribution results represent a modelled allocation,
         not factual causation. No revenue is attributed. Observational data only.
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="btn-group mb-4">
         {MODELS.map((m) => (
           <button
             key={m.name}
+            type="button"
             onClick={() => setActiveModel(m.name)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeModel === m.name
-                ? 'bg-blue-600 text-white'
-                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`btn btn--sm ${activeModel === m.name ? 'btn--primary' : 'btn--secondary'}`}
           >
             {m.label}
           </button>
@@ -55,26 +54,36 @@ export default function AttributionMaturityPage() {
       </div>
 
       {model && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-4">
-          <h2 className="font-medium text-gray-900 mb-3">{model.label}</h2>
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Formula</p>
-              <p className="font-mono text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded">{model.formula}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Limitation</p>
-              <p className="text-sm text-gray-600">{model.limitation}</p>
-            </div>
+        <div className="card mb-4">
+          <div className="card__header">{model.label}</div>
+          <div className="card__body">
+            <dl className="definition-list">
+              <dt>Formula</dt>
+              <dd>
+                <code style={{
+                  display: 'block',
+                  fontSize: '0.85rem',
+                  background: 'var(--color-bg)',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--radius)',
+                }}>
+                  {model.formula}
+                </code>
+              </dd>
+              <dt>Limitation</dt>
+              <dd className="text-sm">{model.limitation}</dd>
+            </dl>
           </div>
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-        <p className="text-gray-500 text-sm">
-          Attribution calculations run automatically for each recorded conversion.
-          Journey data will appear here once models are activated.
-        </p>
+      <div className="card">
+        <div className="card__body" style={{ textAlign: 'center', padding: '2rem 1.25rem' }}>
+          <p className="text-sm text-muted" style={{ margin: 0 }}>
+            Attribution calculations run automatically for each recorded conversion.
+            Journey data will appear here once models are activated.
+          </p>
+        </div>
       </div>
     </div>
   );

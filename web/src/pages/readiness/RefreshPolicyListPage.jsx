@@ -10,38 +10,38 @@ export default function RefreshPolicyListPage() {
   }, []);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Refresh Policies</h1>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
-          New Policy
-        </button>
+    <div>
+      <div className="page-header">
+        <h1>Refresh Policies</h1>
+        <div className="page-header__actions">
+          <button type="button" className="btn btn--sm btn--primary">New Policy</button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="text-gray-500">Loading…</div>
+        <p className="muted">Loading…</p>
       ) : policies.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-500 text-sm">
-            No refresh policies defined. Create a policy to start generating
-            evidence-based content refresh recommendations.
-          </p>
+        <div className="card">
+          <div className="card__body" style={{ textAlign: 'center', padding: '2rem 1.25rem' }}>
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              No refresh policies defined. Create a policy to start generating
+              evidence-based content refresh recommendations.
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        <div className="card">
           {policies.map((policy) => (
-            <div key={policy.uuid} className="p-4 flex items-center justify-between">
+            <div
+              key={policy.uuid}
+              className="card__body section-header"
+              style={{ borderBottom: '1px solid var(--color-border)' }}
+            >
               <div>
-                <p className="font-medium text-gray-900">{policy.name}</p>
-                <p className="text-sm text-gray-500">{policy.content_type}</p>
+                <p style={{ fontWeight: 600, margin: 0 }}>{policy.name}</p>
+                <p className="text-sm text-muted" style={{ margin: '0.25rem 0 0' }}>{policy.content_type}</p>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  policy.is_active
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}
-              >
+              <span className={`badge ${policy.is_active ? 'badge--success' : 'badge--muted'}`}>
                 {policy.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>

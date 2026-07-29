@@ -6,53 +6,89 @@ const CONNECTORS = [
   { id: 3, provider: 'indexnow', display_name: 'IndexNow', health_status: 'unknown', enabled: false, last_health_check: null },
 ];
 
-const HealthIcon = ({ status }) => {
-  if (status === 'healthy')  return <CheckCircle className="h-4 w-4 text-green-500" />;
-  if (status === 'failing')  return <XCircle className="h-4 w-4 text-red-500" />;
-  return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-};
+function HealthIcon({ status }) {
+  const style = { flexShrink: 0 };
+  if (status === 'healthy') return <CheckCircle size={16} style={{ ...style, color: 'var(--color-success)' }} />;
+  if (status === 'failing') return <XCircle size={16} style={{ ...style, color: 'var(--color-danger)' }} />;
+  return <AlertCircle size={16} style={{ ...style, color: 'var(--color-warning)' }} />;
+}
 
 export default function ConnectorConfigPage() {
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Plug className="h-7 w-7 text-gray-700" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Connectors</h1>
-          <p className="text-sm text-gray-500">Manage analytics and submission connector configurations</p>
+    <div>
+      <div className="page-header page-header--stack">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <Plug size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} aria-hidden="true" />
+          <h1>Connectors</h1>
         </div>
+        <p className="page-header__subtitle">
+          Manage analytics and submission connector configurations
+        </p>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+      <div className="alert alert-info mb-4">
         <strong>Security:</strong> Credentials are stored as environment references only. Raw API keys are never persisted in the database.
       </div>
 
-      <div className="space-y-4">
-        {CONNECTORS.map(c => (
-          <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Settings className="h-5 w-5 text-gray-500" />
+      <div className="stack" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {CONNECTORS.map((c) => (
+          <div key={c.id} className="card">
+            <div
+              className="card__body"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--color-bg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Settings size={18} style={{ color: 'var(--color-text-muted)' }} aria-hidden="true" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, margin: 0 }}>{c.display_name}</p>
+                  <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0', fontFamily: 'var(--font-mono, monospace)' }}>
+                    {c.provider}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-gray-800">{c.display_name}</p>
-                <p className="text-xs text-gray-400 font-mono">{c.provider}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5 text-sm">
-                <HealthIcon status={c.health_status} />
-                <span className="text-gray-600 capitalize">{c.health_status}</span>
-              </div>
-              <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${c.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {c.enabled ? 'Enabled' : 'Disabled'}
-              </span>
-              {c.last_health_check && (
-                <span className="text-xs text-gray-400">
-                  Checked {new Date(c.last_health_check).toLocaleTimeString()}
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                  marginLeft: 'auto',
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} className="text-sm">
+                  <HealthIcon status={c.health_status} />
+                  <span style={{ textTransform: 'capitalize' }}>{c.health_status}</span>
+                </div>
+                <span className={`badge ${c.enabled ? 'badge--success' : 'badge--muted'}`}>
+                  {c.enabled ? 'Enabled' : 'Disabled'}
                 </span>
-              )}
-              <button className="text-xs text-blue-600 hover:text-blue-800">Configure</button>
+                {c.last_health_check && (
+                  <span className="text-sm text-muted">
+                    Checked {new Date(c.last_health_check).toLocaleTimeString()}
+                  </span>
+                )}
+                <button type="button" className="btn btn--sm btn--secondary">Configure</button>
+              </div>
             </div>
           </div>
         ))}
