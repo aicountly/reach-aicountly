@@ -13,7 +13,7 @@ const navItems = [
 
 export default function PublishingLayout() {
   return (
-    <div className="page-layout">
+    <div className="page-layout page-layout--flush">
       <div className="page-layout__header">
         <div className="page-layout__title-row">
           <Globe size={18} className="page-layout__icon" aria-hidden="true" />

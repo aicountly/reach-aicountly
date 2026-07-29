@@ -46,9 +46,11 @@ describe('CommunityOverviewPage', () => {
     await waitFor(() => expect(screen.getByText(/Network error/i)).toBeInTheDocument());
   });
 
-  it('renders page heading', async () => {
+  it('shows empty status breakdowns when there is no data', async () => {
     api.get.mockResolvedValueOnce({});
     renderWithAuth(<CommunityOverviewPage />, ctx);
-    await waitFor(() => expect(screen.getByText('Community Control Centre')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No questions yet/i)).toBeInTheDocument());
+    expect(screen.getByText(/No answers yet/i)).toBeInTheDocument();
+    expect(screen.getByText('Questions by status')).toBeInTheDocument();
   });
 });

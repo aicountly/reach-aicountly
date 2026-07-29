@@ -105,6 +105,19 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+/* Titles placed directly in a card (without card__header) still need spacing */
+.card > .card__title {
+  padding: 0.9rem 1.1rem 0;
+}
+.card > .data-table,
+.card > table {
+  margin: 0.5rem 0 0;
+}
+.card > .muted,
+.card > p {
+  padding: 0.75rem 1.1rem 1rem;
 }
 
 .card-header,
@@ -155,8 +168,20 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
 .stats-row,
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.85rem;
+}
+@media (max-width: 1100px) {
+  .stats-row,
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .stats-row,
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .stat-card {
   background: var(--color-surface);
@@ -164,6 +189,11 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+.stat-card--warning {
+  border-color: #fde68a;
+  background: linear-gradient(180deg, #fffbeb 0%, var(--color-surface) 48%);
 }
 .stat-card__value {
   font-size: 1.75rem;
@@ -418,6 +448,13 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
   display: flex;
   flex-direction: column;
   min-height: 100%;
+}
+/* Cancel ReachLayout <main> padding so section chrome is full-bleed in the content column */
+.page-layout--flush {
+  margin: -1.25rem -1.5rem;
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
 }
 .page-layout__header {
   background: var(--color-surface);
