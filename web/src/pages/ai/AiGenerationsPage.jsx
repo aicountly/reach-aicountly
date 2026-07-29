@@ -9,6 +9,8 @@ export default function AiGenerationsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const perPage = 20;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
 
   const load = useCallback(() => {
     setLoading(true);
@@ -21,42 +23,44 @@ export default function AiGenerationsPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Generation Requests</h1>
-        <span className="text-sm text-gray-500">{total} total</span>
+    <div>
+      <div className="page-header">
+        <div>
+          <h1>Generation Requests</h1>
+          <p className="page-header__subtitle">{total} total</p>
+        </div>
       </div>
 
-      {error && <div className="text-sm text-red-600">Error: {error}</div>}
-      {loading && <div className="text-sm text-gray-500">Loading…</div>}
+      {error && <p className="text-error">Error: {error}</p>}
+      {loading && <p className="muted">Loading…</p>}
 
       {!loading && requests.length === 0 && (
-        <p className="text-sm text-gray-500">No generation requests found.</p>
+        <p className="muted">No generation requests found.</p>
       )}
 
       {!loading && requests.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
               <tr>
                 {['UUID', 'Task', 'Content Type', 'Status', 'Requested By', 'Created'].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-gray-600">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {requests.map(r => (
-                <tr key={r.uuid} className="hover:bg-gray-50">
-                  <td className="px-3 py-2">
-                    <Link to={`/ai/generations/${r.uuid}`} className="text-blue-600 hover:underline font-mono text-xs">
+                <tr key={r.uuid}>
+                  <td>
+                    <Link to={`/ai/generations/${r.uuid}`} className="text-sm">
                       {r.uuid?.slice(0, 8)}…
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-gray-700">{r.task_type}</td>
-                  <td className="px-3 py-2 text-gray-600">{r.content_type}</td>
-                  <td className="px-3 py-2"><AiGenerationBadge status={r.status} /></td>
-                  <td className="px-3 py-2 text-gray-500 text-xs">{r.requested_actor_type}</td>
-                  <td className="px-3 py-2 text-gray-500 text-xs">{r.created_at?.slice(0, 10)}</td>
+                  <td>{r.task_type}</td>
+                  <td>{r.content_type}</td>
+                  <td><AiGenerationBadge status={r.status} /></td>
+                  <td className="text-muted text-xs">{r.requested_actor_type}</td>
+                  <td className="text-muted text-xs">{r.created_at?.slice(0, 10)}</td>
                 </tr>
               ))}
             </tbody>
@@ -64,10 +68,24 @@ export default function AiGenerationsPage() {
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 text-sm rounded border border-gray-200 disabled:opacity-50">Prev</button>
-        <span className="text-sm text-gray-600 self-center">Page {page}</span>
-        <button onClick={() => setPage(p => p + 1)} disabled={requests.length < 20} className="px-3 py-1 text-sm rounded border border-gray-200 disabled:opacity-50">Next</button>
+      <div className="pagination">
+        <button
+          type="button"
+          className="btn btn--sm btn--secondary"
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page === 1}
+        >
+          Prev
+        </button>
+        <span className="pagination__info">Page {page} / {totalPages}</span>
+        <button
+          type="button"
+          className="btn btn--sm btn--secondary"
+          onClick={() => setPage(p => p + 1)}
+          disabled={page >= totalPages || requests.length < perPage}
+        >
+          Next
+        </button>
       </div>
     </div>
   );

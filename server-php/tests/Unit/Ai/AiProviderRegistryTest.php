@@ -63,4 +63,20 @@ class AiProviderRegistryTest extends CIUnitTestCase
             }
         }
     }
+
+    public function testResolveReturnsUnconfiguredProviderWithoutThrowing(): void
+    {
+        $original = $_ENV['AI_OPENAI_API_KEY'] ?? null;
+        unset($_ENV['AI_OPENAI_API_KEY']);
+
+        $registry = new AiProviderRegistry();
+        $provider = $registry->resolve('openai');
+
+        $this->assertSame('openai', $provider->getProviderKey());
+        $this->assertFalse($provider->isConfigured());
+
+        if ($original !== null) {
+            $_ENV['AI_OPENAI_API_KEY'] = $original;
+        }
+    }
 }

@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { listPrompts } from '../../services/aiService.js';
 
 const STATUS_BADGE = {
-  approved:    'bg-green-100 text-green-700',
-  draft:       'bg-yellow-100 text-yellow-700',
-  needs_review:'bg-blue-100 text-blue-700',
-  rejected:    'bg-red-100 text-red-700',
-  deprecated:  'bg-gray-100 text-gray-500',
+  approved:     'badge badge--success',
+  draft:        'badge badge--warning',
+  needs_review: 'badge badge--info',
+  rejected:     'badge badge--danger',
+  deprecated:   'badge badge--muted',
 };
 
 export default function AiPromptsPage() {
@@ -22,44 +22,45 @@ export default function AiPromptsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-sm text-gray-500 p-4">Loading prompts…</div>;
-  if (error)   return <div className="text-sm text-red-600 p-4">Error: {error}</div>;
+  if (loading) return <p className="muted">Loading prompts…</p>;
+  if (error)   return <p className="text-error">Error: {error}</p>;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Prompt Templates</h1>
+    <div>
+      <div className="page-header page-header--stack">
+        <h1>Prompt Templates</h1>
+        <p className="page-header__subtitle">
+          Prompt versions are immutable after creation. Only approved versions are used for generation.
+          Approval requires <code>ai_prompt.approve</code> permission.
+        </p>
       </div>
-      <p className="text-xs text-gray-500">
-        Prompt versions are immutable after creation. Only approved versions are used for generation.
-        Approval requires <code>ai_prompt.approve</code> permission.
-      </p>
+
       {templates.length === 0 ? (
-        <p className="text-sm text-gray-500">No prompt templates found.</p>
+        <p className="muted">No prompt templates found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
               <tr>
                 {['Name', 'Slug', 'Task Type', 'Content Type', 'Status', 'Actions'].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-gray-600">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {templates.map(t => (
-                <tr key={t.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 font-medium text-gray-800">{t.name}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-600">{t.slug}</td>
-                  <td className="px-3 py-2 text-gray-600">{t.task_type}</td>
-                  <td className="px-3 py-2 text-gray-600">{t.content_type || '—'}</td>
-                  <td className="px-3 py-2">
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_BADGE[t.status] || 'bg-gray-100 text-gray-600'}`}>
+                <tr key={t.id}>
+                  <td>{t.name}</td>
+                  <td className="text-muted text-xs">{t.slug}</td>
+                  <td>{t.task_type}</td>
+                  <td>{t.content_type || '—'}</td>
+                  <td>
+                    <span className={STATUS_BADGE[t.status] || 'badge badge--muted'}>
                       {t.status}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
-                    <Link to={`/ai/prompts/${t.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
+                  <td>
+                    <Link to={`/ai/prompts/${t.id}`} className="text-sm">View</Link>
                   </td>
                 </tr>
               ))}

@@ -334,7 +334,7 @@ class AiGenerationOrchestrator
             ->select('pv.*')
             ->where('pt.task_type', $request['task_type'])
             ->where('pt.status', 'approved')
-            ->whereNull('pt.deleted_at')
+            ->where('pt.deleted_at', null)
             ->limit(1)
             ->get()
             ->getRowArray();

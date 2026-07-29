@@ -429,10 +429,15 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
   font-size: 0.86rem;
   margin-bottom: 0.75rem;
 }
-.alert-info    { background: var(--color-info-light);    color: var(--color-info);    border-color: var(--color-info); }
-.alert-warning { background: var(--color-warning-light); color: var(--color-warning); border-color: var(--color-warning); }
-.alert-danger  { background: var(--color-danger-light);  color: var(--color-danger);  border-color: var(--color-danger); }
-.alert-success { background: var(--color-success-light); color: var(--color-success); border-color: var(--color-success); }
+.alert-info,
+.alert--info    { background: var(--color-info-light);    color: var(--color-info);    border-color: var(--color-info); }
+.alert-warning,
+.alert--warning { background: var(--color-warning-light); color: var(--color-warning); border-color: var(--color-warning); }
+.alert-danger,
+.alert--danger,
+.alert--error   { background: var(--color-danger-light);  color: var(--color-danger);  border-color: var(--color-danger); }
+.alert-success,
+.alert--success { background: var(--color-success-light); color: var(--color-success); border-color: var(--color-success); }
 
 .filter-bar {
   display: flex;

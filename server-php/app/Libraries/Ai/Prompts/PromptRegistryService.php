@@ -42,7 +42,7 @@ class PromptRegistryService
         // Enforce unique slug
         $existing = $db->table('reach_ai_prompt_templates')
             ->where('slug', $slug)
-            ->whereNull('deleted_at')
+            ->where('deleted_at', null)
             ->countAllResults();
 
         if ($existing > 0) {
@@ -93,7 +93,7 @@ class PromptRegistryService
         $row = db_connect()
             ->table('reach_ai_prompt_templates')
             ->where('slug', $slug)
-            ->whereNull('deleted_at')
+            ->where('deleted_at', null)
             ->get()
             ->getRowArray();
 
@@ -109,7 +109,7 @@ class PromptRegistryService
         $row = db_connect()
             ->table('reach_ai_prompt_templates')
             ->where('id', $id)
-            ->whereNull('deleted_at')
+            ->where('deleted_at', null)
             ->get()
             ->getRowArray();
 
@@ -129,12 +129,12 @@ class PromptRegistryService
         $builder = $db->table('reach_ai_prompt_templates')
             ->where('task_type', $taskType)
             ->where('status', 'approved')
-            ->whereNull('deleted_at');
+            ->where('deleted_at', null);
 
         if ($contentType !== null) {
             $builder->groupStart()
                 ->where('content_type', $contentType)
-                ->orWhereNull('content_type')
+                ->orWhere('content_type', null)
                 ->groupEnd();
         }
 

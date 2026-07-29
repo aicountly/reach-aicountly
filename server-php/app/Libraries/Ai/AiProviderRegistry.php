@@ -32,6 +32,20 @@ class AiProviderRegistry
     }
 
     /**
+     * Resolve a registered provider by key without requiring configuration.
+     *
+     * @throws \InvalidArgumentException if the key is unknown
+     */
+    public function resolve(string $providerKey): AiProviderInterface
+    {
+        if (! isset($this->providers[$providerKey])) {
+            throw new \InvalidArgumentException("Unknown AI provider: {$providerKey}");
+        }
+
+        return $this->providers[$providerKey];
+    }
+
+    /**
      * Resolve a provider by key.
      *
      * @throws \InvalidArgumentException if the key is unknown
@@ -39,11 +53,7 @@ class AiProviderRegistry
      */
     public function get(string $providerKey): AiProviderInterface
     {
-        if (! isset($this->providers[$providerKey])) {
-            throw new \InvalidArgumentException("Unknown AI provider: {$providerKey}");
-        }
-
-        $provider = $this->providers[$providerKey];
+        $provider = $this->resolve($providerKey);
 
         if ($providerKey !== MockAiProvider::PROVIDER_KEY && ! $provider->isConfigured()) {
             throw new \RuntimeException("AI provider '{$providerKey}' is not configured in this environment.");

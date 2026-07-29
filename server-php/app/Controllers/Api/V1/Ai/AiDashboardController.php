@@ -60,7 +60,7 @@ class AiDashboardController extends BaseApiController
 
         foreach (['openai', 'mock'] as $key) {
             try {
-                $provider = $registry->get($key);
+                $provider = $registry->resolve($key);
                 if (!$provider->isConfigured()) {
                     $providers[] = [
                         'provider_key'   => $key,
@@ -83,8 +83,13 @@ class AiDashboardController extends BaseApiController
                 if (!$result->healthy) {
                     $allHealthy = false;
                 }
-            } catch (\Throwable) {
-                $providers[] = ['provider_key' => $key, 'healthy' => false, 'error_message' => 'Registry error', 'circuit_open' => false];
+            } catch (\Throwable $e) {
+                $providers[] = [
+                    'provider_key'  => $key,
+                    'healthy'       => false,
+                    'error_message' => $e->getMessage() ?: 'Registry error',
+                    'circuit_open'  => false,
+                ];
                 $allHealthy = false;
             }
         }

@@ -39,14 +39,14 @@ class PromptController extends BaseApiController
         $perPage = 20;
 
         $templates = $db->table('reach_ai_prompt_templates')
-            ->whereNull('deleted_at')
+            ->where('deleted_at', null)
             ->orderBy('updated_at', 'DESC')
             ->limit($perPage, ($page - 1) * $perPage)
             ->get()
             ->getResultArray();
 
         $total = $db->table('reach_ai_prompt_templates')
-            ->whereNull('deleted_at')
+            ->where('deleted_at', null)
             ->countAllResults();
 
         return $this->ok(['templates' => $templates, 'total' => $total, 'page' => $page, 'per_page' => $perPage]);
