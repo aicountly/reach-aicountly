@@ -115,15 +115,21 @@ class RefreshOutcomeService
         $metrics = [];
         $now = date('Y-m-d H:i:s');
 
-        // Search metrics
-        foreach (['impressions', 'clicks', 'ctr', 'avg_position'] as $field) {
-            $bVal = $baseline['search'][$field] ?? null;
-            $pVal = $post['search'][$field] ?? null;
+        // Search metrics — packet keys from IntelligenceEvidenceService::buildSearchEvidence
+        $searchFields = [
+            'impressions'  => 'impressions',
+            'clicks'       => 'clicks',
+            'ctr'          => 'avg_ctr',
+            'avg_position' => 'avg_position',
+        ];
+        foreach ($searchFields as $metricSuffix => $packetKey) {
+            $bVal = $baseline['search'][$packetKey] ?? null;
+            $pVal = $post['search'][$packetKey] ?? null;
             if ($bVal !== null && $pVal !== null && $bVal > 0) {
                 $changePct = round((($pVal - $bVal) / $bVal) * 100, 4);
                 $metrics[] = [
                     'metric_domain'        => 'search',
-                    'metric_name'          => "observed_change_{$field}",
+                    'metric_name'          => "observed_change_{$metricSuffix}",
                     'baseline_value'       => $bVal,
                     'post_value'           => $pVal,
                     'observed_change_pct'  => $changePct,
@@ -136,23 +142,28 @@ class RefreshOutcomeService
             }
         }
 
-        // Engagement metrics
-        foreach (['sessions', 'pageviews', 'engagement_rate', 'avg_session_duration'] as $field) {
-            $bVal = $baseline['engagement'][$field] ?? null;
-            $pVal = $post['engagement'][$field] ?? null;
+        // Engagement metrics — packet keys from IntelligenceEvidenceService::buildEngagementEvidence
+        $engagementFields = [
+            'sessions'         => 'sessions',
+            'pageviews'        => 'page_views',
+            'engagement_rate'  => 'avg_engagement_rate',
+        ];
+        foreach ($engagementFields as $metricSuffix => $packetKey) {
+            $bVal = $baseline['engagement'][$packetKey] ?? null;
+            $pVal = $post['engagement'][$packetKey] ?? null;
             if ($bVal !== null && $pVal !== null && $bVal > 0) {
                 $changePct = round((($pVal - $bVal) / $bVal) * 100, 4);
                 $metrics[] = [
-                    'metric_domain'       => 'engagement',
-                    'metric_name'         => "observed_change_{$field}",
-                    'baseline_value'      => $bVal,
-                    'post_value'          => $pVal,
-                    'observed_change_pct' => $changePct,
-                    'evidence_source'     => 'google_analytics',
-                    'confidence'          => $this->confidence((int) ($baseline['engagement']['data_points'] ?? 0), (int) ($post['engagement']['data_points'] ?? 0)),
-                    'data_points_baseline'=> (int) ($baseline['engagement']['data_points'] ?? 0),
-                    'data_points_post'    => (int) ($post['engagement']['data_points'] ?? 0),
-                    'measured_at'         => $now,
+                    'metric_domain'        => 'engagement',
+                    'metric_name'          => "observed_change_{$metricSuffix}",
+                    'baseline_value'       => $bVal,
+                    'post_value'           => $pVal,
+                    'observed_change_pct'  => $changePct,
+                    'evidence_source'      => 'google_analytics',
+                    'confidence'           => $this->confidence((int) ($baseline['engagement']['data_points'] ?? 0), (int) ($post['engagement']['data_points'] ?? 0)),
+                    'data_points_baseline' => (int) ($baseline['engagement']['data_points'] ?? 0),
+                    'data_points_post'     => (int) ($post['engagement']['data_points'] ?? 0),
+                    'measured_at'          => $now,
                 ];
             }
         }

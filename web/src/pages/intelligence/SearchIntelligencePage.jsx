@@ -41,7 +41,7 @@ export default function SearchIntelligencePage() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Search size={26} style={{ color: 'var(--color-info)' }} />

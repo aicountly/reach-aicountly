@@ -59,7 +59,7 @@ export default function VisibilityOverviewPage() {
   }, []);
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <Eye size={26} style={{ color: 'var(--color-primary)' }} />
         <div>
@@ -126,11 +126,6 @@ export default function VisibilityOverviewPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="alert alert-warning" style={{ marginBottom: 0 }}>
-        <strong>Governance:</strong> All prompts must be explicitly approved before execution.
-        Raw AI responses are stored immutably for audit purposes. Budget limits are enforced per run.
       </div>
     </div>
   );

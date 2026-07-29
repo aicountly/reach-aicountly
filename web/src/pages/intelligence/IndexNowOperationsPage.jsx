@@ -1,118 +1,222 @@
-import { useState } from 'react';
-import { Zap, Send, RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Zap, Send, RefreshCw, CheckCircle, Clock, Shield, XCircle, AlertTriangle } from 'lucide-react';
+import { submitIndexNowUrl, retryIndexNowPending } from '../../services/intelligenceService.js';
 
 export default function IndexNowOperationsPage() {
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
 
-  const submissions = [
-    { id: 1, url: 'https://example.com/blog/post-1', status: 'submitted', submitted_at: '2026-07-15T08:00:00Z', attempt_count: 1 },
-    { id: 2, url: 'https://example.com/blog/post-2', status: 'retrying', attempt_count: 1, next_retry_at: '2026-07-15T08:10:00Z' },
-    { id: 3, url: 'https://example.com/blog/post-3', status: 'failed', attempt_count: 3 },
-  ];
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!url) return;
-    setSubmitting(true);
-    setTimeout(() => {
-      setResult({ success: true, url, status: 'submitted' });
-      setSubmitting(false);
-      setUrl('');
-    }, 800);
-  };
+  const counts = useMemo(() => {
+    const tally = { total: submissions.length, submitted: 0, retrying: 0, failed: 0, pending: 0 };
+    for (const row of submissions) {
+      const key = (row.status || 'submitted').toLowerCase();
+      if (key in tally) tally[key] += 1;
+      else tally.submitted += 1;
+    }
+    return tally;
+  }, [submissions]);
 
   const statusBadge = (status) => {
     const map = {
-      submitted: 'bg-green-100 text-green-700',
-      retrying: 'bg-yellow-100 text-yellow-700',
-      failed: 'bg-red-100 text-red-700',
-      pending: 'bg-blue-100 text-blue-700',
+      submitted: 'badge--success',
+      retrying: 'badge--warning',
+      failed: 'badge--danger',
+      pending: 'badge--info',
     };
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? 'bg-gray-100 text-gray-700'}`}>
-        {status}
-      </span>
-    );
+    return <span className={`badge ${map[status] ?? 'badge--muted'}`}>{status}</span>;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!url.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await submitIndexNowUrl({ url: url.trim(), tenant_id: 1 });
+      const row = res?.data || { url: url.trim(), status: 'submitted', attempt_count: 1, submitted_at: new Date().toISOString() };
+      setResult(row);
+      setSubmissions((prev) => [{ id: row.id || Date.now(), ...row, url: row.url || url.trim() }, ...prev]);
+      setUrl('');
+    } catch (err) {
+      setError(err.message || 'Submission failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    setError(null);
+    try {
+      await retryIndexNowPending();
+      setResult({ status: 'retrying', url: 'pending submissions' });
+    } catch (err) {
+      setError(err.message || 'Retry failed');
+    } finally {
+      setRetrying(false);
+    }
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Zap className="h-7 w-7 text-yellow-500" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">IndexNow Operations</h1>
-          <p className="text-sm text-gray-500">Submit URLs to search engine indexes via IndexNow protocol</p>
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <Zap size={22} style={{ color: 'var(--color-warning)', flexShrink: 0 }} aria-hidden="true" />
+          <div>
+            <h1 style={{ margin: 0 }}>IndexNow Operations</h1>
+            <p className="page-header__subtitle" style={{ marginTop: '0.15rem' }}>
+              Submit URLs to search engine indexes via IndexNow protocol
+            </p>
+          </div>
+        </div>
+        <div className="page-header__actions">
+          <button type="button" className="btn btn--sm btn--secondary" onClick={handleRetry} disabled={retrying}>
+            <RefreshCw size={14} aria-hidden="true" />
+            {retrying ? 'Retrying…' : 'Retry pending'}
+          </button>
         </div>
       </div>
 
-      {/* Submit URL form */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Submit URL</h2>
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <input
-            type="url"
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            placeholder="https://example.com/blog/my-post"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            required
-          />
-          <button
-            type="submit"
-            disabled={submitting || !url}
-            className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 text-sm font-medium"
-          >
-            <Send className="h-4 w-4" />
-            {submitting ? 'Submitting…' : 'Submit'}
-          </button>
-        </form>
-        {result && (
-          <div className="mt-3 flex items-center gap-2 text-green-700 text-sm">
-            <CheckCircle className="h-4 w-4" />
-            URL submitted: {result.url}
+      {error && <div className="alert alert-danger mb-4">{error}</div>}
+
+      <div className="stat-grid mb-4">
+        {[
+          { label: 'Session total', value: counts.total, icon: Zap, color: 'var(--color-primary)' },
+          { label: 'Submitted', value: counts.submitted, icon: CheckCircle, color: 'var(--color-success)' },
+          { label: 'Retrying', value: counts.retrying + counts.pending, icon: AlertTriangle, color: 'var(--color-warning)' },
+          { label: 'Failed', value: counts.failed, icon: XCircle, color: 'var(--color-danger)' },
+        ].map((stat) => (
+          <div key={stat.label} className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <stat.icon size={20} style={{ color: stat.color, flexShrink: 0 }} aria-hidden="true" />
+            <div>
+              <div className="stat-card__value">{stat.value}</div>
+              <div className="stat-card__label">{stat.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="mb-4"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+          gap: '1rem',
+          alignItems: 'stretch',
+        }}
+      >
+        <div className="card" style={{ minWidth: 0 }}>
+          <div className="card__header">
+            <h2 className="card__title" style={{ margin: 0 }}>Submit URL</h2>
+          </div>
+          <div className="card__body">
+            <form onSubmit={handleSubmit}>
+              <label className="text-xs text-secondary" htmlFor="indexnow-url" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                Canonical page URL
+              </label>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                <input
+                  id="indexnow-url"
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com/blog/my-post"
+                  required
+                  style={{ flex: '1 1 220px', minWidth: 0 }}
+                />
+                <button
+                  type="submit"
+                  disabled={submitting || !url.trim()}
+                  className="btn btn--primary"
+                  style={{ flex: '0 0 auto', minWidth: '7.5rem' }}
+                >
+                  <Send size={14} aria-hidden="true" />
+                  {submitting ? 'Submitting…' : 'Submit'}
+                </button>
+              </div>
+            </form>
+            {result && (
+              <p className="text-sm" style={{ margin: '0.85rem 0 0', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <CheckCircle size={14} style={{ color: 'var(--color-success)', flexShrink: 0 }} aria-hidden="true" />
+                {result.status === 'retrying'
+                  ? 'Retry queued for pending submissions'
+                  : `URL submitted: ${result.url}`}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="card" style={{ minWidth: 0 }}>
+          <div className="card__header">
+            <h2 className="card__title" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Shield size={15} aria-hidden="true" />
+              Endpoint policy
+            </h2>
+          </div>
+          <div className="card__body">
+            <p className="text-sm text-muted" style={{ margin: '0 0 0.75rem' }}>
+              Submissions are only accepted to allowlisted IndexNow endpoints.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
+              <li><code>api.indexnow.org</code></li>
+              <li><code>www.bing.com</code></li>
+              <li><code>search.google.com</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title" style={{ margin: 0 }}>Recent Submissions</h2>
+          <span className="text-sm text-muted">{counts.total} in this session</span>
+        </div>
+        {submissions.length === 0 ? (
+          <div className="card__body">
+            <p className="muted" style={{ margin: 0 }}>
+              No submissions in this session yet. Submit a URL above to see results here.
+            </p>
+          </div>
+        ) : (
+          <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '48%' }}>URL</th>
+                  <th style={{ width: '14%' }}>Status</th>
+                  <th style={{ width: '12%' }}>Attempts</th>
+                  <th style={{ width: '26%' }}>Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissions.map((s) => (
+                  <tr key={s.id}>
+                    <td className="text-sm" style={{ fontFamily: 'var(--font-mono, monospace)', wordBreak: 'break-all' }}>
+                      {s.url}
+                    </td>
+                    <td>{statusBadge(s.status || 'submitted')}</td>
+                    <td>{s.attempt_count ?? 1}</td>
+                    <td className="text-sm text-muted">
+                      {s.submitted_at
+                        ? new Date(s.submitted_at).toLocaleString()
+                        : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Clock size={12} aria-hidden="true" />
+                            —
+                          </span>
+                        )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
-
-      {/* SSRF note */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-        <strong>Security:</strong> Submissions are only accepted to allowlisted endpoints (api.indexnow.org, www.bing.com, search.google.com).
-      </div>
-
-      {/* Recent submissions */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-800">Recent Submissions</h2>
-          <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
-            <RefreshCw className="h-3 w-3" /> Retry pending
-          </button>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">URL</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Attempts</th>
-              <th className="px-4 py-3 text-left">Submitted</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {submissions.map(s => (
-              <tr key={s.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs text-gray-700 truncate max-w-xs">{s.url}</td>
-                <td className="px-4 py-3">{statusBadge(s.status)}</td>
-                <td className="px-4 py-3 text-gray-500">{s.attempt_count}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">
-                  {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : (
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {s.next_retry_at ? `retry at ${new Date(s.next_retry_at).toLocaleTimeString()}` : '—'}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );

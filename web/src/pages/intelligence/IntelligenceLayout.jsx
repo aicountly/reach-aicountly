@@ -1,22 +1,27 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
+/**
+ * Horizontal Intelligence chrome only — no nested left aside.
+ * Nested routes stay in this sub-nav so they remain reachable
+ * (the app Sidebar lists primary destinations only).
+ */
 const navItems = [
-  { to: '/intelligence',                      label: 'Overview',       end: true },
-  { to: '/intelligence/search',               label: 'Search',         end: true },
-  { to: '/intelligence/search/queries',       label: 'Queries' },
-  { to: '/intelligence/search/pages',         label: 'Pages' },
-  { to: '/intelligence/content',              label: 'Performance',    end: true },
-  { to: '/intelligence/sitemaps',             label: 'Sitemaps' },
-  { to: '/intelligence/indexnow',             label: 'IndexNow' },
-  { to: '/intelligence/attribution',          label: 'Attribution',    end: true },
-  { to: '/intelligence/attribution/utm',      label: 'UTM Templates' },
-  { to: '/intelligence/visibility',           label: 'AI Visibility',  end: true },
-  { to: '/intelligence/visibility/prompts',   label: 'Prompt Library' },
-  { to: '/intelligence/visibility/runs',      label: 'Run History' },
-  { to: '/intelligence/competitors',          label: 'Competitors' },
-  { to: '/intelligence/connectors',           label: 'Connectors' },
-  { to: '/intelligence/operations',           label: 'Operations' },
+  { to: '/intelligence', end: true, label: 'Overview' },
+  { to: '/intelligence/search', end: true, label: 'Search' },
+  { to: '/intelligence/search/queries', label: 'Queries' },
+  { to: '/intelligence/search/pages', label: 'Pages' },
+  { to: '/intelligence/content', end: true, label: 'Content' },
+  { to: '/intelligence/sitemaps', label: 'Sitemaps' },
+  { to: '/intelligence/indexnow', label: 'IndexNow' },
+  { to: '/intelligence/attribution', end: true, label: 'Attribution' },
+  { to: '/intelligence/attribution/utm', label: 'UTM Templates' },
+  { to: '/intelligence/visibility', end: true, label: 'AI Visibility' },
+  { to: '/intelligence/visibility/prompts', label: 'Prompt Library' },
+  { to: '/intelligence/visibility/runs', label: 'Run History' },
+  { to: '/intelligence/competitors', label: 'Competitors' },
+  { to: '/intelligence/connectors', label: 'Connectors' },
+  { to: '/intelligence/operations', label: 'Operations' },
 ];
 
 export default function IntelligenceLayout() {

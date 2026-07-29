@@ -42,13 +42,13 @@ export default function AttributionOverviewPage() {
   ];
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <Target size={28} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
         <div>
           <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Attribution Overview</h1>
           <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
-            First-touch and last-touch lead attribution foundations
+            First-touch and last-touch lead attribution
           </p>
         </div>
       </div>
@@ -71,7 +71,7 @@ export default function AttributionOverviewPage() {
             ))}
           </div>
 
-          <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card" style={{ marginBottom: 0 }}>
             <div className="card-header">Conversions by First-Touch Channel</div>
             <div className="card-body">
               {breakdown.length === 0 ? (
@@ -102,11 +102,6 @@ export default function AttributionOverviewPage() {
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="alert alert-warning" style={{ marginBottom: 0 }}>
-            <strong>Phase 8 Attribution:</strong> First-touch and last-touch attribution only.
-            Multi-touch weighting and revenue attribution are planned for Phase 9.
           </div>
         </>
       )}

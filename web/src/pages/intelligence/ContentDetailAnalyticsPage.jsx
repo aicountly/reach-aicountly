@@ -34,7 +34,7 @@ export default function ContentDetailAnalyticsPage() {
     : null;
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <BarChart2 size={26} style={{ color: 'var(--color-primary)' }} />
         <div>

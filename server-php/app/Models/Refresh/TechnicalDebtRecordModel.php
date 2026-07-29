@@ -20,4 +20,15 @@ class TechnicalDebtRecordModel extends Model
         'tenant_id', 'classification', 'title', 'description', 'impact', 'workaround',
         'owner', 'target_date', 'acceptance_reason', 'accepted_by', 'accepted_at',
     ];
+
+    /** Unresolved critical/high blockers (not formally accepted). */
+    public function getOpenBlockers(): array
+    {
+        return $this->whereIn('classification', ['critical_blocker', 'high_blocker'])
+            ->groupStart()
+                ->where('accepted_by', null)
+                ->orWhere('accepted_by', 0)
+            ->groupEnd()
+            ->findAll();
+    }
 }

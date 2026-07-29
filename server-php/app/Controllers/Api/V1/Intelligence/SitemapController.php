@@ -58,13 +58,21 @@ class SitemapController extends BaseApiController
 
     public function generate(): ResponseInterface
     {
-        $tenantId = (int) ($this->request->getJSON(true)['tenant_id'] ?? 1);
+        $tenantId = (int) (($this->request->getJSON(true)['tenant_id'] ?? 1));
 
         try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_sitemap_snapshots')) {
+                return $this->response->setStatusCode(503)->setJSON([
+                    'error' => 'Sitemap storage is not available yet. Run database migrations first.',
+                ]);
+            }
+
             $snapshot = $this->service()->generateSnapshot($tenantId, 'manual');
             return $this->response->setStatusCode(201)->setJSON(['data' => $snapshot, 'message' => 'Snapshot generated']);
         } catch (\Throwable $e) {
-            return $this->response->setStatusCode(500)->setJSON(['error' => $e->getMessage()]);
+            log_message('error', 'SitemapController::generate: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'Unable to generate snapshot']);
         }
     }
 

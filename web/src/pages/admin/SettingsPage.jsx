@@ -56,43 +56,88 @@ export function SettingsPage() {
       <div className="page-header">
         <div>
           <h1>Portal settings</h1>
-          <p className="text-sm text-muted">Key/value app-level settings stored in the database.</p>
+          <p className="page-header__subtitle">
+            Key/value app-level settings stored in the database.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button className="btn btn-secondary" onClick={addRow}><Plus size={14}/> Add setting</button>
-          <button className="btn btn-primary" onClick={save} disabled={saving}><Save size={14}/> {saving ? 'Saving…' : 'Save all'}</button>
+        <div className="page-header__actions">
+          <button type="button" className="btn btn-secondary" onClick={addRow}>
+            <Plus size={14} aria-hidden="true" /> Add setting
+          </button>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+            <Save size={14} aria-hidden="true" /> {saving ? 'Saving…' : 'Save all'}
+          </button>
         </div>
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
       {saved && <Alert variant="success">Settings saved.</Alert>}
 
-      <Card padding={false}>
-        <div style={{ padding: '1rem' }}>
-          {rows.length === 0 && <div className="text-sm text-muted">No settings entries yet. Add one to get started.</div>}
+      {rows.length === 0 ? (
+        <Card>
+          <p className="text-sm text-muted" style={{ margin: 0 }}>
+            No settings entries yet. Add one to get started.
+          </p>
+        </Card>
+      ) : (
+        <div className="settings-list">
           {rows.map((r, i) => (
-            <div key={i} className="flex flex-col gap-1 mb-4" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 12 }}>
-              <div className="flex items-center gap-2">
-                <input
-                  value={r.key}
-                  onChange={(e) => updateVal(i, { key: e.target.value })}
-                  placeholder="setting_key"
-                  style={{ fontFamily: 'monospace', flex: 1 }}
-                />
-                <label className="text-xs text-secondary flex items-center gap-1">
-                  <input type="checkbox" checked={r.isObject} onChange={(e) => updateVal(i, { isObject: e.target.checked })} style={{ width: 'auto' }} /> JSON
+            <div key={i} className="settings-row card">
+              <div className="settings-row__toolbar">
+                <label className="settings-row__field settings-row__field--key">
+                  <span className="settings-row__label">Key</span>
+                  <input
+                    value={r.key}
+                    onChange={(e) => updateVal(i, { key: e.target.value })}
+                    placeholder="setting_key"
+                    className="settings-row__input settings-row__input--key"
+                    spellCheck={false}
+                  />
                 </label>
-                <button className="btn btn-danger btn-sm" onClick={() => removeRow(i)} title="Remove"><Trash2 size={12}/></button>
+
+                <div className="settings-row__actions">
+                  <label className="settings-row__json">
+                    <input
+                      type="checkbox"
+                      checked={r.isObject}
+                      onChange={(e) => updateVal(i, { isObject: e.target.checked })}
+                    />
+                    <span>JSON</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => removeRow(i)}
+                    title="Remove setting"
+                    aria-label={`Remove ${r.key || 'setting'}`}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-              {r.isObject ? (
-                <textarea rows={4} value={r.value} onChange={(e) => updateVal(i, { value: e.target.value })} style={{ fontFamily: 'monospace', fontSize: '0.8rem' }} />
-              ) : (
-                <input value={r.value} onChange={(e) => updateVal(i, { value: e.target.value })} />
-              )}
+
+              <label className="settings-row__field">
+                <span className="settings-row__label">Value</span>
+                {r.isObject ? (
+                  <textarea
+                    rows={4}
+                    value={r.value}
+                    onChange={(e) => updateVal(i, { value: e.target.value })}
+                    className="settings-row__input settings-row__input--json"
+                    spellCheck={false}
+                  />
+                ) : (
+                  <input
+                    value={r.value}
+                    onChange={(e) => updateVal(i, { value: e.target.value })}
+                    className="settings-row__input"
+                  />
+                )}
+              </label>
             </div>
           ))}
         </div>
-      </Card>
+      )}
     </div>
   );
 }

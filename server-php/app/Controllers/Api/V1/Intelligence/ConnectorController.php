@@ -43,6 +43,114 @@ class ConnectorController extends BaseApiController
         }
     }
 
+    /**
+     * Create or update a connector configuration.
+     * Credentials must be environment references only — never raw secrets.
+     */
+    public function upsert(): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_analytics_connections')) {
+                return $this->response->setStatusCode(503)->setJSON([
+                    'error' => 'Connector storage is not available yet. Run database migrations first.',
+                ]);
+            }
+
+            $provider = strtolower(trim((string) ($body['provider'] ?? '')));
+            $allowed  = ['gsc', 'ga4', 'bing', 'indexnow'];
+            if (! in_array($provider, $allowed, true)) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error' => 'provider must be one of: gsc, ga4, bing, indexnow',
+                ]);
+            }
+
+            $credential = trim((string) ($body['credential_reference'] ?? ''));
+            if ($credential === '' || strtoupper($credential) === '[REDACTED]') {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error' => 'credential_reference is required (environment variable name only)',
+                ]);
+            }
+            if (preg_match('/^(sk-|AIza|ya29\.|xox[baprs]-)/i', $credential)
+                || (str_contains($credential, ' ') && strlen($credential) > 40)
+            ) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error' => 'credential_reference looks like a raw secret. Store an env var name instead.',
+                ]);
+            }
+
+            $tenantId     = (int) ($body['tenant_id'] ?? 1);
+            $siteProperty = trim((string) ($body['site_property'] ?? ''));
+            $propertyId   = trim((string) ($body['property_id'] ?? ''));
+
+            if ($provider === 'gsc' && $siteProperty === '') {
+                return $this->response->setStatusCode(422)->setJSON(['error' => 'site_property is required for gsc']);
+            }
+            if ($provider === 'ga4' && $propertyId === '') {
+                return $this->response->setStatusCode(422)->setJSON(['error' => 'property_id is required for ga4']);
+            }
+
+            $model    = new AnalyticsConnectionModel();
+            $existing = null;
+            $idHint   = isset($body['id']) ? (int) $body['id'] : 0;
+            if ($idHint > 0) {
+                $existing = $model->find($idHint);
+                if ($existing && (int) ($existing['tenant_id'] ?? 0) !== $tenantId) {
+                    $existing = null;
+                }
+            }
+            if (! $existing) {
+                $builder = $model->where('tenant_id', $tenantId)->where('provider', $provider);
+                if ($provider === 'gsc') {
+                    $builder->where('site_property', $siteProperty);
+                }
+                $existing = $builder->first();
+            }
+
+            $payload = [
+                'tenant_id'            => $tenantId,
+                'provider'             => $provider,
+                'display_name'         => trim((string) ($body['display_name'] ?? '')) ?: match ($provider) {
+                    'gsc'      => 'Google Search Console',
+                    'ga4'      => 'GA4 Content Analytics',
+                    'indexnow' => 'IndexNow',
+                    default    => strtoupper($provider),
+                },
+                'site_property'        => $siteProperty !== '' ? $siteProperty : null,
+                'property_id'          => $propertyId !== '' ? $propertyId : null,
+                'credential_reference' => $credential,
+                'enabled'              => array_key_exists('enabled', $body) ? (bool) $body['enabled'] : true,
+                'health_status'        => $body['health_status'] ?? ($existing['health_status'] ?? 'unknown'),
+            ];
+            if (! empty($payload['enabled'])) {
+                $payload['enabled_at']  = date('Y-m-d H:i:s');
+                $payload['disabled_at'] = null;
+            }
+
+            if ($existing) {
+                $model->update((int) $existing['id'], $payload);
+                $row = $model->find((int) $existing['id']);
+                return $this->response->setJSON(['data' => $model->redactCredentials($row)]);
+            }
+
+            $id = $model->insert($payload);
+            if (! $id) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error'  => 'Unable to save connector',
+                    'errors' => $model->errors(),
+                ]);
+            }
+
+            $row = $model->find($id);
+            return $this->response->setStatusCode(201)->setJSON(['data' => $model->redactCredentials($row)]);
+        } catch (\Throwable $e) {
+            log_message('error', 'ConnectorController::upsert: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'Unable to save connector']);
+        }
+    }
+
     public function show(int $id): ResponseInterface
     {
         try {
@@ -152,6 +260,33 @@ class ConnectorController extends BaseApiController
             return $this->response->setJSON(['message' => 'Connector disabled']);
         } catch (\Throwable $e) {
             log_message('error', 'ConnectorController::disable: ' . $e->getMessage());
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+        }
+    }
+
+    public function enable(int $id): ResponseInterface
+    {
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_analytics_connections')) {
+                return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+            }
+
+            $model = new AnalyticsConnectionModel();
+            $conn  = $model->find($id);
+            if (! $conn) {
+                return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+            }
+
+            $model->update($id, [
+                'enabled'     => true,
+                'enabled_at'  => date('Y-m-d H:i:s'),
+                'disabled_at' => null,
+            ]);
+
+            return $this->response->setJSON(['data' => $model->redactCredentials($model->find($id))]);
+        } catch (\Throwable $e) {
+            log_message('error', 'ConnectorController::enable: ' . $e->getMessage());
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
         }
     }

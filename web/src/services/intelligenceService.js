@@ -35,8 +35,52 @@ export function listCompetitors(params = {}) {
   return api.get('v1/intelligence/competitors', params);
 }
 
+export function createCompetitor(body) {
+  return api.post('v1/intelligence/competitors', body);
+}
+
 export function listConnectors(params = {}) {
   return api.get('v1/intelligence/connectors', params);
+}
+
+export function upsertConnector(body) {
+  return api.post('v1/intelligence/connectors', body);
+}
+
+export function healthCheckConnector(id) {
+  return api.post(`v1/intelligence/connectors/${id}/health-check`);
+}
+
+export function disableConnector(id) {
+  return api.post(`v1/intelligence/connectors/${id}/disable`);
+}
+
+export function enableConnector(id) {
+  return api.post(`v1/intelligence/connectors/${id}/enable`);
+}
+
+export function createSearchConnection(body) {
+  return api.post('v1/intelligence/search/connections', body);
+}
+
+export function createContentConnection(body) {
+  return api.post('v1/intelligence/content/connections', body);
+}
+
+export function submitIndexNowUrl(body) {
+  return api.post('v1/intelligence/indexnow/submit', body);
+}
+
+export function retryIndexNowPending() {
+  return api.post('v1/intelligence/indexnow/retry-pending');
+}
+
+export function getLatestSitemap(params = {}) {
+  return api.get('v1/intelligence/sitemaps', params);
+}
+
+export function generateSitemapSnapshot(body = {}) {
+  return api.post('v1/intelligence/sitemaps/generate', body);
 }
 
 export function listSearchMetrics(params = {}) {
@@ -56,7 +100,18 @@ const intelligenceService = {
   listVisibilityRuns,
   listVisibilityObservations,
   listCompetitors,
+  createCompetitor,
   listConnectors,
+  upsertConnector,
+  healthCheckConnector,
+  disableConnector,
+  enableConnector,
+  createSearchConnection,
+  createContentConnection,
+  submitIndexNowUrl,
+  retryIndexNowPending,
+  getLatestSitemap,
+  generateSitemapSnapshot,
   listSearchMetrics,
   listContentMetrics,
 };

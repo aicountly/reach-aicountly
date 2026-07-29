@@ -34,14 +34,63 @@ class CompetitorController extends BaseApiController
 
     public function create(): ResponseInterface
     {
-        $body  = $this->request->getJSON(true) ?? [];
-        $model = new CompetitorModel();
-        $id    = $model->insert($body);
-        if (!$id) return $this->response->setStatusCode(422)->setJSON(['errors' => $model->errors()]);
+        $body = $this->request->getJSON(true) ?? [];
 
-        (new AuditLogger())->log(null, AuditLogger::COMPETITOR_CREATED, 'competitor', (int)$id, null, $model->find($id), null, 'human');
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_competitors')) {
+                return $this->response->setStatusCode(503)->setJSON([
+                    'error' => 'Competitor storage is not available yet. Run database migrations first.',
+                ]);
+            }
 
-        return $this->response->setStatusCode(201)->setJSON(['data' => $model->find($id)]);
+            $name = trim((string) ($body['name'] ?? ''));
+            if ($name === '') {
+                return $this->response->setStatusCode(422)->setJSON(['error' => 'name is required']);
+            }
+
+            $payload = [
+                'tenant_id'          => (int) ($body['tenant_id'] ?? 1),
+                'name'               => $name,
+                'legal_name'         => $body['legal_name'] ?? null,
+                'website_domain'     => $body['website_domain'] ?? $body['domain'] ?? null,
+                'category'           => $body['category'] ?? 'general',
+                'monitoring_enabled' => array_key_exists('monitoring_enabled', $body)
+                    ? (bool) $body['monitoring_enabled']
+                    : true,
+                'monitoring_status'  => $body['monitoring_status'] ?? 'active',
+                'notes'              => $body['notes'] ?? null,
+            ];
+
+            $model = new CompetitorModel();
+            $id    = $model->insert($payload);
+            if (! $id) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error'  => 'Unable to create competitor',
+                    'errors' => $model->errors(),
+                ]);
+            }
+
+            try {
+                (new AuditLogger())->log(
+                    null,
+                    AuditLogger::COMPETITOR_CREATED,
+                    'competitor',
+                    (int) $id,
+                    null,
+                    $model->find($id),
+                    null,
+                    'human'
+                );
+            } catch (\Throwable $e) {
+                log_message('error', 'CompetitorController::create audit: ' . $e->getMessage());
+            }
+
+            return $this->response->setStatusCode(201)->setJSON(['data' => $model->find($id)]);
+        } catch (\Throwable $e) {
+            log_message('error', 'CompetitorController::create: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'Unable to create competitor']);
+        }
     }
 
     public function show(int $id): ResponseInterface

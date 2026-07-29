@@ -211,7 +211,33 @@ class AttributionModelService
         );
     }
 
+    public static function catalog(): array
+    {
+        $out = [];
+        foreach (self::definitions() as $name => $def) {
+            $out[] = [
+                'model_name'  => $name,
+                'label'       => match ($name) {
+                    'equal_weight'   => 'Equal Weight',
+                    'position_based' => 'Position Based',
+                    'time_decay'     => 'Time Decay',
+                    default          => $name,
+                },
+                'description' => $def['description'],
+                'formula'     => $def['formula'],
+                'limitations' => $def['limitations'],
+            ];
+        }
+
+        return $out;
+    }
+
     private function modelDefinitions(): array
+    {
+        return self::definitions();
+    }
+
+    private static function definitions(): array
     {
         return [
             'equal_weight' => [

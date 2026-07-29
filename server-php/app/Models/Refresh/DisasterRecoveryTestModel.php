@@ -18,4 +18,11 @@ class DisasterRecoveryTestModel extends Model
         'test_type', 'environment', 'status', 'rpo_minutes', 'rto_minutes',
         'procedure_followed', 'evidence_notes', 'tested_by', 'tested_at',
     ];
+
+    public function hasPassedType(string $testType): bool
+    {
+        return $this->where('test_type', $testType)
+            ->where('status', 'passed')
+            ->countAllResults() > 0;
+    }
 }

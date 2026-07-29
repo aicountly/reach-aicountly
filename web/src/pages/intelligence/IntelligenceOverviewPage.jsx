@@ -71,7 +71,7 @@ export default function IntelligenceOverviewPage() {
   }, []);
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ marginBottom: '1.25rem' }}>
         <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Intelligence Control Centre</h1>
         <p className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>

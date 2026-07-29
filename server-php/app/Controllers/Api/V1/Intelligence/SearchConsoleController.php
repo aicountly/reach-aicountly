@@ -32,10 +32,46 @@ class SearchConsoleController extends BaseApiController
 
     public function createConnection(): ResponseInterface
     {
-        $body  = $this->request->getJSON(true) ?? [];
-        $model = new AnalyticsConnectionModel();
-        $id    = $model->insert(array_merge($body, ['provider' => 'gsc']));
-        return $this->response->setStatusCode(201)->setJSON(['data' => $model->find($id)]);
+        $body = $this->request->getJSON(true) ?? [];
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('reach_analytics_connections')) {
+                return $this->response->setStatusCode(503)->setJSON([
+                    'error' => 'Connector storage is not available yet. Run database migrations first.',
+                ]);
+            }
+
+            $siteProperty = trim((string) ($body['site_property'] ?? ''));
+            $credential   = trim((string) ($body['credential_reference'] ?? ''));
+            if ($siteProperty === '' || $credential === '') {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error' => 'site_property and credential_reference are required',
+                ]);
+            }
+
+            $model = new AnalyticsConnectionModel();
+            $id    = $model->insert([
+                'tenant_id'            => (int) ($body['tenant_id'] ?? 1),
+                'provider'             => 'gsc',
+                'display_name'         => $body['display_name'] ?? 'Google Search Console',
+                'site_property'        => $siteProperty,
+                'credential_reference' => $credential,
+                'enabled'              => array_key_exists('enabled', $body) ? (bool) $body['enabled'] : true,
+                'health_status'        => $body['health_status'] ?? 'unknown',
+            ]);
+            if (! $id) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'error'  => 'Unable to create connection',
+                    'errors' => $model->errors(),
+                ]);
+            }
+
+            return $this->response->setStatusCode(201)->setJSON(['data' => $model->find($id)]);
+        } catch (\Throwable $e) {
+            log_message('error', 'SearchConsoleController::createConnection: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'Unable to create connection']);
+        }
     }
 
     public function connection(int $id): ResponseInterface

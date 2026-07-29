@@ -801,9 +801,39 @@ $routes->group('v1', static function ($routes) {
 
         // Phase 8: Connector Operations
         $routes->get('intelligence/connectors',                              'Api\\V1\\Intelligence\\ConnectorController::index',                  ['filter' => 'permission:connector.read']);
+        $routes->post('intelligence/connectors',                             'Api\\V1\\Intelligence\\ConnectorController::upsert',                 ['filter' => 'permission:connector.manage']);
         $routes->get('intelligence/connectors/(:num)',                       'Api\\V1\\Intelligence\\ConnectorController::show/$1',                ['filter' => 'permission:connector.read']);
         $routes->post('intelligence/connectors/(:num)/health-check',         'Api\\V1\\Intelligence\\ConnectorController::healthCheck/$1',         ['filter' => 'permission:connector.read']);
         $routes->post('intelligence/connectors/(:num)/disable',              'Api\\V1\\Intelligence\\ConnectorController::disable/$1',             ['filter' => 'permission:connector.manage']);
+        $routes->post('intelligence/connectors/(:num)/enable',               'Api\\V1\\Intelligence\\ConnectorController::enable/$1',              ['filter' => 'permission:connector.manage']);
+
+        // Phase 9: Attribution maturity models
+        $routes->get('readiness/attribution/models',                         'Api\\V1\\Refresh\\AttributionModelController::index',               ['filter' => 'permission:attribution_model.read']);
+        $routes->post('readiness/attribution/models',                        'Api\\V1\\Refresh\\AttributionModelController::create',              ['filter' => 'permission:attribution_model.manage']);
+        $routes->post('readiness/attribution/models/(:num)/activate',        'Api\\V1\\Refresh\\AttributionModelController::activate/$1',         ['filter' => 'permission:attribution_model.approve']);
+
+        // Phase 9: Refresh outcomes (observational post-refresh changes)
+        $routes->get('readiness/outcomes',                                   'Api\\V1\\Refresh\\RefreshOutcomeController::index',                 ['filter' => 'permission:refresh_outcome.read']);
+        $routes->get('readiness/outcomes/(:num)',                            'Api\\V1\\Refresh\\RefreshOutcomeController::show/$1',               ['filter' => 'permission:refresh_outcome.read']);
+        $routes->post('readiness/outcomes/(:num)/measure',                   'Api\\V1\\Refresh\\RefreshOutcomeController::measure/$1',            ['filter' => 'permission:refresh_outcome.trigger']);
+
+        // Phase 9: Product readiness / release acceptance
+        $routes->get('readiness/release/prerequisites',                      'Api\\V1\\Readiness\\ReleaseAcceptanceController::prerequisites',   ['filter' => 'permission:readiness.read']);
+        $routes->get('readiness/release/latest',                             'Api\\V1\\Readiness\\ReleaseAcceptanceController::latest',          ['filter' => 'permission:readiness.read']);
+        $routes->post('readiness/release',                                   'Api\\V1\\Readiness\\ReleaseAcceptanceController::create',          ['filter' => 'permission:readiness.accept']);
+
+        $routes->get('readiness/findings',                                   'Api\\V1\\Readiness\\FindingsController::index',                    ['filter' => 'permission:readiness.read']);
+        $routes->get('readiness/findings/blockers',                          'Api\\V1\\Readiness\\FindingsController::blockers',                  ['filter' => 'permission:readiness.read']);
+
+        $routes->get('readiness/disaster-recovery',                          'Api\\V1\\Readiness\\DisasterRecoveryController::index',             ['filter' => 'permission:disaster_recovery.read']);
+        $routes->post('readiness/disaster-recovery',                         'Api\\V1\\Readiness\\DisasterRecoveryController::store',             ['filter' => 'permission:disaster_recovery.run']);
+
+        $routes->get('readiness/operational-checks',                         'Api\\V1\\Readiness\\OperationalCheckController::index',             ['filter' => 'permission:readiness.read']);
+        $routes->post('readiness/operational-checks/ensure-defaults',        'Api\\V1\\Readiness\\OperationalCheckController::ensureDefaults',    ['filter' => 'permission:readiness.manage']);
+        $routes->post('readiness/operational-checks',                        'Api\\V1\\Readiness\\OperationalCheckController::upsert',             ['filter' => 'permission:readiness.manage']);
+
+        $routes->get('readiness/technical-debt',                             'Api\\V1\\Readiness\\TechnicalDebtController::index',                ['filter' => 'permission:technical_debt.read']);
+        $routes->get('readiness/operations/summary',                         'Api\\V1\\Readiness\\OperationsController::summary',                 ['filter' => 'permission:readiness.read']);
 
     });
 });

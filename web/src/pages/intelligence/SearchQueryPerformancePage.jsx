@@ -26,7 +26,7 @@ export default function SearchQueryPerformancePage() {
   }, []);
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <Search size={26} style={{ color: 'var(--color-primary)' }} />
         <div>

@@ -35,7 +35,7 @@ export default function IntelligenceOperationsPage() {
   const failed = connectors.filter((c) => ['failed', 'unhealthy'].includes((c.health_status || c.status || '').toLowerCase())).length;
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Activity size={26} />

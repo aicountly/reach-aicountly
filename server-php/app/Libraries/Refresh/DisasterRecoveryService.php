@@ -76,9 +76,6 @@ class DisasterRecoveryService
 
     public function hasPassed(string $testType): bool
     {
-        return $this->testModel
-            ->where('test_type', $testType)
-            ->where('status', 'passed')
-            ->countAllResults() > 0;
+        return $this->testModel->hasPassedType($testType);
     }
 }

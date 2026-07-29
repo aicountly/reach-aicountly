@@ -31,7 +31,7 @@ export default function UnattributedLeadsPage() {
   }, []);
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <AlertCircle size={26} style={{ color: 'var(--color-danger)' }} />
         <div>

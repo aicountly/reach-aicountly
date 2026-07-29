@@ -9,7 +9,7 @@ const RUNS = [
 
 export default function VisibilityRunHistoryPage() {
   return (
-    <div className="p-6 space-y-6">
+    <div>
       <div className="flex items-center gap-3">
         <History className="h-7 w-7 text-purple-600" />
         <div>
