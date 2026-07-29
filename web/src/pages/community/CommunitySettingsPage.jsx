@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { normalizeCommunityList } from './communityListUtils';
 
 export default function CommunitySettingsPage() {
   const [spaces, setSpaces]     = useState([]);
@@ -16,7 +17,7 @@ export default function CommunitySettingsPage() {
   function load() {
     setLoading(true);
     api.get('v1/community/spaces')
-      .then(r => setSpaces(Array.isArray(r) ? r : (r?.data ?? [])))
+      .then(r => setSpaces(normalizeCommunityList(r)))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }

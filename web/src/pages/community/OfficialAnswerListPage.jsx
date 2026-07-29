@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
 const STATUS_OPTS = ['', 'draft', 'generated', 'pending_approval', 'approved', 'published', 'withdrawn'];
 const STATUS_CLASS = {
@@ -24,8 +25,8 @@ export default function OfficialAnswerListPage() {
     setLoading(true);
     api.get('v1/community/answers', { status: status || undefined, page })
       .then(r => {
-        setAnswers(Array.isArray(r) ? r : (r?.data ?? []));
-        setTotalPages(r.data?.meta?.last_page ?? 1);
+        setAnswers(normalizeCommunityList(r));
+        setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

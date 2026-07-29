@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
 const STATUS_CLASS = {
   pending: 'badge--info',
@@ -23,8 +24,8 @@ export default function CommunityPublishingMonitorPage() {
     setLoading(true);
     api.get('v1/community/deployments', { page })
       .then(r => {
-        setDeployments(Array.isArray(r) ? r : (r?.data ?? []));
-        setTotalPages(r.data?.meta?.last_page ?? 1);
+        setDeployments(normalizeCommunityList(r));
+        setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

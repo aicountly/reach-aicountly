@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
 const STATUS_OPTS = ['', 'new', 'triaged', 'in_progress', 'answered', 'closed', 'spam'];
 const SORT_OPTS   = ['triage_score_desc', 'newest', 'oldest'];
@@ -27,8 +28,8 @@ export default function QuestionInboxPage() {
     setLoading(true);
     api.get('v1/community/questions', { status: status || undefined, sort, page })
       .then(r => {
-        setQuestions(Array.isArray(r) ? r : (r?.data ?? []));
-        setTotalPages(r.data?.meta?.last_page ?? 1);
+        setQuestions(normalizeCommunityList(r));
+        setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

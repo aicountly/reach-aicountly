@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
 const FINDING_CLASS = {
   spam: 'badge--error',
@@ -23,8 +24,8 @@ export default function CommunityModerationQueuePage() {
     setLoading(true);
     api.get('v1/community/moderation/queue', { page })
       .then(r => {
-        setFindings(Array.isArray(r) ? r : (r?.data ?? []));
-        setTotalPages(r.data?.meta?.last_page ?? 1);
+        setFindings(normalizeCommunityList(r));
+        setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

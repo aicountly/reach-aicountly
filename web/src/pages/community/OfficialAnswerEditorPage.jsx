@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 
 const STATUS_ACTIONS = {
   draft:            ['generate', 'save', 'run_moderation'],
@@ -31,10 +32,11 @@ export default function OfficialAnswerEditorPage() {
       api.get(`v1/community/answers/${uuid}/versions`),
     ])
       .then(([ar, vr]) => {
-        const a = ar?.data ?? ar ?? null;
-        setAnswer(a);
-        setBody(a?.current_body ?? '');
-        setVersions(Array.isArray(vr) ? vr : (vr?.data ?? []));
+        const a = normalizeCommunityObject(ar);
+        const answer = Object.keys(a).length ? a : (ar ?? null);
+        setAnswer(answer);
+        setBody(answer?.current_body ?? '');
+        setVersions(normalizeCommunityList(vr));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

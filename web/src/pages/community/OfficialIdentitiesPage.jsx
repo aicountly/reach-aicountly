@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { normalizeCommunityList } from './communityListUtils';
 
 export default function OfficialIdentitiesPage() {
   const [identities, setIdentities] = useState([]);
@@ -13,7 +14,7 @@ export default function OfficialIdentitiesPage() {
   function load() {
     setLoading(true);
     api.get('v1/community/identities', { include_inactive: 1 })
-      .then(r => setIdentities(Array.isArray(r) ? r : (r?.data ?? [])))
+      .then(r => setIdentities(normalizeCommunityList(r)))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }

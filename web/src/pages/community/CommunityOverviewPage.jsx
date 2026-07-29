@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeCommunityObject } from './communityListUtils';
 
 export default function CommunityOverviewPage() {
   const [stats, setStats] = useState(null);
@@ -9,7 +10,7 @@ export default function CommunityOverviewPage() {
 
   useEffect(() => {
     api.get('v1/community/analytics/overview')
-      .then(r => setStats(r?.data ?? r ?? {}))
+      .then(r => setStats(normalizeCommunityObject(r)))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

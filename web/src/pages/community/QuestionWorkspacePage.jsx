@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 
 const TRANSITION_STATUSES = ['triaged', 'in_progress', 'closed', 'spam'];
 
@@ -23,8 +24,9 @@ export default function QuestionWorkspacePage() {
       api.get('v1/community/answers', { question_uuid: uuid }),
     ])
       .then(([qr, ar]) => {
-        setQuestion(qr?.data ?? qr ?? null);
-        setAnswers(Array.isArray(ar) ? ar : (ar?.data ?? []));
+        const q = normalizeCommunityObject(qr);
+        setQuestion(Object.keys(q).length ? q : (qr ?? null));
+        setAnswers(normalizeCommunityList(ar));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

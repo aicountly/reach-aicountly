@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 
 export default function CommunityAnalyticsPage() {
   const [overview, setOverview]   = useState(null);
@@ -17,9 +18,9 @@ export default function CommunityAnalyticsPage() {
       api.get('v1/community/analytics/coverage'),
     ])
       .then(([o, e, c]) => {
-        setOverview(o?.data ?? o ?? null);
-        setEngagement(Array.isArray(e) ? e : (e?.data ?? []));
-        setCoverage(Array.isArray(c) ? c : (c?.data ?? []));
+        setOverview(normalizeCommunityObject(o));
+        setEngagement(normalizeCommunityList(e));
+        setCoverage(normalizeCommunityList(c));
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
