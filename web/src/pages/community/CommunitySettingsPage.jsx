@@ -93,33 +93,37 @@ export default function CommunitySettingsPage() {
       )}
 
       <section className="card">
-        <h2 className="card__title">Community spaces</h2>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Slug</th>
-              <th>Title</th>
-              <th>Visibility</th>
-              <th>Moderation</th>
-              <th>Official answers</th>
-              <th>Active</th>
-            </tr>
-          </thead>
-          <tbody>
-            {spaces.length === 0 ? (
-              <tr><td colSpan={6} className="muted">No spaces configured.</td></tr>
-            ) : spaces.map(s => (
-              <tr key={s.id}>
-                <td><code>{s.slug}</code></td>
-                <td>{s.title}</td>
-                <td>{s.visibility}</td>
-                <td>{s.moderation_mode}</td>
-                <td>{s.official_answer_policy}</td>
-                <td>{s.is_active ? <span className="badge badge--success">Active</span> : <span className="badge badge--neutral">Inactive</span>}</td>
+        <div className="card__header">
+          <h2 className="card__title">Community spaces</h2>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Slug</th>
+                <th>Title</th>
+                <th>Visibility</th>
+                <th>Moderation</th>
+                <th>Official answers</th>
+                <th>Active</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {spaces.length === 0 ? (
+                <tr><td colSpan={6} className="muted">No spaces configured.</td></tr>
+              ) : spaces.map(s => (
+                <tr key={s.id}>
+                  <td><code>{s.slug}</code></td>
+                  <td>{s.title}</td>
+                  <td>{s.visibility}</td>
+                  <td>{s.moderation_mode}</td>
+                  <td>{s.official_answer_policy}</td>
+                  <td>{s.is_active ? <span className="badge badge--success">Active</span> : <span className="badge badge--neutral">Inactive</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

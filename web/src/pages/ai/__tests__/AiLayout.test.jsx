@@ -26,4 +26,10 @@ describe('AiLayout', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Generations')).toBeInTheDocument();
   });
+
+  it('uses page-layout with horizontal sub-nav', () => {
+    renderWithAuth(<AiLayout />, ctx);
+    expect(document.querySelector('.page-layout--flush')).toBeTruthy();
+    expect(document.querySelector('.sub-nav')).toBeTruthy();
+  });
 });

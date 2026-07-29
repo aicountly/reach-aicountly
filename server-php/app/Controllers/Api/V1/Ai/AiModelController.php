@@ -19,8 +19,8 @@ class AiModelController extends BaseApiController
         $rows = $db->query(
             "SELECT m.id, m.model_key, m.model_family, m.display_name,
                     m.provider_id, p.provider_key, p.display_name AS provider_name,
-                    m.context_limit, m.max_output_tokens,
-                    m.input_cost_per_unit, m.output_cost_per_unit, m.cost_unit_size,
+                    m.context_limit, m.maximum_output_tokens,
+                    m.input_cost_per_unit, m.output_cost_per_unit, m.cost_unit,
                     m.enabled, m.approval_status,
                     m.supports_structured_output
              FROM reach_ai_models m

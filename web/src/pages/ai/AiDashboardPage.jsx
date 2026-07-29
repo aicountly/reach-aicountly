@@ -1,25 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAiDashboard } from '../../services/aiService.js';
-import { ROUTES } from '../../constants/routes.js';
 import AiGenerationBadge from '../../components/ai/AiGenerationBadge.jsx';
-
-function StatCard({ label, value, sub, color = 'blue' }) {
-  const colors = {
-    blue:   'bg-blue-50 border-blue-100 text-blue-700',
-    green:  'bg-green-50 border-green-100 text-green-700',
-    red:    'bg-red-50 border-red-100 text-red-700',
-    purple: 'bg-purple-50 border-purple-100 text-purple-700',
-    yellow: 'bg-yellow-50 border-yellow-100 text-yellow-700',
-  };
-  return (
-    <div className={`rounded-lg border p-4 ${colors[color]}`}>
-      <p className="text-xs font-medium uppercase tracking-wide opacity-70">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value ?? '—'}</p>
-      {sub && <p className="text-xs mt-1 opacity-70">{sub}</p>}
-    </div>
-  );
-}
 
 export default function AiDashboardPage() {
   const [data, setData] = useState(null);
@@ -33,53 +15,73 @@ export default function AiDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-sm text-gray-500 p-4">Loading AI dashboard…</div>;
-  if (error)   return <div className="text-sm text-red-600 p-4">Error: {error}</div>;
+  if (loading) return <p className="muted">Loading AI dashboard…</p>;
+  if (error)   return <p className="text-error">Error: {error}</p>;
 
   const stats = data?.stats || {};
   const recentRequests = data?.recent_requests || [];
+  const todayCost = stats.today_cost != null
+    ? `$${Number(stats.today_cost).toFixed(4)}`
+    : '$0.0000';
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">AI Dashboard</h1>
+    <div>
+      <div className="page-header page-header--stack">
+        <h1>AI Dashboard</h1>
+        <p className="page-header__subtitle">Generation volume, failures, and spend for today.</p>
+      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Generations" value={stats.total_generations} color="blue" />
-        <StatCard label="Completed Today" value={stats.completed_today} color="green" />
-        <StatCard label="Failed Today" value={stats.failed_today} color="red" />
-        <StatCard label="Today's Cost" value={stats.today_cost ? `$${stats.today_cost}` : '$0.00'} color="purple" />
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-card__value">{stats.total_generations ?? 0}</div>
+          <div className="stat-card__label">Total Generations</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__value">{stats.completed_today ?? 0}</div>
+          <div className="stat-card__label">Completed Today</div>
+        </div>
+        <div className="stat-card stat-card--warning">
+          <div className="stat-card__value">{stats.failed_today ?? 0}</div>
+          <div className="stat-card__label">Failed Today</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__value">{todayCost}</div>
+          <div className="stat-card__label">Today&apos;s Cost</div>
+        </div>
       </div>
 
       {recentRequests.length > 0 && (
-        <div>
-          <h2 className="text-base font-semibold text-gray-800 mb-3">Recent Generation Requests</h2>
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
+        <section className="card mt-4">
+          <div className="card__header">
+            <h2 className="card__title">Recent Generation Requests</h2>
+          </div>
+          <div className="card__body" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">UUID</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Type</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Created</th>
+                  <th>UUID</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {recentRequests.map(r => (
-                  <tr key={r.uuid} className="hover:bg-gray-50">
-                    <td className="px-3 py-2">
-                      <Link to={`/ai/generations/${r.uuid}`} className="text-blue-600 hover:underline font-mono text-xs">
+                  <tr key={r.uuid}>
+                    <td>
+                      <Link to={`/ai/generations/${r.uuid}`} className="text-sm">
                         {r.uuid?.slice(0, 8)}…
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{r.content_type}</td>
-                    <td className="px-3 py-2"><AiGenerationBadge status={r.status} /></td>
-                    <td className="px-3 py-2 text-gray-500 text-xs">{r.created_at}</td>
+                    <td>{r.content_type}</td>
+                    <td><AiGenerationBadge status={r.status} /></td>
+                    <td className="text-muted text-xs">{r.created_at}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

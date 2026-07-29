@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { BrainCircuit } from 'lucide-react';
 import { ROUTES } from '../../constants/routes.js';
 import { usePermission } from '../../hooks/usePermission.js';
 
@@ -28,62 +29,33 @@ export default function AiLayout() {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-      <div style={{
-        background: 'var(--color-surface)',
-        borderBottom: '1px solid var(--color-border)',
-        padding: '0.85rem 1.25rem',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text)' }}>
-            AI Control Centre
-          </span>
+    <div className="page-layout page-layout--flush">
+      <div className="page-layout__header">
+        <div className="page-layout__title-row">
+          <BrainCircuit size={18} className="page-layout__icon" aria-hidden="true" />
+          <h1 className="page-layout__title">AI Control Centre</h1>
           <span className="badge badge-primary">Phase 3</span>
         </div>
-        <p className="text-xs text-muted">
+        <p className="page-layout__subtitle">
           Manage AI providers, prompts, generation requests, usage and budgets.
         </p>
       </div>
 
-      <div style={{
-        borderBottom: '1px solid var(--color-border)',
-        background: 'var(--color-bg)',
-      }}>
-        <nav
-          aria-label="AI navigation"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.15rem 0.25rem',
-            padding: '0 0.75rem',
-            overflowX: 'auto',
-          }}
-        >
-          {visible.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              style={({ isActive }) => ({
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '0.65rem 0.9rem',
-                fontSize: '0.85rem',
-                fontWeight: isActive ? 600 : 500,
-                whiteSpace: 'nowrap',
-                borderBottom: isActive
-                  ? '2px solid var(--color-primary)'
-                  : '2px solid transparent',
-                color: isActive ? 'var(--color-primary-hover)' : 'var(--color-text-secondary)',
-                textDecoration: 'none',
-              })}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
+      <nav className="sub-nav" aria-label="AI navigation">
+        {visible.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `sub-nav__link${isActive ? ' sub-nav__link--active' : ''}`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
 
-      <div style={{ flex: 1, padding: '1.25rem 1.5rem' }}>
+      <div className="page-layout__body">
         <Outlet />
       </div>
     </div>

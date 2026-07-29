@@ -4,13 +4,10 @@ import {
   Share2, ListOrdered, Mail, MessageCircle, TrendingUp, Sparkles,
   Paintbrush, BarChart3, Users, ArrowRightCircle, Bot, ScrollText,
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
-  BookOpen, PenTool, Package, BrainCircuit, Cpu, Route, FlaskConical,
-  Zap, CircleDollarSign, ShieldAlert, HeartPulse,
-  Globe, Send, Link2, CheckCircle2, Radio,
-  MessagesSquare, BadgeCheck, ShieldQuestion, LineChart,
-  MessageSquare, Smartphone,
-  Search, MapPin, Eye, Users2, Plug,
-  RefreshCw, Target, Lock, Database, Server, CheckSquare,
+  BookOpen, PenTool, Package, BrainCircuit,
+  Globe, Send, Link2,
+  MessagesSquare,
+  Search,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { BotModeBadge } from '../bot/BotModeBadge';
@@ -56,42 +53,23 @@ const NAV = [
       { label: 'Calendar',         path: ROUTES.CONTENT_CALENDAR,   icon: CalendarDays, requires: 'content.view' },
     ],
   },
+  /* Sections with horizontal sub-nav: sidebar lists the section root only. */
   {
     title: 'Knowledge Foundation',
     items: [
-      { label: 'Knowledge Overview', path: ROUTES.KNOWLEDGE,            icon: BookOpen, end: true, requires: 'knowledge.view' },
-      { label: 'Products',           path: ROUTES.KNOWLEDGE_PRODUCTS,   icon: BookOpen, requires: 'product.view' },
-      { label: 'Claims',             path: ROUTES.KNOWLEDGE_CLAIMS,     icon: BookOpen, requires: 'claim.view' },
-      { label: 'Brand Rules',        path: ROUTES.KNOWLEDGE_BRAND_RULES,icon: BookOpen, requires: 'brand_rules.view' },
-      { label: 'Content Policies',   path: ROUTES.KNOWLEDGE_POLICIES,      icon: BookOpen, requires: 'content_policy.view' },
-      { label: 'Completeness',       path: ROUTES.KNOWLEDGE_COMPLETENESS,  icon: BookOpen, requires: 'knowledge.view' },
+      { label: 'Knowledge', path: ROUTES.KNOWLEDGE, icon: BookOpen, requires: 'knowledge.view' },
     ],
   },
   {
     title: 'Publishing',
     items: [
-      { label: 'Blog Publishing',  path: '/publishing/blogs',          icon: Globe,         requires: 'publishing.view' },
-      { label: 'Knowledge Base',   path: '/publishing/knowledge-bases', icon: BookOpen,      requires: 'publishing.view' },
-      { label: 'Calendar',         path: '/publishing/calendar',        icon: CalendarDays,  requires: 'publishing.view' },
-      { label: 'Deployments',      path: '/publishing/deployments',     icon: Send,          requires: 'publishing.view' },
-      { label: 'Verifications',    path: '/publishing/verifications',   icon: CheckCircle2,  requires: 'publishing.view' },
-      { label: 'Connections',      path: '/publishing/connections',     icon: Link2,         requires: 'publishing.manage_connections' },
-      { label: 'Readiness',        path: '/publishing/readiness',       icon: Radio,         requires: 'publishing.view' },
+      { label: 'Publishing', path: '/publishing', icon: Globe, requires: 'publishing.view' },
     ],
   },
   {
     title: 'Distribution',
     items: [
-      { label: 'Overview',        path: '/distribution',                   icon: Send,           end: true, requires: 'distribution.read' },
-      { label: 'Campaigns',       path: '/distribution/campaigns',         icon: FileText,       requires: 'distribution.read' },
-      { label: 'Audience',        path: '/distribution/audience',          icon: Users,          requires: 'distribution.read' },
-      { label: 'Suppressions',    path: '/distribution/suppressions',      icon: ShieldCheck,    requires: 'distribution.read' },
-      { label: 'Social',          path: '/distribution/social',            icon: MessagesSquare, requires: 'distribution.read' },
-      { label: 'Email',           path: '/distribution/email',             icon: Mail,           requires: 'distribution.read' },
-      { label: 'WhatsApp',        path: '/distribution/whatsapp',          icon: MessageSquare,  requires: 'distribution.read' },
-      { label: 'SMS',             path: '/distribution/sms',               icon: Smartphone,     requires: 'sms.read' },
-      { label: 'Orchestration',   path: '/distribution/orchestration',     icon: Activity,       requires: 'distribution.read' },
-      { label: 'Analytics',       path: '/distribution/analytics',         icon: LineChart,      requires: 'distribution.read' },
+      { label: 'Distribution', path: '/distribution', icon: Send, requires: 'distribution.read' },
     ],
   },
   {
@@ -109,61 +87,25 @@ const NAV = [
   {
     title: 'Community Q&A',
     items: [
-      { label: 'Overview',         path: '/community/overview',     icon: MessagesSquare, requires: 'community.view' },
-      { label: 'Question Inbox',   path: '/community/questions',    icon: ShieldQuestion, requires: 'community.view' },
-      { label: 'Official Answers', path: '/community/answers',      icon: BadgeCheck,     requires: 'community.view' },
-      { label: 'Identities',       path: '/community/identities',   icon: Users,          requires: 'community_identity.manage' },
-      { label: 'Moderation',       path: '/community/moderation',   icon: ShieldCheck,    requires: 'community_question.moderate' },
-      { label: 'Deployments',      path: '/community/deployments',  icon: Send,           requires: 'community.view' },
-      { label: 'Analytics',        path: '/community/analytics',    icon: LineChart,      requires: 'community_analytics.view' },
-      { label: 'Settings',         path: '/community/settings',     icon: Settings,       requires: 'community_settings.manage' },
+      { label: 'Community Q&A', path: '/community', icon: MessagesSquare, requires: 'community.view' },
     ],
   },
   {
     title: 'AI Control Centre',
     items: [
-      { label: 'AI Dashboard',   path: ROUTES.AI_DASHBOARD,   icon: BrainCircuit, end: true, requires: 'ai.generate' },
-      { label: 'Providers',      path: ROUTES.AI_PROVIDERS,   icon: Cpu,          requires: 'ai_provider.manage' },
-      { label: 'Models',         path: ROUTES.AI_MODELS,      icon: Sparkles,     requires: 'ai_provider.manage' },
-      { label: 'Routing',        path: ROUTES.AI_ROUTING,     icon: Route,        requires: 'ai_provider.manage' },
-      { label: 'Prompts',        path: ROUTES.AI_PROMPTS,     icon: FlaskConical, requires: 'ai_prompt.approve' },
-      { label: 'Generations',    path: ROUTES.AI_GENERATIONS, icon: Zap,          requires: 'ai.generate' },
-      { label: 'Usage',          path: ROUTES.AI_USAGE,       icon: CircleDollarSign, requires: 'ai_provider.manage' },
-      { label: 'Budgets',        path: ROUTES.AI_BUDGETS,     icon: CircleDollarSign, requires: 'ai_provider.manage' },
-      { label: 'Validations',    path: ROUTES.AI_VALIDATIONS, icon: ShieldAlert,  requires: 'ai.generate' },
-      { label: 'Health',         path: ROUTES.AI_HEALTH,      icon: HeartPulse,   requires: 'ai_provider.manage' },
+      { label: 'AI Control Centre', path: ROUTES.AI, icon: BrainCircuit, requires: 'ai.generate' },
     ],
   },
   {
     title: 'Intelligence',
     items: [
-      { label: 'Overview',      path: '/intelligence',                    icon: Search,     end: true, requires: 'intelligence.read' },
-      { label: 'Search',        path: '/intelligence/search',             icon: Search,     requires: 'search.read' },
-      { label: 'Content',       path: '/intelligence/content',            icon: BarChart3,  requires: 'analytics.read' },
-      { label: 'Sitemaps',      path: '/intelligence/sitemaps',           icon: MapPin,     requires: 'sitemap.read' },
-      { label: 'IndexNow',      path: '/intelligence/indexnow',           icon: Zap,        requires: 'sitemap.submit' },
-      { label: 'Attribution',   path: '/intelligence/attribution',        icon: Link2,      requires: 'attribution.read' },
-      { label: 'AI Visibility', path: '/intelligence/visibility',         icon: Eye,        requires: 'visibility.read' },
-      { label: 'Competitors',   path: '/intelligence/competitors',        icon: Users2,     requires: 'competitor.read' },
-      { label: 'Connectors',    path: '/intelligence/connectors',         icon: Plug,       requires: 'connector.read' },
-      { label: 'Operations',    path: '/intelligence/operations',         icon: Activity,   requires: 'intelligence.operations' },
+      { label: 'Intelligence', path: '/intelligence', icon: Search, requires: 'intelligence.read' },
     ],
   },
   {
     title: 'Product Readiness',
     items: [
-      { label: 'Overview',           path: '/readiness',                    icon: LayoutDashboard, end: true, requires: 'readiness.read' },
-      { label: 'Recommendations',    path: '/readiness/refresh',            icon: RefreshCw,      requires: 'refresh.read' },
-      { label: 'Outcomes',           path: '/readiness/outcomes',           icon: Target,         requires: 'refresh_outcome.read' },
-      { label: 'Attribution',        path: '/readiness/attribution',        icon: BarChart3,      requires: 'attribution_model.read' },
-      { label: 'Security',           path: '/readiness/security',           icon: ShieldCheck,    requires: 'readiness.read' },
-      { label: 'Privacy',            path: '/readiness/privacy',            icon: Lock,           requires: 'readiness.read' },
-      { label: 'AI Governance',      path: '/readiness/ai-governance',      icon: Bot,            requires: 'readiness.read' },
-      { label: 'Migrations',         path: '/readiness/migrations',         icon: Database,       requires: 'readiness.read' },
-      { label: 'Operations',         path: '/readiness/operations',         icon: Activity,       requires: 'readiness.read' },
-      { label: 'Disaster Recovery',  path: '/readiness/disaster-recovery',  icon: Server,         requires: 'disaster_recovery.read' },
-      { label: 'Technical Debt',     path: '/readiness/technical-debt',     icon: Wrench,         requires: 'technical_debt.read' },
-      { label: 'Release Acceptance', path: '/readiness/release',            icon: CheckSquare,    requires: 'readiness.accept' },
+      { label: 'Product Readiness', path: '/readiness', icon: LayoutDashboard, requires: 'readiness.read' },
     ],
   },
   {
@@ -195,7 +137,7 @@ export function Sidebar() {
       width: 'var(--sidebar-width)', height: '100vh', position: 'fixed', top: 0, left: 0,
       zIndex: 200,
       background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)',
-      display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: 'auto',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
       boxSizing: 'border-box',
     }}>
       <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
@@ -204,7 +146,12 @@ export function Sidebar() {
         <div className="mt-2"><BotModeBadge /></div>
       </div>
 
-      <nav style={{ flex: 1, padding: '0.65rem 0.75rem', minWidth: 0 }}>
+      <nav style={{
+        flex: 1, minHeight: 0, minWidth: 0,
+        padding: '0.65rem 0.65rem 0.65rem 0.75rem',
+        overflowX: 'hidden', overflowY: 'auto',
+        scrollbarGutter: 'stable',
+      }}>
         {visibleSections.map((section) => (
           <div key={section.title} style={{ marginBottom: '1rem' }}>
             <p style={{
