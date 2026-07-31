@@ -8,14 +8,17 @@ namespace App\Libraries\Publishing\Connector;
  * Used in all automated tests and when REACH_PUB_MOCK=true.
  * Never makes real HTTP calls.
  * Stores calls in memory for assertion.
+ *
+ * Prefer PublicSitePublisherFactory::make() in application code so the same
+ * mock instance (and checksum bookkeeping) is reused across create/verify.
  */
 class MockPublicSitePublisher implements PublicSitePublisherInterface
 {
     /** @var array<int, array> */
     private array $calls = [];
 
-    /** Next mocked public_content_id counter (process-wide for factory make()). */
-    private static int $nextId = 1;
+    /** Next mocked public_content_id counter */
+    private int $nextId = 1;
 
     /** Can be set to simulate failures */
     private ?string $forceErrorCategory = null;
@@ -23,13 +26,14 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
     /**
      * Last checksum accepted for each mocked public_content_id, so
      * getVerification() reflects what was actually "published" instead of a
-     * fixed literal. Stored statically because PublicSitePublisherFactory::make()
-     * returns a fresh instance per call; without shared state, VERIFY would
-     * never see the checksum stored during createDraft/schedule.
+     * fixed literal. Without this, executeVerifyPublication()'s real
+     * checksum comparison against the deployment's real payload checksum
+     * would always report checksum_mismatch against this mock — a false
+     * failure caused by the test double, not by the code under test.
      *
      * @var array<int, string>
      */
-    private static array $checksumsById = [];
+    private array $checksumsById = [];
 
     public function forceError(?string $category): void
     {
@@ -44,9 +48,9 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
     public function reset(): void
     {
         $this->calls = [];
-        self::$nextId = 1;
+        $this->nextId = 1;
         $this->forceErrorCategory = null;
-        self::$checksumsById = [];
+        $this->checksumsById = [];
     }
 
     public function createDraft(array $envelope): array
@@ -57,9 +61,9 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             return $this->err($this->forceErrorCategory);
         }
 
-        $id   = self::$nextId++;
+        $id   = $this->nextId++;
         $uuid = 'mock-' . $id . '-' . substr(md5((string) $id), 0, 8);
-        self::$checksumsById[$id] = (string) ($envelope['payload_checksum'] ?? 'mock-checksum');
+        $this->checksumsById[$id] = (string) ($envelope['payload_checksum'] ?? 'mock-checksum');
 
         return [
             'success'                 => true,
@@ -83,7 +87,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         }
 
         if (isset($envelope['payload_checksum'])) {
-            self::$checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
+            $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
         }
 
         return [
@@ -103,7 +107,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         }
 
         if (isset($envelope['payload_checksum'])) {
-            self::$checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
+            $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
         }
 
         return [
@@ -115,7 +119,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             'public_version'   => 1,
             'published_at'     => date('Y-m-d\TH:i:s\Z'),
             'sitemap_status'   => 'included',
-            'payload_checksum' => $envelope['payload_checksum'] ?? (self::$checksumsById[$publicContentId] ?? 'mock-checksum'),
+            'payload_checksum' => $envelope['payload_checksum'] ?? ($this->checksumsById[$publicContentId] ?? 'mock-checksum'),
         ];
     }
 
@@ -128,7 +132,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         }
 
         if (isset($envelope['payload_checksum'])) {
-            self::$checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
+            $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
         }
 
         return [
@@ -137,7 +141,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             'public_content_id'=> $publicContentId,
             'public_status'    => 'scheduled',
             'scheduled_at'     => $scheduledAt,
-            'payload_checksum' => $envelope['payload_checksum'] ?? (self::$checksumsById[$publicContentId] ?? 'mock-checksum'),
+            'payload_checksum' => $envelope['payload_checksum'] ?? ($this->checksumsById[$publicContentId] ?? 'mock-checksum'),
             'canonical_url'    => 'https://aicountly.com/blog/mock-' . $publicContentId,
         ];
     }
@@ -186,39 +190,34 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             'public_status'        => 'published',
             'canonical_url'        => 'https://aicountly.com/blog/mock-' . $publicContentId,
             'public_version'       => 1,
-            'payload_checksum'     => self::$checksumsById[$publicContentId] ?? 'mock-checksum',
+            'payload_checksum'     => $this->checksumsById[$publicContentId] ?? 'mock-checksum',
             'reach_content_version'=> 1,
             'title'                => 'Mock Article',
             'body_hash'            => 'mock-body-hash',
             'structured_data_types'=> ['BlogPosting'],
             'sitemap_status'       => 'included',
             'robots_directive'     => 'index,follow',
-            'updated_at'           => date('Y-m-d\TH:i:s\Z'),
         ];
     }
 
-    public function triggerVerification(int $publicContentId): array
-    {
-        return $this->getVerification($publicContentId);
-    }
-
-    public function healthCheck(): bool
+    public function healthCheck(): array
     {
         $this->record('healthCheck', []);
-        return true;
+
+        return ['success' => true, 'healthy' => true, 'latency_ms' => 1];
     }
 
     private function record(string $method, array $args): void
     {
-        $this->calls[] = ['method' => $method, 'args' => $args, 'at' => microtime(true)];
+        $this->calls[] = ['method' => $method, 'args' => $args, 'at' => time()];
     }
 
     private function err(string $category): array
     {
         return [
-            'success'           => false,
-            'error_category'    => $category,
-            'safe_error_message'=> 'Mock forced error: ' . $category,
+            'success'             => false,
+            'error_category'      => $category,
+            'safe_error_message'  => 'Mock forced error: ' . $category,
         ];
     }
 }
