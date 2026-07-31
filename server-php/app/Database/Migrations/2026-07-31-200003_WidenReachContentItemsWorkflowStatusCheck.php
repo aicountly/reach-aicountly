@@ -55,14 +55,28 @@ class WidenReachContentItemsWorkflowStatusCheck extends Migration
 
     public function down(): void
     {
+        // Feature tests run with $refresh = true (migrate down → up between
+        // tests). By the time this down() runs, prior tests may have left
+        // blog-automation statuses (live, topic_candidate, …) in the column.
+        // Re-adding the narrower CHECK without normalizing those rows fails
+        // with "check constraint … is violated by some row" and aborts the
+        // entire Feature suite. Map any out-of-vocabulary value to archived
+        // first so the rollback constraint can be applied cleanly.
+        $narrow = [
+            'idea', 'brief', 'draft', 'validation_pending', 'review_pending',
+            'changes_requested', 'approved', 'scheduled', 'ready_for_publication',
+            'published', 'refresh_due', 'archived', 'rejected',
+        ];
+        $list = "'" . implode("','", $narrow) . "'";
+
         $this->db->query('ALTER TABLE reach_content_items DROP CONSTRAINT IF EXISTS rci_workflow_status_chk');
         $this->db->query(
+            "UPDATE reach_content_items SET workflow_status = 'archived' "
+            . "WHERE workflow_status NOT IN ({$list})"
+        );
+        $this->db->query(
             "ALTER TABLE reach_content_items ADD CONSTRAINT rci_workflow_status_chk "
-            . "CHECK (workflow_status IN ("
-            . "'idea','brief','draft','validation_pending','review_pending',"
-            . "'changes_requested','approved','scheduled','ready_for_publication',"
-            . "'published','refresh_due','archived','rejected'"
-            . "))"
+            . "CHECK (workflow_status IN ({$list}))"
         );
     }
 }
