@@ -62,7 +62,7 @@ class BlogPublicationPayloadBuilder
             ? (json_decode($rawSnapshot, true) ?? [])
             : (is_array($rawSnapshot) ? $rawSnapshot : []);
         $rawBody  = (string) ($version['body_html'] ?? $snapshot['body_html'] ?? $blogDetails['body_html'] ?? '');
-        $safeBody = HtmlSanitizer::sanitize($rawBody);
+        $safeBody = (new HtmlSanitizer())->purify($rawBody);
 
         // Structured data
         $structuredData = $this->db->table('reach_content_structured_data')
