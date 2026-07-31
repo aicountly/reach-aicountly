@@ -272,9 +272,14 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // internally, then lease + execute it exactly like the `reach:work`
         // worker (App\Commands\ReachWork) would.
         // -----------------------------------------------------------------
-        $jobRow = $db->table('reach_jobs')
-            ->where('payload_json LIKE', '%"deployment_id":' . $deploymentId . '%')
-            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+        // payload_json is JSONB — use a JSON path, not LIKE (Postgres rejects jsonb ~~ text).
+        $jobRow = $db->query(
+            "SELECT * FROM reach_jobs
+             WHERE (payload_json->>'deployment_id') = ?
+             ORDER BY id DESC
+             LIMIT 1",
+            [(string) $deploymentId],
+        )->getRowArray();
         $this->assertNotNull($jobRow, 'enqueuePublication() must create a real reach_jobs row for the worker to lease.');
 
         $jobService = new JobService();
