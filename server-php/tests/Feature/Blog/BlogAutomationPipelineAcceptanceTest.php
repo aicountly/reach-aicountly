@@ -237,6 +237,19 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // -----------------------------------------------------------------
         // Step 15: schedule publication through the real deployment service
         // -----------------------------------------------------------------
+        $existingConn = $db->table('reach_publication_connections')
+            ->where('connection_key', 'aicountly_com')->get()->getRowArray();
+        if (! $existingConn) {
+            $db->table('reach_publication_connections')->insert([
+                'connection_key' => 'aicountly_com',
+                'display_name'   => 'AICOUNTLY.com (test)',
+                'base_url'       => 'https://example.test',
+                'enabled'        => true,
+                'created_at'     => date('Y-m-d H:i:s'),
+                'updated_at'     => date('Y-m-d H:i:s'),
+            ]);
+        }
+
         $scheduleBlockId = $this->workBlocks->create([
             'block_type' => WorkBlockService::TYPE_SCHEDULE_PUBLISH,
             'content_item_id' => $contentItemId,
@@ -244,7 +257,7 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
             'input_json' => ['scheduled_at' => date('c', strtotime('+1 hour'))],
         ]);
         $scheduleResult = $this->workBlocks->execute($scheduleBlockId);
-        $this->assertArrayHasKey('deployment_id', $scheduleResult);
+        $this->assertArrayHasKey('deployment_id', $scheduleResult, 'SCHEDULE_PUBLISH must enqueue a deployment: ' . json_encode($scheduleResult));
         $deploymentId = (int) $scheduleResult['deployment_id'];
         $this->assertGreaterThan(0, $deploymentId);
         $this->assertSame(
