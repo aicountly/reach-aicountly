@@ -211,8 +211,10 @@ class AiGenerationOrchestrator
             }
 
             $run = $this->runs->create($requestId, $providerId, $modelId, $attemptNumber, $promptVersion ? (int) $promptVersion['id'] : null);
-            $this->runs->linkGroundingSnapshot($run['id'], (int) $snapshot['id']);
-            $this->runs->markRunning($run['id']);
+            // Postgres drivers often return numeric ids as strings.
+            $runId = (int) $run['id'];
+            $this->runs->linkGroundingSnapshot($runId, (int) $snapshot['id']);
+            $this->runs->markRunning($runId);
 
             $input = new AiGenerationInput(
                 systemPrompt:    $systemPrompt,
@@ -226,13 +228,13 @@ class AiGenerationOrchestrator
             try {
                 $result = $currentDecision->provider->generate($input);
                 $this->circuitBreaker->recordSuccess($providerKey);
-                $this->runs->markCompleted($run['id'], $result);
+                $this->runs->markCompleted($runId, $result);
 
-                $artifact = $this->artifacts->store($requestId, $run['id'], $result, $outputSchema);
+                $artifact = $this->artifacts->store($requestId, $runId, $result, $outputSchema);
 
                 $this->budget->recordUsage([
                     'generation_request_id' => $requestId,
-                    'generation_run_id'     => $run['id'],
+                    'generation_run_id'     => $runId,
                     'provider_id'           => $providerId,
                     'model_id'              => $modelId,
                     'prompt_version_id'     => $promptVersion ? (int) $promptVersion['id'] : null,
@@ -254,7 +256,7 @@ class AiGenerationOrchestrator
 
                     AuditLogger::record('ai.generation_completed', [
                         'request_id'   => $requestId,
-                        'run_id'       => $run['id'],
+                        'run_id'       => $runId,
                         'artifact_id'  => $artifact['id'],
                         'total_tokens' => $result->totalTokens,
                     ]);
@@ -265,7 +267,7 @@ class AiGenerationOrchestrator
                 return;
             } catch (AiProviderException $e) {
                 $this->circuitBreaker->recordFailure($providerKey, $e->getProviderError()->category);
-                $this->runs->markFailed($run['id'], $e->getProviderError());
+                $this->runs->markFailed($runId, $e->getProviderError());
 
                 if (! $e->isRetryable()) {
                     $this->failRequest($requestId, $e->getProviderError()->category, $e->getProviderError()->message);
