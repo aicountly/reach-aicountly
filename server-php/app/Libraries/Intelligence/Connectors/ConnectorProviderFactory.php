@@ -59,11 +59,18 @@ class ConnectorProviderFactory
 
     private static function envBool(string $key): bool
     {
-        $value = getenv($key);
-        if ($value === false || $value === '') {
-            $value = $_ENV[$key] ?? '';
+        // Prefer $_ENV over getenv(): dotenv / putenv() can leave a stale
+        // "false" in the process environment that would otherwise shadow an
+        // intentional $_ENV override (tests and request-scoped flips).
+        if (array_key_exists($key, $_ENV)) {
+            return filter_var((string) $_ENV[$key], FILTER_VALIDATE_BOOL);
         }
 
-        return filter_var(is_string($value) ? $value : '', FILTER_VALIDATE_BOOL);
+        $value = getenv($key);
+        if ($value === false || $value === '') {
+            return false;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOL);
     }
 }

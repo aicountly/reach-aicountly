@@ -25,6 +25,8 @@ final class GoogleAnalyticsContentConnectorTest extends CIUnitTestCase
     {
         ConnectorProviderFactory::useMocks(false);
         unset($_ENV['CONTENT_ANALYTICS_USE_MOCK'], $_ENV['CONTENT_ANALYTICS_ENABLED']);
+        putenv('CONTENT_ANALYTICS_USE_MOCK');
+        putenv('CONTENT_ANALYTICS_ENABLED');
         parent::tearDown();
     }
 
@@ -163,6 +165,7 @@ final class GoogleAnalyticsContentConnectorTest extends CIUnitTestCase
     {
         ConnectorProviderFactory::useMocks(false);
         $_ENV['CONTENT_ANALYTICS_USE_MOCK'] = 'true';
+        putenv('CONTENT_ANALYTICS_USE_MOCK=true');
 
         $this->assertInstanceOf(
             MockContentAnalyticsConnector::class,

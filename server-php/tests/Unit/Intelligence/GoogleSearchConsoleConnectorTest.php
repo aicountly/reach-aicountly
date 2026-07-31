@@ -21,6 +21,8 @@ final class GoogleSearchConsoleConnectorTest extends CIUnitTestCase
     {
         ConnectorProviderFactory::useMocks(false);
         unset($_ENV['SEARCH_CONSOLE_USE_MOCK'], $_ENV['SEARCH_CONSOLE_ENABLED']);
+        putenv('SEARCH_CONSOLE_USE_MOCK');
+        putenv('SEARCH_CONSOLE_ENABLED');
         parent::tearDown();
     }
 
@@ -242,6 +244,7 @@ final class GoogleSearchConsoleConnectorTest extends CIUnitTestCase
     {
         ConnectorProviderFactory::useMocks(false);
         $_ENV['SEARCH_CONSOLE_USE_MOCK'] = 'true';
+        putenv('SEARCH_CONSOLE_USE_MOCK=true');
 
         $this->assertInstanceOf(
             MockSearchConsoleConnector::class,
