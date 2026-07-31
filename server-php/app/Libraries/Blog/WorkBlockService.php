@@ -1375,7 +1375,7 @@ class WorkBlockService
         $now = date('Y-m-d H:i:s');
         $this->db->table('reach_work_blocks')->where('id', $id)->update([
             'eligibility_status'     => 'blocked',
-            'failure_classification' => $reason,
+            'failure_classification' => mb_substr($reason, 0, 64),
             'output_json'            => json_encode($output, JSON_UNESCAPED_SLASHES),
             'updated_at'             => $now,
         ]);
@@ -1397,10 +1397,17 @@ class WorkBlockService
             'block_type' => $blockType,
         ];
 
+        // failure_classification is VARCHAR(64). Callers often pass a full
+        // RuntimeException message (far longer), which previously aborted the
+        // Feature suite with "value too long for type character varying(64)".
+        // Keep the full reason in output_json; store a stable truncated label
+        // in the classification column.
+        $classification = mb_substr(preg_replace('/\s+/', '_', strtolower(trim($reason))) ?? $reason, 0, 64);
+
         $now = date('Y-m-d H:i:s');
         $this->db->table('reach_work_blocks')->where('id', $id)->update([
             'eligibility_status'     => 'failed',
-            'failure_classification' => $reason,
+            'failure_classification' => $classification,
             'output_json'            => json_encode($output, JSON_UNESCAPED_SLASHES),
             'completed_at'           => $now,
             'updated_at'             => $now,

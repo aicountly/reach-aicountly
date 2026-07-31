@@ -60,8 +60,8 @@ class BlogReadinessService
             $blocking[] = 'No content version found';
         }
 
-        // Gate 4: version not superseded
-        if ($version && $version['status'] === 'superseded') {
+        // Gate 4: version not superseded (status is optional / additive on versions)
+        if ($version && (($version['status'] ?? null) === 'superseded')) {
             $blocking[] = 'Current version is superseded; a new version must be approved';
         }
 
