@@ -250,11 +250,15 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
             ]);
         }
 
+        // Use a due-now schedule so the queued worker job is immediately
+        // leasable (available_at <= NOW()). A future scheduled_at would
+        // correctly defer the job, which prevents exercising the real
+        // lease + handler path in this acceptance test.
         $scheduleBlockId = $this->workBlocks->create([
             'block_type' => WorkBlockService::TYPE_SCHEDULE_PUBLISH,
             'content_item_id' => $contentItemId,
             'content_version_id' => $contentVersionId,
-            'input_json' => ['scheduled_at' => date('c', strtotime('+1 hour'))],
+            'input_json' => ['scheduled_at' => date('c', strtotime('-1 minute'))],
         ]);
         $scheduleResult = $this->workBlocks->execute($scheduleBlockId);
         $this->assertArrayHasKey('deployment_id', $scheduleResult, 'SCHEDULE_PUBLISH must enqueue a deployment: ' . json_encode($scheduleResult));
@@ -284,7 +288,12 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
 
         $jobService = new JobService();
         $leased = $jobService->reserve((string) $jobRow['queue'], 'e2e-test-worker');
-        $this->assertNotNull($leased, 'The publication job must be leasable from its queue.');
+        $this->assertNotNull($leased, 'The publication job must be leasable from its queue. job=' . json_encode([
+            'id' => $jobRow['id'] ?? null,
+            'queue' => $jobRow['queue'] ?? null,
+            'status' => $jobRow['status'] ?? null,
+            'available_at' => $jobRow['available_at'] ?? null,
+        ]));
         $this->assertSame((int) $jobRow['id'], (int) $leased['id']);
 
         $handlerResult = (new JobHandlerRegistry())->execute($leased);
