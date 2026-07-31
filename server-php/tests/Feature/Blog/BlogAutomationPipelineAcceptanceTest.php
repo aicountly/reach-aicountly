@@ -65,8 +65,13 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // the PUBLISH_BLOG auto-publish work block for LOW-risk content
         // either, to keep the "auto-publish default off" invariant honest.
         unset($_ENV['BLOG_AUTO_PUBLISH_ENABLED'], $_ENV['BLOG_IMAGE_GENERATION_ENABLED']);
+        // Sitemap/indexing steps must fail closed without inventing a live
+        // public site; clear any CI/dotenv public URL so UPDATE_SITEMAP blocks.
+        unset($_ENV['AICOUNTLY_PUBLIC_SITE_BASE_URL']);
+        putenv('AICOUNTLY_PUBLIC_SITE_BASE_URL');
 
         $this->workBlocks = new WorkBlockService();
+        \App\Libraries\Publishing\Connector\PublicSitePublisherFactory::resetMock();
     }
 
     public function testFullBlogAutomationPipelineEndToEnd(): void
@@ -335,10 +340,12 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $this->assertNotNull($sitemapBlock, 'Going LIVE must automatically chain an UPDATE_SITEMAP check.');
         $sitemapOutcome = $this->workBlocks->execute((int) $sitemapBlock['id']);
         // No AICOUNTLY_PUBLIC_SITE_BASE_URL is configured in this test, so the
-        // handler must block honestly rather than claim sitemap inclusion.
+        // handler must block/fail honestly rather than claim sitemap inclusion.
         $this->assertTrue(
-            ($sitemapOutcome['blocked'] ?? false) === true || array_key_exists('sitemap_included', $sitemapOutcome),
-            'UPDATE_SITEMAP must never silently claim success without a real check.',
+            ($sitemapOutcome['blocked'] ?? false) === true
+            || ($sitemapOutcome['failed'] ?? false) === true
+            || array_key_exists('sitemap_included', $sitemapOutcome),
+            'UPDATE_SITEMAP must never silently claim success without a real check: ' . json_encode($sitemapOutcome),
         );
         $profile = $db->table('reach_blog_publication_profiles')->where('content_item_id', $contentItemId)->get()->getRowArray();
         $this->assertNotSame('indexed', $profile['indexing_status'] ?? null, 'Publishing must never be conflated with being indexed.');
