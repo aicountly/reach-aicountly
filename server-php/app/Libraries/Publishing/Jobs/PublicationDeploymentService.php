@@ -234,6 +234,11 @@ class PublicationDeploymentService
             }
 
             if ($response['success'] ?? false) {
+                // Always persist the Reach-computed checksum; mock/public
+                // responses may omit it on schedule/publish follow-on calls.
+                if (empty($response['payload_checksum'])) {
+                    $response['payload_checksum'] = $checksum;
+                }
                 $this->onSuccess($deploymentId, $attemptId, $response, $deployment);
             } else {
                 $this->onFailure($deploymentId, $attemptId, $response['error_category'] ?? 'unknown_error', $response['safe_error_message'] ?? '');
