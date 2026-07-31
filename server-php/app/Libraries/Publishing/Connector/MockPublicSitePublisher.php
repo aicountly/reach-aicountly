@@ -8,9 +8,6 @@ namespace App\Libraries\Publishing\Connector;
  * Used in all automated tests and when REACH_PUB_MOCK=true.
  * Never makes real HTTP calls.
  * Stores calls in memory for assertion.
- *
- * Prefer PublicSitePublisherFactory::make() in application code so the same
- * mock instance (and checksum bookkeeping) is reused across create/verify.
  */
 class MockPublicSitePublisher implements PublicSitePublisherInterface
 {
@@ -62,7 +59,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         }
 
         $id   = $this->nextId++;
-        $uuid = 'mock-' . $id . '-' . substr(md5((string) $id), 0, 8);
+        $uuid = 'mock-' . $id . '-' . substr(md5($id), 0, 8);
         $this->checksumsById[$id] = (string) ($envelope['payload_checksum'] ?? 'mock-checksum');
 
         return [
@@ -197,27 +194,32 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             'structured_data_types'=> ['BlogPosting'],
             'sitemap_status'       => 'included',
             'robots_directive'     => 'index,follow',
+            'updated_at'           => date('Y-m-d\TH:i:s\Z'),
         ];
     }
 
-    public function healthCheck(): array
+    public function triggerVerification(int $publicContentId): array
+    {
+        return $this->getVerification($publicContentId);
+    }
+
+    public function healthCheck(): bool
     {
         $this->record('healthCheck', []);
-
-        return ['success' => true, 'healthy' => true, 'latency_ms' => 1];
+        return true;
     }
 
     private function record(string $method, array $args): void
     {
-        $this->calls[] = ['method' => $method, 'args' => $args, 'at' => time()];
+        $this->calls[] = ['method' => $method, 'args' => $args, 'at' => microtime(true)];
     }
 
     private function err(string $category): array
     {
         return [
-            'success'             => false,
-            'error_category'      => $category,
-            'safe_error_message'  => 'Mock forced error: ' . $category,
+            'success'           => false,
+            'error_category'    => $category,
+            'safe_error_message'=> 'Mock forced error: ' . $category,
         ];
     }
 }
