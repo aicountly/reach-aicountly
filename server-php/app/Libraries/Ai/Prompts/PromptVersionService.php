@@ -59,11 +59,11 @@ class PromptVersionService
 
         $db->transComplete();
 
-        AuditLogger::log('ai.prompt_version_created', [
+        AuditLogger::record('ai.prompt_version_created', [
             'template_id' => $templateId,
             'version_id'  => $id,
             'version_num' => $nextNum,
-        ], $actor);
+        ], $actor['user_id'] ?? null);
 
         return $this->findById($id);
     }
@@ -109,10 +109,10 @@ class PromptVersionService
 
         $db->transComplete();
 
-        AuditLogger::log('ai.prompt_version_approved', [
+        AuditLogger::record('ai.prompt_version_approved', [
             'template_id' => $version['prompt_template_id'],
             'version_id'  => $versionId,
-        ], $actor);
+        ], $actor['user_id'] ?? null);
 
         return $this->findById($versionId);
     }

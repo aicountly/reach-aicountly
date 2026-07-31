@@ -1,4 +1,5 @@
 /vendor/
+/composer.phar
 /writable/cache/*
 !/writable/cache/.gitkeep
 /writable/logs/*

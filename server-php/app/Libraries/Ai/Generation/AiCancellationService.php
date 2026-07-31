@@ -38,10 +38,10 @@ class AiCancellationService
 
         $this->requests->cancel($requestId, $reason);
 
-        AuditLogger::log('ai.generation_cancelled', [
+        AuditLogger::record('ai.generation_cancelled', [
             'request_id' => $requestId,
             'reason'     => $reason,
-        ], $actor);
+        ], $actor['user_id'] ?? null);
 
         return $this->requests->findById($requestId);
     }

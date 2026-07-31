@@ -3,6 +3,7 @@
 namespace App\Libraries\Publishing\Jobs;
 
 use App\Libraries\AuditLogger;
+use App\Libraries\JobService;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
 use App\Libraries\Publishing\Seo\PublicationReadinessAggregator;
@@ -18,11 +19,13 @@ class PublicationDeploymentService
 {
     private \CodeIgniter\Database\BaseConnection $db;
     private PublishingErrorClassifier $classifier;
+    private JobService $jobService;
 
-    public function __construct()
+    public function __construct(?JobService $jobService = null)
     {
         $this->db         = \Config\Database::connect();
         $this->classifier = new PublishingErrorClassifier();
+        $this->jobService = $jobService ?? new JobService();
     }
 
     /**
@@ -79,19 +82,9 @@ class PublicationDeploymentService
             'updated_at'         => date('Y-m-d H:i:s'),
         ]);
 
-        $deploymentId = $this->db->insertID();
+        $deploymentId = (int) $this->db->insertID();
 
-        // Enqueue to Phase 0 job queue
-        $this->db->table('reach_jobs')->insert([
-            'type'       => 'publication',
-            'payload'    => json_encode([
-                'job_class'     => 'PublicationJob',
-                'deployment_id' => $deploymentId,
-            ]),
-            'status'     => 'pending',
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+        $this->enqueuePublicationJob($deploymentId, $idempotencyKey, $scheduledAt);
 
         AuditLogger::record('publishing.queued', [
             'content_item_id' => $contentItemId,
@@ -103,7 +96,39 @@ class PublicationDeploymentService
     }
 
     /**
-     * Process a deployment â€” called by the job worker.
+     * Enqueue a publication job via JobService (testable wiring point).
+     */
+    public function enqueuePublicationJob(
+        int $deploymentId,
+        string $idempotencyKey,
+        ?string $scheduledAt = null,
+        bool $isRetry = false
+    ): int {
+        $payload = ['deployment_id' => $deploymentId];
+        if ($isRetry) {
+            $payload['is_retry'] = true;
+        }
+
+        $opts = [
+            'queue'           => 'publishing',
+            'idempotency_key' => $idempotencyKey . ($isRetry ? ':retry' : ''),
+            'priority'        => 10,
+        ];
+
+        if ($scheduledAt !== null && $scheduledAt !== '') {
+            return $this->jobService->enqueueAt(
+                'reach.publication',
+                $payload,
+                $scheduledAt,
+                $opts,
+            );
+        }
+
+        return $this->jobService->enqueue('reach.publication', $payload, $opts);
+    }
+
+    /**
+     * Process a deployment — called by the job worker.
      */
     public function processDeployment(int $deploymentId): void
     {

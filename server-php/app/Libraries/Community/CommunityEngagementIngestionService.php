@@ -71,7 +71,7 @@ class CommunityEngagementIngestionService
 
         $id = $db->insertID();
 
-        AuditLogger::log(AuditLogger::COMMUNITY_ENGAGEMENT_RECORDED, [
+        AuditLogger::record(AuditLogger::COMMUNITY_ENGAGEMENT_RECORDED, [
             'answer_uuid' => $answerUuid,
             'event_type'  => $eventType,
             'event_id'    => $id,

@@ -2,92 +2,202 @@
 
 namespace App\Jobs;
 
+use App\Libraries\AuditLogger;
 use App\Libraries\JobContext;
 use App\Libraries\JobHandlerInterface;
-use App\Libraries\AuditLogger;
 
 /**
  * Phase 5 — Community Analytics Reconciliation Job.
  *
  * Job type key: reach.community_analytics_reconciliation
  *
- * Payload: { "cache_date": "YYYY-MM-DD" (optional, defaults to yesterday) }
+ * Payload: { "date": "YYYY-MM-DD" (optional, defaults to yesterday) }
  *
- * Refreshes the reach_community_analytics_cache table with aggregated
- * genuine engagement counts for a given day. Only validated events
- * (is_validated = TRUE) are counted.
+ * Aggregates a single day into reach_community_analytics_cache.
+ *
+ * The cache table is keyed by (metric_key, dimension, period_start, period_end)
+ * with a numeric `value` — this job writes exactly that shape. An earlier
+ * version queried cache_date/event_count/answer_external_id/is_validated, none
+ * of which exist in any migration, so every run failed.
  */
 class CommunityAnalyticsReconciliationJob implements JobHandlerInterface
 {
     public function handle(array $payload, JobContext $ctx): array
     {
-        $cacheDate = $payload['cache_date'] ?? date('Y-m-d', strtotime('-1 day'));
+        $date        = (string) ($payload['date'] ?? $payload['cache_date'] ?? date('Y-m-d', strtotime('-1 day')));
+        $periodStart = $date . ' 00:00:00';
+        $periodEnd   = $date . ' 23:59:59';
 
-        $db = db_connect();
-
-        // Aggregate genuine engagement by answer + event type for the day
-        $rows = $db->query("
-            SELECT
-                ea.answer_id,
-                e.event_type,
-                COUNT(*) AS event_count
-            FROM reach_community_engagement_events e
-            JOIN reach_community_official_answers ea ON ea.external_id = e.answer_external_id
-            WHERE e.is_validated = TRUE
-              AND DATE(e.created_at) = :cacheDate
-            GROUP BY ea.answer_id, e.event_type
-        ", [':cacheDate' => $cacheDate])->getResultArray();
-
-        foreach ($rows as $row) {
-            $db->query("
-                INSERT INTO reach_community_analytics_cache
-                    (cache_date, answer_id, event_type, event_count, last_reconciled_at)
-                VALUES (:cacheDate, :answerId, :eventType, :eventCount, NOW())
-                ON CONFLICT (cache_date, answer_id, event_type) DO UPDATE SET
-                    event_count         = EXCLUDED.event_count,
-                    last_reconciled_at  = NOW()
-            ", [
-                ':cacheDate'  => $cacheDate,
-                ':answerId'   => (int) $row['answer_id'],
-                ':eventType'  => $row['event_type'],
-                ':eventCount' => (int) $row['event_count'],
-            ]);
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new \InvalidArgumentException("CommunityAnalyticsReconciliationJob: invalid date '{$date}'.");
         }
 
-        // Also compute per-space aggregates
-        $spaceRows = $db->query("
-            SELECT
-                q.space_id,
-                COUNT(DISTINCT a.id)  AS total_answers,
-                COUNT(DISTINCT CASE WHEN a.status = 'published' THEN a.id END) AS published_answers,
-                COUNT(DISTINCT aq.id) AS total_questions
-            FROM reach_community_official_answers a
-            JOIN reach_community_questions aq ON aq.id = a.question_id
-            JOIN reach_community_spaces q ON q.id = aq.space_id
-            WHERE a.status != 'withdrawn'
-            GROUP BY q.space_id
-        ")->getResultArray();
+        $db      = db_connect();
+        $written = 0;
 
-        foreach ($spaceRows as $row) {
-            $db->query("
-                INSERT INTO reach_community_analytics_cache
-                    (cache_date, space_id, event_type, event_count, last_reconciled_at)
-                VALUES (:cacheDate, :spaceId, 'space_summary', :cnt, NOW())
-                ON CONFLICT (cache_date, space_id, event_type) DO UPDATE SET
-                    event_count        = EXCLUDED.event_count,
-                    last_reconciled_at = NOW()
-            ", [
-                ':cacheDate' => $cacheDate,
-                ':spaceId'   => (int) $row['space_id'],
-                ':cnt'       => (int) $row['published_answers'],
-            ]);
+        // 1. Genuine engagement per answer and event type. Only validated,
+        //    non-bot-filtered events are counted.
+        $engagement = $db->query(
+            'SELECT e.answer_id, e.event_type, COUNT(*) AS total
+               FROM reach_community_engagement_events e
+              WHERE e.validated = TRUE
+                AND e.bot_filtered = FALSE
+                AND e.answer_id IS NOT NULL
+                AND e.event_timestamp >= ?
+                AND e.event_timestamp <= ?
+              GROUP BY e.answer_id, e.event_type',
+            [$periodStart, $periodEnd]
+        )->getResultArray();
+
+        foreach ($engagement as $row) {
+            $written += $this->upsert(
+                $db,
+                'engagement.' . $row['event_type'],
+                'answer:' . (int) $row['answer_id'],
+                $periodStart,
+                $periodEnd,
+                (float) $row['total'],
+                ['answer_id' => (int) $row['answer_id'], 'event_type' => $row['event_type']]
+            );
         }
 
-        AuditLogger::log(AuditLogger::COMMUNITY_ANALYTICS_RECONCILED, [
-            'cache_date'  => $cacheDate,
-            'rows_synced' => count($rows),
-        ]);
+        // 2. Question funnel counts for the day, by status.
+        $questions = $db->query(
+            'SELECT status, COUNT(*) AS total
+               FROM reach_community_questions
+              WHERE created_at >= ? AND created_at <= ?
+              GROUP BY status',
+            [$periodStart, $periodEnd]
+        )->getResultArray();
 
-        return ['ok' => true, 'cache_date' => $cacheDate, 'rows_synced' => count($rows)];
+        foreach ($questions as $row) {
+            $written += $this->upsert(
+                $db,
+                'questions.by_status',
+                (string) $row['status'],
+                $periodStart,
+                $periodEnd,
+                (float) $row['total'],
+                ['status' => $row['status']]
+            );
+        }
+
+        // 3. Answer funnel counts for the day, by status and risk tier.
+        $answers = $db->query(
+            'SELECT status, risk_tier, COUNT(*) AS total
+               FROM reach_community_official_answers
+              WHERE created_at >= ? AND created_at <= ?
+              GROUP BY status, risk_tier',
+            [$periodStart, $periodEnd]
+        )->getResultArray();
+
+        foreach ($answers as $row) {
+            $written += $this->upsert(
+                $db,
+                'answers.by_status',
+                $row['status'] . '|tier:' . (int) $row['risk_tier'],
+                $periodStart,
+                $periodEnd,
+                (float) $row['total'],
+                ['status' => $row['status'], 'risk_tier' => (int) $row['risk_tier']]
+            );
+        }
+
+        // 4. Publication outcomes for the day.
+        $deployments = $db->query(
+            'SELECT status, COUNT(*) AS total
+               FROM reach_community_deployments
+              WHERE created_at >= ? AND created_at <= ?
+              GROUP BY status',
+            [$periodStart, $periodEnd]
+        )->getResultArray();
+
+        foreach ($deployments as $row) {
+            $written += $this->upsert(
+                $db,
+                'publications.by_status',
+                (string) $row['status'],
+                $periodStart,
+                $periodEnd,
+                (float) $row['total'],
+                ['status' => $row['status']]
+            );
+        }
+
+        // 5. Human review backlog and stale-answer backlog as of this run.
+        $backlog = $db->query(
+            "SELECT
+                COUNT(*) FILTER (WHERE status IN ('editorial_review','professional_review')) AS review_backlog,
+                COUNT(*) FILTER (WHERE freshness_deadline IS NOT NULL AND freshness_deadline < CURRENT_DATE
+                                   AND status = 'published')                                 AS stale_answers,
+                COUNT(*) FILTER (WHERE reverification_state = 'due')                         AS reverification_backlog
+               FROM reach_community_official_answers"
+        )->getRowArray() ?? [];
+
+        foreach (['review_backlog', 'stale_answers', 'reverification_backlog'] as $metric) {
+            $written += $this->upsert(
+                $db,
+                'backlog.' . $metric,
+                'global',
+                $periodStart,
+                $periodEnd,
+                (float) ($backlog[$metric] ?? 0),
+                []
+            );
+        }
+
+        // 6. Bot versus human contribution ratio for published answers.
+        $contribution = $db->query(
+            "SELECT
+                COUNT(*) FILTER (WHERE ai_assisted = TRUE)  AS bot_authored,
+                COUNT(*) FILTER (WHERE ai_assisted = FALSE) AS human_authored
+               FROM reach_community_official_answers
+              WHERE status = 'published'"
+        )->getRowArray() ?? [];
+
+        foreach (['bot_authored', 'human_authored'] as $metric) {
+            $written += $this->upsert(
+                $db,
+                'contribution.' . $metric,
+                'global',
+                $periodStart,
+                $periodEnd,
+                (float) ($contribution[$metric] ?? 0),
+                []
+            );
+        }
+
+        AuditLogger::record(AuditLogger::COMMUNITY_ANALYTICS_RECONCILED, [
+            'date'           => $date,
+            'metrics_written' => $written,
+        ], $ctx->enqueuedByUserId);
+
+        return ['ok' => true, 'date' => $date, 'metrics_written' => $written];
+    }
+
+    /**
+     * Upsert against the real cache key: (metric_key, dimension, period_start, period_end).
+     */
+    private function upsert(
+        $db,
+        string $metricKey,
+        string $dimension,
+        string $periodStart,
+        string $periodEnd,
+        float $value,
+        array $meta
+    ): int {
+        $db->query(
+            'INSERT INTO reach_community_analytics_cache
+                (metric_key, dimension, period_start, period_end, value, meta, computed_at)
+             VALUES (?, ?, ?, ?, ?, ?::jsonb, NOW())
+             ON CONFLICT (metric_key, dimension, period_start, period_end) DO UPDATE SET
+                value       = EXCLUDED.value,
+                meta        = EXCLUDED.meta,
+                computed_at = NOW()',
+            [$metricKey, $dimension, $periodStart, $periodEnd, $value, json_encode($meta)]
+        );
+
+        return 1;
     }
 }

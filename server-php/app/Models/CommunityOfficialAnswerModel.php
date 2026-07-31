@@ -22,6 +22,10 @@ class CommunityOfficialAnswerModel extends Model
         'jurisdiction', 'product', 'language',
         'correction_state', 'correction_note',
         'withdrawal_state', 'status',
+        'risk_tier', 'scheduled_at', 'verification_provider', 'verified_at',
+        'applicability_date', 'freshness_deadline', 'reverification_state',
+        'style_profile_id', 'operational_role', 'revision_number',
+        'public_correction_note',
     ];
 
     protected array $casts = [

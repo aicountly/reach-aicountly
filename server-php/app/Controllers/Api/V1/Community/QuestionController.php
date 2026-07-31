@@ -74,14 +74,19 @@ class QuestionController extends BaseApiController
     /** POST /community/questions — manual intake */
     public function create(): ResponseInterface
     {
-        $body = $this->request->getJSON(true) ?? [];
+        $body   = $this->request->getJSON(true) ?? [];
+        $actor  = $this->userId();
+
         try {
-            $intakeService = new CommunityQuestionIntakeService();
-            $question = $intakeService->ingest($body);
-            AuditLogger::record(AuditLogger::COMMUNITY_QUESTION_INGESTED, ['question_uuid' => $question['external_id']]);
+            $question = (new CommunityQuestionIntakeService())->intake($body, $actor);
+            AuditLogger::record(
+                AuditLogger::COMMUNITY_QUESTION_INGESTED,
+                ['question_uuid' => $question['uuid'] ?? null],
+                $actor
+            );
             return $this->response->setStatusCode(201)->setJSON(['data' => $question]);
-        } catch (\InvalidArgumentException $e) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'error' => $e->getMessage()]);
         }
     }
 

@@ -120,12 +120,18 @@ class CommunityModerationController extends BaseApiController
     public function runModeration(string $answerUuid): ResponseInterface
     {
         try {
-            $modSvc   = new OfficialAnswerModerationService();
-            $findings = $modSvc->moderate($answerUuid);
-            AuditLogger::record(AuditLogger::COMMUNITY_MODERATION_RUN, ['answer_uuid' => $answerUuid]);
+            $findings = (new \App\Libraries\Community\OfficialAnswerLifecycleService())
+                ->moderate($answerUuid, null, $this->userId());
+
+            AuditLogger::record(
+                AuditLogger::COMMUNITY_MODERATION_RUN,
+                ['answer_uuid' => $answerUuid, 'decision' => $findings['decision'] ?? null],
+                $this->userId()
+            );
             return $this->response->setJSON(['data' => $findings]);
         } catch (\RuntimeException $e) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
+            $status = str_contains($e->getMessage(), 'not found') ? 404 : 422;
+            return $this->response->setStatusCode($status)->setJSON(['ok' => false, 'error' => $e->getMessage()]);
         }
     }
 }

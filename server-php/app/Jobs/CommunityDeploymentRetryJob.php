@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Libraries\AuditLogger;
+use App\Libraries\Community\OfficialAnswerPublishingService;
 use App\Libraries\JobContext;
 use App\Libraries\JobHandlerInterface;
-use App\Libraries\Community\OfficialAnswerPublishingService;
 use App\Models\CommunityDeploymentModel;
-use App\Libraries\AuditLogger;
 
 /**
  * Phase 5 — Community Deployment Retry Job.
@@ -15,33 +15,46 @@ use App\Libraries\AuditLogger;
  *
  * Payload: { "deployment_uuid": "string" }
  *
- * Retries a failed community publishing deployment up to the configured
- * max attempt limit.
+ * Retries a failed community publishing deployment, reusing the original
+ * idempotency key so that a retry cannot produce a second public publication.
+ * The job fails when the deployment is dead-lettered so the queue records a
+ * failure rather than a false success.
  */
 class CommunityDeploymentRetryJob implements JobHandlerInterface
 {
     public function handle(array $payload, JobContext $ctx): array
     {
-        $deploymentUuid = $payload['deployment_uuid'] ?? '';
-        if (empty($deploymentUuid)) {
+        $deploymentUuid = (string) ($payload['deployment_uuid'] ?? '');
+        if ($deploymentUuid === '') {
             throw new \InvalidArgumentException('CommunityDeploymentRetryJob: deployment_uuid is required.');
         }
 
-        $model      = new CommunityDeploymentModel();
-        $deployment = $model->findByUuid($deploymentUuid);
-
-        if (!$deployment) {
+        $deployment = (new CommunityDeploymentModel())->findByUuid($deploymentUuid);
+        if ($deployment === null) {
             throw new \RuntimeException("Deployment not found: {$deploymentUuid}");
         }
 
-        $pubSvc = new OfficialAnswerPublishingService();
-        $result = $pubSvc->retryDeployment($deployment);
+        $actorId = $ctx->enqueuedByUserId;
+        $result  = (new OfficialAnswerPublishingService())->retryDeployment($deployment, $actorId);
+        $outcome = (string) ($result['outcome'] ?? 'unknown');
 
-        AuditLogger::log(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, [
+        AuditLogger::record(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, [
             'deployment_uuid' => $deploymentUuid,
-            'outcome'         => $result['outcome'] ?? 'unknown',
-        ]);
+            'outcome'         => $outcome,
+            'attempts'        => $result['attempts'] ?? null,
+        ], $actorId);
 
-        return ['ok' => true, 'deployment_uuid' => $deploymentUuid];
+        if (in_array($outcome, ['dead_letter', 'approval_invalidated'], true)) {
+            throw new \RuntimeException(
+                "Deployment {$deploymentUuid} could not be republished (outcome: {$outcome})."
+            );
+        }
+
+        return [
+            'ok'              => $outcome !== 'retrying',
+            'deployment_uuid' => $deploymentUuid,
+            'outcome'         => $outcome,
+            'attempts'        => $result['attempts'] ?? null,
+        ];
     }
 }

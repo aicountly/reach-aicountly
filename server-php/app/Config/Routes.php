@@ -122,6 +122,19 @@ $routes->group('v1', static function ($routes) {
         $routes->get('blog/posts/(:num)/versions',        'Api\\V1\\BlogVersionController::index/$1',      ['filter' => 'permission:blog.view']);
         $routes->get('blog/posts/(:num)/versions/(:num)', 'Api\\V1\\BlogVersionController::show/$1/$2',    ['filter' => 'permission:blog.view']);
 
+        // Blog Command Centre
+        $routes->get('blog-command-centre/overview',                 'BlogCommandCentreController::overview',        ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/settings/portfolio',     'BlogCommandCentreController::getPortfolio',    ['filter' => 'permission:blog.view']);
+        $routes->put('blog-command-centre/settings/portfolio',     'BlogCommandCentreController::updatePortfolio', ['filter' => 'permission:blog.edit']);
+        $routes->get('blog-command-centre/settings',               'BlogCommandCentreController::getSettings',   ['filter' => 'permission:blog.view']);
+        $routes->put('blog-command-centre/settings',                 'BlogCommandCentreController::updateSettings', ['filter' => 'permission:blog.edit']);
+        $routes->get('blog-command-centre/roadmap/candidates',       'BlogCommandCentreController::roadmapCandidates', ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/roadmap/scored',           'BlogCommandCentreController::roadmapScored',     ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/roadmap/decisions',        'BlogCommandCentreController::roadmapDecisions',  ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/roadmap/optimizer-runs',   'BlogCommandCentreController::optimizerRuns',     ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::scoringWeights',    ['filter' => 'permission:blog.view']);
+        $routes->put('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::updateScoringWeights', ['filter' => 'permission:blog.edit']);
+
         // Content calendar
         $routes->get('calendar/items',           'Api\\V1\\ContentCalendarController::index',      ['filter' => 'permission:blog.view']);
         $routes->post('calendar/items',          'Api\\V1\\ContentCalendarController::store',      ['filter' => 'permission:blog.edit']);
@@ -577,6 +590,12 @@ $routes->group('v1', static function ($routes) {
         $routes->put('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::update/$1',                 ['filter' => 'permission:community_answer.edit']);
         $routes->get('community/answers/(:segment)/versions',                'Api\\V1\\Community\\OfficialAnswerController::versions/$1',               ['filter' => 'permission:community.view']);
         $routes->post('community/answers/(:segment)/generate',               'Api\\V1\\Community\\OfficialAnswerController::generate/$1',               ['filter' => 'permission:community_answer.generate']);
+        $routes->post('community/answers/(:segment)/validate',               'Api\\V1\\Community\\OfficialAnswerController::validateAnswer/$1',         ['filter' => 'permission:community_answer.review']);
+        $routes->post('community/answers/(:segment)/submit-review',          'Api\\V1\\Community\\OfficialAnswerController::submitForReview/$1',        ['filter' => 'permission:community_answer.review']);
+        $routes->post('community/answers/(:segment)/schedule',               'Api\\V1\\Community\\OfficialAnswerController::schedule/$1',               ['filter' => 'permission:community_answer.schedule']);
+        $routes->post('community/answers/(:segment)/unpublish',              'Api\\V1\\Community\\OfficialAnswerController::unpublish/$1',              ['filter' => 'permission:community_answer.unpublish']);
+        $routes->post('community/answers/(:segment)/archive',                'Api\\V1\\Community\\OfficialAnswerController::archive/$1',                ['filter' => 'permission:community_answer.withdraw']);
+        $routes->post('community/answers/(:segment)/risk',                   'Api\\V1\\Community\\OfficialAnswerController::setRisk/$1',                ['filter' => 'permission:community_answer.override_validation']);
         $routes->post('community/answers/(:segment)/approve',                'Api\\V1\\Community\\OfficialAnswerController::approve/$1',                ['filter' => 'permission:community_answer.approve']);
         $routes->post('community/answers/(:segment)/reject',                 'Api\\V1\\Community\\OfficialAnswerController::reject/$1',                 ['filter' => 'permission:community_answer.approve']);
         $routes->post('community/answers/(:segment)/publish',                'Api\\V1\\Community\\OfficialAnswerController::publish/$1',                ['filter' => 'permission:community_answer.publish']);

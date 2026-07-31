@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Libraries\Ai;
 
+use App\Libraries\Ai\Providers\GeminiProvider;
 use App\Libraries\Ai\Providers\MockAiProvider;
 use App\Libraries\Ai\Providers\OpenAiProvider;
+use App\Libraries\Ai\Providers\PerplexityProvider;
 
 /**
  * Phase 3 — Central registry of available AI provider adapters.
@@ -23,6 +25,8 @@ class AiProviderRegistry
     public function __construct()
     {
         $this->register(new OpenAiProvider());
+        $this->register(new GeminiProvider());
+        $this->register(new PerplexityProvider());
         $this->register(new MockAiProvider());
     }
 

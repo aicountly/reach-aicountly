@@ -7,9 +7,10 @@ import {
   BookOpen, PenTool, Package, BrainCircuit,
   Globe, Send,
   MessagesSquare,
-  Search,
+  Search, NotebookPen,
 } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
+import { isBlogCommandCentreEnabled } from '../../constants/blogFeatureFlags';
 import { BotModeBadge } from '../bot/BotModeBadge';
 import { ReachLogo } from '../brand/ReachLogo';
 import { useReachCounts } from '../../context/ReachCountsContext';
@@ -20,7 +21,6 @@ const NAV = [
     title: 'Marketing',
     items: [
       { label: 'Dashboard',         path: ROUTES.DASHBOARD,        icon: LayoutDashboard, end: true, requires: 'dashboard.view' },
-      { label: 'Blog Management',   path: ROUTES.BLOG_LIST,        icon: FileText,        countKey: 'blog', requires: 'blog.view' },
       { label: 'Content Calendar',  path: ROUTES.CONTENT_CALENDAR_LEGACY, icon: CalendarDays,    requires: 'blog.view' },
       { label: 'Campaigns',         path: ROUTES.CAMPAIGN_LIST,    icon: Megaphone,       requires: 'campaign.view' },
       { label: 'Landing Pages',     path: ROUTES.LANDING_LIST,     icon: MonitorSmartphone, requires: 'campaign.view' },
@@ -53,6 +53,12 @@ const NAV = [
       { label: 'Calendar',         path: ROUTES.CONTENT_CALENDAR,   icon: CalendarDays, requires: 'content.view' },
     ],
   },
+  ...(isBlogCommandCentreEnabled() ? [{
+    title: 'Blog Command Centre',
+    items: [
+      { label: 'Blog Command Centre', path: ROUTES.BLOG_COMMAND_CENTRE, icon: NotebookPen, requires: 'blog.view' },
+    ],
+  }] : []),
   /* Sections with horizontal sub-nav: sidebar lists the section root only. */
   {
     title: 'Knowledge Foundation',

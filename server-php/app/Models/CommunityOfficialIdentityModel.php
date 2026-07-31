@@ -18,6 +18,9 @@ class CommunityOfficialIdentityModel extends Model
         'uuid', 'slug', 'display_name', 'department', 'badge_type',
         'avatar_reference', 'authorised_scopes', 'disclosure_template',
         'approval_requirements', 'is_active',
+        'public_slug', 'short_description', 'topic_specialisation',
+        'operational_role', 'ai_disclosure', 'public_external_id',
+        'created_by', 'approved_by',
     ];
 
     protected array $casts = [

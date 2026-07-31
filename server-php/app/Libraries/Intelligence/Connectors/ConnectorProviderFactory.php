@@ -13,14 +13,19 @@ class ConnectorProviderFactory
         self::$useMocks = $value;
     }
 
+    /**
+     * Returns the live Google connector whenever real credentials are present, and
+     * the mock only when explicitly requested via useMocks() or when
+     * SEARCH_CONSOLE_USE_MOCK=true. A misconfigured live connector is returned as-is
+     * so callers surface an honest "misconfigured" state instead of mock numbers.
+     */
     public static function searchConsole(): SearchConsoleConnectorInterface
     {
-        if (self::$useMocks) {
+        if (self::$useMocks || self::envBool('SEARCH_CONSOLE_USE_MOCK')) {
             return new MockSearchConsoleConnector(enabled: true);
         }
 
-        $enabled = (bool) (getenv('SEARCH_CONSOLE_ENABLED') ?: ($_ENV['SEARCH_CONSOLE_ENABLED'] ?? false));
-        return new MockSearchConsoleConnector(enabled: $enabled);
+        return new GoogleSearchConsoleConnector();
     }
 
     public static function contentAnalytics(): ContentAnalyticsConnectorInterface
@@ -41,5 +46,15 @@ class ConnectorProviderFactory
 
         $enabled = (bool) (getenv('INDEXNOW_ENABLED') ?: ($_ENV['INDEXNOW_ENABLED'] ?? false));
         return new MockIndexNowConnector(enabled: $enabled);
+    }
+
+    private static function envBool(string $key): bool
+    {
+        $value = getenv($key);
+        if ($value === false || $value === '') {
+            $value = $_ENV[$key] ?? '';
+        }
+
+        return filter_var(is_string($value) ? $value : '', FILTER_VALIDATE_BOOL);
     }
 }

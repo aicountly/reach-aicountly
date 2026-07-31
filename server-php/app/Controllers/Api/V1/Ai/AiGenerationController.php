@@ -82,12 +82,12 @@ class AiGenerationController extends BaseApiController
             // Job queue failure should not block the response; request is in 'pending' state
         }
 
-        AuditLogger::log('ai.generation_requested', [
+        AuditLogger::record('ai.generation_requested', [
             'request_id'   => $request['id'],
             'request_uuid' => $request['uuid'],
             'task_type'    => $request['task_type'],
             'content_type' => $request['content_type'],
-        ], $actor);
+        ], $actor['user_id'] ?? null);
 
         return $this->ok(['request' => $request], 202);
     }

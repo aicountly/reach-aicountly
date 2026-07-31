@@ -93,8 +93,9 @@ class CommunityAnalyticsService
     {
         $db = db_connect();
         return $db->table('reach_community_analytics_cache')
-            ->where('cache_date >=', date('Y-m-d', strtotime("-{$days} days")))
-            ->orderBy('cache_date', 'DESC')
+            ->where('period_start >=', date('Y-m-d 00:00:00', strtotime("-{$days} days")))
+            ->orderBy('period_start', 'DESC')
+            ->orderBy('metric_key', 'ASC')
             ->get()->getResultArray();
     }
 }

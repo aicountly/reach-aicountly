@@ -52,6 +52,25 @@ class OfficialAnswerPublishingService
             );
         }
 
+        // Never publish the same approved version twice. If a prior deployment
+        // for this exact version + checksum already succeeded, return it.
+        $priorSuccess = $this->deployModel
+            ->where('answer_id', $answerId)
+            ->where('answer_version_number', $answer['approved_version'])
+            ->where('version_checksum', $answer['approved_version_checksum'])
+            ->where('operation', 'publish')
+            ->where('status', 'succeeded')
+            ->first();
+
+        if ($priorSuccess !== null) {
+            return [
+                'success'          => true,
+                'duplicate'        => true,
+                'public_answer_id' => $priorSuccess['public_answer_id'] ?? null,
+                'canonical_url'    => $priorSuccess['public_url'] ?? null,
+            ];
+        }
+
         $version     = $this->answerRepo->getApprovedVersion($answer);
         $idempotency = bin2hex(random_bytes(16));
 
@@ -99,6 +118,122 @@ class OfficialAnswerPublishingService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Retry a failed deployment.
+     *
+     * The original idempotency key is deliberately reused: the receiver treats a
+     * repeat of an already-succeeded key as a replay and returns the first
+     * result, so a retry can never produce a second public publication.
+     *
+     * @param array $deployment Row from reach_community_deployments.
+     */
+    public function retryDeployment(array $deployment, ?int $actorId = null): array
+    {
+        $deploymentId = (int) $deployment['id'];
+        $answerId     = (int) $deployment['answer_id'];
+        $attempts     = (int) ($deployment['attempt_count'] ?? 0);
+        $maxAttempts  = (int) ($deployment['max_attempts'] ?? 5);
+
+        if (($deployment['status'] ?? '') === 'succeeded') {
+            return [
+                'success'  => true,
+                'outcome'  => 'already_succeeded',
+                'skipped'  => true,
+                'public_answer_id' => $deployment['public_answer_id'] ?? null,
+                'canonical_url'    => $deployment['public_url'] ?? null,
+            ];
+        }
+
+        if (! in_array($deployment['status'] ?? '', ['failed', 'retrying'], true)) {
+            throw new \RuntimeException(
+                "Deployment #{$deploymentId} is in status '{$deployment['status']}' and cannot be retried."
+            );
+        }
+
+        if ($attempts >= $maxAttempts) {
+            $this->deployModel->update($deploymentId, [
+                'status'     => 'dead_letter',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            AuditLogger::record(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, [
+                'deployment_id' => $deploymentId,
+                'outcome'       => 'dead_letter',
+                'attempts'      => $attempts,
+            ], $actorId);
+
+            return ['success' => false, 'outcome' => 'dead_letter', 'attempts' => $attempts];
+        }
+
+        $answer = $this->answerRepo->findById($answerId);
+        if ($answer === null) {
+            throw new \RuntimeException("Answer #{$answerId} not found for deployment #{$deploymentId}");
+        }
+
+        // The approval must still be intact — a retry must not publish content
+        // that was edited or un-approved since the original attempt.
+        if (! $this->approval->verifyApprovalForPublication($answer)) {
+            $this->deployModel->update($deploymentId, [
+                'status'              => 'dead_letter',
+                'last_error'          => 'approval checksum no longer valid',
+                'last_error_category' => 'validation_error',
+                'updated_at'          => date('Y-m-d H:i:s'),
+            ]);
+            return ['success' => false, 'outcome' => 'approval_invalidated'];
+        }
+
+        $attempts++;
+        $version = $this->answerRepo->getVersion($answerId, (int) $deployment['answer_version_number']);
+
+        $this->deployModel->update($deploymentId, [
+            'status'        => 'executing',
+            'attempt_count' => $attempts,
+            'updated_at'    => date('Y-m-d H:i:s'),
+        ]);
+
+        $envelope = $this->buildPublishEnvelope($answer, $version, (string) $deployment['idempotency_key']);
+        $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);
+
+        if ($result['success'] ?? false) {
+            $this->handlePublishSuccess($deploymentId, $answerId, $result, $actorId);
+
+            AuditLogger::record(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, [
+                'deployment_id' => $deploymentId,
+                'outcome'       => 'succeeded',
+                'attempts'      => $attempts,
+            ], $actorId);
+
+            return array_merge($result, ['outcome' => 'succeeded', 'attempts' => $attempts]);
+        }
+
+        $exhausted = $attempts >= $maxAttempts;
+        $this->deployModel->update($deploymentId, [
+            'status'              => $exhausted ? 'dead_letter' : 'retrying',
+            'attempt_count'       => $attempts,
+            'last_error'          => substr((string) ($result['safe_error_message'] ?? 'unknown'), 0, 500),
+            'last_error_category' => $result['error_category'] ?? 'unknown',
+            'next_retry_at'       => $exhausted ? null : date('Y-m-d H:i:s', time() + $this->backoffSeconds($attempts)),
+            'updated_at'          => date('Y-m-d H:i:s'),
+        ]);
+
+        AuditLogger::record(AuditLogger::COMMUNITY_DEPLOYMENT_RETRIED, [
+            'deployment_id' => $deploymentId,
+            'outcome'       => $exhausted ? 'dead_letter' : 'retrying',
+            'attempts'      => $attempts,
+        ], $actorId);
+
+        return array_merge($result, [
+            'outcome'  => $exhausted ? 'dead_letter' : 'retrying',
+            'attempts' => $attempts,
+        ]);
+    }
+
+    /** Exponential backoff capped at one hour. */
+    private function backoffSeconds(int $attempt): int
+    {
+        return (int) min(3600, 30 * (2 ** max(0, $attempt - 1)));
     }
 
     /**

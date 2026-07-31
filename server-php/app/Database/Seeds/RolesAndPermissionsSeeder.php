@@ -16,6 +16,10 @@ use Config\Permissions;
  *   analyst           — read-only + analytics + audit view.
  *   viewer            — dashboard + read-only view of content.
  *
+ * Phase 5 adds the community_* roles which split the official Q&A lifecycle
+ * across separate actors so that no single non-admin role can both approve and
+ * publish an official answer.
+ *
  * Idempotent: existing rows are updated in place so re-running the seeder is safe.
  */
 class RolesAndPermissionsSeeder extends Seeder
@@ -24,6 +28,60 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         $now = date('Y-m-d H:i:s');
 
+        $roles = self::roleDefinitions();
+
+        $tbl = $this->db->table('reach_roles');
+        foreach ($roles as $role) {
+            $existing = $tbl->where('slug', $role['slug'])->get()->getRowArray();
+            if ($existing) {
+                $tbl->where('id', $existing['id'])->update([
+                    'name'        => $role['name'],
+                    'description' => $role['description'],
+                    'permissions' => json_encode($role['permissions']),
+                    'updated_at'  => $now,
+                ]);
+                CLI::write("Updated role {$role['slug']} (" . count($role['permissions']) . ' perms).', 'green');
+            } else {
+                $tbl->insert([
+                    'slug'        => $role['slug'],
+                    'name'        => $role['name'],
+                    'description' => $role['description'],
+                    'permissions' => json_encode($role['permissions']),
+                    'created_at'  => $now,
+                    'updated_at'  => $now,
+                ]);
+                CLI::write("Seeded role {$role['slug']} (" . count($role['permissions']) . ' perms).', 'green');
+            }
+        }
+
+        // Ensure the canonical "system" bot user exists as a non-login actor for FK usage.
+        $usersTbl = $this->db->table('reach_users');
+        $roleId = (int) ($tbl->where('slug', 'super_admin')->get()->getRowArray()['id'] ?? 0);
+        $sysEmail = 'system-bot@reach.local';
+        if (! $usersTbl->where('email', $sysEmail)->get()->getRow() && $roleId > 0) {
+            $usersTbl->insert([
+                'email'             => $sysEmail,
+                'name'              => 'Reach System Bot',
+                'password_hash'     => '',
+                'role_id'           => $roleId,
+                'is_active'         => false,
+                'is_login_disabled' => true,
+                'actor_type'        => 'system',
+                'created_at'        => $now,
+                'updated_at'        => $now,
+            ]);
+            CLI::write('Seeded system bot user (non-login).', 'green');
+        }
+    }
+
+    /**
+     * Canonical role definitions written by run(). Exposed as a pure static
+     * function so RBAC separation-of-duties can be asserted without a database.
+     *
+     * @return array<int, array{slug: string, name: string, description: string, permissions: string[]}>
+     */
+    public static function roleDefinitions(): array
+    {
         $blogAll        = Permissions::groups()['blog'];
         $campaignAll    = Permissions::groups()['campaign'];
         $socialAll      = Permissions::groups()['social'];
@@ -96,6 +154,62 @@ class RolesAndPermissionsSeeder extends Seeder
             Permissions::PUBLICATION_TARGET_VIEW,
         ];
 
+        // Phase 5 community scopes — separation of duties across the official
+        // Q&A lifecycle. Generation, review, professional approval, and
+        // publication are held by different roles so that no community_* role
+        // can both approve and publish the same official answer.
+        $communityViewerScope = [
+            Permissions::COMMUNITY_VIEW,
+            Permissions::COMMUNITY_ANALYTICS_VIEW,
+        ];
+
+        $communityContributorScope = [
+            Permissions::COMMUNITY_VIEW,
+            Permissions::COMMUNITY_INTAKE_CREATE,
+            Permissions::COMMUNITY_QUESTION_EDIT,
+            Permissions::COMMUNITY_ANSWER_GENERATE,
+            Permissions::COMMUNITY_ANSWER_EDIT,
+        ];
+
+        $communityReviewerScope = [
+            Permissions::COMMUNITY_VIEW,
+            Permissions::COMMUNITY_QUESTION_CLASSIFY,
+            Permissions::COMMUNITY_ANSWER_REVIEW,
+            Permissions::COMMUNITY_ANSWER_EDIT,
+        ];
+
+        $communityProfessionalApproverScope = [
+            Permissions::COMMUNITY_VIEW,
+            Permissions::COMMUNITY_ANSWER_REVIEW,
+            Permissions::COMMUNITY_ANSWER_PROFESSIONAL_REVIEW,
+            Permissions::COMMUNITY_ANSWER_APPROVE,
+        ];
+
+        $communityModeratorScope = [
+            Permissions::COMMUNITY_VIEW,
+            Permissions::COMMUNITY_QUESTION_MODERATE,
+            Permissions::COMMUNITY_ANSWER_UNPUBLISH,
+            Permissions::COMMUNITY_ANSWER_RESTORE,
+            Permissions::COMMUNITY_ANSWER_WITHDRAW,
+        ];
+
+        $communityPublisherScope = [
+            Permissions::COMMUNITY_VIEW,
+            Permissions::COMMUNITY_ANSWER_SCHEDULE,
+            Permissions::COMMUNITY_ANSWER_PUBLISH,
+        ];
+
+        // Managers own the whole operational surface but never the professional
+        // approval gate and never the break-glass validation override.
+        $communityManagerScope = array_values(array_unique(array_merge(
+            $communityViewerScope,
+            $communityContributorScope,
+            $communityReviewerScope,
+            $communityModeratorScope,
+            $communityPublisherScope,
+            [Permissions::COMMUNITY_SETTINGS_MANAGE, Permissions::COMMUNITY_IDENTITY_MANAGE],
+        )));
+
         $roles = [
             [
                 'slug' => 'super_admin',
@@ -121,6 +235,18 @@ class RolesAndPermissionsSeeder extends Seeder
                     // Phase 3 AI — admins get full AI access
                     $aiAll, $aiProviderAll, $aiModelAll, $aiRoutingAll, $aiPromptAll,
                     $aiGenerationAll, $aiGroundingAll, $aiUsageAll, $aiBudgetAll, $aiValidationAll,
+                    // Phase 5 community — the manager surface plus the admin-only
+                    // grants (bulk import, professional approval, audit, ingest and
+                    // the break-glass validation override) that no community_* role holds.
+                    $communityManagerScope,
+                    [
+                        Permissions::COMMUNITY_INTAKE_IMPORT,
+                        Permissions::COMMUNITY_ANSWER_PROFESSIONAL_REVIEW,
+                        Permissions::COMMUNITY_ANSWER_APPROVE,
+                        Permissions::COMMUNITY_ANSWER_OVERRIDE_VALIDATION,
+                        Permissions::COMMUNITY_AUDIT_VIEW,
+                        Permissions::COMMUNITY_ENGAGEMENT_INGEST,
+                    ],
                 ))),
             ],
             [
@@ -217,6 +343,8 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::AEO_VIEW, Permissions::AEO_REVIEW,
                     Permissions::STRUCTURED_DATA_VIEW, Permissions::STRUCTURED_DATA_REVIEW,
                     Permissions::KB_PUBLISHING_VIEW,
+                    // Phase 5 community — reviews official answers; no approve/publish
+                    Permissions::COMMUNITY_VIEW, Permissions::COMMUNITY_ANSWER_REVIEW,
                 ]))),
             ],
             [
@@ -232,6 +360,8 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::WHATSAPP_VIEW, Permissions::LEAD_VIEW,
                 ], $knowledgeViewOnly, $contentViewOnly, $aiViewOnly, [
                     Permissions::AI_USAGE_VIEW,
+                    // Phase 5 community — read-only community analytics
+                    Permissions::COMMUNITY_VIEW, Permissions::COMMUNITY_ANALYTICS_VIEW,
                 ]))),
             ],
             [
@@ -249,51 +379,84 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::CLAIM_VIEW, Permissions::SOURCE_VIEW,
                     // Phase 2: viewer can read content items and versions
                     Permissions::CONTENT_VIEW, Permissions::CONTENT_VERSION_VIEW,
+                    // Phase 5: viewer can read community Q&A and its analytics
+                    Permissions::COMMUNITY_VIEW, Permissions::COMMUNITY_ANALYTICS_VIEW,
                 ], []))),
+            ],
+            [
+                'slug' => 'community_viewer',
+                'name' => 'Community Viewer',
+                'description' => 'Read-only view of community questions, official answers, and analytics.',
+                'permissions' => array_values(array_unique($communityViewerScope)),
+            ],
+            [
+                'slug' => 'community_contributor',
+                'name' => 'Community Contributor',
+                'description' => 'Drafts questions and generates/edits official answers; cannot approve or publish.',
+                'permissions' => array_values(array_unique($communityContributorScope)),
+            ],
+            [
+                'slug' => 'community_reviewer',
+                'name' => 'Community Reviewer',
+                'description' => 'Reviews and classifies community content; cannot approve or publish.',
+                'permissions' => array_values(array_unique($communityReviewerScope)),
+            ],
+            [
+                'slug' => 'community_professional_approver',
+                'name' => 'Community Professional Approver',
+                'description' => 'Qualified professional sign-off on official answers; approval only, never publication.',
+                'permissions' => array_values(array_unique($communityProfessionalApproverScope)),
+            ],
+            [
+                'slug' => 'community_moderator',
+                'name' => 'Community Moderator',
+                'description' => 'Moderates questions and takes published answers down; cannot generate, approve, or publish.',
+                'permissions' => array_values(array_unique($communityModeratorScope)),
+            ],
+            [
+                'slug' => 'community_publisher',
+                'name' => 'Community Publisher',
+                'description' => 'Schedules and publishes approved official answers; cannot approve or generate them.',
+                'permissions' => array_values(array_unique($communityPublisherScope)),
+            ],
+            [
+                'slug' => 'community_manager',
+                'name' => 'Community Manager',
+                'description' => 'Full community operations plus settings and identity management; no validation override.',
+                'permissions' => $communityManagerScope,
+            ],
+            [
+                'slug' => 'community_automation_admin',
+                'name' => 'Community Automation Admin',
+                'description' => 'Configures community automation and engagement ingestion; cannot approve or publish.',
+                'permissions' => array_values(array_unique([
+                    Permissions::COMMUNITY_VIEW,
+                    Permissions::COMMUNITY_SETTINGS_MANAGE,
+                    Permissions::COMMUNITY_ANALYTICS_VIEW,
+                    Permissions::COMMUNITY_ENGAGEMENT_INGEST,
+                ])),
+            ],
+            [
+                'slug' => 'community_auditor',
+                'name' => 'Community Auditor',
+                'description' => 'Read-only community audit trail and analytics visibility; no mutating permissions.',
+                'permissions' => array_values(array_unique([
+                    Permissions::COMMUNITY_VIEW,
+                    Permissions::COMMUNITY_AUDIT_VIEW,
+                    Permissions::COMMUNITY_ANALYTICS_VIEW,
+                ])),
+            ],
+            [
+                'slug' => 'community_service_account',
+                'name' => 'Community Service Account',
+                'description' => 'Machine actor for engagement ingestion only; can never generate, approve, or publish.',
+                'permissions' => array_values(array_unique([
+                    Permissions::COMMUNITY_VIEW,
+                    Permissions::COMMUNITY_ENGAGEMENT_INGEST,
+                ])),
             ],
         ];
 
-        $tbl = $this->db->table('reach_roles');
-        foreach ($roles as $role) {
-            $existing = $tbl->where('slug', $role['slug'])->get()->getRowArray();
-            if ($existing) {
-                $tbl->where('id', $existing['id'])->update([
-                    'name'        => $role['name'],
-                    'description' => $role['description'],
-                    'permissions' => json_encode($role['permissions']),
-                    'updated_at'  => $now,
-                ]);
-                CLI::write("Updated role {$role['slug']} (" . count($role['permissions']) . ' perms).', 'green');
-            } else {
-                $tbl->insert([
-                    'slug'        => $role['slug'],
-                    'name'        => $role['name'],
-                    'description' => $role['description'],
-                    'permissions' => json_encode($role['permissions']),
-                    'created_at'  => $now,
-                    'updated_at'  => $now,
-                ]);
-                CLI::write("Seeded role {$role['slug']} (" . count($role['permissions']) . ' perms).', 'green');
-            }
-        }
-
-        // Ensure the canonical "system" bot user exists as a non-login actor for FK usage.
-        $usersTbl = $this->db->table('reach_users');
-        $roleId = (int) ($tbl->where('slug', 'super_admin')->get()->getRowArray()['id'] ?? 0);
-        $sysEmail = 'system-bot@reach.local';
-        if (! $usersTbl->where('email', $sysEmail)->get()->getRow() && $roleId > 0) {
-            $usersTbl->insert([
-                'email'             => $sysEmail,
-                'name'              => 'Reach System Bot',
-                'password_hash'     => '',
-                'role_id'           => $roleId,
-                'is_active'         => false,
-                'is_login_disabled' => true,
-                'actor_type'        => 'system',
-                'created_at'        => $now,
-                'updated_at'        => $now,
-            ]);
-            CLI::write('Seeded system bot user (non-login).', 'green');
-        }
+        return $roles;
     }
 }

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { Save, ArrowLeft, Trash2 } from 'lucide-react';
 import { blogService } from '../../services/blogService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { ROUTES } from '../../constants/routes';
+import { isBlogLegacyCreateDisabled } from '../../constants/blogFeatureFlags';
 
 const EMPTY = {
   title: '', slug: '', excerpt: '', content: '', category: '', tags: '',
@@ -85,8 +86,16 @@ export function BlogEditorPage() {
 
   if (loading) return <Loader />;
 
+  if (isNew && isBlogLegacyCreateDisabled()) {
+    return <Navigate to={ROUTES.CONTENT_NEW} replace />;
+  }
+
   return (
     <div>
+      <Alert variant="warning">
+        Legacy blog editor is deprecated. Create and edit blogs in Content Studio or Blog Command Centre.
+      </Alert>
+
       <div className="page-header">
         <div>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}>

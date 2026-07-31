@@ -3,6 +3,7 @@
 namespace App\Libraries\Publishing\Jobs;
 
 use App\Libraries\AuditLogger;
+use App\Libraries\JobService;
 use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
 
 /**
@@ -15,15 +16,17 @@ class PublicationRetryService
 {
     private \CodeIgniter\Database\BaseConnection $db;
     private PublishingErrorClassifier $classifier;
+    private JobService $jobService;
 
     private const MAX_ATTEMPTS = 5;
     private const BASE_DELAY_SECONDS = 60;
     private const MAX_DELAY_SECONDS = 3600;
 
-    public function __construct()
+    public function __construct(?JobService $jobService = null)
     {
         $this->db         = \Config\Database::connect();
         $this->classifier = new PublishingErrorClassifier();
+        $this->jobService = $jobService ?? new JobService();
     }
 
     /**
@@ -71,19 +74,17 @@ class PublicationRetryService
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
 
-        // Re-enqueue with retry delay
-        $this->db->table('reach_jobs')->insert([
-            'type'         => 'publication',
-            'payload'      => json_encode([
-                'job_class'     => 'PublicationJob',
-                'deployment_id' => $deploymentId,
-                'is_retry'      => true,
-            ]),
-            'status'       => 'pending',
-            'available_at' => $retryAt,
-            'created_at'   => date('Y-m-d H:i:s'),
-            'updated_at'   => date('Y-m-d H:i:s'),
-        ]);
+        $idempotencyKey = (string) ($deployment['idempotency_key'] ?? "deployment-{$deploymentId}");
+        $this->jobService->enqueueAt(
+            'reach.publication',
+            ['deployment_id' => $deploymentId, 'is_retry' => true],
+            $retryAt,
+            [
+                'queue'           => 'publishing',
+                'idempotency_key' => $idempotencyKey . ':retry:' . ($attemptCount + 1),
+                'priority'        => 10,
+            ],
+        );
 
         AuditLogger::record('publishing.retry_scheduled', [
             'deployment_id'  => $deploymentId,

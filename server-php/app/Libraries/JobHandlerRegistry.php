@@ -17,6 +17,8 @@ use App\Jobs\CommunityAnswerGenerationJob;
 use App\Jobs\CommunityPublicationVerificationJob;
 use App\Jobs\CommunityDeploymentRetryJob;
 use App\Jobs\CommunityAnalyticsReconciliationJob;
+use App\Jobs\PublicationJob;
+use App\Jobs\BlogWorkBlockJob;
 use RuntimeException;
 
 /**
@@ -48,6 +50,9 @@ class JobHandlerRegistry
         $this->handlers['reach.community_publication_verification']  = new CommunityPublicationVerificationJob();
         $this->handlers['reach.community_deployment_retry']          = new CommunityDeploymentRetryJob();
         $this->handlers['reach.community_analytics_reconciliation']  = new CommunityAnalyticsReconciliationJob();
+        // Phase 2 blog automation / publishing
+        $this->handlers['reach.publication']                         = new PublicationJob();
+        $this->handlers['reach.blog_work_block']                     = new BlogWorkBlockJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

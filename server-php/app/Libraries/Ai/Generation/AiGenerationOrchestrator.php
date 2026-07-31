@@ -128,14 +128,14 @@ class AiGenerationOrchestrator
 
         if ($budgetResult->hardBlocked) {
             $this->requests->updateStatus($requestId, 'blocked');
-            AuditLogger::log('ai.budget_blocked', [
+            AuditLogger::record('ai.budget_blocked', [
                 'request_id'  => $requestId,
                 'scope_type'  => $budgetResult->scopeType,
                 'scope_ref'   => $budgetResult->scopeRef,
                 'period_type' => $budgetResult->periodType,
                 'used_amount' => $budgetResult->usedAmount,
                 'hard_limit'  => $budgetResult->hardLimit,
-            ], ['type' => 'system']);
+            ]);
             return;
         }
 
@@ -248,12 +248,12 @@ class AiGenerationOrchestrator
                 if ($artifact['schema_validation_status'] === 'passed') {
                     $this->requests->updateStatus($requestId, 'completed', ['completed_at' => date('Y-m-d H:i:s')]);
 
-                    AuditLogger::log('ai.generation_completed', [
+                    AuditLogger::record('ai.generation_completed', [
                         'request_id'   => $requestId,
                         'run_id'       => $run['id'],
                         'artifact_id'  => $artifact['id'],
                         'total_tokens' => $result->totalTokens,
-                    ], ['type' => 'system']);
+                    ]);
                 } else {
                     $this->failRequest($requestId, 'schema_validation_failed', 'AI output did not pass schema validation.');
                 }
@@ -290,11 +290,11 @@ class AiGenerationOrchestrator
     private function failRequest(int $requestId, string $reason, string $message): void
     {
         $this->requests->updateStatus($requestId, 'failed');
-        AuditLogger::log('ai.generation_failed', [
+        AuditLogger::record('ai.generation_failed', [
             'request_id' => $requestId,
             'reason'     => $reason,
             'message'    => $message,
-        ], ['type' => 'system']);
+        ]);
     }
 
     private function resolveProductSlug(array $request): ?string

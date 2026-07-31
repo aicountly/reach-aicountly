@@ -25,7 +25,8 @@ describe('Sidebar', () => {
         permissions: ['*'],
       },
     });
-    expect(screen.getByText('Blog Management')).toBeInTheDocument();
+    expect(screen.getAllByText('Blog Command Centre').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Blog Management')).not.toBeInTheDocument();
     expect(screen.getByText('Bot Queue')).toBeInTheDocument();
     expect(screen.getByText('Audit Logs')).toBeInTheDocument();
     expect(screen.getByText('Job Monitor')).toBeInTheDocument();
@@ -46,7 +47,7 @@ describe('Sidebar', () => {
     });
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Blog Management')).toBeInTheDocument();
+    expect(screen.queryByText('Blog Management')).not.toBeInTheDocument();
     expect(screen.queryByText('Bot Queue')).not.toBeInTheDocument();
     expect(screen.queryByText('Audit Logs')).not.toBeInTheDocument();
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();

@@ -11,6 +11,7 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { ROUTES } from '../../constants/routes';
+import { isBlogLegacyCreateDisabled } from '../../constants/blogFeatureFlags';
 
 const STATUS_OPTIONS = ['', 'idea','draft','seo_review','internal_review','approved','scheduled','published','rejected','archived'];
 
@@ -82,12 +83,23 @@ export function BlogListPage() {
 
   return (
     <div>
+      <Alert variant="warning">
+        Legacy Blog Management is deprecated. Use{' '}
+        <Link to={ROUTES.BLOG_COMMAND_CENTRE}>Blog Command Centre</Link>{' '}
+        or Content Studio for blog content.
+      </Alert>
+
       <div className="page-header">
         <div>
           <h1>Blog management</h1>
           <p className="text-sm text-muted">Drafts, approvals & publishing to AICOUNTLY.com.</p>
         </div>
-        <Link to={ROUTES.BLOG_NEW} className="btn btn-primary"><Plus size={14}/> New post</Link>
+        {!isBlogLegacyCreateDisabled() && (
+          <Link to={ROUTES.BLOG_NEW} className="btn btn-primary"><Plus size={14}/> New post</Link>
+        )}
+        {isBlogLegacyCreateDisabled() && (
+          <Link to={ROUTES.BCC_PIPELINE} className="btn btn-primary"><Plus size={14}/> New blog content</Link>
+        )}
       </div>
 
       <FilterBar>

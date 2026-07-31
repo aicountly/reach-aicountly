@@ -26,14 +26,23 @@ class CommunityPublicationVerificationJob implements JobHandlerInterface
             throw new \InvalidArgumentException('CommunityPublicationVerificationJob: answer_id is required.');
         }
 
-        $verifySvc = new CommunityPublicationVerificationService();
-        $result    = $verifySvc->verify($answerId);
+        $actorId = $ctx->enqueuedByUserId;
+        $result  = (new CommunityPublicationVerificationService())->verify($answerId, $actorId);
+        $outcome = (string) ($result['outcome'] ?? 'unknown');
 
-        AuditLogger::log(AuditLogger::COMMUNITY_ANSWER_VERIFICATION_RUN, [
+        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_VERIFICATION_RUN, [
             'answer_id' => $answerId,
-            'outcome'   => $result['outcome'] ?? 'unknown',
-        ]);
+            'outcome'   => $outcome,
+        ], $actorId);
 
-        return ['ok' => true, 'answer_id' => $answerId, 'result' => $result];
+        // A mismatched or missing public record is a real failure — surfacing it
+        // as a failed job is what triggers reconciliation.
+        if (in_array($outcome, ['mismatch', 'not_found', 'failed'], true)) {
+            throw new \RuntimeException(
+                "Publication verification failed for answer #{$answerId} (outcome: {$outcome})."
+            );
+        }
+
+        return ['ok' => true, 'answer_id' => $answerId, 'outcome' => $outcome, 'result' => $result];
     }
 }

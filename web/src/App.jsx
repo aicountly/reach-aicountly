@@ -5,9 +5,12 @@ import { ReachLayout } from './components/layout/ReachLayout';
 import ControllerGate from './pages/ControllerGate';
 import { DashboardPage } from './pages/DashboardPage';
 
-import { BlogListPage } from './pages/blog/BlogListPage';
-import { BlogEditorPage } from './pages/blog/BlogEditorPage';
-import { BlogDetailPage } from './pages/blog/BlogDetailPage';
+import {
+  BlogLegacyListRedirect,
+  BlogLegacyNewRedirect,
+  BlogLegacyDetailRedirect,
+  BlogLegacyEditRedirect,
+} from './pages/blog-command-centre/BlogLegacyRedirects.jsx';
 
 import { ContentCalendarPage } from './pages/ContentCalendarPage';
 
@@ -178,6 +181,28 @@ import VideoPublicationListPage   from './pages/video/VideoPublicationListPage.j
 import VideoConnectionsPage       from './pages/video/VideoConnectionsPage.jsx';
 import VideoOperationsDashboardPage from './pages/video/VideoOperationsDashboardPage.jsx';
 
+import BlogCommandCentreLayout from './pages/blog-command-centre/BlogCommandCentreLayout.jsx';
+import { BlogOverviewPage } from './pages/blog-command-centre/BlogOverviewPage.jsx';
+import { BlogScaffoldPage } from './pages/blog-command-centre/BlogScaffoldPage.jsx';
+import { BlogSharedEmbed } from './pages/blog-command-centre/BlogSharedEmbed.jsx';
+import { BlogDeepLinkRedirect } from './pages/blog-command-centre/BlogDeepLinkRedirect.jsx';
+import { RoadmapCandidatesPage } from './pages/blog-command-centre/roadmap/RoadmapCandidatesPage.jsx';
+import { RoadmapScoredPage } from './pages/blog-command-centre/roadmap/RoadmapScoredPage.jsx';
+import { RoadmapOptimizerPage } from './pages/blog-command-centre/roadmap/RoadmapOptimizerPage.jsx';
+import { ReadyToPublishPage } from './pages/blog-command-centre/ReadyToPublishPage.jsx';
+import { EmergencyUnpublishPage } from './pages/blog-command-centre/EmergencyUnpublishPage.jsx';
+import { PortfolioPerformancePage } from './pages/blog-command-centre/PortfolioPerformancePage.jsx';
+import { BlogPortfolioSettingsPage } from './pages/blog-command-centre/settings/BlogPortfolioSettingsPage.jsx';
+import { AutomationWindowPage } from './pages/blog-command-centre/settings/AutomationWindowPage.jsx';
+import { PublicationRulesPage } from './pages/blog-command-centre/settings/PublicationRulesPage.jsx';
+import { RiskRulesPage } from './pages/blog-command-centre/settings/RiskRulesPage.jsx';
+import { ProviderRoutingPage } from './pages/blog-command-centre/settings/ProviderRoutingPage.jsx';
+import { VerificationThresholdsPage } from './pages/blog-command-centre/settings/VerificationThresholdsPage.jsx';
+import { StorageConfigurationPage } from './pages/blog-command-centre/settings/StorageConfigurationPage.jsx';
+import { SeoConfigurationPage } from './pages/blog-command-centre/settings/SeoConfigurationPage.jsx';
+import { NotificationsSettingsPage } from './pages/blog-command-centre/settings/NotificationsSettingsPage.jsx';
+import { isBlogCommandCentreEnabled } from './constants/blogFeatureFlags';
+
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
 
@@ -208,10 +233,88 @@ export default function App() {
       <Route element={<ProtectedRoute><ReachLayout /></ProtectedRoute>}>
         <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
 
-        <Route path={ROUTES.BLOG_LIST}    element={<BlogListPage />} />
-        <Route path={ROUTES.BLOG_NEW}     element={<BlogEditorPage />} />
-        <Route path={ROUTES.BLOG_EDIT}    element={<BlogEditorPage />} />
-        <Route path={ROUTES.BLOG_DETAIL}  element={<BlogDetailPage />} />
+        <Route path={ROUTES.BLOG_LIST}    element={<BlogLegacyListRedirect />} />
+        <Route path={ROUTES.BLOG_NEW}     element={<BlogLegacyNewRedirect />} />
+        <Route path={ROUTES.BLOG_EDIT}    element={<BlogLegacyEditRedirect />} />
+        <Route path={ROUTES.BLOG_DETAIL}  element={<BlogLegacyDetailRedirect />} />
+
+        <Route path="/blogs/manage" element={<Navigate to={ROUTES.BLOG_COMMAND_CENTRE} replace />} />
+        <Route path="/marketing/blogs" element={<Navigate to={ROUTES.BLOG_COMMAND_CENTRE} replace />} />
+
+        {/* Blog Command Centre */}
+        {isBlogCommandCentreEnabled() && (
+        <Route path={ROUTES.BLOG_COMMAND_CENTRE} element={<BlogCommandCentreLayout />}>
+          <Route index element={<BlogOverviewPage />} />
+
+          <Route path="roadmap" element={<Navigate to="candidates" replace />} />
+          <Route path="roadmap/candidates" element={<RoadmapCandidatesPage />} />
+          <Route path="roadmap/scored" element={<RoadmapScoredPage />} />
+          <Route path="roadmap/gaps" element={<BlogScaffoldPage />} />
+          <Route path="roadmap/refresh" element={<BlogScaffoldPage />} />
+          <Route path="roadmap/optimizer" element={<RoadmapOptimizerPage />} />
+          <Route path="roadmap/clusters" element={<BlogDeepLinkRedirect />} />
+
+          <Route path="pipeline" element={<Navigate to="drafts" replace />} />
+          <Route path="pipeline/briefs" element={<BlogSharedEmbed embed="content-briefs" />} />
+          <Route path="pipeline/drafts" element={<BlogSharedEmbed embed="content-drafts" />} />
+          <Route path="pipeline/versions" element={<BlogSharedEmbed embed="content-versions" />} />
+          <Route path="pipeline/editorial" element={<BlogSharedEmbed embed="content-editorial" />} />
+          <Route path="pipeline/research" element={<BlogScaffoldPage />} />
+
+          <Route path="verification" element={<BlogScaffoldPage />} />
+          <Route path="verification/unsupported-claims" element={<BlogScaffoldPage />} />
+          <Route path="verification/source-review" element={<BlogScaffoldPage />} />
+          <Route path="verification/risk-review" element={<BlogScaffoldPage />} />
+          <Route path="verification/media" element={<BlogScaffoldPage />} />
+
+          <Route path="approvals" element={<BlogSharedEmbed embed="approvals" />} />
+          <Route path="approvals/history" element={<BlogSharedEmbed embed="approvals-history" />} />
+
+          <Route path="publishing" element={<Navigate to="ready" replace />} />
+          <Route path="publishing/ready" element={<ReadyToPublishPage />} />
+          <Route path="publishing/calendar" element={<BlogSharedEmbed embed="calendar" />} />
+          <Route path="publishing/scheduled" element={<BlogSharedEmbed embed="scheduled" />} />
+          <Route path="publishing/deployments" element={<BlogSharedEmbed embed="deployments" />} />
+          <Route path="publishing/rollback" element={<BlogSharedEmbed embed="rollback" />} />
+          <Route path="publishing/emergency-unpublish" element={<EmergencyUnpublishPage />} />
+          <Route path="published" element={<BlogSharedEmbed embed="published" />} />
+
+          <Route path="seo" element={<Navigate to="search" replace />} />
+          <Route path="seo/search" element={<BlogDeepLinkRedirect />} />
+          <Route path="seo/internal-links" element={<BlogScaffoldPage />} />
+          <Route path="seo/cannibalisation" element={<BlogScaffoldPage />} />
+          <Route path="seo/sitemap" element={<BlogDeepLinkRedirect />} />
+          <Route path="seo/technical" element={<BlogScaffoldPage />} />
+          <Route path="indexing" element={<BlogDeepLinkRedirect />} />
+
+          <Route path="analytics" element={<Navigate to="portfolio" replace />} />
+          <Route path="analytics/portfolio" element={<PortfolioPerformancePage />} />
+          <Route path="analytics/content" element={<BlogDeepLinkRedirect />} />
+          <Route path="analytics/search" element={<BlogDeepLinkRedirect />} />
+          <Route path="analytics/product" element={<BlogDeepLinkRedirect />} />
+          <Route path="analytics/attribution" element={<BlogDeepLinkRedirect />} />
+
+          <Route path="operations" element={<Navigate to="queue" replace />} />
+          <Route path="operations/queue" element={<BlogSharedEmbed embed="queue-monitor" />} />
+          <Route path="operations/failed-jobs" element={<BlogSharedEmbed embed="failed-jobs" />} />
+          <Route path="operations/cron" element={<BlogDeepLinkRedirect />} />
+          <Route path="operations/ai-usage" element={<BlogSharedEmbed embed="ai-usage" />} />
+          <Route path="operations/provider-health" element={<BlogSharedEmbed embed="provider-health" />} />
+          <Route path="operations/provider-routing" element={<BlogSharedEmbed embed="provider-routing" />} />
+          <Route path="operations/audit" element={<BlogSharedEmbed embed="audit" />} />
+
+          <Route path="settings" element={<Navigate to="portfolio" replace />} />
+          <Route path="settings/portfolio" element={<BlogPortfolioSettingsPage />} />
+          <Route path="settings/automation-window" element={<AutomationWindowPage />} />
+          <Route path="settings/publication-rules" element={<PublicationRulesPage />} />
+          <Route path="settings/risk-rules" element={<RiskRulesPage />} />
+          <Route path="settings/provider-routing" element={<ProviderRoutingPage />} />
+          <Route path="settings/verification-thresholds" element={<VerificationThresholdsPage />} />
+          <Route path="settings/storage" element={<StorageConfigurationPage />} />
+          <Route path="settings/seo" element={<SeoConfigurationPage />} />
+          <Route path="settings/notifications" element={<NotificationsSettingsPage />} />
+        </Route>
+        )}
 
         <Route path={ROUTES.CONTENT_CALENDAR_LEGACY} element={<ContentCalendarPage />} />
 

@@ -3,26 +3,33 @@
 namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
+use App\Enums\CommunityRiskTier;
+use App\Libraries\Community\OfficialAnswerLifecycleService;
 use App\Libraries\Community\OfficialAnswerRepository;
-use App\Libraries\Community\OfficialAnswerGenerationService;
-use App\Libraries\Community\OfficialAnswerApprovalService;
-use App\Libraries\Community\OfficialAnswerPublishingService;
-use App\Libraries\Community\OfficialAnswerCorrectionService;
-use App\Libraries\Community\OfficialAnswerWithdrawalService;
-use App\Libraries\Community\OfficialAnswerVersionService;
-use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
+use InvalidArgumentException;
+use RuntimeException;
 
+/**
+ * Official answer HTTP surface.
+ *
+ * Every route segment is a UUID. All state changes are delegated to
+ * OfficialAnswerLifecycleService, which is the single place that resolves a
+ * UUID to the internal numeric ID before calling the domain services. This
+ * controller performs no ID translation and holds no lifecycle rules of its own.
+ */
 class OfficialAnswerController extends BaseApiController
 {
     private OfficialAnswerRepository $repo;
+    private OfficialAnswerLifecycleService $lifecycle;
 
     public function __construct()
     {
-        $this->repo = new OfficialAnswerRepository();
+        $this->repo      = new OfficialAnswerRepository();
+        $this->lifecycle = new OfficialAnswerLifecycleService();
     }
 
-    /** GET /community/answers — list by status/question */
+    /** GET /community/answers */
     public function index(): ResponseInterface
     {
         $status  = (string) ($this->request->getGet('status') ?? '');
@@ -34,17 +41,11 @@ class OfficialAnswerController extends BaseApiController
                 return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
             }
 
-            $items = $status !== ''
-                ? $this->repo->listByStatus($status, $perPage)
-                : $this->repo->listByStatus('draft', $perPage);
-
-            if (! is_array($items)) {
-                $items = [];
-            }
+            $items = $this->repo->listByStatus($status !== '' ? $status : 'draft_requested', $perPage);
 
             return $this->response->setJSON([
-                'data' => $items,
-                'meta' => ['total' => count($items)],
+                'data' => is_array($items) ? $items : [],
+                'meta' => ['total' => is_array($items) ? count($items) : 0],
             ]);
         } catch (\Throwable $e) {
             log_message('error', 'OfficialAnswerController::index: ' . $e->getMessage());
@@ -56,150 +57,251 @@ class OfficialAnswerController extends BaseApiController
     public function show(string $uuid): ResponseInterface
     {
         $answer = $this->repo->findByUuid($uuid);
-        if (!$answer) {
-            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+        if ($answer === null) {
+            return $this->notFound();
         }
         return $this->response->setJSON(['data' => $answer]);
     }
 
-    /** POST /community/answers — create blank answer record for a question */
+    /** POST /community/answers — reserve a draft answer for a question */
     public function create(): ResponseInterface
     {
         $body         = $this->request->getJSON(true) ?? [];
-        $questionUuid = $body['question_uuid'] ?? '';
-        $identitySlug = $body['official_identity_slug'] ?? 'aicountly-official';
+        $questionUuid = (string) ($body['question_uuid'] ?? '');
+        $identitySlug = (string) ($body['official_identity_slug'] ?? 'aicountly-official');
 
-        if (empty($questionUuid)) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => 'question_uuid required']);
+        if ($questionUuid === '') {
+            return $this->unprocessable('question_uuid is required.');
         }
 
-        $versionSvc = new OfficialAnswerVersionService();
-        $answer     = $versionSvc->createBlank($questionUuid, $identitySlug);
-        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_DRAFT_CREATED, ['answer_uuid' => $answer['external_id']]);
-        return $this->response->setStatusCode(201)->setJSON(['data' => $answer]);
+        return $this->guard(
+            fn () => $this->response->setStatusCode(201)->setJSON([
+                'data' => $this->lifecycle->createDraft($questionUuid, $identitySlug, $this->userId()),
+            ])
+        );
     }
 
-    /** POST /community/answers/(:segment)/generate — trigger AI generation */
+    /** POST /community/answers/(:segment)/generate */
     public function generate(string $uuid): ResponseInterface
     {
-        $body    = $this->request->getJSON(true) ?? [];
-        $options = $body['options'] ?? [];
+        $body       = $this->request->getJSON(true) ?? [];
+        $answerType = (string) ($body['answer_type'] ?? 'detailed');
 
-        try {
-            $genSvc = new OfficialAnswerGenerationService();
-            $result = $genSvc->generate($uuid, $options);
-            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_GENERATION_STARTED, ['answer_uuid' => $uuid]);
-            return $this->response->setJSON(['data' => $result]);
-        } catch (\RuntimeException $e) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
-        }
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->requestGeneration($uuid, $answerType, $this->userId()),
+        ]));
     }
 
-    /** PUT /community/answers/(:segment) — save human-edited content */
+    /** PUT /community/answers/(:segment) — save a human edit as a new version */
     public function update(string $uuid): ResponseInterface
     {
         $body    = $this->request->getJSON(true) ?? [];
-        $content = $body['content'] ?? [];
+        $content = (string) ($body['content'] ?? '');
+        $excerpt = (string) ($body['excerpt'] ?? '');
+        $sources = (array) ($body['sources'] ?? []);
 
-        $versionSvc = new OfficialAnswerVersionService();
-        $version    = $versionSvc->createVersion($uuid, $content, 'human_edit');
-        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_EDITED, ['answer_uuid' => $uuid]);
-        return $this->response->setJSON(['data' => $version]);
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->saveHumanEdit($uuid, $content, $excerpt, $sources, $this->userId()),
+        ]));
+    }
+
+    /** POST /community/answers/(:segment)/validate */
+    public function validateAnswer(string $uuid): ResponseInterface
+    {
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->validate($uuid),
+        ]));
+    }
+
+    /** POST /community/answers/(:segment)/submit-review */
+    public function submitForReview(string $uuid): ResponseInterface
+    {
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->submitForReview($uuid, $this->userId()),
+        ]));
     }
 
     /** POST /community/answers/(:segment)/approve */
     public function approve(string $uuid): ResponseInterface
     {
-        $body    = $this->request->getJSON(true) ?? [];
-        $note    = $body['note'] ?? null;
-        $userId  = $this->userId();
+        $body         = $this->request->getJSON(true) ?? [];
+        $approvalType = (string) ($body['approval_type'] ?? 'standard');
+        $reason       = (string) ($body['reason'] ?? $body['note'] ?? '');
+        $version      = isset($body['version_number']) ? (int) $body['version_number'] : null;
+        $userId       = $this->userId();
 
-        try {
-            $approvalSvc = new OfficialAnswerApprovalService();
-            $approval    = $approvalSvc->approve($uuid, $userId, $note);
-            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_APPROVED, ['answer_uuid' => $uuid, 'approver_id' => $userId]);
-            return $this->response->setJSON(['data' => $approval]);
-        } catch (\RuntimeException $e) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
+        if ($userId === null) {
+            return $this->unprocessable('An authenticated approver is required.');
         }
+
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->approve($uuid, $userId, $version, $approvalType, $reason),
+        ]));
     }
 
     /** POST /community/answers/(:segment)/reject */
     public function reject(string $uuid): ResponseInterface
     {
-        $body    = $this->request->getJSON(true) ?? [];
-        $reason  = $body['reason'] ?? '';
-        $userId  = $this->userId();
+        $body   = $this->request->getJSON(true) ?? [];
+        $reason = (string) ($body['reason'] ?? '');
+        $userId = $this->userId();
 
-        try {
-            $approvalSvc = new OfficialAnswerApprovalService();
-            $approvalSvc->reject($uuid, $userId, $reason);
-            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_APPROVAL_REJECTED, ['answer_uuid' => $uuid]);
-            return $this->response->setJSON(['success' => true]);
-        } catch (\RuntimeException $e) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
+        if ($userId === null) {
+            return $this->unprocessable('An authenticated reviewer is required.');
         }
+
+        return $this->guard(function () use ($uuid, $userId, $reason, $body) {
+            $this->lifecycle->reject(
+                $uuid,
+                $userId,
+                $reason,
+                isset($body['version_number']) ? (int) $body['version_number'] : null
+            );
+            return $this->response->setJSON(['success' => true]);
+        });
+    }
+
+    /** POST /community/answers/(:segment)/schedule */
+    public function schedule(string $uuid): ResponseInterface
+    {
+        $body        = $this->request->getJSON(true) ?? [];
+        $scheduledAt = (string) ($body['scheduled_at'] ?? '');
+
+        if ($scheduledAt === '') {
+            return $this->unprocessable('scheduled_at is required.');
+        }
+
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->schedule($uuid, $scheduledAt, $this->userId()),
+        ]));
     }
 
     /** POST /community/answers/(:segment)/publish */
     public function publish(string $uuid): ResponseInterface
     {
-        try {
-            $pubSvc = new OfficialAnswerPublishingService();
-            $result = $pubSvc->publish($uuid);
-            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_PUBLISHED, ['answer_uuid' => $uuid]);
-            return $this->response->setJSON(['data' => $result]);
-        } catch (\RuntimeException $e) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->publish($uuid, $this->userId()),
+        ]));
+    }
+
+    /** POST /community/answers/(:segment)/unpublish */
+    public function unpublish(string $uuid): ResponseInterface
+    {
+        $body   = $this->request->getJSON(true) ?? [];
+        $reason = (string) ($body['reason'] ?? '');
+
+        if (trim($reason) === '') {
+            return $this->unprocessable('A reason is required to unpublish an answer.');
         }
+
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->unpublish($uuid, $reason, $this->userId()),
+        ]));
     }
 
     /** POST /community/answers/(:segment)/withdraw */
     public function withdraw(string $uuid): ResponseInterface
     {
         $body   = $this->request->getJSON(true) ?? [];
-        $reason = $body['reason'] ?? '';
-        $userId = $this->userId();
+        $reason = (string) ($body['reason'] ?? '');
 
-        $withdrawalSvc = new OfficialAnswerWithdrawalService();
-        $withdrawalSvc->withdraw($uuid, $userId, $reason);
-        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_WITHDRAWN, ['answer_uuid' => $uuid, 'reason' => $reason]);
-        return $this->response->setJSON(['success' => true]);
+        return $this->guard(function () use ($uuid, $reason) {
+            $this->lifecycle->withdraw($uuid, $reason, $this->userId());
+            return $this->response->setJSON(['success' => true]);
+        });
     }
 
     /** POST /community/answers/(:segment)/restore */
     public function restore(string $uuid): ResponseInterface
     {
-        $userId        = $this->userId();
-        $withdrawalSvc = new OfficialAnswerWithdrawalService();
-        $withdrawalSvc->restore($uuid, $userId);
-        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_RESTORED, ['answer_uuid' => $uuid]);
-        return $this->response->setJSON(['success' => true]);
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->restore($uuid, $this->userId()),
+        ]));
     }
 
     /** POST /community/answers/(:segment)/correct */
     public function correct(string $uuid): ResponseInterface
     {
-        $body      = $this->request->getJSON(true) ?? [];
-        $content   = $body['content'] ?? [];
-        $note      = $body['correction_note'] ?? '';
-        $userId    = $this->userId();
+        $body    = $this->request->getJSON(true) ?? [];
+        $content = (string) ($body['content'] ?? '');
+        $excerpt = (string) ($body['excerpt'] ?? '');
+        $note    = (string) ($body['correction_note'] ?? '');
+        $sources = (array) ($body['sources'] ?? []);
 
-        $correctionSvc = new OfficialAnswerCorrectionService();
-        $version       = $correctionSvc->correct($uuid, $userId, $content, $note);
-        AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_CORRECTED, ['answer_uuid' => $uuid, 'note' => $note]);
-        return $this->response->setJSON(['data' => $version]);
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->correct($uuid, $content, $excerpt, $note, $sources, $this->userId()),
+        ]));
+    }
+
+    /** POST /community/answers/(:segment)/archive */
+    public function archive(string $uuid): ResponseInterface
+    {
+        return $this->guard(function () use ($uuid) {
+            $this->lifecycle->archive($uuid, $this->userId());
+            return $this->response->setJSON(['success' => true]);
+        });
+    }
+
+    /**
+     * POST /community/answers/(:segment)/risk
+     * Lowering a tier is an override: it requires a reason and is audited.
+     */
+    public function setRisk(string $uuid): ResponseInterface
+    {
+        $body   = $this->request->getJSON(true) ?? [];
+        $tier   = CommunityRiskTier::tryFrom((int) ($body['risk_tier'] ?? -1));
+        $reason = (string) ($body['reason'] ?? '');
+        $userId = $this->userId();
+
+        if ($tier === null) {
+            return $this->unprocessable('risk_tier must be an integer between 0 and 4.');
+        }
+        if ($userId === null) {
+            return $this->unprocessable('An authenticated actor is required to change risk tier.');
+        }
+
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->setRiskTierWithOverride($uuid, $tier, $reason, $userId),
+        ]));
     }
 
     /** GET /community/answers/(:segment)/versions */
     public function versions(string $uuid): ResponseInterface
     {
         $answer = $this->repo->findByUuid($uuid);
-        if (!$answer) {
-            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+        if ($answer === null) {
+            return $this->notFound();
         }
-        $versions = $this->repo->listVersions((int) $answer['id']);
-        return $this->response->setJSON(['data' => $versions]);
+        return $this->response->setJSON(['data' => $this->repo->listVersions((int) $answer['id'])]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Translate domain exceptions into the canonical API error envelope so that
+     * a failed lifecycle action can never be reported as a success.
+     */
+    private function guard(callable $action): ResponseInterface
+    {
+        try {
+            return $action();
+        } catch (InvalidArgumentException $e) {
+            return $this->unprocessable($e->getMessage());
+        } catch (RuntimeException $e) {
+            if (str_contains($e->getMessage(), 'not found')) {
+                return $this->notFound($e->getMessage());
+            }
+            return $this->unprocessable($e->getMessage());
+        }
+    }
+
+    private function notFound(string $message = 'Official answer not found.'): ResponseInterface
+    {
+        return $this->response->setStatusCode(404)->setJSON(['ok' => false, 'error' => $message]);
+    }
+
+    private function unprocessable(string $message): ResponseInterface
+    {
+        return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'error' => $message]);
     }
 }
-

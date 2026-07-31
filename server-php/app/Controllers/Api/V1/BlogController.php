@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Blog\BlogFeatureFlags;
 use App\Models\ApprovalModel;
 use App\Models\BlogPostModel;
 use App\Models\BlogVersionModel;
@@ -48,6 +49,14 @@ class BlogController extends BaseApiController
 
     public function store()
     {
+        $flags = new BlogFeatureFlags();
+        if ($flags->isEnabled('legacy_create_disabled')) {
+            return $this->fail(
+                'Legacy blog creation is disabled. Use Content Studio or Blog Command Centre.',
+                403,
+            );
+        }
+
         $body      = $this->input();
         $sanitizer = Services::htmlSanitizer();
         $blog      = new BlogPostModel();

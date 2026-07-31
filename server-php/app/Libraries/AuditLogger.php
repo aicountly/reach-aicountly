@@ -235,6 +235,11 @@ class AuditLogger
     public const COMMUNITY_DEPLOYMENT_RETRIED           = 'community.deployment.retried';
     public const COMMUNITY_ENGAGEMENT_RECORDED          = 'community.engagement.recorded';
 
+    // Lifecycle events emitted by OfficialAnswerLifecycleService
+    public const COMMUNITY_ANSWER_ARCHIVED              = 'community.answer.archived';
+    public const COMMUNITY_ANSWER_RISK_CHANGED          = 'community.answer.risk_changed';
+    public const COMMUNITY_ANSWER_RISK_DOWNGRADED       = 'community.answer.risk_downgraded';
+
     // =========================================================================
     // Phase 6 — Video Content Automation audit events
     // =========================================================================

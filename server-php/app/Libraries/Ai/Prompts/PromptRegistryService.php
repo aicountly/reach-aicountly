@@ -80,10 +80,10 @@ class PromptRegistryService
             $actor,
         );
 
-        AuditLogger::log('ai.prompt_template_created', [
+        AuditLogger::record('ai.prompt_template_created', [
             'template_id' => $templateId,
             'slug'        => $slug,
-        ], $actor);
+        ], $actor['user_id'] ?? null);
 
         return $this->findBySlug($slug);
     }
