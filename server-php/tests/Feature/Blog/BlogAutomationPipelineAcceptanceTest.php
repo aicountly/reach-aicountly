@@ -354,6 +354,11 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         ActorRegistry::idForUser($approverId);
         (new BlogContentApprovalService())->approve($contentItemId, $contentVersionId, $approverId, 'standard', 'approved anyway');
 
+        // Auto-publish is off by default in setUp(); this negative case needs
+        // the automated PUBLISH_BLOG path to run so the hard HIGH-risk ban fires.
+        $_ENV['BLOG_AUTO_PUBLISH_ENABLED'] = 'true';
+        $_ENV['BLOG_PUBLIC_PUBLISHER_ENABLED'] = 'true';
+
         $publishBlockId = $this->workBlocks->create([
             'block_type' => WorkBlockService::TYPE_PUBLISH_BLOG,
             'content_item_id' => $contentItemId,
@@ -376,12 +381,15 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
 
         [$contentItemId] = $this->buildMinimalDraftFixture('high');
         $sm = new BlogStateMachine($this->workBlocks);
-        (new \App\Libraries\Blog\WorkBlockService()); // ensure autoloaded
+
+        // Walk the legal adjacency path from draft; the approval gate fires only
+        // on the transition into published/live (assertPublishAllowed).
+        $sm->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, []);
+        $sm->transition($contentItemId, BlogStateMachine::APPROVED, null, []);
+        $sm->transition($contentItemId, BlogStateMachine::PUBLISH_QUEUED, null, []);
+        $sm->transition($contentItemId, BlogStateMachine::PUBLISHING, null, []);
 
         try {
-            $sm->transition($contentItemId, BlogStateMachine::APPROVED, null, []);
-            $sm->transition($contentItemId, BlogStateMachine::PUBLISH_QUEUED, null, []);
-            $sm->transition($contentItemId, BlogStateMachine::PUBLISHING, null, []);
             $sm->transition($contentItemId, BlogStateMachine::PUBLISHED, null, []);
             $this->fail('Recording a HIGH-risk item as PUBLISHED without a valid approval must be rejected.');
         } catch (\RuntimeException $e) {
@@ -525,6 +533,26 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
 
         [$contentItemId, $contentVersionId] = $this->buildMinimalDraftFixture('low');
         $db = Database::connect();
+
+        // enqueuePublication() requires human approval before any schedule/publish.
+        $headers = $this->authAs('reach_admin');
+        $approverId = (int) $db->table('reach_users')->where('email', 'reach_admin@test.aicountly.org')->get()->getRowArray()['id'];
+        ActorRegistry::idForUser($approverId);
+        (new BlogContentApprovalService())->approve($contentItemId, $contentVersionId, $approverId, 'standard', 'schedule fixture');
+
+        $existingConn = $db->table('reach_publication_connections')
+            ->where('connection_key', 'aicountly_com')->get()->getRowArray();
+        if (! $existingConn) {
+            $db->table('reach_publication_connections')->insert([
+                'connection_key' => 'aicountly_com',
+                'display_name'   => 'AICOUNTLY.com (test)',
+                'base_url'       => 'https://example.test',
+                'enabled'        => true,
+                'created_at'     => date('Y-m-d H:i:s'),
+                'updated_at'     => date('Y-m-d H:i:s'),
+            ]);
+        }
+
         $pub = new PublicationDeploymentService(new JobService());
 
         $scheduledAt = date('c', strtotime('+2 hours'));

@@ -11,6 +11,10 @@ final class BlogCrudTest extends ApiTestCase
 {
     public function testCreateShowListAndUpdate(): void
     {
+        // Legacy blog create is disabled by default (BlogFeatureFlags); this
+        // CRUD suite exercises the still-supported legacy API path explicitly.
+        $_ENV['BLOG_LEGACY_CREATE_DISABLED'] = 'false';
+
         $headers = $this->authAs('super_admin');
 
         // Create

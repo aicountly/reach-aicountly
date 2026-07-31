@@ -64,7 +64,13 @@ class AiGroundingContextBuilder
             return $this->buildForProduct($productSlug, $intent);
         }
 
-        $rawContext = $this->knowledge->forIntent($intent);
+        // Callers (AiGenerationOrchestrator) pass an AI task_type string such as
+        // "draft_generation". KnowledgeGroundingService::forIntent() expects a
+        // numeric reach_search_intents primary key — only use it when we have one.
+        $rawContext = null;
+        if (ctype_digit($intent)) {
+            $rawContext = $this->knowledge->forIntent((int) $intent);
+        }
 
         if (! $rawContext) {
             $rawContext = ['intent' => $intent, 'product' => null];
