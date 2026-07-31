@@ -62,7 +62,10 @@ class BlogStateMachine
         self::INTERNAL_REVIEW      => [self::APPROVED, self::CHANGES_REQUESTED, self::REJECTED],
         self::CHANGES_REQUESTED    => [self::DRAFT, self::OUTLINE_DRAFT, self::ARCHIVED],
         self::APPROVED             => [self::SCHEDULED, self::PUBLISH_QUEUED, self::ARCHIVED],
-        self::SCHEDULED            => [self::PUBLISH_QUEUED, self::APPROVED, self::ARCHIVED],
+        // Scheduled items may be force-published, returned to approved, or —
+        // after a successful public verify of a due schedule — moved to
+        // verification_pending / live without a separate publish work block.
+        self::SCHEDULED            => [self::PUBLISH_QUEUED, self::APPROVED, self::ARCHIVED, self::VERIFICATION_PENDING, self::LIVE, self::PUBLISHED],
         self::PUBLISH_QUEUED       => [self::PUBLISHING, self::BLOCKED, self::FAILED],
         self::PUBLISHING           => [self::PUBLISHED, self::FAILED, self::BLOCKED],
         self::PUBLISHED            => [self::VERIFICATION_PENDING, self::LIVE, self::REFRESH_PENDING],
