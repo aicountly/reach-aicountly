@@ -216,10 +216,18 @@ cd web && npm ci && npm run build
 # it is safe even if the server clock is not Asia/Kolkata.
 30 0 * * * cd /path/to/server-php && /usr/bin/php spark reach:blog-optimize-roadmap >> writable/logs/blog-optimizer.log 2>&1
 
-# Existing worker (must keep running)
-* * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --once --limit=20 >> writable/logs/worker.log 2>&1
+# Existing worker (must keep running) — CRITICAL: reach:work only drains the queue(s)
+# named in --queue. Blog automation jobs are enqueued on the 'blog' and 'publishing'
+# queues (see App\Libraries\Blog\WorkBlockService::enqueueEligibleBatch and
+# App\Libraries\Publishing\Jobs\PublicationDeploymentService::enqueuePublicationJob).
+# A worker started with only "--queue=default" (as originally shipped) NEVER
+# processes those jobs — they sit "queued" forever. --queue accepts a
+# comma-separated list so one worker cron line drains all three:
+* * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --queue=default,blog,publishing --once --limit=20 >> writable/logs/worker.log 2>&1
 * * * * * cd /path/to/server-php && /usr/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 ```
+
+**Worker validation after deploy:** run `php spark reach:work --queue=default,blog,publishing --once --limit=1` manually once and confirm the `worker.start` log line lists all three queues, then check `SELECT queue, status, count(*) FROM reach_jobs GROUP BY queue, status;` — `blog` and `publishing` rows must not accumulate indefinitely in `pending`/`reserved` status.
 
 If the server clock is UTC, schedule the optimiser at `0 19 * * *` instead — IST is
 UTC+5:30 year-round with no daylight saving, so 19:00 UTC is 00:30 IST the next day.

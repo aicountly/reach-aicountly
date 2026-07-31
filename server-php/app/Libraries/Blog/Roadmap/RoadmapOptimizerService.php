@@ -349,7 +349,10 @@ class RoadmapOptimizerService
                 'portfolio_stream'   => $candidate['portfolio_stream'] ?? null,
                 'decision_id'        => $decisionId,
             ], JSON_UNESCAPED_SLASHES),
-            'eligibility_status' => 'pending',
+            // Eligible immediately: the optimizer is the human-approved roadmap decision
+            // (CREATE_NEW) that authorizes this brief. Leaving it 'pending' meant the
+            // dispatcher's enqueueEligibleBatch() would never pick it up.
+            'eligibility_status' => 'eligible',
             'idempotency_key'    => $key,
             'priority'           => (int) ($candidate['publication_priority'] ?? 0),
             'created_at'         => date('Y-m-d H:i:s'),

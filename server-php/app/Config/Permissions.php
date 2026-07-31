@@ -322,6 +322,9 @@ final class Permissions
     /** Community — engagement */
     public const COMMUNITY_ENGAGEMENT_INGEST = 'community_engagement.ingest';
 
+    /** Community — role-routed operational agent runtime (Phase 5 remediation) */
+    public const COMMUNITY_AGENT_DISPATCH = 'community_agent.dispatch';
+
     // =========================================================================
     // Phase 6 — Video Content Automation
     // =========================================================================
@@ -580,6 +583,7 @@ final class Permissions
             'community_analytics'  => [self::COMMUNITY_ANALYTICS_VIEW],
             'community_audit'      => [self::COMMUNITY_AUDIT_VIEW],
             'community_engagement' => [self::COMMUNITY_ENGAGEMENT_INGEST],
+            'community_agent'      => [self::COMMUNITY_AGENT_DISPATCH],
             // Phase 6: Video Content Automation
             'video'             => [
                 self::VIDEO_READ, self::VIDEO_CREATE, self::VIDEO_UPDATE, self::VIDEO_GENERATE,

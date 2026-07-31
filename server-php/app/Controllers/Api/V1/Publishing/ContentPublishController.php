@@ -84,10 +84,12 @@ class ContentPublishController extends BaseApiController
         $actor  = $this->request->actor ?? null;
         $reason = $body['reason'] ?? 'Manual unpublish';
 
-        // Find the active deployment
+        // Find the active deployment. 'rolled_back' is included because a
+        // rollback keeps the article live (showing a prior version), so it
+        // must remain eligible for a genuine takedown.
         $deployment = $this->db->table('reach_publication_deployments')
             ->where('content_item_id', $contentItemId)
-            ->whereIn('status', ['published', 'verified'])
+            ->whereIn('status', ['published', 'verified', 'rolled_back'])
             ->orderBy('id', 'DESC')
             ->limit(1)
             ->get()->getRowArray();
@@ -97,7 +99,7 @@ class ContentPublishController extends BaseApiController
         }
 
         try {
-            $success = (new PublicationRollbackService())->rollback($deployment['id'], $reason, $actor?->id);
+            $success = (new PublicationRollbackService())->unpublish($deployment['id'], $reason, $actor?->id);
             return $this->ok(['unpublished' => $success]);
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 422);

@@ -44,6 +44,16 @@ class CommunityPublicSitePublisher implements CommunityPublisherInterface
     // CommunityPublisherInterface implementation
     // -------------------------------------------------------------------------
 
+    public function createIdentity(array $envelope): array
+    {
+        return $this->post('/api/reach/v1/community/identities', $envelope);
+    }
+
+    public function updateIdentity(string $externalId, array $envelope): array
+    {
+        return $this->put("/api/reach/v1/community/identities/{$externalId}", $envelope);
+    }
+
     public function createQuestion(array $envelope): array
     {
         return $this->post('/api/reach/v1/community/questions', $envelope);
@@ -87,6 +97,40 @@ class CommunityPublicSitePublisher implements CommunityPublisherInterface
     public function getAnswerVerification(string $answerUuid): array
     {
         return $this->get("/api/reach/v1/community/answers/{$answerUuid}/verification");
+    }
+
+    public function createComment(array $envelope): array
+    {
+        return $this->post('/api/reach/v1/community/comments', $envelope);
+    }
+
+    public function applyCorrection(array $envelope): array
+    {
+        return $this->post('/api/reach/v1/community/corrections', $envelope);
+    }
+
+    public function applyModerationAction(array $envelope): array
+    {
+        return $this->post('/api/reach/v1/community/moderation/actions', $envelope);
+    }
+
+    public function getRecord(string $externalId): array
+    {
+        return $this->get("/api/reach/v1/community/records/{$externalId}");
+    }
+
+    public function reconcile(array $externalIds): array
+    {
+        return $this->post('/api/reach/v1/community/reconcile', ['external_ids' => $externalIds]);
+    }
+
+    public function getChanges(string $sinceIso8601, int $limit = 500): array
+    {
+        $path = '/api/reach/v1/community/changes'
+            . '?since=' . rawurlencode($sinceIso8601)
+            . '&limit=' . max(1, min($limit, 500));
+
+        return $this->get($path);
     }
 
     public function healthCheck(): bool

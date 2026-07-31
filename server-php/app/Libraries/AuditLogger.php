@@ -219,6 +219,12 @@ class AuditLogger
     public const COMMUNITY_ENGAGEMENT_BOT_FILTERED      = 'community.engagement.bot_filtered';
     public const COMMUNITY_PUBLISHING_CHECKSUM_MISMATCH = 'community.publishing.checksum_mismatch';
     public const COMMUNITY_PUBLISHING_ROLLBACK          = 'community.publishing.rollback';
+    public const COMMUNITY_PUBLISHING_RISK_BLOCKED      = 'community.publishing.risk_blocked';
+    public const COMMUNITY_COMMENT_POSTED               = 'community.comment.posted';
+    public const COMMUNITY_COMMENT_FAILED               = 'community.comment.failed';
+    public const COMMUNITY_AGENT_RUN_BLOCKED            = 'community.agent.run_blocked';
+    public const COMMUNITY_SYNC_COMPLETED               = 'community.sync.completed';
+    public const COMMUNITY_SYNC_DRIFT_DETECTED          = 'community.sync.drift_detected';
 
     // Additional Phase 5 events used by controllers and jobs
     public const COMMUNITY_QUESTION_INGESTED            = 'community.question.ingested';

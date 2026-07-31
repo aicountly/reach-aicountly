@@ -434,6 +434,11 @@ class RolesAndPermissionsSeeder extends Seeder
                     Permissions::COMMUNITY_SETTINGS_MANAGE,
                     Permissions::COMMUNITY_ANALYTICS_VIEW,
                     Permissions::COMMUNITY_ENGAGEMENT_INGEST,
+                    // Role-routed agent runtime (question_curator, community_steward,
+                    // thread_facilitator, review_objection_desk) — never
+                    // expert_answer_assistant's draft path alone grants publish;
+                    // the dispatcher itself still blocks publish-adjacent actions.
+                    Permissions::COMMUNITY_AGENT_DISPATCH,
                 ])),
             ],
             [

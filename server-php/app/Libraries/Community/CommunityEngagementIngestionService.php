@@ -8,17 +8,28 @@ use App\Libraries\AuditLogger;
 /**
  * Phase 5 — Community Engagement Ingestion Service.
  *
- * Records genuine engagement events (views, helpful votes, shares) for
- * published official answers. Enforces deduplication and validation.
+ * Records genuine engagement events (page views, helpful votes, replies,
+ * reports, clicks) against the schema created by migration
+ * 2026-07-13-100100_CreateReachCommunityEngagementEvents. Enforces
+ * deduplication, event-type validation and a real bot filter: events
+ * attributable to an official identity, a service account or an automation
+ * source are never counted as genuine community engagement, because Reach
+ * itself is never allowed to manufacture engagement on its own content
+ * (see CommunityReceiverController::guardEngagement on the public side —
+ * this is the mirror-image guarantee on the ingestion side).
  *
- * Rules:
- *  - No synthetic/fabricated engagement may be recorded.
- *  - Deduplication key prevents double-counting the same event.
- *  - Events are soft-stored with is_validated = FALSE until the
- *    reconciliation job validates them.
+ * Events are soft-stored with validated = FALSE until validatePending()
+ * (invoked by the reconciliation job) confirms them.
  */
 class CommunityEngagementIngestionService
 {
+    private const ALLOWED_EVENT_TYPES = ['page_view', 'helpful', 'not_helpful', 'reply', 'report', 'click'];
+
+    /** Sources that can never produce genuine engagement — mirrors the
+     *  receiver-side ENGAGEMENT_OPERATIONS guard so a bot/service caller can
+     *  never inflate its own metrics from the ingestion side either. */
+    private const BOT_SOURCES = ['reach_service', 'reach_bot', 'reach_automation', 'official_identity', 'service_account'];
+
     private CommunityEngagementEventModel $model;
 
     public function __construct()
@@ -30,77 +41,85 @@ class CommunityEngagementIngestionService
      * Ingest a genuine engagement event.
      *
      * @param array{
-     *   answer_external_id: string,
+     *   answer_id?: int,
+     *   question_id?: int,
      *   event_type: string,
-     *   source_platform: string,
-     *   dedup_key?: string,
-     *   metadata?: array
+     *   source?: string,
+     *   deduplication_key?: string,
+     *   session_reference?: string,
+     *   event_timestamp?: string,
+     *   is_bot?: bool
      * } $event
      */
     public function ingest(array $event): array
     {
-        $answerUuid    = $event['answer_external_id'] ?? '';
-        $eventType     = $event['event_type'] ?? '';
-        $sourcePlatform = $event['source_platform'] ?? 'unknown';
-        $dedupKey      = $event['dedup_key'] ?? null;
+        $answerId   = isset($event['answer_id']) ? (int) $event['answer_id'] : null;
+        $questionId = isset($event['question_id']) ? (int) $event['question_id'] : null;
+        $eventType  = (string) ($event['event_type'] ?? '');
+        $source     = (string) ($event['source'] ?? 'public_site');
+        $dedupKey   = $event['deduplication_key'] ?? null;
 
-        if (empty($answerUuid) || empty($eventType)) {
-            throw new \InvalidArgumentException('answer_external_id and event_type are required.');
+        if ($answerId === null && $questionId === null) {
+            throw new \InvalidArgumentException('Either answer_id or question_id is required.');
         }
 
-        $allowedTypes = ['view', 'helpful_vote', 'share', 'click'];
-        if (!in_array($eventType, $allowedTypes, true)) {
+        if (!in_array($eventType, self::ALLOWED_EVENT_TYPES, true)) {
             throw new \InvalidArgumentException("Unknown event_type '{$eventType}'.");
         }
 
-        // Deduplication check
-        if ($dedupKey !== null && $this->model->existsByDedupKey($dedupKey)) {
-            return ['duplicate' => true, 'dedup_key' => $dedupKey];
+        if ($dedupKey === null || trim((string) $dedupKey) === '') {
+            throw new \InvalidArgumentException('deduplication_key is required.');
+        }
+        $dedupKey = (string) $dedupKey;
+
+        if ($this->model->existsByDedupKey($dedupKey)) {
+            return ['duplicate' => true, 'deduplication_key' => $dedupKey];
         }
 
-        $db = db_connect();
-        $db->table('reach_community_engagement_events')->insert([
-            'answer_external_id' => $answerUuid,
-            'event_type'         => $eventType,
-            'source_platform'    => $sourcePlatform,
-            'dedup_key'          => $dedupKey,
-            'metadata_json'      => json_encode($event['metadata'] ?? []),
-            'is_validated'       => false,
-            'created_at'         => date('Y-m-d H:i:s'),
-        ]);
+        $botFiltered = $this->isBotSourced($event, $source);
 
-        $id = $db->insertID();
+        $id = $this->model->insert([
+            'event_type'        => $eventType,
+            'answer_id'         => $answerId,
+            'question_id'       => $questionId,
+            'source'            => $source,
+            'event_timestamp'   => $event['event_timestamp'] ?? date('Y-m-d H:i:s'),
+            'deduplication_key' => $dedupKey,
+            'session_reference' => $event['session_reference'] ?? null,
+            'bot_filtered'      => $botFiltered,
+            'validated'         => false,
+            'ingested_at'       => date('Y-m-d H:i:s'),
+        ], true);
 
         AuditLogger::record(AuditLogger::COMMUNITY_ENGAGEMENT_RECORDED, [
-            'answer_uuid' => $answerUuid,
-            'event_type'  => $eventType,
-            'event_id'    => $id,
+            'answer_id'    => $answerId,
+            'question_id'  => $questionId,
+            'event_type'   => $eventType,
+            'event_id'     => $id,
+            'bot_filtered' => $botFiltered,
         ]);
 
-        return ['ok' => true, 'event_id' => $id, 'duplicate' => false];
+        return ['ok' => true, 'event_id' => $id, 'duplicate' => false, 'bot_filtered' => $botFiltered];
     }
 
     /**
-     * Validate pending engagement events.
-     * Marks bot/invalid events as invalid, real events as validated.
+     * Validate pending engagement events. Bot-filtered events are never
+     * validated regardless of any other signal — they simply do not count.
      */
     public function validatePending(int $limit = 500): int
     {
         $db   = db_connect();
         $rows = $db->table('reach_community_engagement_events')
-            ->where('is_validated', false)
+            ->where('validated', false)
             ->limit($limit)
             ->get()->getResultArray();
 
         $validated = 0;
         foreach ($rows as $row) {
-            // Basic heuristic: events with a dedup_key are treated as validated
-            // (they come from trusted SDK calls). Anonymous events without dedup
-            // keys get a basic bot-check (placeholder for real bot detection).
             $isValid = $this->passesBasicValidation($row);
             $db->table('reach_community_engagement_events')
                 ->where('id', $row['id'])
-                ->update(['is_validated' => $isValid]);
+                ->update(['validated' => $isValid]);
             if ($isValid) {
                 $validated++;
             }
@@ -109,18 +128,30 @@ class CommunityEngagementIngestionService
         return $validated;
     }
 
-    private function passesBasicValidation(array $row): bool
+    private function isBotSourced(array $event, string $source): bool
     {
-        // Reject events without a proper answer reference
-        if (empty($row['answer_external_id'])) {
-            return false;
-        }
-        // Accept events with dedup keys from trusted sources
-        if (!empty($row['dedup_key'])) {
+        if (!empty($event['is_bot']) || !empty($event['is_official_identity'])) {
             return true;
         }
-        // Accept events from known platforms
-        $trustedPlatforms = ['reach_sdk', 'aicountly_com', 'reach_api'];
-        return in_array($row['source_platform'] ?? '', $trustedPlatforms, true);
+
+        return in_array(strtolower(trim($source)), self::BOT_SOURCES, true);
+    }
+
+    private function passesBasicValidation(array $row): bool
+    {
+        if (!empty($row['bot_filtered'])) {
+            return false;
+        }
+
+        if (empty($row['answer_id']) && empty($row['question_id'])) {
+            return false;
+        }
+
+        if (!empty($row['deduplication_key'])) {
+            return true;
+        }
+
+        $trustedSources = ['reach_sdk', 'aicountly_com', 'public_site'];
+        return in_array($row['source'] ?? '', $trustedSources, true);
     }
 }

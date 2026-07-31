@@ -300,9 +300,13 @@ class AiGenerationOrchestrator
     private function resolveProductSlug(array $request): ?string
     {
         if (! empty($request['content_item_id'])) {
+            // CRITICAL FIX: reach_content_items has no `product_id` column — the
+            // FK is `primary_product_id`. The previous join referenced a
+            // non-existent column, which threw a DB error for every AI
+            // generation request that carried a content_item_id.
             $row = db_connect()
                 ->table('reach_content_items ci')
-                ->join('reach_products p', 'p.id = ci.product_id', 'left')
+                ->join('reach_products p', 'p.id = ci.primary_product_id', 'left')
                 ->select('p.slug')
                 ->where('ci.id', $request['content_item_id'])
                 ->limit(1)

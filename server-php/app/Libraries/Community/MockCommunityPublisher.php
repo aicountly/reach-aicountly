@@ -19,6 +19,27 @@ class MockCommunityPublisher implements CommunityPublisherInterface
     private array $errorOverrides = [];
     private int $nextPublicAnswerId = 1000;
 
+    public function createIdentity(array $envelope): array
+    {
+        return $this->record(__FUNCTION__, [$envelope], [
+            'success'             => true,
+            'operation'           => 'create_identity',
+            'public_identity_id'  => $this->nextPublicAnswerId++,
+            'identity_slug'       => $envelope['payload']['slug'] ?? ('mock-identity-' . uniqid()),
+            'request_id'          => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function updateIdentity(string $externalId, array $envelope): array
+    {
+        return $this->record(__FUNCTION__, [$externalId, $envelope], [
+            'success'            => true,
+            'operation'          => 'update_identity',
+            'public_identity_id' => $this->nextPublicAnswerId,
+            'request_id'         => 'mock-' . uniqid(),
+        ]);
+    }
+
     public function createQuestion(array $envelope): array
     {
         return $this->record(__FUNCTION__, [$envelope], [
@@ -124,6 +145,72 @@ class MockCommunityPublisher implements CommunityPublisherInterface
             'sitemap_status'   => 'included',
             'robots_directive' => 'index,follow',
             'request_id'       => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function createComment(array $envelope): array
+    {
+        return $this->record(__FUNCTION__, [$envelope], [
+            'success'             => true,
+            'operation'           => 'create_comment',
+            'public_comment_id'   => $this->nextPublicAnswerId++,
+            'public_comment_uuid' => $envelope['reach_comment_uuid'] ?? $envelope['payload']['reach_comment_uuid'] ?? ('mock-' . uniqid()),
+            'public_status'       => 'published',
+            'request_id'          => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function applyCorrection(array $envelope): array
+    {
+        return $this->record(__FUNCTION__, [$envelope], [
+            'success'           => true,
+            'operation'         => 'correct',
+            'revision_number'   => 2,
+            'previous_revision' => 1,
+            'request_id'        => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function applyModerationAction(array $envelope): array
+    {
+        return $this->record(__FUNCTION__, [$envelope], [
+            'success'       => true,
+            'operation'     => 'moderation_action',
+            'public_status' => $envelope['payload']['action'] ?? 'hidden',
+            'request_id'    => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function getRecord(string $externalId): array
+    {
+        return $this->record(__FUNCTION__, [$externalId], [
+            'success'       => true,
+            'entity_type'   => 'answer',
+            'public_id'     => $this->nextPublicAnswerId,
+            'public_status' => 'published',
+            'request_id'    => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function reconcile(array $externalIds): array
+    {
+        return $this->record(__FUNCTION__, [$externalIds], [
+            'success'    => true,
+            'operation'  => 'reconcile',
+            'records'    => [],
+            'missing'    => [],
+            'request_id' => 'mock-' . uniqid(),
+        ]);
+    }
+
+    public function getChanges(string $sinceIso8601, int $limit = 500): array
+    {
+        return $this->record(__FUNCTION__, [$sinceIso8601, $limit], [
+            'success'    => true,
+            'questions'  => [],
+            'answers'    => [],
+            'comments'   => [],
+            'request_id' => 'mock-' . uniqid(),
         ]);
     }
 

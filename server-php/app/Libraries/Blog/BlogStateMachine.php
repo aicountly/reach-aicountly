@@ -86,6 +86,11 @@ class BlogStateMachine
         self::DRAFT_GENERATING => WorkBlockService::TYPE_GENERATE_DRAFT,
         self::ROADMAP_PLANNED => WorkBlockService::TYPE_OPTIMIZE_ROADMAP,
         self::REFRESH_PENDING => WorkBlockService::TYPE_REFRESH_CONTENT,
+        // Going live must be followed by a real sitemap-presence check, not
+        // an assumption that "published" implies "indexed" or even "in the
+        // sitemap yet". WorkBlockService::executeUpdateSitemap() chains a
+        // CHECK_INDEXING block itself once the sitemap check completes.
+        self::LIVE            => WorkBlockService::TYPE_UPDATE_SITEMAP,
     ];
 
     private BaseConnection $db;
@@ -174,28 +179,41 @@ class BlogStateMachine
     }
 
     /**
+     * Guards the transition INTO published/live. This only enforces the
+     * "high-risk requires human approval" rule. It must NOT also apply the
+     * auto-publish hard ban here: by the time the state machine records a
+     * PUBLISHED/LIVE transition, the actual publish call has already been
+     * made (either by a human via ContentPublishController, or by the
+     * automated PUBLISH_BLOG work block, which applies
+     * BlogFeatureFlags::assertHighRiskAutoPublishForbidden() itself before
+     * ever calling the publisher). Re-applying the ban here would make
+     * legitimately approved high-risk content permanently unable to be
+     * recorded as published even though it is already live — a false
+     * negative that previously blocked correct, approved publications.
+     *
      * @param array<string,mixed> $item
      */
     private function assertPublishAllowed(int $contentItemId, array $item): void
     {
         $riskLevel = strtoupper((string) ($item['risk_level'] ?? 'LOW'));
-        if (in_array($riskLevel, ['HIGH', 'CRITICAL'], true)) {
-            $approval = strtolower((string) ($item['approval_status'] ?? 'not_required'));
-            if ($approval !== 'approved') {
-                throw new \RuntimeException('High-risk blog content requires human approval before publish.');
-            }
-            $this->flags->assertHighRiskAutoPublishForbidden($riskLevel);
-        }
-
-        $details = $this->db->table('reach_content_blog_details')
+        $details   = $this->db->table('reach_content_blog_details')
             ->where('content_item_id', $contentItemId)
             ->get()
             ->getRowArray();
         $riskClass = strtoupper((string) ($details['risk_class'] ?? 'LOW'));
-        if ($riskClass === 'HIGH') {
+
+        if (in_array($riskLevel, ['HIGH', 'CRITICAL'], true) || $riskClass === 'HIGH') {
             $approval = strtolower((string) ($item['approval_status'] ?? 'not_required'));
             if ($approval !== 'approved') {
-                throw new \RuntimeException('HIGH risk_class requires approval before publish.');
+                throw new \RuntimeException('High-risk blog content requires human approval before publish.');
+            }
+
+            $approvals = new BlogContentApprovalService();
+            $versionId = (int) ($item['current_version_id'] ?? 0);
+            if ($versionId > 0 && ! $approvals->verifyForPublication($contentItemId, $versionId)) {
+                throw new \RuntimeException(
+                    'High-risk blog content requires a valid, checksum-matching approval for the exact version being published.'
+                );
             }
         }
     }

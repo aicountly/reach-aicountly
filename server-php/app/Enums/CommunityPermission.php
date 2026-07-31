@@ -43,4 +43,7 @@ enum CommunityPermission: string
     case AnalyticsView            = 'community_analytics.view';
     case AuditView                = 'community_audit.view';
     case EngagementIngest         = 'community_engagement.ingest';
+
+    // Role-routed operational agent runtime (Phase 5 remediation)
+    case AgentDispatch            = 'community_agent.dispatch';
 }

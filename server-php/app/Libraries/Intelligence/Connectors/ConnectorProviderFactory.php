@@ -28,14 +28,23 @@ class ConnectorProviderFactory
         return new GoogleSearchConsoleConnector();
     }
 
+    /**
+     * Returns the live GA4 connector whenever GA4_ENABLED is set, and the mock only
+     * when explicitly requested via useMocks() or CONTENT_ANALYTICS_USE_MOCK=true.
+     *
+     * Previously this always returned MockContentAnalyticsConnector — a real,
+     * working GA4 client (Ga4AnalyticsClient / GoogleAnalyticsContentConnector)
+     * existed but was never wired in, so a configured GA4 property never actually
+     * reached dashboards; they silently consumed mock rows regardless of
+     * configuration.
+     */
     public static function contentAnalytics(): ContentAnalyticsConnectorInterface
     {
-        if (self::$useMocks) {
+        if (self::$useMocks || self::envBool('CONTENT_ANALYTICS_USE_MOCK')) {
             return new MockContentAnalyticsConnector(enabled: true);
         }
 
-        $enabled = (bool) (getenv('CONTENT_ANALYTICS_ENABLED') ?: ($_ENV['CONTENT_ANALYTICS_ENABLED'] ?? false));
-        return new MockContentAnalyticsConnector(enabled: $enabled);
+        return new GoogleAnalyticsContentConnector();
     }
 
     public static function indexNow(): IndexNowConnectorInterface
@@ -50,11 +59,18 @@ class ConnectorProviderFactory
 
     private static function envBool(string $key): bool
     {
-        $value = getenv($key);
-        if ($value === false || $value === '') {
-            $value = $_ENV[$key] ?? '';
+        // Prefer $_ENV over getenv(): dotenv / putenv() can leave a stale
+        // "false" in the process environment that would otherwise shadow an
+        // intentional $_ENV override (tests and request-scoped flips).
+        if (array_key_exists($key, $_ENV)) {
+            return filter_var((string) $_ENV[$key], FILTER_VALIDATE_BOOL);
         }
 
-        return filter_var(is_string($value) ? $value : '', FILTER_VALIDATE_BOOL);
+        $value = getenv($key);
+        if ($value === false || $value === '') {
+            return false;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOL);
     }
 }

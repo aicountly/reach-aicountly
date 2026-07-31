@@ -6,6 +6,7 @@ use App\Controllers\BaseApiController;
 use App\Models\CommunityDeploymentModel;
 use App\Libraries\Community\OfficialAnswerPublishingService;
 use App\Libraries\Community\CommunityPublicationVerificationService;
+use App\Libraries\Community\CommunityPublicationReconciliationService;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -112,6 +113,19 @@ class CommunityDeploymentController extends BaseApiController
         $verifySvc = new CommunityPublicationVerificationService();
         $result    = $verifySvc->verify($deployment['answer_id']);
         AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_VERIFICATION_RUN, ['deployment_uuid' => $uuid]);
+        return $this->response->setJSON(['data' => $result]);
+    }
+
+    /**
+     * POST /community/deployments/reconcile
+     *
+     * Batch-reconciles every published answer against the public site's
+     * receiver (not scoped to a single deployment — that's what /verify is
+     * for). Idempotent: safe to call repeatedly or on a schedule.
+     */
+    public function reconcile(): ResponseInterface
+    {
+        $result = (new CommunityPublicationReconciliationService())->reconcileAll();
         return $this->response->setJSON(['data' => $result]);
     }
 }

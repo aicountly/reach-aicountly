@@ -50,6 +50,8 @@ class CommunityAnalyticsService
 
     /**
      * Return genuine engagement event counts over the given number of days.
+     * Only validated, non-bot-filtered events are counted — Reach-authored
+     * content can never inflate its own engagement metrics.
      *
      * @return list<array{day: string, event_type: string, cnt: int}>
      */
@@ -58,11 +60,12 @@ class CommunityAnalyticsService
         $days = min($days, 90);
         $db   = db_connect();
         return $db->query("
-            SELECT DATE(created_at) AS day, event_type, COUNT(*) AS cnt
+            SELECT DATE(event_timestamp) AS day, event_type, COUNT(*) AS cnt
             FROM reach_community_engagement_events
-            WHERE is_validated = TRUE
-              AND created_at >= NOW() - INTERVAL '{$days} days'
-            GROUP BY DATE(created_at), event_type
+            WHERE validated = TRUE
+              AND bot_filtered = FALSE
+              AND event_timestamp >= NOW() - INTERVAL '{$days} days'
+            GROUP BY DATE(event_timestamp), event_type
             ORDER BY day ASC
         ")->getResultArray();
     }

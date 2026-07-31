@@ -20,6 +20,18 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
     /** Can be set to simulate failures */
     private ?string $forceErrorCategory = null;
 
+    /**
+     * Last checksum accepted for each mocked public_content_id, so
+     * getVerification() reflects what was actually "published" instead of a
+     * fixed literal. Without this, executeVerifyPublication()'s real
+     * checksum comparison against the deployment's real payload checksum
+     * would always report checksum_mismatch against this mock — a false
+     * failure caused by the test double, not by the code under test.
+     *
+     * @var array<int, string>
+     */
+    private array $checksumsById = [];
+
     public function forceError(?string $category): void
     {
         $this->forceErrorCategory = $category;
@@ -35,6 +47,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         $this->calls = [];
         $this->nextId = 1;
         $this->forceErrorCategory = null;
+        $this->checksumsById = [];
     }
 
     public function createDraft(array $envelope): array
@@ -47,6 +60,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
 
         $id   = $this->nextId++;
         $uuid = 'mock-' . $id . '-' . substr(md5($id), 0, 8);
+        $this->checksumsById[$id] = (string) ($envelope['payload_checksum'] ?? 'mock-checksum');
 
         return [
             'success'                 => true,
@@ -69,6 +83,10 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             return $this->err($this->forceErrorCategory);
         }
 
+        if (isset($envelope['payload_checksum'])) {
+            $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
+        }
+
         return [
             'success'          => true,
             'operation'        => 'update_draft',
@@ -83,6 +101,10 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
 
         if ($this->forceErrorCategory) {
             return $this->err($this->forceErrorCategory);
+        }
+
+        if (isset($envelope['payload_checksum'])) {
+            $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
         }
 
         return [
@@ -158,7 +180,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             'public_status'        => 'published',
             'canonical_url'        => 'https://aicountly.com/blog/mock-' . $publicContentId,
             'public_version'       => 1,
-            'payload_checksum'     => 'mock-checksum',
+            'payload_checksum'     => $this->checksumsById[$publicContentId] ?? 'mock-checksum',
             'reach_content_version'=> 1,
             'title'                => 'Mock Article',
             'body_hash'            => 'mock-body-hash',
