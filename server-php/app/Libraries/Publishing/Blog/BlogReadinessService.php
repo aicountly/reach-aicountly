@@ -70,11 +70,11 @@ class BlogReadinessService
             $blocking[] = 'Unresolved critical validation findings';
         }
 
-        // Gate 6: critical findings check
+        // Gate 6: unresolved failed validations (schema uses validation_status, not severity)
         $criticalCount = $this->db->table('reach_content_validations')
             ->where('content_item_id', $contentItemId)
-            ->where('severity', 'critical')
-            ->whereIn('status', ['open', 'acknowledged'])
+            ->where('validation_status', 'failed')
+            ->where('waived_at IS NULL', null, false)
             ->countAllResults();
 
         if ($criticalCount > 0) {
@@ -90,8 +90,10 @@ class BlogReadinessService
             $blocking[] = 'SEO profile is missing';
         } elseif ($seoProfile['seo_status'] === 'blocked') {
             $blocking[] = 'SEO profile is blocked';
-        } elseif ($seoProfile['seo_status'] !== 'ready') {
+        } elseif (! in_array($seoProfile['seo_status'], ['ready', 'warning'], true)) {
             $blocking[] = 'SEO profile is not ready (current: ' . $seoProfile['seo_status'] . ')';
+        } elseif ($seoProfile['seo_status'] === 'warning') {
+            $warnings[] = 'SEO profile has non-blocking warnings';
         }
 
         // Gate 8: slug

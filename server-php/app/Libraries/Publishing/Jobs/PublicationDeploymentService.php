@@ -79,6 +79,23 @@ class PublicationDeploymentService
             throw new \RuntimeException("Publication connection '{$connectionKey}' not found or disabled");
         }
 
+        // Idempotent replay: an identical in-flight schedule/publish for the same
+        // item+version+operation must return the existing deployment, not create
+        // a competing one. time()-suffixed keys alone are not enough.
+        $existing = $this->db->table('reach_publication_deployments')
+            ->where('content_item_id', $contentItemId)
+            ->where('content_version_id', $contentVersionId)
+            ->where('connection_id', $connection['id'])
+            ->where('operation', $operation)
+            ->whereIn('status', ['draft', 'ready', 'queued', 'sending', 'scheduled', 'verification_pending'])
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()->getRowArray();
+
+        if ($existing) {
+            return (int) $existing['id'];
+        }
+
         // Readiness gate
         $aggregator = new PublicationReadinessAggregator();
         $readiness  = $aggregator->evaluate($contentItemId, $item['content_type']);

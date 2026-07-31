@@ -17,6 +17,7 @@ use App\Libraries\Blog\Verification\FactVerificationService;
 use App\Libraries\ContentVersionService;
 use App\Libraries\JobService;
 use App\Libraries\Publishing\Blog\BlogInternalLinkService;
+use App\Libraries\Publishing\Blog\BlogPublishingProfileService;
 use App\Libraries\Publishing\Jobs\PublicationDeploymentService;
 use App\Libraries\Publishing\Jobs\PublicationRollbackService;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
@@ -745,6 +746,8 @@ class WorkBlockService
             throw new \RuntimeException('SEO_OPTIMIZE work block requires content_item_id');
         }
 
+        $this->ensurePublicationProfilesForItem($contentItemId);
+
         $result = (new SeoReadinessService())->evaluate($contentItemId);
 
         try {
@@ -1354,6 +1357,81 @@ class WorkBlockService
         $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Ensure SEO + blog publication profiles exist with the minimum fields
+     * required by BlogReadinessService before schedule/publish.
+     */
+    private function ensurePublicationProfilesForItem(int $contentItemId): void
+    {
+        $item = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
+        if (! $item) {
+            return;
+        }
+
+        $brief = (new ContentBriefModel())->forItem($contentItemId) ?: [];
+        $version = $this->db->table('reach_content_versions')
+            ->where('content_item_id', $contentItemId)
+            ->orderBy('version_number', 'DESC')
+            ->limit(1)->get()->getRowArray();
+
+        $slug = (string) ($item['slug'] ?? '');
+        if ($slug === '') {
+            $slug = $this->buildUniqueSlug((string) ($item['title'] ?? 'blog-post'));
+        }
+
+        $metaTitle = mb_substr((string) ($version['title'] ?? $item['title'] ?? $slug), 0, 120);
+        $metaDescription = mb_substr(
+            (string) ($version['summary'] ?? $brief['objective'] ?? $item['title'] ?? 'Blog article'),
+            0,
+            320,
+        );
+        if (mb_strlen($metaDescription) < 100) {
+            $metaDescription = str_pad($metaDescription, 100, '.');
+        }
+
+        $seo = $this->db->table('reach_content_seo_profiles')
+            ->where('content_item_id', $contentItemId)->get()->getRowArray();
+
+        $seoData = [
+            'content_version_id'     => $version['id'] ?? null,
+            'primary_keyword'        => $brief['primary_keyword'] ?? ($item['title'] ?? null),
+            'meta_title'             => $metaTitle,
+            'meta_description'       => $metaDescription,
+            'slug'                   => $slug,
+            'canonical_preference'   => 'self_canonical',
+            'seo_status'             => 'ready',
+            'updated_at'             => date('Y-m-d H:i:s'),
+        ];
+
+        if ($seo) {
+            // Never overwrite a blocked profile; fill only missing readiness fields.
+            $patch = ['updated_at' => $seoData['updated_at']];
+            foreach (['slug', 'meta_title', 'meta_description', 'canonical_preference', 'primary_keyword'] as $field) {
+                if (empty($seo[$field])) {
+                    $patch[$field] = $seoData[$field];
+                }
+            }
+            if (! in_array($seo['seo_status'] ?? '', ['ready', 'warning', 'blocked'], true)) {
+                $patch['seo_status'] = 'ready';
+            }
+            $this->db->table('reach_content_seo_profiles')
+                ->where('content_item_id', $contentItemId)->update($patch);
+        } else {
+            $seoData['content_item_id'] = $contentItemId;
+            $seoData['created_at'] = date('Y-m-d H:i:s');
+            $this->db->table('reach_content_seo_profiles')->insert($seoData);
+        }
+
+        $profiles = new BlogPublishingProfileService();
+        $profile = $profiles->getOrCreate($contentItemId);
+        if (empty($profile['author_reference'])) {
+            $profiles->update($contentItemId, [
+                'author_reference' => 'aicountly-editorial',
+                'excerpt'          => $metaDescription,
+            ]);
+        }
     }
 
     /**

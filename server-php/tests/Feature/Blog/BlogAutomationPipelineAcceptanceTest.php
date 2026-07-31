@@ -540,6 +540,33 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         ActorRegistry::idForUser($approverId);
         (new BlogContentApprovalService())->approve($contentItemId, $contentVersionId, $approverId, 'standard', 'schedule fixture');
 
+        // Readiness gates require approved workflow + SEO/blog publication profiles.
+        $item = $db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
+        $slug = (string) ($item['slug'] ?? ('fixture-' . $contentItemId));
+        $db->table('reach_content_items')->where('id', $contentItemId)->update([
+            'workflow_status' => BlogStateMachine::APPROVED,
+            'updated_at'      => date('Y-m-d H:i:s'),
+        ]);
+        $db->table('reach_content_seo_profiles')->insert([
+            'content_item_id'      => $contentItemId,
+            'content_version_id'   => $contentVersionId,
+            'primary_keyword'      => 'gst filing',
+            'meta_title'           => 'How to file GST returns on time for small business owners',
+            'meta_description'     => str_pad('Deterministic SEO meta description for schedule idempotency fixture.', 100, '.'),
+            'slug'                 => $slug,
+            'canonical_preference' => 'self_canonical',
+            'seo_status'           => 'ready',
+            'created_at'           => date('Y-m-d H:i:s'),
+            'updated_at'           => date('Y-m-d H:i:s'),
+        ]);
+        $db->table('reach_blog_publication_profiles')->insert([
+            'content_item_id'  => $contentItemId,
+            'author_reference' => 'aicountly-editorial',
+            'excerpt'          => 'Deterministic fixture excerpt.',
+            'created_at'       => date('Y-m-d H:i:s'),
+            'updated_at'       => date('Y-m-d H:i:s'),
+        ]);
+
         $existingConn = $db->table('reach_publication_connections')
             ->where('connection_key', 'aicountly_com')->get()->getRowArray();
         if (! $existingConn) {
