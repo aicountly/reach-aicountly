@@ -614,6 +614,10 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community/deployments/(:segment)',                     'Api\\V1\\Community\\CommunityDeploymentController::show/$1',              ['filter' => 'permission:community.view']);
         $routes->post('community/deployments/(:segment)/retry',              'Api\\V1\\Community\\CommunityDeploymentController::retry/$1',             ['filter' => 'permission:community_answer.publish']);
         $routes->post('community/deployments/(:segment)/verify',             'Api\\V1\\Community\\CommunityDeploymentController::verify/$1',            ['filter' => 'permission:community_answer.publish']);
+        $routes->post('community/deployments/reconcile',                     'Api\\V1\\Community\\CommunityDeploymentController::reconcile',            ['filter' => 'permission:community_answer.publish']);
+
+        // --- Phase 5 remediation: role-routed operational agent runtime ---
+        $routes->post('community/agents/dispatch',                          'Api\\V1\\Community\\CommunityAgentDispatchController::dispatch',          ['filter' => 'permission:community_agent.dispatch']);
 
         // Analytics
         $routes->get('community/analytics/overview',                         'Api\\V1\\Community\\CommunityAnalyticsController::overview',              ['filter' => 'permission:community_analytics.view']);

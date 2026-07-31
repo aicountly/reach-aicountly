@@ -37,6 +37,7 @@ final class CommunityPermissionTest extends TestCase
         'community_analytics.view',
         'community_audit.view',
         'community_engagement.ingest',
+        'community_agent.dispatch',
     ];
 
     // -------------------------------------------------------------------------

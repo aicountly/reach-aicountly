@@ -34,14 +34,6 @@ class CommunityDeploymentModel extends Model
         return $this->where('idempotency_key', $key)->first();
     }
 
-    public function listPendingRetries(): array
-    {
-        return $this->where('status', 'retrying')
-            ->where('next_retry_at <=', date('Y-m-d H:i:s'))
-            ->where('attempt_count <', $this->db->table($this->table)->getCompiledSelect())
-            ->findAll();
-    }
-
     public function listRetryDue(): array
     {
         return $this->db->table($this->table)

@@ -1,9 +1,10 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { NotebookPen } from 'lucide-react';
 import { Breadcrumbs } from '../../components/common/Breadcrumbs';
 import { BlogScopeProvider } from '../../context/BlogScopeContext';
 import { usePermission } from '../../hooks/usePermission';
 import { isBlogCommandCentreEnabled } from '../../constants/blogFeatureFlags';
+import { ForbiddenPage } from '../ForbiddenPage';
 import {
   BCC_SECTIONS,
   buildBccBreadcrumbs,
@@ -17,7 +18,13 @@ export function BlogCommandCentreLayout() {
   const enabled = isBlogCommandCentreEnabled();
   const canAccess = hasAny(['blog.view', 'content.view', 'publishing.view']);
 
-  if (!enabled || !canAccess) return null;
+  // A disabled feature reads as "not found" (no such surface — same
+  // fallback the app router uses for unknown paths); a real permission
+  // denial must say so explicitly rather than render a blank page — a
+  // silent blank screen on direct URL access is itself an audit finding
+  // (RBAC must be visible, not merely "nothing happens").
+  if (!enabled) return <Navigate to={ROUTES.DASHBOARD} replace />;
+  if (!canAccess) return <ForbiddenPage requiredPermission="blog.view" />;
 
   const activeSection = findBccSectionByPath(pathname);
   const breadcrumbItems = buildBccBreadcrumbs(pathname);

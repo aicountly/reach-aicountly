@@ -2,6 +2,7 @@
 
 namespace App\Libraries\Publishing\Blog;
 
+use App\Libraries\Blog\BlogContentApprovalService;
 use App\Libraries\HtmlSanitizer;
 
 /**
@@ -14,11 +15,13 @@ class BlogPublicationPayloadBuilder
 {
     private \CodeIgniter\Database\BaseConnection $db;
     private BlogMetadataService $metadata;
+    private BlogContentApprovalService $approvals;
 
-    public function __construct()
+    public function __construct(?BlogContentApprovalService $approvals = null)
     {
-        $this->db       = \Config\Database::connect();
-        $this->metadata = new BlogMetadataService();
+        $this->db        = \Config\Database::connect();
+        $this->metadata  = new BlogMetadataService();
+        $this->approvals = $approvals ?? new BlogContentApprovalService();
     }
 
     /**
@@ -97,6 +100,11 @@ class BlogPublicationPayloadBuilder
 
         $bodyMarkdown = $snapshot['body_markdown'] ?? null;
 
+        // Named-reviewer attribution ("Reviewed by CA Rahul Gupta") may only surface when a
+        // checksum-bound approval by a registered protected reviewer exists for this exact
+        // version. The free-text reviewer_reference field can never produce this on its own.
+        $protectedReviewerName = $this->approvals->protectedReviewerName($contentItemId, $contentVersionId);
+
         $payload = [
             'title'                => $item['title'] ?? '',
             'slug'                 => $seo['slug'] ?? $item['slug'] ?? '',
@@ -112,7 +120,8 @@ class BlogPublicationPayloadBuilder
             'category'             => $profile['category'] ?? '',
             'tags'                 => $tags,
             'author_name'          => $profile['author_reference'] ?? '',
-            'reviewer_name'        => $profile['reviewer_reference'] ?? '',
+            'reviewer_name'        => $protectedReviewerName ?? '',
+            'reviewer_reference'   => $profile['reviewer_reference'] ?? '',
             'featured_image_url'   => $profile['featured_image_reference'] ?? $blogDetails['featured_image_url'] ?? '',
             'featured_image_alt'   => $profile['featured_image_alt'] ?? '',
             'internal_links'       => $internalLinks,

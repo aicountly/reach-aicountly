@@ -28,14 +28,23 @@ class ConnectorProviderFactory
         return new GoogleSearchConsoleConnector();
     }
 
+    /**
+     * Returns the live GA4 connector whenever GA4_ENABLED is set, and the mock only
+     * when explicitly requested via useMocks() or CONTENT_ANALYTICS_USE_MOCK=true.
+     *
+     * Previously this always returned MockContentAnalyticsConnector — a real,
+     * working GA4 client (Ga4AnalyticsClient / GoogleAnalyticsContentConnector)
+     * existed but was never wired in, so a configured GA4 property never actually
+     * reached dashboards; they silently consumed mock rows regardless of
+     * configuration.
+     */
     public static function contentAnalytics(): ContentAnalyticsConnectorInterface
     {
-        if (self::$useMocks) {
+        if (self::$useMocks || self::envBool('CONTENT_ANALYTICS_USE_MOCK')) {
             return new MockContentAnalyticsConnector(enabled: true);
         }
 
-        $enabled = (bool) (getenv('CONTENT_ANALYTICS_ENABLED') ?: ($_ENV['CONTENT_ANALYTICS_ENABLED'] ?? false));
-        return new MockContentAnalyticsConnector(enabled: $enabled);
+        return new GoogleAnalyticsContentConnector();
     }
 
     public static function indexNow(): IndexNowConnectorInterface

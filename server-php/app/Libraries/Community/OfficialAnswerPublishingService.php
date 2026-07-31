@@ -3,7 +3,9 @@
 namespace App\Libraries\Community;
 
 use App\Enums\CommunityAnswerStatus;
+use App\Enums\CommunityRiskTier;
 use App\Libraries\AuditLogger;
+use App\Models\CommunityAnswerApprovalModel;
 use App\Models\CommunityDeploymentModel;
 
 /**
@@ -11,6 +13,12 @@ use App\Models\CommunityDeploymentModel;
  *
  * Enforces:
  *   - Pre-publication approval checksum verification
+ *   - Publish-time risk re-check (tier 4 always blocked; tier 2/3 must have a
+ *     professional/compliance approval record) — approval-time gating in
+ *     OfficialAnswerLifecycleService::approve() is necessary but not
+ *     sufficient, because the risk tier can be raised after approval via
+ *     setRiskTierWithOverride() without automatically revoking the existing
+ *     approval. This re-check is the defense-in-depth backstop.
  *   - Idempotent deployment records
  *   - HMAC-signed API calls via CommunityPublicSitePublisher
  *   - Status transition after successful/failed deployment
@@ -18,13 +26,78 @@ use App\Models\CommunityDeploymentModel;
 class OfficialAnswerPublishingService
 {
     public function __construct(
-        private readonly OfficialAnswerRepository     $answerRepo  = new OfficialAnswerRepository(),
-        private readonly OfficialAnswerApprovalService $approval   = new OfficialAnswerApprovalService(),
-        private readonly CommunityDeploymentModel      $deployModel = new CommunityDeploymentModel(),
-        private CommunityPublisherInterface            $publisher   = new CommunityPublicSitePublisher()
+        private readonly OfficialAnswerRepository      $answerRepo     = new OfficialAnswerRepository(),
+        private readonly OfficialAnswerApprovalService  $approval       = new OfficialAnswerApprovalService(),
+        private readonly CommunityDeploymentModel       $deployModel    = new CommunityDeploymentModel(),
+        private readonly CommunityAnswerApprovalModel    $approvalModel  = new CommunityAnswerApprovalModel(),
+        private CommunityPublisherInterface              $publisher      = new CommunityPublicSitePublisher()
     ) {
         // Allow factory injection for test environments
         $this->publisher = CommunityPublisherFactory::create();
+    }
+
+    /**
+     * Re-derive the risk tier the same way OfficialAnswerLifecycleService
+     * does. Duplicated rather than shared because the lifecycle service
+     * depends on this service (not vice versa) — introducing a back-reference
+     * would create a circular dependency for a three-line lookup.
+     */
+    private function riskTierOf(array $answer): CommunityRiskTier
+    {
+        if (isset($answer['risk_tier']) && $answer['risk_tier'] !== null && $answer['risk_tier'] !== '') {
+            return CommunityRiskTier::from((int) $answer['risk_tier']);
+        }
+        return CommunityRiskTier::fromClassification($answer['risk_classification'] ?? 'low');
+    }
+
+    /**
+     * Publish-time risk gate. Throws when the current risk tier can never
+     * publish (tier 4) or requires an approval record this answer does not
+     * actually have (tier 2/3 must be professional_review/compliance_review,
+     * never standard) — re-asserted here because the tier may have changed
+     * since the stored approval was granted.
+     */
+    private function assertPublishableRiskState(array $answer): void
+    {
+        $answerId = (int) $answer['id'];
+        $tier     = $this->riskTierOf($answer);
+
+        if ($tier === CommunityRiskTier::Prohibited) {
+            AuditLogger::record(AuditLogger::COMMUNITY_PUBLISHING_RISK_BLOCKED, [
+                'answer_id' => $answerId,
+                'risk_tier' => $tier->value,
+                'reason'    => 'risk_tier_prohibited',
+            ]);
+            throw new \RuntimeException(
+                "Publication blocked: answer #{$answerId} is risk tier 4 (prohibited) and can never be published."
+            );
+        }
+
+        if (! $tier->requiresProfessionalApproval()) {
+            return;
+        }
+
+        $approvalRecord = $this->approvalModel
+            ->where('answer_id', $answerId)
+            ->where('answer_version_number', $answer['approved_version'] ?? null)
+            ->where('version_checksum', $answer['approved_version_checksum'] ?? null)
+            ->where('outcome', 'approved')
+            ->orderBy('created_at', 'DESC')
+            ->first();
+
+        $approvalType = $approvalRecord['approval_type'] ?? 'standard';
+        if (! in_array($approvalType, ['professional_review', 'compliance_review'], true)) {
+            AuditLogger::record(AuditLogger::COMMUNITY_PUBLISHING_RISK_BLOCKED, [
+                'answer_id'      => $answerId,
+                'risk_tier'      => $tier->value,
+                'approval_type'  => $approvalType,
+                'reason'         => 'insufficient_approval_for_risk_tier',
+            ]);
+            throw new \RuntimeException(
+                "Publication blocked: risk tier {$tier->value} requires professional or compliance approval; " .
+                "recorded approval type for answer #{$answerId} was '{$approvalType}'."
+            );
+        }
     }
 
     /**
@@ -51,6 +124,9 @@ class OfficialAnswerPublishingService
                 "Publication blocked: approval checksum verification failed for answer #{$answerId}"
             );
         }
+
+        // Gate: risk tier may have been raised since approval — re-assert now.
+        $this->assertPublishableRiskState($answer);
 
         // Never publish the same approved version twice. If a prior deployment
         // for this exact version + checksum already succeeded, return it.
@@ -182,6 +258,19 @@ class OfficialAnswerPublishingService
                 'updated_at'          => date('Y-m-d H:i:s'),
             ]);
             return ['success' => false, 'outcome' => 'approval_invalidated'];
+        }
+
+        // Risk tier may have been raised since the original attempt — re-assert.
+        try {
+            $this->assertPublishableRiskState($answer);
+        } catch (\RuntimeException $e) {
+            $this->deployModel->update($deploymentId, [
+                'status'              => 'dead_letter',
+                'last_error'          => substr($e->getMessage(), 0, 500),
+                'last_error_category' => 'validation_error',
+                'updated_at'          => date('Y-m-d H:i:s'),
+            ]);
+            return ['success' => false, 'outcome' => 'risk_blocked'];
         }
 
         $attempts++;

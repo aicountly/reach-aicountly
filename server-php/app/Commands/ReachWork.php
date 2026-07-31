@@ -11,7 +11,10 @@ use Throwable;
  * `php spark reach:work` — long-running worker that reserves and executes jobs.
  *
  * Options:
- *   --queue=<name>       (default: "default")
+ *   --queue=<name>       (default: "default"). Accepts a comma-separated list,
+ *                        e.g. --queue=default,blog,publishing, to drain several
+ *                        queues from one worker process. Reserving cycles
+ *                        through the listed queues in order each idle pass.
  *   --once               process at most one job then exit (useful for cron)
  *   --limit=<n>          exit after N jobs (default 0 = unlimited)
  *   --worker-id=<slug>   distinct id emitted in logs and stored on the job row
@@ -30,7 +33,11 @@ class ReachWork extends BaseCommand
 
     public function run(array $params): int
     {
-        $queue    = (string) ($params['queue'] ?? CLI::getOption('queue') ?? 'default');
+        $queueOption = (string) ($params['queue'] ?? CLI::getOption('queue') ?? 'default');
+        $queues      = array_values(array_filter(array_map('trim', explode(',', $queueOption))));
+        if ($queues === []) {
+            $queues = ['default'];
+        }
         $once     = (bool) (CLI::getOption('once') ?? false);
         $limit    = (int) ($params['limit'] ?? CLI::getOption('limit') ?? 0);
         $workerId = (string) ($params['worker-id'] ?? CLI::getOption('worker-id') ?? gethostname() . '.' . getmypid());
@@ -43,7 +50,7 @@ class ReachWork extends BaseCommand
         $processed = 0;
 
         $this->log('worker.start', [
-            'worker_id' => $workerId, 'queue' => $queue, 'once' => $once, 'limit' => $limit, 'sleep' => $sleep,
+            'worker_id' => $workerId, 'queues' => $queues, 'once' => $once, 'limit' => $limit, 'sleep' => $sleep,
         ]);
 
         while (true) {
@@ -52,7 +59,14 @@ class ReachWork extends BaseCommand
                 break;
             }
 
-            $row = $svc->reserve($queue, $workerId, $lease);
+            $row = null;
+            foreach ($queues as $candidateQueue) {
+                $row = $svc->reserve($candidateQueue, $workerId, $lease);
+                if ($row) {
+                    break;
+                }
+            }
+
             if (! $row) {
                 if ($once) {
                     break;
