@@ -1242,7 +1242,10 @@ class WorkBlockService
 
         if ($success && $contentItemId > 0) {
             try {
-                (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::UNPUBLISHED, null, ['work_block_id' => $id]);
+                $sm = new BlogStateMachine($this);
+                // LIVE only adjoins UNPUBLISH_QUEUED; complete the takedown path.
+                $sm->transition($contentItemId, BlogStateMachine::UNPUBLISH_QUEUED, null, ['work_block_id' => $id]);
+                $sm->transition($contentItemId, BlogStateMachine::UNPUBLISHED, null, ['work_block_id' => $id]);
             } catch (\Throwable) {
             }
         }
