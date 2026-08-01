@@ -391,7 +391,9 @@ class WorkBlockService
             $this->db->table('reach_content_blog_details')->insert([
                 'content_item_id'  => $contentItemId,
                 'portfolio_stream' => $candidate['portfolio_stream'] ?? $input['portfolio_stream'] ?? null,
-                'funnel_stage'     => $candidate['funnel_stage'] ?? $input['funnel_stage'] ?? null,
+                'funnel_stage'     => $this->normalizeFunnelStage(
+                    $candidate['funnel_stage'] ?? $input['funnel_stage'] ?? null
+                ),
                 'audience'         => $candidate['audience'] ?? $input['audience'] ?? null,
                 'search_intent'    => $candidate['search_intent'] ?? $input['search_intent'] ?? null,
                 'campaign'         => $candidate['campaign'] ?? $input['campaign'] ?? null,
@@ -410,13 +412,22 @@ class WorkBlockService
 
         $stateMachine->transition($contentItemId, BlogStateMachine::BRIEF_DRAFT, null, ['work_block_id' => $id]);
 
+        // Keep work-block row linked for downstream outline/draft handlers.
+        $this->db->table('reach_work_blocks')->where('id', $id)->update([
+            'content_item_id' => $contentItemId,
+            'updated_at'      => date('Y-m-d H:i:s'),
+        ]);
+
         $briefs = new ContentBriefModel();
         $existing = $briefs->forItem($contentItemId);
         $briefRow = [
             'content_item_id'      => $contentItemId,
             'objective'            => (string) ($input['objective'] ?? "Rank and convert for: {$title}"),
             'audience_description' => (string) ($candidate['audience'] ?? $input['audience'] ?? ''),
-            'funnel_stage'         => (string) ($candidate['funnel_stage'] ?? $input['funnel_stage'] ?? 'awareness'),
+            // DB CHECK rcb_funnel_stage_chk allows only top|middle|bottom|NULL.
+            'funnel_stage'         => $this->normalizeFunnelStage(
+                $candidate['funnel_stage'] ?? $input['funnel_stage'] ?? null
+            ),
             'primary_keyword'      => (string) ($candidate['seed_keyword'] ?? $title),
             'secondary_keywords'   => $input['secondary_keywords'] ?? [],
             'questions_to_answer'  => $input['questions_to_answer'] ?? [],
@@ -1462,6 +1473,26 @@ class WorkBlockService
         ]);
 
         return $output;
+    }
+
+    /**
+     * Map free-text / legacy funnel labels onto reach_content_briefs CHECK values.
+     * Allowed: top | middle | bottom | null.
+     */
+    private function normalizeFunnelStage(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return 'top';
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            'top', 'tof', 'tofu', 'awareness', 'aware' => 'top',
+            'middle', 'mof', 'mofu', 'consideration', 'consider' => 'middle',
+            'bottom', 'bof', 'bofu', 'decision', 'conversion', 'convert' => 'bottom',
+            default => 'top',
+        };
     }
 
     /**
