@@ -16,7 +16,8 @@ use Throwable;
  *                        queues from one worker process. Reserving cycles
  *                        through the listed queues in order each idle pass.
  *   --once               process at most one job then exit (useful for cron)
- *   --limit=<n>          exit after N jobs (default 0 = unlimited)
+ *   --limit=<n>          process up to N jobs then exit; also exits on idle
+ *                        when the queues are empty (default 0 = run until stop)
  *   --worker-id=<slug>   distinct id emitted in logs and stored on the job row
  *   --sleep=<seconds>    idle sleep between reservation attempts (default 2)
  *   --lease=<seconds>    lease duration (default 300)
@@ -68,7 +69,9 @@ class ReachWork extends BaseCommand
             }
 
             if (! $row) {
-                if ($once) {
+                // Cron-friendly: --once or --limit=N must not sleep forever when
+                // queues are empty. Unlimited mode (limit=0, no --once) keeps polling.
+                if ($once || $limit > 0) {
                     break;
                 }
                 if ($sleep > 0) {
