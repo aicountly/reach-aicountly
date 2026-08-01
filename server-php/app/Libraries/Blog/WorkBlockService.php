@@ -131,7 +131,11 @@ class WorkBlockService
 
         foreach ($rows as $row) {
             $blockId = (int) $row['id'];
-            $key     = $row['idempotency_key'] ?? ('work-block-' . $blockId);
+            $baseKey = $row['idempotency_key'] ?? ('work-block-' . $blockId);
+            // After a failed attempt, avoid colliding with the completed/failed
+            // reach_jobs row that still owns the original idempotency key.
+            $attempt = (int) ($row['attempt_count'] ?? 0);
+            $key     = $attempt > 0 ? ($baseKey . ':attempt:' . $attempt) : $baseKey;
 
             try {
                 $jobId = $this->jobService->enqueue(

@@ -99,7 +99,29 @@ class JobService
                     ->where('idempotency_key', $opts['idempotency_key'])
                     ->get()->getRowArray();
                 if ($existing) {
-                    return (int) $existing['id'];
+                    $existingStatus = (string) ($existing['status'] ?? '');
+                    // In-flight duplicate: keep true idempotency.
+                    if (in_array($existingStatus, ['pending', 'reserved', 'processing'], true)) {
+                        return (int) $existing['id'];
+                    }
+
+                    // Terminal job still holds the unique key. Retire it so a
+                    // deliberate retry (e.g. failed work-block re-dispatch) can
+                    // enqueue a fresh pending row instead of returning a dead id.
+                    $this->db->table('reach_jobs')->where('id', (int) $existing['id'])->update([
+                        'idempotency_key' => $opts['idempotency_key'] . ':retired:' . $existing['id'],
+                        'updated_at'      => $now,
+                    ]);
+                    $this->model->insert($row);
+                    $id = (int) $this->db->insertID();
+                    $this->audit('job.enqueued', $id, $opts['enqueued_by_user_id'] ?? null, [
+                        'job_type'     => $jobType,
+                        'queue'        => $row['queue'],
+                        'available_at' => $available,
+                        'replaces_job' => (int) $existing['id'],
+                    ], $opts['request_id'] ?? null);
+
+                    return $id;
                 }
             }
             throw $e;
