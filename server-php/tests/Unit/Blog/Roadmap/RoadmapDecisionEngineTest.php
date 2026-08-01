@@ -25,6 +25,41 @@ final class RoadmapDecisionEngineTest extends TestCase
         $this->assertSame(RoadmapDecisionEngine::HOLD, $result['decision']);
     }
 
+    public function testPostgresFalseStringIsNotTreatedAsLocked(): void
+    {
+        $result = $this->engine->decide(
+            ['is_locked' => 'f', 'is_human_pinned' => 'f'],
+            ['total_score' => 90, 'deductions' => [], 'factors' => []],
+            ['min_score' => 40],
+        );
+
+        $this->assertSame(RoadmapDecisionEngine::CREATE_NEW, $result['decision']);
+        $this->assertSame('Candidate meets scoring threshold.', $result['reason']);
+    }
+
+    public function testPostgresTrueStringIsTreatedAsLocked(): void
+    {
+        $result = $this->engine->decide(
+            ['is_locked' => 't'],
+            ['total_score' => 90, 'deductions' => [], 'factors' => []],
+        );
+
+        $this->assertSame(RoadmapDecisionEngine::HOLD, $result['decision']);
+        $this->assertSame('Candidate is locked.', $result['reason']);
+    }
+
+    public function testPostgresHumanPinnedTrueStringCreatesNew(): void
+    {
+        $result = $this->engine->decide(
+            ['is_locked' => 'f', 'is_human_pinned' => 't'],
+            ['total_score' => 5, 'deductions' => [], 'factors' => []],
+            ['min_score' => 40],
+        );
+
+        $this->assertSame(RoadmapDecisionEngine::CREATE_NEW, $result['decision']);
+        $this->assertSame('Human-pinned candidate.', $result['reason']);
+    }
+
     public function testCooldownCandidateHolds(): void
     {
         $result = $this->engine->decide(

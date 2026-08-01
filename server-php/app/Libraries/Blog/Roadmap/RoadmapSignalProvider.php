@@ -3,6 +3,7 @@
 namespace App\Libraries\Blog\Roadmap;
 
 use App\Libraries\Blog\BlogPortfolioService;
+use App\Libraries\Support\PgBoolean;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
@@ -92,7 +93,8 @@ class RoadmapSignalProvider
             'product_production_ready'      => $productId > 0 ? $this->isProductProductionReady($productId) : true,
             'create_product_support_flagged'=> ! empty($signals['create_product_support']),
             'risk_level'                    => $this->contentRiskLevel($contentItemId),
-            'evidence_ready'                => ! empty($signals['evidence_ready']) || ! empty($candidate['evidence_ready']),
+            'evidence_ready'                => PgBoolean::isTrue($signals['evidence_ready'] ?? false)
+                || PgBoolean::isTrue($candidate['evidence_ready'] ?? false),
             'portfolio_counts'              => $this->portfolioStreamCounts(),
             'portfolio_target_mix'          => $this->portfolioTargetMix(),
         ];

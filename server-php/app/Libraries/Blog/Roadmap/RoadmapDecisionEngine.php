@@ -2,6 +2,8 @@
 
 namespace App\Libraries\Blog\Roadmap;
 
+use App\Libraries\Support\PgBoolean;
+
 /**
  * Deterministic roadmap decision rules for scored topic candidates.
  *
@@ -44,7 +46,7 @@ class RoadmapDecisionEngine
         $total      = (float) ($score['total_score'] ?? 0);
         $minScore   = (float) ($context['min_score'] ?? env('BLOG_ROADMAP_MIN_SCORE', 40));
 
-        if (! empty($candidate['is_locked'])) {
+        if (PgBoolean::isTrue($candidate['is_locked'] ?? false)) {
             return $this->result(self::HOLD, 'Candidate is locked.');
         }
 
@@ -52,7 +54,7 @@ class RoadmapDecisionEngine
             return $this->result(self::HOLD, 'Candidate is in cooldown.');
         }
 
-        if (! empty($candidate['is_human_pinned'])) {
+        if (PgBoolean::isTrue($candidate['is_human_pinned'] ?? false)) {
             return $this->result(self::CREATE_NEW, 'Human-pinned candidate.');
         }
 
@@ -65,9 +67,9 @@ class RoadmapDecisionEngine
         }
 
         $risk = strtoupper((string) ($context['risk_level'] ?? $candidate['risk_level'] ?? 'LOW'));
-        $evidenceReady = ! empty($candidate['evidence_ready'])
-            || ! empty($context['evidence_ready'])
-            || ! empty($score['inputs']['signals']['evidence_ready'] ?? null);
+        $evidenceReady = PgBoolean::isTrue($candidate['evidence_ready'] ?? false)
+            || PgBoolean::isTrue($context['evidence_ready'] ?? false)
+            || PgBoolean::isTrue($score['inputs']['signals']['evidence_ready'] ?? false);
 
         if ((! empty($deductions['weak_evidence']) || ! $evidenceReady) && $risk === 'HIGH') {
             return $this->result(self::REQUIRE_HUMAN_REVIEW, 'High-risk topic lacks sufficient evidence.', true);

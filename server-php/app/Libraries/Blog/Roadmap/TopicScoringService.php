@@ -2,6 +2,7 @@
 
 namespace App\Libraries\Blog\Roadmap;
 
+use App\Libraries\Support\PgBoolean;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
@@ -212,10 +213,10 @@ class TopicScoringService
     private function evidenceNorm(array $signals, array $candidate, array &$missingSignals): float
     {
         if (array_key_exists('evidence_ready', $signals)) {
-            return ! empty($signals['evidence_ready']) ? 1.0 : 0.0;
+            return PgBoolean::isTrue($signals['evidence_ready']) ? 1.0 : 0.0;
         }
         if (array_key_exists('evidence_ready', $candidate)) {
-            return ! empty($candidate['evidence_ready']) ? 1.0 : 0.0;
+            return PgBoolean::isTrue($candidate['evidence_ready']) ? 1.0 : 0.0;
         }
 
         $missingSignals[] = 'evidence_ready';
