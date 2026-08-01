@@ -28,7 +28,9 @@ class ContentScheduleReadinessJob implements JobHandlerInterface
             ->where('ci.workflow_status', 'scheduled')
             ->where('cs.cancelled_at IS NULL')
             ->where('ci.deleted_at IS NULL')
-            ->select('cs.id as schedule_id, cs.content_item_id, ci.title, ci.created_by')
+            // reach_content_items uses created_by_user_id (not created_by);
+            // schedule rows keep created_by as a fallback notifier target.
+            ->select('cs.id as schedule_id, cs.content_item_id, ci.title, ci.created_by_user_id, cs.created_by')
             ->get()
             ->getResultArray();
 
@@ -42,9 +44,10 @@ class ContentScheduleReadinessJob implements JobHandlerInterface
                ->where('id', $row['content_item_id'])
                ->update(['workflow_status' => 'ready_for_publication', 'updated_at' => date('Y-m-d H:i:s')]);
 
-            if ($row['created_by']) {
+            $notifyUserId = (int) ($row['created_by_user_id'] ?? $row['created_by'] ?? 0);
+            if ($notifyUserId > 0) {
                 $notifSvc->dispatch(
-                    (int) $row['created_by'],
+                    $notifyUserId,
                     NotificationService::TYPE_SCHEDULE_CONFIRMED,
                     "Content \"{$row['title']}\" is ready for publication.",
                     [

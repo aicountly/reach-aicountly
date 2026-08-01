@@ -261,12 +261,17 @@ class RoadmapOptimizerService
      */
     private function loadCandidates(int $limit): array
     {
+        // Human-pinned rows bypass cooldown so operators can force a pilot/retry
+        // without waiting for BLOG_ROADMAP_COOLDOWN_DAYS.
         $builder = $this->db()->table('reach_topic_candidates')
             ->whereIn('status', ['candidate', 'scored'])
             ->where('is_locked', false)
             ->groupStart()
-                ->where('cooldown_until IS NULL', null, false)
-                ->orWhere('cooldown_until <=', date('Y-m-d H:i:s'))
+                ->where('is_human_pinned', true)
+                ->orGroupStart()
+                    ->where('cooldown_until IS NULL', null, false)
+                    ->orWhere('cooldown_until <=', date('Y-m-d H:i:s'))
+                ->groupEnd()
             ->groupEnd()
             ->orderBy('id', 'ASC');
 

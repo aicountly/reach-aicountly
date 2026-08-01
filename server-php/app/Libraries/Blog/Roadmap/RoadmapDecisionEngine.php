@@ -8,18 +8,19 @@ use App\Libraries\Support\PgBoolean;
  * Deterministic roadmap decision rules for scored topic candidates.
  *
  * Rule order (first match wins):
- * 1. locked or active cooldown → HOLD
- * 2. human_pinned → CREATE_NEW
- * 3. cannibalisation deduction → MERGE_COMPETING
- * 4. near_duplicate deduction → REJECT
- * 5. weak_evidence or missing evidence with HIGH risk → REQUIRE_HUMAN_REVIEW
- * 6. existing content stale → REFRESH_EXISTING
- * 7. existing content weak CTR + strong impressions → IMPROVE_TITLE_META
- * 8. existing content with low internal link value → IMPROVE_INTERNAL_LINKS
- * 9. portfolio_over_concentration deduction → HOLD
- * 10. total score below minimum → HOLD
- * 11. product-stream + non-production product → CREATE_PRODUCT_SUPPORT if flagged else HOLD
- * 12. default → CREATE_NEW
+ * 1. locked → HOLD
+ * 2. human_pinned → CREATE_NEW (bypasses cooldown and score floor)
+ * 3. active cooldown → HOLD
+ * 4. cannibalisation deduction → MERGE_COMPETING
+ * 5. near_duplicate deduction → REJECT
+ * 6. weak_evidence or missing evidence with HIGH risk → REQUIRE_HUMAN_REVIEW
+ * 7. existing content stale → REFRESH_EXISTING
+ * 8. existing content weak CTR + strong impressions → IMPROVE_TITLE_META
+ * 9. existing content with low internal link value → IMPROVE_INTERNAL_LINKS
+ * 10. portfolio_over_concentration deduction → HOLD
+ * 11. total score below minimum → HOLD
+ * 12. product-stream + non-production product → CREATE_PRODUCT_SUPPORT if flagged else HOLD
+ * 13. default → CREATE_NEW
  */
 class RoadmapDecisionEngine
 {
@@ -50,12 +51,13 @@ class RoadmapDecisionEngine
             return $this->result(self::HOLD, 'Candidate is locked.');
         }
 
-        if ($this->cooldownActive($candidate)) {
-            return $this->result(self::HOLD, 'Candidate is in cooldown.');
-        }
-
+        // Pinned topics are an explicit operator override — evaluate before cooldown.
         if (PgBoolean::isTrue($candidate['is_human_pinned'] ?? false)) {
             return $this->result(self::CREATE_NEW, 'Human-pinned candidate.');
+        }
+
+        if ($this->cooldownActive($candidate)) {
+            return $this->result(self::HOLD, 'Candidate is in cooldown.');
         }
 
         if (! empty($deductions['cannibalisation'])) {

@@ -60,6 +60,22 @@ final class RoadmapDecisionEngineTest extends TestCase
         $this->assertSame('Human-pinned candidate.', $result['reason']);
     }
 
+    public function testHumanPinnedBypassesActiveCooldown(): void
+    {
+        $result = $this->engine->decide(
+            [
+                'is_locked'       => 'f',
+                'is_human_pinned' => 't',
+                'cooldown_until'  => date('Y-m-d H:i:s', strtotime('+14 days')),
+            ],
+            ['total_score' => 5, 'deductions' => [], 'factors' => []],
+            ['min_score' => 40],
+        );
+
+        $this->assertSame(RoadmapDecisionEngine::CREATE_NEW, $result['decision']);
+        $this->assertSame('Human-pinned candidate.', $result['reason']);
+    }
+
     public function testCooldownCandidateHolds(): void
     {
         $result = $this->engine->decide(
