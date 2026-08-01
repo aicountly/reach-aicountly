@@ -8,6 +8,7 @@ use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\AiProviderException;
 use App\Libraries\Ai\AiProviderInterface;
 use App\Libraries\Ai\AiProviderRegistry;
+use App\Libraries\Ai\Providers\MockAiProvider;
 use App\Libraries\Ai\Providers\PerplexityProvider;
 use App\Libraries\Blog\BlogFeatureFlags;
 
@@ -59,6 +60,26 @@ class FactVerificationService
             );
         }
 
+        // Nothing to verify — treat as passed rather than fail-closed on an
+        // unavailable verifier. Claim extractors often return [] for plain
+        // editorial copy (including MockAiProvider draft bodies).
+        if ($claims === []) {
+            return $this->buildResult(
+                status:      'passed',
+                passRate:    1.0,
+                unsupported: [],
+                claims:      [],
+                threshold:   $threshold,
+                provider:    null,
+            );
+        }
+
+        // In mock/test mode, never call a real verifier; use the mock adapter
+        // so Feature CI can exercise the publishability gate deterministically.
+        if (($_ENV['REACH_AI_MOCK'] ?? 'false') === 'true') {
+            $providerKey = MockAiProvider::PROVIDER_KEY;
+        }
+
         try {
             $provider = $this->resolveVerifier($providerKey, $opts);
         } catch (\Throwable) {
@@ -70,7 +91,23 @@ class FactVerificationService
         }
 
         try {
-            $verification = $this->verifyWithProvider($provider, $claims, $opts);
+            if ($provider->getProviderKey() === MockAiProvider::PROVIDER_KEY) {
+                // Deterministic mock verdict: mark each claim verified with no
+                // sources. HIGH-risk claims still fail the authoritative-source
+                // gate below (fail-closed).
+                $verification = [
+                    'claims' => array_map(
+                        static fn (array $claim) => [
+                            'text'     => (string) ($claim['text'] ?? ''),
+                            'verified' => true,
+                            'sources'  => [],
+                        ],
+                        $claims,
+                    ),
+                ];
+            } else {
+                $verification = $this->verifyWithProvider($provider, $claims, $opts);
+            }
         } catch (\Throwable) {
             return $this->unavailableResult($claims, $threshold, $providerKey);
         }

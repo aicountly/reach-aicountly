@@ -51,7 +51,7 @@ class KnowledgeBasePublicationPayloadBuilder
             : ($version['snapshot_json'] ?? []);
 
         $rawBody  = $snapshot['body_html'] ?? '';
-        $safeBody = HtmlSanitizer::sanitize($rawBody);
+        $safeBody = (new HtmlSanitizer())->purify($rawBody);
 
         // Structured data
         $structuredData = $this->db->table('reach_content_structured_data')

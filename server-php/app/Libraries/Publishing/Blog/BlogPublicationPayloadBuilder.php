@@ -56,10 +56,13 @@ class BlogPublicationPayloadBuilder
         $blogDetails = $this->db->table('reach_content_blog_details')
             ->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
 
-        // Sanitise HTML body
-        $snapshot = is_string($version['snapshot_json']) ? json_decode($version['snapshot_json'], true) : ($version['snapshot_json'] ?? []);
-        $rawBody  = $snapshot['body_html'] ?? $blogDetails['body_html'] ?? '';
-        $safeBody = HtmlSanitizer::sanitize($rawBody);
+        // Sanitise HTML body — prefer version columns, then snapshot, then blog details.
+        $rawSnapshot = $version['snapshot_json'] ?? null;
+        $snapshot = is_string($rawSnapshot)
+            ? (json_decode($rawSnapshot, true) ?? [])
+            : (is_array($rawSnapshot) ? $rawSnapshot : []);
+        $rawBody  = (string) ($version['body_html'] ?? $snapshot['body_html'] ?? $blogDetails['body_html'] ?? '');
+        $safeBody = (new HtmlSanitizer())->purify($rawBody);
 
         // Structured data
         $structuredData = $this->db->table('reach_content_structured_data')
@@ -98,7 +101,7 @@ class BlogPublicationPayloadBuilder
             $tags = json_decode($tags, true) ?? [];
         }
 
-        $bodyMarkdown = $snapshot['body_markdown'] ?? null;
+        $bodyMarkdown = $version['body_markdown'] ?? $snapshot['body_markdown'] ?? null;
 
         // Named-reviewer attribution ("Reviewed by CA Rahul Gupta") may only surface when a
         // checksum-bound approval by a registered protected reviewer exists for this exact

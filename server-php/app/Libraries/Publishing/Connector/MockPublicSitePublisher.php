@@ -116,6 +116,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             'public_version'   => 1,
             'published_at'     => date('Y-m-d\TH:i:s\Z'),
             'sitemap_status'   => 'included',
+            'payload_checksum' => $envelope['payload_checksum'] ?? ($this->checksumsById[$publicContentId] ?? 'mock-checksum'),
         ];
     }
 
@@ -127,12 +128,18 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             return $this->err($this->forceErrorCategory);
         }
 
+        if (isset($envelope['payload_checksum'])) {
+            $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
+        }
+
         return [
             'success'          => true,
             'operation'        => 'schedule',
             'public_content_id'=> $publicContentId,
             'public_status'    => 'scheduled',
             'scheduled_at'     => $scheduledAt,
+            'payload_checksum' => $envelope['payload_checksum'] ?? ($this->checksumsById[$publicContentId] ?? 'mock-checksum'),
+            'canonical_url'    => 'https://aicountly.com/blog/mock-' . $publicContentId,
         ];
     }
 

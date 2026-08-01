@@ -65,8 +65,13 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // the PUBLISH_BLOG auto-publish work block for LOW-risk content
         // either, to keep the "auto-publish default off" invariant honest.
         unset($_ENV['BLOG_AUTO_PUBLISH_ENABLED'], $_ENV['BLOG_IMAGE_GENERATION_ENABLED']);
+        // Sitemap/indexing steps must fail closed without inventing a live
+        // public site; clear any CI/dotenv public URL so UPDATE_SITEMAP blocks.
+        unset($_ENV['AICOUNTLY_PUBLIC_SITE_BASE_URL']);
+        putenv('AICOUNTLY_PUBLIC_SITE_BASE_URL');
 
         $this->workBlocks = new WorkBlockService();
+        \App\Libraries\Publishing\Connector\PublicSitePublisherFactory::resetMock();
     }
 
     public function testFullBlogAutomationPipelineEndToEnd(): void
@@ -237,14 +242,31 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // -----------------------------------------------------------------
         // Step 15: schedule publication through the real deployment service
         // -----------------------------------------------------------------
+        $existingConn = $db->table('reach_publication_connections')
+            ->where('connection_key', 'aicountly_com')->get()->getRowArray();
+        if (! $existingConn) {
+            $db->table('reach_publication_connections')->insert([
+                'connection_key' => 'aicountly_com',
+                'display_name'   => 'AICOUNTLY.com (test)',
+                'base_url'       => 'https://example.test',
+                'enabled'        => true,
+                'created_at'     => date('Y-m-d H:i:s'),
+                'updated_at'     => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        // Use a due-now schedule so the queued worker job is immediately
+        // leasable (available_at <= NOW()). A future scheduled_at would
+        // correctly defer the job, which prevents exercising the real
+        // lease + handler path in this acceptance test.
         $scheduleBlockId = $this->workBlocks->create([
             'block_type' => WorkBlockService::TYPE_SCHEDULE_PUBLISH,
             'content_item_id' => $contentItemId,
             'content_version_id' => $contentVersionId,
-            'input_json' => ['scheduled_at' => date('c', strtotime('+1 hour'))],
+            'input_json' => ['scheduled_at' => date('c', strtotime('-1 minute'))],
         ]);
         $scheduleResult = $this->workBlocks->execute($scheduleBlockId);
-        $this->assertArrayHasKey('deployment_id', $scheduleResult);
+        $this->assertArrayHasKey('deployment_id', $scheduleResult, 'SCHEDULE_PUBLISH must enqueue a deployment: ' . json_encode($scheduleResult));
         $deploymentId = (int) $scheduleResult['deployment_id'];
         $this->assertGreaterThan(0, $deploymentId);
         $this->assertSame(
@@ -259,14 +281,24 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // internally, then lease + execute it exactly like the `reach:work`
         // worker (App\Commands\ReachWork) would.
         // -----------------------------------------------------------------
-        $jobRow = $db->table('reach_jobs')
-            ->where('payload_json LIKE', '%"deployment_id":' . $deploymentId . '%')
-            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+        // payload_json is JSONB — use a JSON path, not LIKE (Postgres rejects jsonb ~~ text).
+        $jobRow = $db->query(
+            "SELECT * FROM reach_jobs
+             WHERE (payload_json->>'deployment_id') = ?
+             ORDER BY id DESC
+             LIMIT 1",
+            [(string) $deploymentId],
+        )->getRowArray();
         $this->assertNotNull($jobRow, 'enqueuePublication() must create a real reach_jobs row for the worker to lease.');
 
         $jobService = new JobService();
         $leased = $jobService->reserve((string) $jobRow['queue'], 'e2e-test-worker');
-        $this->assertNotNull($leased, 'The publication job must be leasable from its queue.');
+        $this->assertNotNull($leased, 'The publication job must be leasable from its queue. job=' . json_encode([
+            'id' => $jobRow['id'] ?? null,
+            'queue' => $jobRow['queue'] ?? null,
+            'status' => $jobRow['status'] ?? null,
+            'available_at' => $jobRow['available_at'] ?? null,
+        ]));
         $this->assertSame((int) $jobRow['id'], (int) $leased['id']);
 
         $handlerResult = (new JobHandlerRegistry())->execute($leased);
@@ -308,10 +340,12 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $this->assertNotNull($sitemapBlock, 'Going LIVE must automatically chain an UPDATE_SITEMAP check.');
         $sitemapOutcome = $this->workBlocks->execute((int) $sitemapBlock['id']);
         // No AICOUNTLY_PUBLIC_SITE_BASE_URL is configured in this test, so the
-        // handler must block honestly rather than claim sitemap inclusion.
+        // handler must block/fail honestly rather than claim sitemap inclusion.
         $this->assertTrue(
-            ($sitemapOutcome['blocked'] ?? false) === true || array_key_exists('sitemap_included', $sitemapOutcome),
-            'UPDATE_SITEMAP must never silently claim success without a real check.',
+            ($sitemapOutcome['blocked'] ?? false) === true
+            || ($sitemapOutcome['failed'] ?? false) === true
+            || array_key_exists('sitemap_included', $sitemapOutcome),
+            'UPDATE_SITEMAP must never silently claim success without a real check: ' . json_encode($sitemapOutcome),
         );
         $profile = $db->table('reach_blog_publication_profiles')->where('content_item_id', $contentItemId)->get()->getRowArray();
         $this->assertNotSame('indexed', $profile['indexing_status'] ?? null, 'Publishing must never be conflated with being indexed.');
@@ -539,6 +573,33 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $approverId = (int) $db->table('reach_users')->where('email', 'reach_admin@test.aicountly.org')->get()->getRowArray()['id'];
         ActorRegistry::idForUser($approverId);
         (new BlogContentApprovalService())->approve($contentItemId, $contentVersionId, $approverId, 'standard', 'schedule fixture');
+
+        // Readiness gates require approved workflow + SEO/blog publication profiles.
+        $item = $db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
+        $slug = (string) ($item['slug'] ?? ('fixture-' . $contentItemId));
+        $db->table('reach_content_items')->where('id', $contentItemId)->update([
+            'workflow_status' => BlogStateMachine::APPROVED,
+            'updated_at'      => date('Y-m-d H:i:s'),
+        ]);
+        $db->table('reach_content_seo_profiles')->insert([
+            'content_item_id'      => $contentItemId,
+            'content_version_id'   => $contentVersionId,
+            'primary_keyword'      => 'gst filing',
+            'meta_title'           => 'How to file GST returns on time for small business owners',
+            'meta_description'     => str_pad('Deterministic SEO meta description for schedule idempotency fixture.', 100, '.'),
+            'slug'                 => $slug,
+            'canonical_preference' => 'self_canonical',
+            'seo_status'           => 'ready',
+            'created_at'           => date('Y-m-d H:i:s'),
+            'updated_at'           => date('Y-m-d H:i:s'),
+        ]);
+        $db->table('reach_blog_publication_profiles')->insert([
+            'content_item_id'  => $contentItemId,
+            'author_reference' => 'aicountly-editorial',
+            'excerpt'          => 'Deterministic fixture excerpt.',
+            'created_at'       => date('Y-m-d H:i:s'),
+            'updated_at'       => date('Y-m-d H:i:s'),
+        ]);
 
         $existingConn = $db->table('reach_publication_connections')
             ->where('connection_key', 'aicountly_com')->get()->getRowArray();

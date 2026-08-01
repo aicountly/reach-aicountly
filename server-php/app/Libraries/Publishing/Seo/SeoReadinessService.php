@@ -44,9 +44,10 @@ class SeoReadinessService
 
         $snapshot = [];
         if ($version) {
-            $snapshot = is_string($version['snapshot_json'])
-                ? json_decode($version['snapshot_json'], true) ?? []
-                : ($version['snapshot_json'] ?? []);
+            $rawSnapshot = $version['snapshot_json'] ?? null;
+            $snapshot = is_string($rawSnapshot)
+                ? (json_decode($rawSnapshot, true) ?? [])
+                : (is_array($rawSnapshot) ? $rawSnapshot : []);
         }
 
         $bodyText  = strip_tags($snapshot['body_html'] ?? '');

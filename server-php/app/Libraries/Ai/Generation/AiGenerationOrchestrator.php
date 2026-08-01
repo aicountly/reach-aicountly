@@ -15,6 +15,7 @@ use App\Libraries\Ai\Grounding\GroundingException;
 use App\Libraries\Ai\Grounding\GroundingSnapshotService;
 use App\Libraries\Ai\Prompts\OutputSchemaRegistry;
 use App\Libraries\Ai\Prompts\PromptRenderer;
+use App\Libraries\Ai\Providers\MockAiProvider;
 use App\Libraries\Ai\Security\AiCircuitBreaker;
 use App\Libraries\Ai\Security\ConfidentialDataDetector;
 use App\Libraries\Ai\Security\PiiScrubber;
@@ -195,20 +196,25 @@ class AiGenerationOrchestrator
                 continue;
             }
 
-            $db          = db_connect();
-            $providerRow = $db->table('reach_ai_providers')
-                ->where('provider_key', $providerKey)
-                ->limit(1)->get()->getRowArray();
-            $modelRow = $db->table('reach_ai_models')
-                ->where('model_key', $currentDecision->modelKey)
-                ->limit(1)->get()->getRowArray();
+            [$providerId, $modelId] = $this->resolveProviderAndModelIds(
+                $providerKey,
+                $currentDecision->modelKey,
+            );
 
-            $providerId = $providerRow ? (int) $providerRow['id'] : 0;
-            $modelId    = $modelRow    ? (int) $modelRow['id']    : 0;
+            if ($providerId <= 0 || $modelId <= 0) {
+                $this->failRequest(
+                    $requestId,
+                    AiProviderError::CATEGORY_CONFIGURATION,
+                    "AI provider/model catalog rows missing for '{$providerKey}' / '{$currentDecision->modelKey}'.",
+                );
+                return;
+            }
 
             $run = $this->runs->create($requestId, $providerId, $modelId, $attemptNumber, $promptVersion ? (int) $promptVersion['id'] : null);
-            $this->runs->linkGroundingSnapshot($run['id'], (int) $snapshot['id']);
-            $this->runs->markRunning($run['id']);
+            // Postgres drivers often return numeric ids as strings.
+            $runId = (int) $run['id'];
+            $this->runs->linkGroundingSnapshot($runId, (int) $snapshot['id']);
+            $this->runs->markRunning($runId);
 
             $input = new AiGenerationInput(
                 systemPrompt:    $systemPrompt,
@@ -222,13 +228,13 @@ class AiGenerationOrchestrator
             try {
                 $result = $currentDecision->provider->generate($input);
                 $this->circuitBreaker->recordSuccess($providerKey);
-                $this->runs->markCompleted($run['id'], $result);
+                $this->runs->markCompleted($runId, $result);
 
-                $artifact = $this->artifacts->store($requestId, $run['id'], $result, $outputSchema);
+                $artifact = $this->artifacts->store($requestId, $runId, $result, $outputSchema);
 
                 $this->budget->recordUsage([
                     'generation_request_id' => $requestId,
-                    'generation_run_id'     => $run['id'],
+                    'generation_run_id'     => $runId,
                     'provider_id'           => $providerId,
                     'model_id'              => $modelId,
                     'prompt_version_id'     => $promptVersion ? (int) $promptVersion['id'] : null,
@@ -250,7 +256,7 @@ class AiGenerationOrchestrator
 
                     AuditLogger::record('ai.generation_completed', [
                         'request_id'   => $requestId,
-                        'run_id'       => $run['id'],
+                        'run_id'       => $runId,
                         'artifact_id'  => $artifact['id'],
                         'total_tokens' => $result->totalTokens,
                     ]);
@@ -261,7 +267,7 @@ class AiGenerationOrchestrator
                 return;
             } catch (AiProviderException $e) {
                 $this->circuitBreaker->recordFailure($providerKey, $e->getProviderError()->category);
-                $this->runs->markFailed($run['id'], $e->getProviderError());
+                $this->runs->markFailed($runId, $e->getProviderError());
 
                 if (! $e->isRetryable()) {
                     $this->failRequest($requestId, $e->getProviderError()->category, $e->getProviderError()->message);
@@ -376,5 +382,114 @@ class AiGenerationOrchestrator
 
         $params = json_decode($request['request_parameters_json'] ?? '{}', true);
         return 'Generate a ' . ($request['content_type'] ?? 'piece of content') . ' based on the grounding context provided. ' . ($params['instructions'] ?? '');
+    }
+
+    /**
+     * Resolve FK ids for the chosen provider/model. When REACH_AI_MOCK=true and
+     * the mock adapter is selected, ensure catalog rows exist so generation runs
+     * can satisfy NOT NULL FKs without requiring a seeded production catalog.
+     *
+     * @return array{0:int,1:int} [provider_id, model_id]
+     */
+    private function resolveProviderAndModelIds(string $providerKey, string $modelKey): array
+    {
+        $db = db_connect();
+
+        if (
+            ($_ENV['REACH_AI_MOCK'] ?? 'false') === 'true'
+            && $providerKey === MockAiProvider::PROVIDER_KEY
+        ) {
+            return $this->ensureMockProviderCatalog($db, $modelKey);
+        }
+
+        $providerRow = $db->table('reach_ai_providers')
+            ->where('provider_key', $providerKey)
+            ->where('deleted_at IS NULL', null, false)
+            ->limit(1)->get()->getRowArray();
+        $modelRow = $db->table('reach_ai_models')
+            ->where('model_key', $modelKey)
+            ->where('deleted_at IS NULL', null, false)
+            ->limit(1)->get()->getRowArray();
+
+        return [
+            $providerRow ? (int) $providerRow['id'] : 0,
+            $modelRow ? (int) $modelRow['id'] : 0,
+        ];
+    }
+
+    /**
+     * @return array{0:int,1:int} [provider_id, model_id]
+     */
+    private function ensureMockProviderCatalog($db, string $modelKey): array
+    {
+        $providerRow = $db->table('reach_ai_providers')
+            ->where('provider_key', MockAiProvider::PROVIDER_KEY)
+            ->where('deleted_at IS NULL', null, false)
+            ->limit(1)->get()->getRowArray();
+
+        if (! $providerRow) {
+            $db->table('reach_ai_providers')->insert([
+                'provider_key'               => MockAiProvider::PROVIDER_KEY,
+                'display_name'               => 'Mock AI Provider',
+                'adapter_class'              => MockAiProvider::class,
+                'secret_env_reference'       => '',
+                'status'                     => 'enabled',
+                'supports_structured_output' => true,
+                'supports_health_check'      => true,
+                'configuration_status'       => 'configured',
+                'created_actor_type'         => 'system',
+                'created_at'                 => date('Y-m-d H:i:s'),
+                'updated_at'                 => date('Y-m-d H:i:s'),
+            ]);
+            $providerId = (int) $db->insertID();
+        } else {
+            $providerId = (int) $providerRow['id'];
+            if (($providerRow['status'] ?? '') !== 'enabled') {
+                $db->table('reach_ai_providers')->where('id', $providerId)->update([
+                    'status'       => 'enabled',
+                    'updated_at'   => date('Y-m-d H:i:s'),
+                ]);
+            }
+        }
+
+        $modelRow = $db->table('reach_ai_models')
+            ->where('provider_id', $providerId)
+            ->where('model_key', $modelKey)
+            ->where('deleted_at IS NULL', null, false)
+            ->limit(1)->get()->getRowArray();
+
+        if (! $modelRow) {
+            // Prefer an existing mock-model under this provider if key mismatches.
+            $modelRow = $db->table('reach_ai_models')
+                ->where('provider_id', $providerId)
+                ->where('model_key', 'mock-model')
+                ->where('deleted_at IS NULL', null, false)
+                ->limit(1)->get()->getRowArray();
+        }
+
+        if (! $modelRow) {
+            $db->table('reach_ai_models')->insert([
+                'provider_id'                => $providerId,
+                'model_key'                  => $modelKey !== '' ? $modelKey : 'mock-model',
+                'display_name'               => 'Mock Model',
+                'model_family'               => 'mock',
+                'supports_structured_output' => true,
+                'enabled'                    => true,
+                'approval_status'            => 'approved',
+                'created_at'                 => date('Y-m-d H:i:s'),
+                'updated_at'                 => date('Y-m-d H:i:s'),
+            ]);
+            $modelId = (int) $db->insertID();
+        } else {
+            $modelId = (int) $modelRow['id'];
+            if (! ($modelRow['enabled'] ?? false)) {
+                $db->table('reach_ai_models')->where('id', $modelId)->update([
+                    'enabled'     => true,
+                    'updated_at'  => date('Y-m-d H:i:s'),
+                ]);
+            }
+        }
+
+        return [$providerId, $modelId];
     }
 }

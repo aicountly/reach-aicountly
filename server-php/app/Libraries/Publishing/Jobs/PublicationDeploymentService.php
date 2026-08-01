@@ -79,6 +79,23 @@ class PublicationDeploymentService
             throw new \RuntimeException("Publication connection '{$connectionKey}' not found or disabled");
         }
 
+        // Idempotent replay: an identical in-flight schedule/publish for the same
+        // item+version+operation must return the existing deployment, not create
+        // a competing one. time()-suffixed keys alone are not enough.
+        $existing = $this->db->table('reach_publication_deployments')
+            ->where('content_item_id', $contentItemId)
+            ->where('content_version_id', $contentVersionId)
+            ->where('connection_id', $connection['id'])
+            ->where('operation', $operation)
+            ->whereIn('status', ['draft', 'ready', 'queued', 'sending', 'scheduled', 'verification_pending'])
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()->getRowArray();
+
+        if ($existing) {
+            return (int) $existing['id'];
+        }
+
         // Readiness gate
         $aggregator = new PublicationReadinessAggregator();
         $readiness  = $aggregator->evaluate($contentItemId, $item['content_type']);
@@ -217,6 +234,11 @@ class PublicationDeploymentService
             }
 
             if ($response['success'] ?? false) {
+                // Always persist the Reach-computed checksum; mock/public
+                // responses may omit it on schedule/publish follow-on calls.
+                if (empty($response['payload_checksum'])) {
+                    $response['payload_checksum'] = $checksum;
+                }
                 $this->onSuccess($deploymentId, $attemptId, $response, $deployment);
             } else {
                 $this->onFailure($deploymentId, $attemptId, $response['error_category'] ?? 'unknown_error', $response['safe_error_message'] ?? '');

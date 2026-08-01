@@ -50,18 +50,19 @@ class KnowledgeBaseReadinessService
             $blocking[] = 'No content version found';
         }
 
-        if ($version && $version['status'] === 'superseded') {
+        if ($version && (($version['status'] ?? null) === 'superseded')) {
             $blocking[] = 'Current version is superseded';
         }
 
-        if (in_array($item['validation_status'], ['blocking', 'failed'], true)) {
+        if (in_array($item['validation_status'] ?? null, ['blocking', 'failed'], true)) {
             $blocking[] = 'Unresolved critical validation findings';
         }
 
+        // Schema uses validation_status / waived_at (not severity/status).
         $criticalCount = $this->db->table('reach_content_validations')
             ->where('content_item_id', $contentItemId)
-            ->where('severity', 'critical')
-            ->whereIn('status', ['open', 'acknowledged'])
+            ->where('validation_status', 'failed')
+            ->where('waived_at IS NULL', null, false)
             ->countAllResults();
 
         if ($criticalCount > 0) {
