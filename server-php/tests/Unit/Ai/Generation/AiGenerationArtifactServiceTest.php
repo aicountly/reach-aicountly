@@ -25,22 +25,23 @@ class AiGenerationArtifactServiceTest extends CIUnitTestCase
     {
         $schema  = OutputSchemaRegistry::get('blog_post');
         $service = $this->serviceWithoutDb();
+        $plain   = str_repeat('Indian SMEs should track GST invoices and reconcile ITC monthly. ', 20);
         $result  = $this->makeResult([
             'title'          => 'Test Title',
-            'summary'        => 'Test summary.',
-            'body_html'      => '<p>Body</p>',
-            'body_markdown'  => '**Body**',
-            'body_plain_text' => 'Body',
+            'summary'        => 'Test summary for a genuine blog post about GST compliance for SMEs.',
+            'body_html'      => '<p>' . htmlspecialchars($plain) . '</p>',
+            'body_markdown'  => $plain,
+            'body_plain_text' => $plain,
             'slug_suggestion' => 'test-title',
             'meta_title'     => 'Test Meta Title',
-            'meta_description' => 'Test meta description.',
+            'meta_description' => 'Test meta description for GST compliance guidance.',
             'primary_cta'    => 'Learn More',
             'claims_used'    => [],
             'citations_used' => [],
             'risk_notes'     => [],
             'reading_time_minutes' => 3,
             'sections' => [
-                ['heading' => 'Intro', 'body' => 'Body section'],
+                ['heading' => 'Intro', 'body' => $plain],
             ],
         ]);
 
