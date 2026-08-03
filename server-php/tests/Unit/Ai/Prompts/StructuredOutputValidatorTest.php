@@ -37,6 +37,10 @@ class StructuredOutputValidatorTest extends CIUnitTestCase
             'claims_used'    => [],
             'citations_used' => [],
             'risk_notes'     => [],
+            'reading_time_minutes' => 3,
+            'sections' => [
+                ['heading' => 'Intro', 'body' => 'Body section'],
+            ],
         ];
 
         $errors = $this->validator->validate($data, $schema);
@@ -72,9 +76,14 @@ class StructuredOutputValidatorTest extends CIUnitTestCase
             'slug_suggestion' => 'slug',
             'meta_title'     => 'M',
             'meta_description' => 'D',
+            'primary_cta'    => 'CTA',
             'claims_used'    => [],
             'citations_used' => [],
             'risk_notes'     => [],
+            'reading_time_minutes' => 1,
+            'sections' => [
+                ['heading' => 'H', 'body' => 'B'],
+            ],
         ];
 
         $errors = $this->validator->validate($data, $schema);

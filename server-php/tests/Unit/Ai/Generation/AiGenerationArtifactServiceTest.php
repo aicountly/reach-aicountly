@@ -34,10 +34,14 @@ class AiGenerationArtifactServiceTest extends CIUnitTestCase
             'slug_suggestion' => 'test-title',
             'meta_title'     => 'Test Meta Title',
             'meta_description' => 'Test meta description.',
-            'primary_cta'    => null,
+            'primary_cta'    => 'Learn More',
             'claims_used'    => [],
             'citations_used' => [],
             'risk_notes'     => [],
+            'reading_time_minutes' => 3,
+            'sections' => [
+                ['heading' => 'Intro', 'body' => 'Body section'],
+            ],
         ]);
 
         $status = $service->validateOnly($result, $schema);
