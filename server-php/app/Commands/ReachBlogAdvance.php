@@ -15,7 +15,7 @@ use Throwable;
  *
  * Then run:
  *   php spark reach:blog-dispatch --force
- *   php spark reach:work --queue blog,publishing,community,default --once --limit 10
+ *   php spark reach:work --queue blog,publishing,community,default --limit 20
  */
 class ReachBlogAdvance extends BaseCommand
 {

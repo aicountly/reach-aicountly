@@ -39,8 +39,15 @@ class ReachWork extends BaseCommand
         if ($queues === []) {
             $queues = ['default'];
         }
-        $once     = (bool) (CLI::getOption('once') ?? false);
+        // --limit=N drains up to N jobs. --once alone means 1 job. If both are
+        // passed, limit wins (operators often copy "--once --limit 20" expecting a batch).
+        $onceOpt  = CLI::getOption('once') !== null || array_key_exists('once', $params);
         $limit    = (int) ($params['limit'] ?? CLI::getOption('limit') ?? 0);
+        $once     = $onceOpt && $limit <= 0;
+        if ($onceOpt && $limit > 0) {
+            // Keep once=false so the loop can process up to $limit.
+            $once = false;
+        }
         $workerId = (string) ($params['worker-id'] ?? CLI::getOption('worker-id') ?? gethostname() . '.' . getmypid());
         $sleep    = max(0, (int) ($params['sleep'] ?? CLI::getOption('sleep') ?? 2));
         $lease    = max(30, (int) ($params['lease'] ?? CLI::getOption('lease') ?? 300));

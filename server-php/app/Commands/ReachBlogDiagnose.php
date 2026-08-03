@@ -42,8 +42,9 @@ class ReachBlogDiagnose extends BaseCommand
             'cron_log_files'   => $this->cronLogFiles(),
             'stop_worker_file' => is_file(WRITEPATH . 'stop-reach-worker'),
             'lock_files'       => [
-                'dispatch'  => is_file(WRITEPATH . 'reach-blog-dispatch.lock'),
-                'optimizer' => is_file(WRITEPATH . 'reach-blog-optimize-roadmap.lock'),
+                // Files persist after runs; only "held" means another process holds flock.
+                'dispatch'  => $this->lockFileStatus(WRITEPATH . 'reach-blog-dispatch.lock'),
+                'optimizer' => $this->lockFileStatus(WRITEPATH . 'reach-blog-optimize-roadmap.lock'),
             ],
             'flags'            => [
                 'automation'        => $flags->isEnabled('automation'),
@@ -70,6 +71,27 @@ class ReachBlogDiagnose extends BaseCommand
 
         $blocking = array_filter($report['verdict'], static fn ($v) => ($v['severity'] ?? '') === 'blocking');
         return $blocking === [] ? 0 : 2;
+    }
+
+    /**
+     * @return array{exists:bool,held:bool}
+     */
+    private function lockFileStatus(string $path): array
+    {
+        if (! is_file($path)) {
+            return ['exists' => false, 'held' => false];
+        }
+        $fp = @fopen($path, 'c+');
+        if ($fp === false) {
+            return ['exists' => true, 'held' => true];
+        }
+        $held = ! flock($fp, LOCK_EX | LOCK_NB);
+        if (! $held) {
+            flock($fp, LOCK_UN);
+        }
+        fclose($fp);
+
+        return ['exists' => true, 'held' => $held];
     }
 
     /**
@@ -411,7 +433,7 @@ class ReachBlogDiagnose extends BaseCommand
 
         $actions[] = 'Manual smoke: php spark reach:blog-optimize-roadmap --force';
         $actions[] = 'Manual smoke: php spark reach:blog-dispatch --force';
-        $actions[] = 'Manual smoke: php spark reach:work --queue blog,publishing,community,default --once --limit 10';
+        $actions[] = 'Manual smoke: php spark reach:work --queue blog,publishing,community,default --limit 20';
 
         return $actions;
     }

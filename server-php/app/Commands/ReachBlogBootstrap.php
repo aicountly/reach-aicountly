@@ -51,7 +51,7 @@ class ReachBlogBootstrap extends BaseCommand
                 'next'   => [
                     'php spark reach:blog-optimize-roadmap --force',
                     'php spark reach:blog-dispatch --force',
-                    'php spark reach:work --queue blog,publishing,community,default --once --limit 20',
+                    'php spark reach:work --queue blog,publishing,community,default --limit 20',
                 ],
             ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
 
