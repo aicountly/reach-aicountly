@@ -221,11 +221,16 @@ class AiGenerationOrchestrator
                 'draft_generation', 'content_expansion', 'section_regeneration',
             ], true) ? 120 : 45;
 
+            $maxTokens = in_array((string) ($request['task_type'] ?? ''), [
+                'draft_generation', 'content_expansion', 'section_regeneration',
+            ], true) ? 8192 : 4096;
+
             $input = new AiGenerationInput(
                 systemPrompt:    $systemPrompt,
                 userPrompt:      $userPrompt,
                 outputSchema:    $outputSchema,
                 modelKey:        $currentDecision->modelKey,
+                maxOutputTokens: $maxTokens,
                 timeoutSeconds:  $timeout,
                 requestId:       $request['uuid'] ?? null,
             );

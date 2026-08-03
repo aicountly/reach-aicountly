@@ -1609,7 +1609,30 @@ class WorkBlockService
 
     private function lastAiFailureDetail(int $generationRequestId): string
     {
-        if ($generationRequestId <= 0 || ! $this->db->tableExists('reach_ai_generation_runs')) {
+        if ($generationRequestId <= 0) {
+            return '';
+        }
+
+        // Prefer schema errors — provider runs often "completed" while request failed validation.
+        if ($this->db->tableExists('reach_ai_generation_artifacts')) {
+            $artifact = $this->db->table('reach_ai_generation_artifacts')
+                ->select('schema_validation_status, schema_validation_errors')
+                ->where('generation_request_id', $generationRequestId)
+                ->orderBy('id', 'DESC')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
+            if ($artifact && ($artifact['schema_validation_status'] ?? '') === 'failed') {
+                $errors = $artifact['schema_validation_errors'] ?? '';
+                if (! is_string($errors)) {
+                    $errors = json_encode($errors);
+                }
+
+                return mb_substr('schema_validation_failed|' . (string) $errors, 0, 220);
+            }
+        }
+
+        if (! $this->db->tableExists('reach_ai_generation_runs')) {
             return '';
         }
 
@@ -1628,7 +1651,6 @@ class WorkBlockService
         $parts = array_filter([
             (string) ($run['error_category'] ?? ''),
             (string) ($run['redacted_error_message'] ?? ''),
-            (string) ($run['status'] ?? ''),
         ]);
 
         return mb_substr(implode('|', $parts), 0, 180);

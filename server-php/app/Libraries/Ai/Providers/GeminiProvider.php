@@ -76,6 +76,9 @@ class GeminiProvider implements AiProviderInterface
 
         $generationConfig = [
             'maxOutputTokens' => $input->maxOutputTokens,
+            // Gemini 2.5 Flash thinking otherwise consumes the first part and
+            // leaves blog drafts failing schema validation on non-JSON thought text.
+            'thinkingConfig'  => ['thinkingBudget' => 0],
         ];
 
         if (! empty($input->outputSchema)) {
@@ -118,7 +121,7 @@ class GeminiProvider implements AiProviderInterface
         }
 
         $durationMs         = (int) ((hrtime(true) - $start) / 1_000_000);
-        $rawContent         = $response['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        $rawContent         = $this->extractCandidateText($response);
         $providerResponseId = $response['responseId'] ?? null;
         $usage              = $response['usageMetadata'] ?? [];
         $inputTokens        = (int) ($usage['promptTokenCount'] ?? 0);
@@ -127,10 +130,7 @@ class GeminiProvider implements AiProviderInterface
 
         $parsedJson = null;
         if (! empty($input->outputSchema) && $rawContent !== '') {
-            $decoded = json_decode($rawContent, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $parsedJson = $decoded;
-            }
+            $parsedJson = $this->decodeJsonPayload($rawContent);
         }
 
         return new AiGenerationResult(
@@ -179,6 +179,62 @@ class GeminiProvider implements AiProviderInterface
         }
 
         return is_string($v) ? trim($v) : '';
+    }
+
+    /**
+     * Prefer non-thought text parts. Gemini 2.5 "thinking" responses put
+     * reasoning in parts[0] with thought=true; blog JSON is usually later.
+     *
+     * @param array<string,mixed> $response
+     */
+    private function extractCandidateText(array $response): string
+    {
+        $parts = $response['candidates'][0]['content']['parts'] ?? [];
+        if (! is_array($parts) || $parts === []) {
+            return '';
+        }
+
+        $answerChunks = [];
+        $anyChunks    = [];
+        foreach ($parts as $part) {
+            if (! is_array($part)) {
+                continue;
+            }
+            $text = trim((string) ($part['text'] ?? ''));
+            if ($text === '') {
+                continue;
+            }
+            $anyChunks[] = $text;
+            if (empty($part['thought'])) {
+                $answerChunks[] = $text;
+            }
+        }
+
+        $joined = implode("\n", $answerChunks !== [] ? $answerChunks : $anyChunks);
+        return trim($joined);
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function decodeJsonPayload(string $raw): ?array
+    {
+        $candidates = [$raw];
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)```/i', $raw, $m)) {
+            $candidates[] = trim($m[1]);
+        }
+        if (preg_match('/\{[\s\S]*\}/', $raw, $m)) {
+            $candidates[] = $m[0];
+        }
+
+        foreach ($candidates as $candidate) {
+            $decoded = json_decode($candidate, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 
     /**

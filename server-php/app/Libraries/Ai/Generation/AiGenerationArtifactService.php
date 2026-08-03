@@ -16,10 +16,12 @@ use App\Libraries\Ai\Prompts\StructuredOutputValidator;
 class AiGenerationArtifactService
 {
     private StructuredOutputValidator $schemaValidator;
+    private StructuredOutputCoercer $coercer;
 
     public function __construct()
     {
         $this->schemaValidator = new StructuredOutputValidator();
+        $this->coercer         = new StructuredOutputCoercer();
     }
 
     /**
@@ -36,17 +38,23 @@ class AiGenerationArtifactService
         $validationStatus = 'not_run';
         $validationErrors = null;
         $sanitisedJson    = null;
+        $parsed           = $result->parsedJson;
 
-        if ($result->parsedJson !== null && ! empty($outputSchema)) {
-            $errors = $this->schemaValidator->validate($result->parsedJson, $outputSchema);
+        if ($parsed === null && $result->rawContent !== '') {
+            $parsed = $this->tryParseJson($result->rawContent);
+        }
+
+        if ($parsed !== null && ! empty($outputSchema)) {
+            $parsed = $this->coercer->coerce($parsed, $outputSchema);
+            $errors = $this->schemaValidator->validate($parsed, $outputSchema);
             if (empty($errors)) {
                 $validationStatus = 'passed';
-                $sanitisedJson    = json_encode($this->sanitise($result->parsedJson));
+                $sanitisedJson    = json_encode($this->sanitise($parsed));
             } else {
                 $validationStatus = 'failed';
                 $validationErrors = json_encode($errors);
             }
-        } elseif ($result->parsedJson === null) {
+        } elseif ($parsed === null) {
             $validationStatus = 'failed';
             $validationErrors = json_encode(['Structured output could not be parsed from provider response.']);
         }
@@ -56,7 +64,7 @@ class AiGenerationArtifactService
             'generation_request_id'    => $requestId,
             'generation_run_id'        => $runId,
             'artifact_type'            => 'content',
-            'structured_output_json'   => $result->parsedJson !== null ? json_encode($result->parsedJson) : null,
+            'structured_output_json'   => $parsed !== null ? json_encode($parsed) : null,
             'sanitised_output_json'    => $sanitisedJson,
             'raw_response_reference'   => $rawRef,
             'schema_validation_status' => $validationStatus,
@@ -66,6 +74,28 @@ class AiGenerationArtifactService
 
         $id = (int) $db->insertID();
         return $this->findById($id);
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function tryParseJson(string $raw): ?array
+    {
+        $candidates = [$raw];
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)```/i', $raw, $m)) {
+            $candidates[] = trim($m[1]);
+        }
+        if (preg_match('/\{[\s\S]*\}/', $raw, $m)) {
+            $candidates[] = $m[0];
+        }
+        foreach ($candidates as $candidate) {
+            $decoded = json_decode($candidate, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 
     public function findById(int $id): array
