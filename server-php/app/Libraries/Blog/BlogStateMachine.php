@@ -84,6 +84,9 @@ class BlogStateMachine
     /** @var array<string, string> */
     private const NEXT_WORK_BLOCK = [
         // Content production chain (automation must not stall after brief).
+        // Do NOT map in-progress states (DRAFT_GENERATING / FACT_VERIFYING) back
+        // onto their own work-block types — that creates a second block with a
+        // colliding idempotency key while the current block is still running.
         self::BRIEF_READY      => WorkBlockService::TYPE_GENERATE_OUTLINE,
         self::OUTLINE_READY    => WorkBlockService::TYPE_GENERATE_DRAFT,
         self::DRAFT            => WorkBlockService::TYPE_FACT_VERIFY,
@@ -91,8 +94,6 @@ class BlogStateMachine
         self::SEO_REVIEW       => WorkBlockService::TYPE_CROSS_REVIEW,
         self::PUBLISH_QUEUED   => WorkBlockService::TYPE_PUBLISH_BLOG,
         self::PUBLISHING       => WorkBlockService::TYPE_VERIFY_PUBLICATION,
-        self::FACT_VERIFYING   => WorkBlockService::TYPE_FACT_VERIFY,
-        self::DRAFT_GENERATING => WorkBlockService::TYPE_GENERATE_DRAFT,
         self::ROADMAP_PLANNED  => WorkBlockService::TYPE_OPTIMIZE_ROADMAP,
         self::REFRESH_PENDING  => WorkBlockService::TYPE_REFRESH_CONTENT,
         // Going live must be followed by a real sitemap-presence check, not
@@ -247,12 +248,35 @@ class BlogStateMachine
         }
 
         $versionId = (int) ($meta['content_version_id'] ?? $item['current_version_id'] ?? 0);
-        $id        = $this->workBlocks->create([
+        $key       = "blog-{$contentItemId}-{$toState}-{$blockType}";
+
+        $existing = $this->db->table('reach_work_blocks')
+            ->where('idempotency_key', $key)
+            ->get()
+            ->getRowArray();
+
+        if ($existing) {
+            $existingId = (int) $existing['id'];
+            // Re-open a prior successor that never finished so retries can proceed.
+            if (in_array((string) ($existing['eligibility_status'] ?? ''), [
+                'pending', 'failed', 'blocked',
+            ], true)) {
+                $this->db->table('reach_work_blocks')->where('id', $existingId)->update([
+                    'eligibility_status' => 'eligible',
+                    'content_version_id' => $versionId > 0 ? $versionId : ($existing['content_version_id'] ?? null),
+                    'updated_at'         => date('Y-m-d H:i:s'),
+                ]);
+            }
+
+            return $existingId;
+        }
+
+        $id = $this->workBlocks->create([
             'block_type'         => $blockType,
             'scope'              => 'blog',
             'content_item_id'    => $contentItemId,
             'content_version_id' => $versionId > 0 ? $versionId : null,
-            'idempotency_key'    => "blog-{$contentItemId}-{$toState}-{$blockType}",
+            'idempotency_key'    => $key,
             'input_json'         => ['transition_meta' => $meta],
         ]);
         $this->workBlocks->markEligible($id);
