@@ -81,14 +81,18 @@ final class StructuredOutputCoercer
             $data['slug_suggestion'] = trim($slug, '-');
         }
 
+        if (empty($data['summary']) && $plain !== '') {
+            $data['summary'] = mb_substr($plain, 0, 280);
+        }
+        if (empty($data['summary']) && ! empty($data['title'])) {
+            $data['summary'] = (string) $data['title'];
+        }
         if (empty($data['meta_title']) && ! empty($data['title'])) {
             $data['meta_title'] = mb_substr((string) $data['title'], 0, 70);
         }
-        if (empty($data['meta_description']) && ! empty($data['summary'])) {
-            $data['meta_description'] = mb_substr((string) $data['summary'], 0, 160);
-        }
-        if (empty($data['summary']) && $plain !== '') {
-            $data['summary'] = mb_substr($plain, 0, 280);
+        if (empty($data['meta_description'])) {
+            $source = (string) ($data['summary'] ?? $plain ?: ($data['title'] ?? 'Article summary'));
+            $data['meta_description'] = mb_substr($source, 0, 160);
         }
 
         if (! isset($data['reading_time_minutes']) || (int) $data['reading_time_minutes'] < 1) {
