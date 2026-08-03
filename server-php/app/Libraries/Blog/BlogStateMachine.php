@@ -188,6 +188,14 @@ class BlogStateMachine
         return in_array($toState, self::ADJACENCY[$fromState] ?? [], true);
     }
 
+    /** @return list<string> */
+    public function allowedTargets(string $fromState): array
+    {
+        $fromState = strtolower(trim($fromState));
+
+        return self::ADJACENCY[$fromState] ?? [];
+    }
+
     /**
      * Guards the transition INTO published/live. This only enforces the
      * "high-risk requires human approval" rule. It must NOT also apply the

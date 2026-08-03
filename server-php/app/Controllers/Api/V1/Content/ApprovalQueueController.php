@@ -2,6 +2,7 @@
 
 namespace App\Controllers\Api\V1\Content;
 
+use App\Libraries\Blog\BlogHumanApprovalService;
 use App\Libraries\ContentWorkflowService;
 use App\Libraries\ContentValidationService;
 use App\Models\Content\ContentItemModel;
@@ -63,11 +64,11 @@ class ApprovalQueueController extends BaseContentController
     public function stats()
     {
         $areas = [
-            'today'             => ['workflow_status' => 'review_pending'],
+            'today'             => ['workflow_statuses' => ['review_pending', 'internal_review', 'seo_review']],
             'overdue'           => 'overdue',
             'high_risk'         => 'high_risk',
             'changes_requested' => ['workflow_status' => 'changes_requested'],
-            'ready_for_approval'=> ['workflow_status' => 'review_pending'],
+            'ready_for_approval'=> ['workflow_statuses' => ['review_pending', 'internal_review', 'seo_review']],
             'scheduled'         => ['workflow_status' => 'scheduled'],
             'recently_approved' => ['workflow_status' => 'approved'],
         ];
@@ -94,9 +95,15 @@ class ApprovalQueueController extends BaseContentController
         $body    = $this->input();
         $stage   = $body['stage'] ?? 'final_approval';
         $comment = $body['comment'] ?? '';
+        $actor   = $this->actor();
+        $blog    = new BlogHumanApprovalService();
 
         try {
-            $updated = $this->workflow->approve($item['id'], $stage, $this->actor(), $comment);
+            if ($blog->isBlogAwaitingHuman($item)) {
+                return $this->ok($blog->approve((int) $item['id'], (int) ($actor['id'] ?? 0), (string) $comment));
+            }
+
+            $updated = $this->workflow->approve($item['id'], $stage, $actor, $comment);
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -113,9 +120,15 @@ class ApprovalQueueController extends BaseContentController
         $body   = $this->input();
         $reason = trim($body['reason'] ?? '');
         $stage  = $body['stage'] ?? 'final_approval';
+        $actor  = $this->actor();
+        $blog   = new BlogHumanApprovalService();
 
         try {
-            $updated = $this->workflow->reject($item['id'], $stage, $this->actor(), $reason);
+            if ($blog->isBlogAwaitingHuman($item)) {
+                return $this->ok($blog->reject((int) $item['id'], (int) ($actor['id'] ?? 0), $reason));
+            }
+
+            $updated = $this->workflow->reject($item['id'], $stage, $actor, $reason);
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -131,9 +144,15 @@ class ApprovalQueueController extends BaseContentController
 
         $body   = $this->input();
         $reason = trim($body['reason'] ?? '');
+        $actor  = $this->actor();
+        $blog   = new BlogHumanApprovalService();
 
         try {
-            $updated = $this->workflow->requestChanges($item['id'], $this->actor(), $reason);
+            if ($blog->isBlogAwaitingHuman($item)) {
+                return $this->ok($blog->requestChanges((int) $item['id'], (int) ($actor['id'] ?? 0), $reason));
+            }
+
+            $updated = $this->workflow->requestChanges($item['id'], $actor, $reason);
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -192,7 +211,12 @@ class ApprovalQueueController extends BaseContentController
             }
 
             try {
-                $this->workflow->approve($id, $stage, $this->actor(), $comment);
+                $blog = new BlogHumanApprovalService();
+                if ($blog->isBlogAwaitingHuman($item)) {
+                    $blog->approve($id, (int) ($this->actor()['id'] ?? 0), $comment);
+                } else {
+                    $this->workflow->approve($id, $stage, $this->actor(), $comment);
+                }
                 $results['approved'][] = $id;
             } catch (\RuntimeException $e) {
                 $results['errors'][] = ['id' => $id, 'reason' => $e->getMessage()];
@@ -207,14 +231,14 @@ class ApprovalQueueController extends BaseContentController
     {
         $now = date('Y-m-d H:i:s');
         return match ($area) {
-            'today'              => ['workflow_status' => 'review_pending'],
+            'today'              => ['workflow_statuses' => ['review_pending', 'internal_review', 'seo_review']],
             'overdue'            => ['overdue' => true],
             'high_risk'          => ['high_risk' => true],
             'changes_requested'  => ['workflow_status' => 'changes_requested'],
-            'ready_for_approval' => ['workflow_status' => 'review_pending'],
+            'ready_for_approval' => ['workflow_statuses' => ['review_pending', 'internal_review', 'seo_review']],
             'scheduled'          => ['workflow_status' => 'scheduled'],
             'recently_approved'  => ['workflow_status' => 'approved'],
-            default              => ['workflow_status' => 'review_pending'],
+            default              => ['workflow_statuses' => ['review_pending', 'internal_review', 'seo_review']],
         };
     }
 }

@@ -224,12 +224,12 @@ export function ApprovalsPage() {
     )},
     { key: 'actions', label: '', render: (r) => (
       <div className="flex gap-1">
-        {canApprove && (r.workflow_status === 'review_pending' || r.decision === 'pending') && (
+        {canApprove && (['review_pending', 'internal_review', 'seo_review'].includes(r.workflow_status) || r.decision === 'pending') && (
           <button className="btn btn-primary btn-sm" onClick={() => handleApprove(r.id)}>
             <Check size={12} /> Approve
           </button>
         )}
-        {canReview && (r.workflow_status === 'review_pending' || r.decision === 'pending') && (
+        {canReview && (['review_pending', 'internal_review', 'seo_review'].includes(r.workflow_status) || r.decision === 'pending') && (
           <>
             <button className="btn btn-warning btn-sm" onClick={() => handleReturn(r.id)}>
               <RotateCcw size={12} /> Return

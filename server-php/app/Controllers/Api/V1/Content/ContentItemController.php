@@ -2,6 +2,8 @@
 
 namespace App\Controllers\Api\V1\Content;
 
+use App\Libraries\Blog\BlogHumanApprovalService;
+use App\Libraries\Blog\BlogStateMachine;
 use App\Libraries\ContentItemService;
 use App\Libraries\ContentMappingService;
 use App\Libraries\AuditLogger;
@@ -150,9 +152,18 @@ class ContentItemController extends BaseContentController
         $body    = $this->input();
         $stage   = $body['stage'] ?? 'final_approval';
         $comment = $body['comment'] ?? '';
+        $actor   = $this->actor();
+        $blog    = new BlogHumanApprovalService();
 
         try {
-            $updated = $this->workflow->approve($item['id'], $stage, $this->actor(), $comment);
+            if ($blog->isBlogAwaitingHuman($item)) {
+                $updated = $blog->approve((int) $item['id'], (int) ($actor['id'] ?? 0), (string) $comment);
+
+                return $this->ok($updated);
+            }
+
+            $updated = $this->workflow->approve($item['id'], $stage, $actor, $comment);
+
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -169,9 +180,18 @@ class ContentItemController extends BaseContentController
         $body   = $this->input();
         $reason = trim($body['reason'] ?? '');
         $stage  = $body['stage'] ?? 'final_approval';
+        $actor  = $this->actor();
+        $blog   = new BlogHumanApprovalService();
 
         try {
-            $updated = $this->workflow->reject($item['id'], $stage, $this->actor(), $reason);
+            if ($blog->isBlogAwaitingHuman($item)) {
+                $updated = $blog->reject((int) $item['id'], (int) ($actor['id'] ?? 0), $reason);
+
+                return $this->ok($updated);
+            }
+
+            $updated = $this->workflow->reject($item['id'], $stage, $actor, $reason);
+
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -187,9 +207,18 @@ class ContentItemController extends BaseContentController
 
         $body   = $this->input();
         $reason = trim($body['reason'] ?? '');
+        $actor  = $this->actor();
+        $blog   = new BlogHumanApprovalService();
 
         try {
-            $updated = $this->workflow->requestChanges($item['id'], $this->actor(), $reason);
+            if ($blog->isBlogAwaitingHuman($item)) {
+                $updated = $blog->requestChanges((int) $item['id'], (int) ($actor['id'] ?? 0), $reason);
+
+                return $this->ok($updated);
+            }
+
+            $updated = $this->workflow->requestChanges($item['id'], $actor, $reason);
+
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -221,9 +250,17 @@ class ContentItemController extends BaseContentController
             return $item;
         }
 
+        $current = (string) ($item['workflow_status'] ?? '');
+        if (($item['content_type'] ?? '') === 'blog') {
+            return $this->ok([
+                'current_status' => $current,
+                'next_statuses'  => (new BlogStateMachine())->allowedTargets($current),
+            ]);
+        }
+
         return $this->ok([
-            'current_status' => $item['workflow_status'],
-            'next_statuses'  => $this->workflow->validNextStatuses($item['workflow_status']),
+            'current_status' => $current,
+            'next_statuses'  => $this->workflow->validNextStatuses($current),
         ]);
     }
 

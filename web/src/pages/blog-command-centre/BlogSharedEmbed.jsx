@@ -35,8 +35,8 @@ const EMBED_MAP = {
   'content-editorial': () => (
     <BlogContentListWrapper
       title="Editorial Review"
-      subtitle="Blog items in review or validation stages."
-      defaultWorkflowStatus="review_pending"
+      subtitle="Blog items awaiting human review (internal review / SEO review)."
+      defaultWorkflowStatus="internal_review"
     />
   ),
   approvals: () => <ApprovalsPage />,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Edit2, FileText, MessageSquare, CheckSquare, Clock, GitBranch, Map } from 'lucide-react';
+import { Edit2, FileText, MessageSquare, CheckSquare, Clock, GitBranch, Send } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
@@ -12,6 +12,9 @@ import { WorkflowStatusBar } from '../../components/content/WorkflowStatusBar';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
+const AWAITING_HUMAN = new Set(['review_pending', 'internal_review', 'seo_review']);
+const PUBLISHABLE = new Set(['approved', 'scheduled']);
+
 export function ContentDetailPage() {
   const { id } = useParams();
   const { has } = usePermission();
@@ -21,10 +24,11 @@ export function ContentDetailPage() {
   const [error, setError]           = useState(null);
   const [actioning, setActioning]   = useState(null);
 
-  const canEdit    = has('content.edit');
-  const canSubmit  = has('content.submit');
-  const canApprove = has('content.approve');
-  const canReview  = has('content.review');
+  const canEdit     = has('content.edit');
+  const canSubmit   = has('content.submit');
+  const canApprove  = has('content.approve');
+  const canReview   = has('content.review');
+  const canPublish  = has('publishing.publish');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,31 +81,51 @@ export function ContentDetailPage() {
     finally { setActioning(null); }
   };
 
+  const handlePublish = async () => {
+    if (!window.confirm('Publish this blog to AICOUNTLY.com now?')) return;
+    setActioning('publish');
+    try {
+      await contentService.publishItem(id, item?.current_version_id);
+      load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setActioning(null);
+    }
+  };
+
   if (loading) return <Loader />;
-  if (error) return <Alert variant="danger">{error}</Alert>;
-  if (!item) return null;
+  if (error && !item) return <Alert variant="danger">{error}</Alert>;
+  if (!item) return <Alert variant="warning">Content item not found.</Alert>;
+
+  const awaitingHuman = AWAITING_HUMAN.has(item.workflow_status);
+  const canPublishNow = canPublish
+    && item.content_type === 'blog'
+    && item.approval_status === 'approved'
+    && PUBLISHABLE.has(item.workflow_status);
 
   const detailLinks = [
-    { to: ROUTES.CONTENT_VERSIONS.replace(':id', id), label: 'Versions', icon: <GitBranch size={14} /> },
-    { to: ROUTES.CONTENT_BRIEF.replace(':id', id), label: 'Brief', icon: <FileText size={14} /> },
-    { to: ROUTES.CONTENT_COMMENTS.replace(':id', id), label: 'Comments', icon: <MessageSquare size={14} /> },
-    { to: ROUTES.CONTENT_VALIDATIONS.replace(':id', id), label: 'Validations', icon: <CheckSquare size={14} /> },
-    { to: ROUTES.CONTENT_SCHEDULE.replace(':id', id), label: 'Schedule', icon: <Clock size={14} /> },
+    { to: ROUTES.CONTENT_VERSIONS.replace(':id', id), icon: <GitBranch size={14} />, label: 'Versions' },
+    { to: ROUTES.CONTENT_BRIEF.replace(':id', id), icon: <FileText size={14} />, label: 'Brief' },
+    { to: ROUTES.CONTENT_COMMENTS.replace(':id', id), icon: <MessageSquare size={14} />, label: 'Comments' },
+    { to: ROUTES.CONTENT_VALIDATIONS.replace(':id', id), icon: <CheckSquare size={14} />, label: 'Validations' },
+    { to: ROUTES.CONTENT_SCHEDULE.replace(':id', id), icon: <Clock size={14} />, label: 'Schedule' },
   ];
 
   return (
     <div>
-      {/* Header */}
-      <div className="page-header">
+      {error && <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>}
+
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
             <ContentTypeBadge type={item.content_type} />
             <ContentRiskBadge level={item.risk_level} />
           </div>
           <h1 style={{ margin: 0 }}>{item.title}</h1>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>/{item.slug}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canEdit && (
             <Link to={ROUTES.CONTENT_EDIT.replace(':id', id)} className="btn btn-secondary">
               <Edit2 size={13} /> Edit
@@ -112,12 +136,12 @@ export function ContentDetailPage() {
               Submit for Review
             </button>
           )}
-          {canApprove && item.workflow_status === 'review_pending' && (
+          {canApprove && awaitingHuman && (
             <button className="btn btn-primary" onClick={handleApprove} disabled={actioning === 'approve'}>
               Approve
             </button>
           )}
-          {canReview && item.workflow_status === 'review_pending' && (
+          {canReview && awaitingHuman && (
             <>
               <button className="btn btn-warning" onClick={handleReturn} disabled={actioning === 'return'}>
                 Request Changes
@@ -127,15 +151,18 @@ export function ContentDetailPage() {
               </button>
             </>
           )}
+          {canPublishNow && (
+            <button className="btn btn-primary" onClick={handlePublish} disabled={actioning === 'publish'}>
+              <Send size={13} /> Publish now
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Workflow bar */}
       <Card style={{ marginBottom: 16 }}>
         <WorkflowStatusBar currentStatus={item.workflow_status} nextStatuses={transitions} />
       </Card>
 
-      {/* Detail tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {detailLinks.map((l) => (
           <Link key={l.to} to={l.to} className="btn btn-ghost btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -144,7 +171,6 @@ export function ContentDetailPage() {
         ))}
       </div>
 
-      {/* Meta */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
         <Card>
           <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Status</div>
@@ -183,4 +209,3 @@ export function ContentDetailPage() {
     </div>
   );
 }
-

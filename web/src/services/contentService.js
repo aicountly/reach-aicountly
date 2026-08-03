@@ -80,6 +80,17 @@ export const contentService = {
   cancelSchedule: (id, scheduleId, reason) =>
     request('DELETE', `/content/items/${id}/schedules/${scheduleId}`, { reason }),
 
+  // Publishing (blog / knowledge via publication deployments)
+  publishItem: (id, contentVersionId) =>
+    request('POST', `/publishing/content/${id}/publish`, contentVersionId
+      ? { content_version_id: contentVersionId }
+      : {}),
+  schedulePublish: (id, scheduledAt, contentVersionId) =>
+    request('POST', `/publishing/content/${id}/schedule`, {
+      scheduled_at: scheduledAt,
+      ...(contentVersionId ? { content_version_id: contentVersionId } : {}),
+    }),
+
   // Knowledge mappings
   getMappings: (id) => request('GET', `/content/items/${id}/mappings`),
   syncMappings: (id, mappings) => request('PUT', `/content/items/${id}/mappings`, mappings),

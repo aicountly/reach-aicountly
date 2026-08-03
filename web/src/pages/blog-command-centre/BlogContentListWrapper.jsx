@@ -10,9 +10,11 @@ import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { ROUTES } from '../../constants/routes';
 
 const WORKFLOW_STATUSES = [
-  '', 'idea', 'brief', 'draft', 'validation_pending', 'review_pending',
-  'changes_requested', 'approved', 'scheduled', 'ready_for_publication',
-  'published', 'refresh_due', 'archived', 'rejected',
+  '', 'idea', 'brief', 'brief_ready', 'outline_ready', 'draft', 'draft_generating',
+  'fact_verifying', 'fact_verified', 'seo_review', 'internal_review',
+  'validation_pending', 'review_pending', 'changes_requested', 'approved',
+  'scheduled', 'publish_queued', 'publishing', 'published', 'live',
+  'ready_for_publication', 'refresh_due', 'archived', 'rejected', 'failed', 'blocked',
 ];
 
 /**

@@ -48,7 +48,7 @@ export function ApprovalCard({ item, onApprove, onReject, onReturn, canApprove =
         </div>
       )}
 
-      {(canApprove || canReview) && item.workflow_status === 'review_pending' && (
+      {(canApprove || canReview) && ['review_pending', 'internal_review', 'seo_review'].includes(item.workflow_status) && (
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           {canApprove && (
             <button className="btn btn-primary btn-sm" onClick={() => onApprove?.(item)}>

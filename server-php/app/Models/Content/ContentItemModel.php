@@ -44,6 +44,17 @@ class ContentItemModel extends Model
         if (!empty($filters['workflow_status'])) {
             $builder->where('workflow_status', $filters['workflow_status']);
         }
+        if (!empty($filters['workflow_statuses']) && is_array($filters['workflow_statuses'])) {
+            $builder->whereIn('workflow_status', $filters['workflow_statuses']);
+        }
+        if (!empty($filters['overdue'])) {
+            $builder->where('review_due_at <', date('Y-m-d H:i:s'))
+                ->whereIn('workflow_status', ['review_pending', 'internal_review', 'seo_review', 'validation_pending']);
+        }
+        if (!empty($filters['high_risk'])) {
+            $builder->whereIn('risk_level', ['high', 'critical'])
+                ->whereIn('workflow_status', ['review_pending', 'internal_review', 'seo_review', 'validation_pending']);
+        }
         if (!empty($filters['approval_status'])) {
             $builder->where('approval_status', $filters['approval_status']);
         }
@@ -79,7 +90,7 @@ class ContentItemModel extends Model
     /** Items needing review (for approval centre). */
     public function forApprovalQueue(array $filters = []): array
     {
-        $builder = $this->whereIn('workflow_status', ['review_pending', 'validation_pending'])
+        $builder = $this->whereIn('workflow_status', ['review_pending', 'validation_pending', 'internal_review', 'seo_review'])
             ->withDeleted(false);
 
         if (!empty($filters['overdue'])) {
