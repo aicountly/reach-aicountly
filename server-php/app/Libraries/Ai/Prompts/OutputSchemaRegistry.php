@@ -88,6 +88,11 @@ class OutputSchemaRegistry
                     'sections',
                 ],
                 'properties' => array_merge($base, $seoMeta, [
+                    // Genuine blog drafts must carry substantive body text — stubs
+                    // like title-only / "Untitled draft" must fail schema validation.
+                    'body_html'            => ['type' => 'string', 'minLength' => 400],
+                    'body_markdown'        => ['type' => 'string', 'minLength' => 300],
+                    'body_plain_text'      => ['type' => 'string', 'minLength' => 300],
                     'reading_time_minutes' => ['type' => 'integer', 'minimum' => 1],
                     'sections'             => [
                         'type'  => 'array',

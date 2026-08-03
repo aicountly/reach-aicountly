@@ -128,10 +128,7 @@ export function BlogReviewQueuePage() {
                     {excerpt.length > 220 ? `${excerpt.slice(0, 220)}…` : excerpt}
                   </p>
                 )}
-                <div
-                  style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
                   <Link
                     to={reviewDetailPath(item.id)}
                     className="btn btn-primary btn-sm"
@@ -146,9 +143,9 @@ export function BlogReviewQueuePage() {
                       <Pencil size={13} /> Edit content
                     </Link>
                   )}
-                  {canApprove && (
-                    <span className="text-xs text-muted" style={{ alignSelf: 'center' }}>
-                      Open review to approve
+                  {excerpt && /untitled draft/i.test(excerpt) && (
+                    <span style={{ fontSize: 12, color: '#b45309', alignSelf: 'center' }}>
+                      Placeholder body — regenerate from review
                     </span>
                   )}
                 </div>

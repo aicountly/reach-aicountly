@@ -437,6 +437,7 @@ $routes->group('v1', static function ($routes) {
         $routes->post('content/items/(:num)/reject',               'Api\\V1\\Content\\ContentItemController::reject/$1',      ['filter' => ['permission:content.approve', 'throttle:approval']]);
         $routes->post('content/items/(:num)/request-changes',      'Api\\V1\\Content\\ContentItemController::requestChanges/$1', ['filter' => 'permission:content.review']);
         $routes->post('content/items/(:num)/archive',              'Api\\V1\\Content\\ContentItemController::archive/$1',    ['filter' => 'permission:content.archive']);
+        $routes->post('content/items/(:num)/redraft',              'Api\\V1\\Content\\ContentItemController::redraft/$1',    ['filter' => 'permission:content.edit']);
         $routes->get('content/items/(:num)/transitions',           'Api\\V1\\Content\\ContentItemController::transitions/$1', ['filter' => 'permission:content.view']);
         $routes->post('content/items/(:num)/transition',           'Api\\V1\\Content\\ContentItemController::transition/$1',  ['filter' => 'permission:content.edit']);
 

@@ -8,9 +8,23 @@ namespace App\Libraries\Ai\Generation;
  * Fills missing/blank required structured-output fields with safe defaults so
  * near-complete provider JSON (common with Gemini) can still pass schema
  * validation and become a content version.
+ *
+ * Never invents a fake article body from the title alone — empty body fields
+ * stay empty so schema validation fails instead of saving "Untitled draft".
  */
 final class StructuredOutputCoercer
 {
+    /** Placeholder bodies we must never treat as real draft content. */
+    private const STUB_BODIES = [
+        'untitled draft',
+        'untitled',
+        'n/a',
+        'tbd',
+        'todo',
+        'placeholder',
+        'lorem ipsum',
+    ];
+
     /**
      * @param array<string,mixed> $data
      * @param array<string,mixed> $schema
@@ -26,15 +40,21 @@ final class StructuredOutputCoercer
             if (! is_string($field)) {
                 continue;
             }
+            // Never invent article bodies — leave blank so validation fails.
+            if (in_array($field, ['body_html', 'body_markdown', 'body_plain_text'], true)) {
+                continue;
+            }
             $prop = is_array($properties[$field] ?? null) ? $properties[$field] : [];
             if (! array_key_exists($field, $data) || $this->isBlankForSchema($data[$field], $prop)) {
                 $data[$field] = $this->defaultForProperty($field, $prop, $data);
             }
         }
 
-        // Final pass: never leave required minLength strings empty after defaults.
         foreach ($schema['required'] ?? [] as $field) {
             if (! is_string($field)) {
+                continue;
+            }
+            if (in_array($field, ['body_html', 'body_markdown', 'body_plain_text'], true)) {
                 continue;
             }
             $prop = is_array($properties[$field] ?? null) ? $properties[$field] : [];
@@ -49,6 +69,46 @@ final class StructuredOutputCoercer
         }
 
         return $data;
+    }
+
+    /**
+     * True when body text is missing or is a known stub / title-only fake.
+     */
+    public static function isStubBody(?string $html, ?string $markdown = null, ?string $plain = null, ?string $title = null): bool
+    {
+        $text = trim(html_entity_decode(strip_tags((string) $html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($text === '') {
+            $text = trim((string) $plain);
+        }
+        if ($text === '') {
+            $text = trim(strip_tags(str_replace(['**', '*', '`', '#'], '', (string) $markdown)));
+        }
+        if ($text === '') {
+            return true;
+        }
+
+        $normalized = strtolower(preg_replace('/\s+/', ' ', $text) ?? $text);
+        if (in_array($normalized, self::STUB_BODIES, true)) {
+            return true;
+        }
+        foreach (self::STUB_BODIES as $stub) {
+            if ($normalized === $stub || str_starts_with($normalized, $stub . ' ')) {
+                return true;
+            }
+        }
+
+        $titleNorm = strtolower(trim((string) $title));
+        if ($titleNorm !== '' && $normalized === $titleNorm) {
+            return true;
+        }
+
+        // Extremely short strings are not articles (keep this bar low — schema
+        // minLength enforces production word count separately).
+        if (mb_strlen($text) < 40 || str_word_count($text) < 8) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -95,14 +155,22 @@ final class StructuredOutputCoercer
             $md = $plain;
         }
 
-        if ($html !== '') {
-            $data['body_html'] = $html;
-        }
-        if ($md !== '') {
-            $data['body_markdown'] = $md;
-        }
-        if ($plain !== '') {
-            $data['body_plain_text'] = $plain;
+        // Clear stub bodies so they do not pass minLength via title echo.
+        if (self::isStubBody($html, $md, $plain, $title)) {
+            $html  = '';
+            $md    = '';
+            $plain = '';
+            unset($data['body_html'], $data['body_markdown'], $data['body_plain_text']);
+        } else {
+            if ($html !== '') {
+                $data['body_html'] = $html;
+            }
+            if ($md !== '') {
+                $data['body_markdown'] = $md;
+            }
+            if ($plain !== '') {
+                $data['body_plain_text'] = $plain;
+            }
         }
 
         if ($title === '' && $plain !== '') {
@@ -120,15 +188,15 @@ final class StructuredOutputCoercer
             $data['slug_suggestion'] = trim($slug, '-') ?: 'untitled-draft';
         }
 
-        if (trim((string) ($data['summary'] ?? '')) === '') {
-            $data['summary'] = mb_substr($plain !== '' ? $plain : $title, 0, 280);
+        if (trim((string) ($data['summary'] ?? '')) === '' || self::isStubBody(null, null, (string) ($data['summary'] ?? ''), $title)) {
+            $data['summary'] = $plain !== '' ? mb_substr($plain, 0, 280) : '';
         }
         if (trim((string) ($data['meta_title'] ?? '')) === '') {
             $data['meta_title'] = mb_substr($title, 0, 70);
         }
         if (trim((string) ($data['meta_description'] ?? '')) === '') {
-            $source = trim((string) ($data['summary'] ?? '')) ?: ($plain !== '' ? $plain : $title);
-            $data['meta_description'] = mb_substr($source, 0, 160);
+            $source = trim((string) ($data['summary'] ?? '')) ?: $plain;
+            $data['meta_description'] = $source !== '' ? mb_substr($source, 0, 160) : '';
         }
         if (trim((string) ($data['primary_cta'] ?? '')) === '') {
             $data['primary_cta'] = 'Learn More';
@@ -166,7 +234,6 @@ final class StructuredOutputCoercer
 
         $types = (array) ($prop['type'] ?? 'string');
         if (is_string($value) && trim($value) === '') {
-            // Empty string fails minLength and is useless for required content fields.
             $minLength = (int) ($prop['minLength'] ?? 0);
             return $minLength > 0 || ! in_array('null', $types, true);
         }
@@ -189,8 +256,8 @@ final class StructuredOutputCoercer
             $type = $type[0] ?? 'string';
         }
 
-        $title = trim((string) ($data['title'] ?? 'Untitled draft')) ?: 'Untitled draft';
-        $plain = trim((string) ($data['body_plain_text'] ?? ''));
+        $title   = trim((string) ($data['title'] ?? 'Untitled draft')) ?: 'Untitled draft';
+        $plain   = trim((string) ($data['body_plain_text'] ?? ''));
         $summary = trim((string) ($data['summary'] ?? ''));
 
         return match ($type) {
@@ -201,13 +268,12 @@ final class StructuredOutputCoercer
             default   => match ($field) {
                 'primary_cta'      => 'Learn More',
                 'title'            => $title,
-                'summary'          => $summary !== '' ? $summary : ($plain !== '' ? mb_substr($plain, 0, 280) : $title),
+                'summary'          => $summary !== '' ? $summary : ($plain !== '' ? mb_substr($plain, 0, 280) : ''),
                 'meta_title'       => mb_substr($title, 0, 70),
-                'meta_description' => mb_substr($summary !== '' ? $summary : ($plain !== '' ? $plain : $title), 0, 160),
+                'meta_description' => $summary !== '' ? mb_substr($summary, 0, 160) : ($plain !== '' ? mb_substr($plain, 0, 160) : ''),
                 'slug_suggestion'  => 'untitled-draft',
-                'body_html'        => $plain !== '' ? '<p>' . htmlspecialchars($plain, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</p>' : '<p>' . htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</p>',
-                'body_markdown'    => $plain !== '' ? $plain : $title,
-                'body_plain_text'  => $plain !== '' ? $plain : $title,
+                // Never invent body content from the title.
+                'body_html', 'body_markdown', 'body_plain_text' => '',
                 default            => $title,
             },
         };

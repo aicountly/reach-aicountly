@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Content;
 
 use App\Libraries\Blog\BlogHumanApprovalService;
+use App\Libraries\Blog\BlogRedraftService;
 use App\Libraries\Blog\BlogStateMachine;
 use App\Libraries\ContentItemService;
 use App\Libraries\ContentMappingService;
@@ -96,6 +97,7 @@ class ContentItemController extends BaseContentController
                 ->get()
                 ->getResultArray();
             $item['media_requirements'] = $media;
+            $item['is_stub_body'] = (new BlogRedraftService())->itemHasStubBody($item);
         }
 
         $item['knowledge_maps'] = $this->mapping->getMappings($item['id']);
@@ -275,6 +277,35 @@ class ContentItemController extends BaseContentController
         try {
             $this->service->archive($item['id'], $reason, $this->actor());
             return $this->ok($this->contentItems->find($item['id']));
+        } catch (\RuntimeException $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * Re-queue AI draft generation when the current version is a stub/placeholder.
+     */
+    public function redraft($id)
+    {
+        $item = $this->findItem($id);
+        if ($item instanceof \CodeIgniter\HTTP\ResponseInterface) {
+            return $item;
+        }
+
+        if (($item['content_type'] ?? '') !== 'blog') {
+            return $this->fail('Redraft is only supported for blog content.', 422);
+        }
+
+        try {
+            $result = (new BlogRedraftService())->redraft((int) $item['id'], (int) ($this->actor()['id'] ?? 0));
+            $fresh  = $this->contentItems->find($item['id']);
+
+            return $this->ok([
+                'item'          => $fresh,
+                'work_block_id' => $result['work_block_id'],
+                'from_status'   => $result['from_status'],
+                'message'       => 'Genuine draft generation queued. Run the blog worker (or wait for cron) to produce the full article.',
+            ]);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
         }

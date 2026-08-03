@@ -49,6 +49,7 @@ export const contentService = {
   rejectItem: (id, stage, reason) => request('POST', `/content/items/${id}/reject`, { stage, reason }),
   requestChanges: (id, reason) => request('POST', `/content/items/${id}/request-changes`, { reason }),
   archiveItem: (id, reason) => request('POST', `/content/items/${id}/archive`, { reason }),
+  redraftItem: (id) => request('POST', `/content/items/${id}/redraft`),
 
   // Versions
   listVersions: (id) => request('GET', `/content/items/${id}/versions`),

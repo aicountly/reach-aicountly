@@ -586,7 +586,7 @@ class WorkBlockService
                 'min_word_count'      => $brief['min_word_count'] ?? 900,
                 'max_word_count'      => $brief['max_word_count'] ?? 1800,
                 'tone'                => $brief['tone'] ?? 'professional, plain-language',
-                'instructions'        => 'Write a complete, accurate blog article grounded only in the provided context. Use only verifiable claims.',
+                'instructions'        => 'Write a complete, accurate blog article of at least 900 words grounded only in the provided context. Return full body_html, body_markdown, and body_plain_text with real sections — never placeholders like "Untitled draft". Use only verifiable claims.',
             ],
         ], ['type' => 'system']);
 
@@ -622,6 +622,37 @@ class WorkBlockService
         $structured = is_string($artifact['structured_output_json'] ?? null)
             ? json_decode($artifact['structured_output_json'], true)
             : ($artifact['structured_output_json'] ?? []);
+
+        if (! is_array($structured)
+            || \App\Libraries\Ai\Generation\StructuredOutputCoercer::isStubBody(
+                $structured['body_html'] ?? null,
+                $structured['body_markdown'] ?? null,
+                $structured['body_plain_text'] ?? null,
+                $structured['title'] ?? ($item['title'] ?? null),
+            )
+        ) {
+            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
+            return $this->markFailed(
+                $id,
+                self::TYPE_GENERATE_DRAFT,
+                'stub_or_empty_body:provider returned placeholder/short content instead of a real article',
+            );
+        }
+
+        $plainWords = str_word_count(trim(html_entity_decode(strip_tags((string) (
+            $structured['body_plain_text']
+            ?? $structured['body_html']
+            ?? $structured['body_markdown']
+            ?? ''
+        )), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        if ($plainWords < 200) {
+            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
+            return $this->markFailed(
+                $id,
+                self::TYPE_GENERATE_DRAFT,
+                "short_body:{$plainWords}_words_need_at_least_200",
+            );
+        }
 
         $version = (new ContentVersionService())->createVersion($contentItemId, [
             'title'           => $structured['title']           ?? ($item['title'] ?? ''),

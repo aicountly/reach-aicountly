@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Pencil, RotateCcw, Send, X } from 'lucide-react';
+import { ArrowLeft, Check, Pencil, RotateCcw, RefreshCw, Send, X } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
@@ -43,8 +43,14 @@ export function BlogReviewDetailPage() {
     setNotice(null);
     setError(null);
     try {
-      await fn();
-      setNotice(key === 'approve' ? 'Approved. You can publish from Ready to Publish.' : 'Saved.');
+      const result = await fn();
+      if (key === 'approve') {
+        setNotice('Approved. You can publish from Ready to Publish.');
+      } else if (key === 'redraft') {
+        setNotice(result?.message || 'Genuine AI draft generation queued. Wait for the worker/cron, then refresh.');
+      } else {
+        setNotice('Saved.');
+      }
       load();
     } catch (e) {
       setError(e.message);
@@ -59,6 +65,7 @@ export function BlogReviewDetailPage() {
 
   const version = item.current_version;
   const awaiting = AWAITING.has(item.workflow_status);
+  const isStub = !!item.is_stub_body;
   const canPublishNow = canPublish
     && item.approval_status === 'approved'
     && PUBLISHABLE.has(item.workflow_status);
@@ -78,6 +85,12 @@ export function BlogReviewDetailPage() {
 
       {error && <Alert variant="danger">{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
+      {isStub && (
+        <Alert variant="warning">
+          This is not a real article — the saved body is a placeholder (e.g. &quot;Untitled draft&quot;).
+          Do not approve it. Click <strong>Regenerate genuine draft</strong> to re-run AI generation for a full blog post.
+        </Alert>
+      )}
 
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
@@ -85,12 +98,25 @@ export function BlogReviewDetailPage() {
           <BlogReviewMetaRow item={item} />
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canEdit && isStub && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!!actioning}
+              onClick={() => {
+                if (!window.confirm('Queue a fresh AI draft for this topic? The placeholder body will be replaced after the worker runs.')) return;
+                run('redraft', () => contentService.redraftItem(id));
+              }}
+            >
+              <RefreshCw size={13} /> {actioning === 'redraft' ? 'Queuing…' : 'Regenerate genuine draft'}
+            </button>
+          )}
           {canEdit && (
             <Link to={editHref} className="btn btn-secondary">
               <Pencil size={13} /> Edit content
             </Link>
           )}
-          {canApprove && awaiting && (
+          {canApprove && awaiting && !isStub && (
             <button
               type="button"
               className="btn btn-primary"
@@ -128,7 +154,7 @@ export function BlogReviewDetailPage() {
               </button>
             </>
           )}
-          {canPublishNow && (
+          {canPublishNow && !isStub && (
             <button
               type="button"
               className="btn btn-primary"
@@ -144,11 +170,11 @@ export function BlogReviewDetailPage() {
         </div>
       </div>
 
-      {item.workflow_status === 'approved' && (
+      {item.workflow_status === 'approved' && !isStub && (
         <Alert variant="info">
           This post is approved. Open{' '}
           <Link to={ROUTES.BCC_PUBLISHING_READY}>Ready to Publish</Link>
-          {' '}to publish, or edit content first (editing creates a new version and may require re-approval for high-risk posts).
+          {' '}to publish, or edit content first.
         </Alert>
       )}
 
@@ -171,19 +197,14 @@ export function BlogReviewDetailPage() {
               {version?.created_at && (
                 <div>Created: {new Date(version.created_at).toLocaleString()}</div>
               )}
+              {isStub && <div style={{ color: '#b45309', marginTop: 8 }}>Stub body detected</div>}
             </div>
           </Card>
-          <Card title="SEO">
-            <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-              <div><span className="text-muted">Title:</span> {version?.title || item.title || '—'}</div>
-              <div><span className="text-muted">Summary:</span> {version?.summary || item.summary || '—'}</div>
-            </div>
-          </Card>
-          <Card title="Actions help">
+          <Card title="What to do">
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#4b5563', lineHeight: 1.6 }}>
-              <li>Read the full draft and images.</li>
-              <li>Use Edit content if anything needs fixing.</li>
-              <li>Approve when ready — then publish from Ready to Publish.</li>
+              <li>If you see a stub warning, regenerate — do not approve.</li>
+              <li>After the worker finishes, refresh and read the full article.</li>
+              <li>Edit if needed, then Approve → Ready to Publish.</li>
             </ol>
           </Card>
         </aside>
