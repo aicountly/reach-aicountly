@@ -44,9 +44,9 @@ class BlogReadinessService
             $blocking[] = 'Content type must be blog (found: ' . $item['content_type'] . ')';
         }
 
-        // Gate 2: human approval — AI may never approve
+        // Gate 2: approval recorded (human or low-risk system auto-approve)
         if ($item['approval_status'] !== 'approved') {
-            $blocking[] = 'Content must be human-approved (current: ' . $item['approval_status'] . ')';
+            $blocking[] = 'Content must be approved (current: ' . $item['approval_status'] . ')';
         }
 
         // Gate 3: current version exists
@@ -163,8 +163,11 @@ class BlogReadinessService
         }
 
         // Gate 15: workflow status
-        if (!in_array($item['workflow_status'], ['approved', 'published', 'scheduled'], true)) {
-            $blocking[] = 'Content workflow status must be approved, scheduled, or published (current: ' . $item['workflow_status'] . ')';
+        if (! in_array($item['workflow_status'], [
+            'approved', 'scheduled', 'publish_queued', 'publishing',
+            'published', 'verification_pending', 'live',
+        ], true)) {
+            $blocking[] = 'Content workflow status must be approved/scheduled/publishing/live (current: ' . $item['workflow_status'] . ')';
         }
 
         $ready = empty($blocking);

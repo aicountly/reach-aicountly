@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\ParsesSparkOptions;
+use App\Libraries\Blog\BlogAutoPublishService;
 use App\Libraries\Blog\BlogStateMachine;
 use App\Libraries\Blog\WorkBlockService;
 use CodeIgniter\CLI\BaseCommand;
@@ -42,8 +43,9 @@ class ReachBlogAdvance extends BaseCommand
         BlogStateMachine::DRAFT            => WorkBlockService::TYPE_FACT_VERIFY,
         BlogStateMachine::FACT_VERIFIED    => WorkBlockService::TYPE_SEO_OPTIMIZE,
         BlogStateMachine::SEO_REVIEW       => WorkBlockService::TYPE_CROSS_REVIEW,
-        // Fact-check soft-fails land here; send to human gate instead of dead-ending.
+        // Fact-check soft-fails / parked review — human gate unless auto-publish applies.
         BlogStateMachine::CHANGES_REQUESTED => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
+        BlogStateMachine::INTERNAL_REVIEW   => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
     ];
 
     public function run(array $params): int
@@ -55,9 +57,10 @@ class ReachBlogAdvance extends BaseCommand
 
         $db  = Database::connect();
         $svc = new WorkBlockService();
+        $auto = new BlogAutoPublishService();
 
         $builder = $db->table('reach_content_items')
-            ->select('id, title, workflow_status, current_version_id')
+            ->select('id, title, workflow_status, current_version_id, risk_level, approval_status')
             ->where('content_type', 'blog')
             ->where('deleted_at IS NULL', null, false)
             ->whereIn('workflow_status', array_keys(self::NEXT_BY_STATUS))
@@ -109,13 +112,53 @@ class ReachBlogAdvance extends BaseCommand
             $blockType     = self::NEXT_BY_STATUS[$status];
             $versionId     = (int) ($item['current_version_id'] ?? 0);
 
+            // Low/medium risk + auto-publish flags → approve and enqueue PUBLISH_BLOG.
+            if (in_array($status, [
+                BlogStateMachine::INTERNAL_REVIEW,
+                BlogStateMachine::SEO_REVIEW,
+                BlogStateMachine::CHANGES_REQUESTED,
+            ], true) && $auto->isEligible($item)) {
+                $result = $auto->tryAutoPublish($contentItemId, $versionId > 0 ? $versionId : null);
+                if ($result['queued']) {
+                    $created[] = [
+                        'content_item_id' => $contentItemId,
+                        'title'           => $item['title'],
+                        'status'          => $status,
+                        'action'          => 'auto_publish_queued',
+                        'auto_publish'    => $result,
+                    ];
+                    continue;
+                }
+            }
+
             $existing = $db->table('reach_work_blocks')
                 ->where('content_item_id', $contentItemId)
                 ->where('block_type', $blockType)
-                ->whereIn('eligibility_status', ['pending', 'eligible', 'queued', 'running'])
+                ->whereIn('eligibility_status', ['pending', 'eligible', 'queued', 'running', 'blocked'])
                 ->countAllResults();
 
             if ($existing > 0) {
+                // Re-open blocked human gates so worker can re-enter auto-publish path
+                // after a deploy that enables BLOG_AUTO_PUBLISH_ENABLED.
+                if ($blockType === WorkBlockService::TYPE_HUMAN_REVIEW_GATE) {
+                    $db->table('reach_work_blocks')
+                        ->where('content_item_id', $contentItemId)
+                        ->where('block_type', $blockType)
+                        ->where('eligibility_status', 'blocked')
+                        ->update([
+                            'eligibility_status' => 'eligible',
+                            'updated_at'         => date('Y-m-d H:i:s'),
+                        ]);
+                    $created[] = [
+                        'content_item_id' => $contentItemId,
+                        'title'           => $item['title'] ?? null,
+                        'status'          => $status,
+                        'action'          => 'reopened_human_review_gate',
+                        'block_type'      => $blockType,
+                    ];
+                    continue;
+                }
+
                 $created[] = [
                     'content_item_id' => $contentItemId,
                     'status'          => $status,

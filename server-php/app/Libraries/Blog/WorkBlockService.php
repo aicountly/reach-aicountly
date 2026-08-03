@@ -911,6 +911,19 @@ class WorkBlockService
             } catch (\Throwable) {
             }
 
+            $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish($contentItemId, $contentVersionId, $id);
+            if ($auto['queued']) {
+                $output = [
+                    'requires_human'        => false,
+                    'reason'                => 'editorial_review_failed_auto_published',
+                    'generation_request_id' => $request['id'],
+                    'auto_publish'          => $auto,
+                ];
+                $this->markCompleted($id, $output);
+
+                return $output;
+            }
+
             $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
             $output = [
                 'requires_human'        => true,
@@ -932,13 +945,29 @@ class WorkBlockService
         $actualReviewer = (string) ($run['provider_key'] ?? '');
 
         if ($actualReviewer !== '' && $actualReviewer === $generatorKey) {
-            // Self-review by the same provider must never be silent: force human review.
+            // Self-review by the same provider must never be silent: force human review
+            // unless low-risk auto-publish flags are enabled.
             try {
                 (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
                     'work_block_id' => $id,
                     'reason'        => 'cross_review_self_reviewed_requires_human',
                 ]);
             } catch (\Throwable) {
+            }
+
+            $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish($contentItemId, $contentVersionId, $id);
+            if ($auto['queued']) {
+                $output = [
+                    'generator_provider'   => $generatorKey,
+                    'reviewer_provider'    => $actualReviewer,
+                    'same_provider'        => true,
+                    'requires_human'       => false,
+                    'auto_publish'         => $auto,
+                ];
+                \App\Libraries\AuditLogger::record('blog.cross_review_same_provider_auto_publish', $output);
+                $this->markCompleted($id, $output);
+
+                return $output;
             }
 
             $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
@@ -955,14 +984,28 @@ class WorkBlockService
             return $output;
         }
 
-        // Successful cross-provider review still requires a human gate before
-        // APPROVED/publish — park the item in INTERNAL_REVIEW.
+        // Successful cross-provider review: low/medium risk auto-publishes when flags are on;
+        // otherwise park for human approval.
         try {
             (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
                 'work_block_id' => $id,
                 'reason'        => 'cross_review_completed',
             ]);
         } catch (\Throwable) {
+        }
+
+        $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish($contentItemId, $contentVersionId, $id);
+        if ($auto['queued']) {
+            $output = [
+                'generator_provider'    => $generatorKey,
+                'reviewer_provider'     => $actualReviewer,
+                'same_provider'         => false,
+                'generation_request_id' => $request['id'],
+                'auto_publish'          => $auto,
+            ];
+            $this->markCompleted($id, $output);
+
+            return $output;
         }
 
         $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
@@ -973,6 +1016,7 @@ class WorkBlockService
             'same_provider'         => false,
             'generation_request_id' => $request['id'],
             'human_review_gate_id'  => $gateId,
+            'auto_publish'          => $auto,
         ];
         $this->markCompleted($id, $output);
 
@@ -999,15 +1043,27 @@ class WorkBlockService
     }
 
     /**
-     * A gate, not a generator: never auto-approves. Ensures the item is
-     * visibly parked in a human-actionable review state and leaves the
-     * block 'blocked' until a human acts through the approval API — it
-     * never marks itself 'completed' on its own.
+     * Human review gate. When auto-publish flags are on and the item is
+     * low/medium risk, auto-approve + enqueue PUBLISH_BLOG instead of parking.
+     * High-risk and flag-off paths never auto-approve.
      */
     private function executeHumanReviewGate(int $id, array $block): array
     {
-        $contentItemId = (int) ($block['content_item_id'] ?? 0);
+        $contentItemId    = (int) ($block['content_item_id'] ?? 0);
+        $contentVersionId = (int) ($block['content_version_id'] ?? 0);
+
         if ($contentItemId > 0) {
+            $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish(
+                $contentItemId,
+                $contentVersionId > 0 ? $contentVersionId : null,
+                $id,
+            );
+            if ($auto['queued']) {
+                $this->markCompleted($id, $auto);
+
+                return $auto;
+            }
+
             try {
                 (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, ['work_block_id' => $id]);
             } catch (\Throwable) {
@@ -1064,17 +1120,41 @@ class WorkBlockService
         }
 
         $item = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
+        if (! $item) {
+            throw new \RuntimeException("Content item {$contentItemId} not found");
+        }
         $risk = strtoupper((string) ($item['risk_level'] ?? 'LOW'));
         // Hard ban applies ONLY to this automated/scheduled dispatch path — never to a
         // human explicitly approving+publishing via ContentPublishController.
         $this->flags->assertHighRiskAutoPublishForbidden($risk);
 
+        // Ensure checksum-bound approval_status before deployment (state machine
+        // workflow APPROVED alone is not enough for PublicationDeploymentService).
+        $approvals = new BlogContentApprovalService();
+        if (strtolower((string) ($item['approval_status'] ?? '')) !== 'approved'
+            || ! $approvals->verifyForPublication($contentItemId, $contentVersionId)
+        ) {
+            $systemUserId = (new BlogAutoPublishService($this->flags))->ensureSystemBotUserId();
+            $approvals->approve(
+                $contentItemId,
+                $contentVersionId,
+                $systemUserId,
+                'standard',
+                'Auto-approval recorded by PUBLISH_BLOG (BLOG_AUTO_PUBLISH_ENABLED)',
+            );
+        }
+
+        $sm = new BlogStateMachine($this);
+        $status = strtolower((string) ($item['workflow_status'] ?? ''));
         try {
-            (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::APPROVED, null, ['work_block_id' => $id]);
-            (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::PUBLISH_QUEUED, null, [
-                'work_block_id' => $id, 'content_version_id' => $contentVersionId,
-            ]);
-            (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::PUBLISHING, null, ['work_block_id' => $id]);
+            if (in_array($status, [BlogStateMachine::SEO_REVIEW, BlogStateMachine::CHANGES_REQUESTED], true)) {
+                $sm->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, ['work_block_id' => $id]);
+                $status = BlogStateMachine::INTERNAL_REVIEW;
+            }
+            if ($status === BlogStateMachine::INTERNAL_REVIEW) {
+                $sm->transition($contentItemId, BlogStateMachine::APPROVED, null, ['work_block_id' => $id]);
+                $status = BlogStateMachine::APPROVED;
+            }
         } catch (\Throwable) {
         }
 
@@ -1087,6 +1167,21 @@ class WorkBlockService
             null,
             null,
         );
+
+        try {
+            $fresh = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
+            $status = strtolower((string) ($fresh['workflow_status'] ?? $status));
+            if ($status === BlogStateMachine::APPROVED || $status === BlogStateMachine::SCHEDULED) {
+                $sm->transition($contentItemId, BlogStateMachine::PUBLISH_QUEUED, null, [
+                    'work_block_id' => $id, 'content_version_id' => $contentVersionId,
+                ]);
+                $status = BlogStateMachine::PUBLISH_QUEUED;
+            }
+            if ($status === BlogStateMachine::PUBLISH_QUEUED) {
+                $sm->transition($contentItemId, BlogStateMachine::PUBLISHING, null, ['work_block_id' => $id]);
+            }
+        } catch (\Throwable) {
+        }
 
         $output = ['deployment_id' => $deploymentId, 'status' => 'queued'];
         $this->markCompleted($id, $output);
