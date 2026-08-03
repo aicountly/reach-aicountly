@@ -132,6 +132,16 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_optimizer_runs';
             }
 
+            if ($db->tableExists('reach_topic_clusters')) {
+                $approvedClusters = (int) $db->table('reach_topic_clusters')
+                    ->where('status', 'approved')
+                    ->where('deleted_at IS NULL', null, false)
+                    ->countAllResults();
+                $snap['topic_clusters'] = ['approved' => $approvedClusters];
+            } else {
+                $snap['missing_table'][] = 'reach_topic_clusters';
+            }
+
             if ($db->tableExists('reach_topic_candidates')) {
                 $rows = $db->query(
                     'SELECT status, COUNT(*) AS cnt FROM reach_topic_candidates GROUP BY status ORDER BY status'
@@ -304,6 +314,15 @@ class ReachBlogDiagnose extends BaseCommand
             return $issues;
         }
 
+        $approvedClusters = (int) ($db['topic_clusters']['approved'] ?? 0);
+        if ($approvedClusters === 0) {
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'no_approved_clusters',
+                'message'  => 'No approved topic clusters in Knowledge. Discover cannot create candidates until foundation clusters exist.',
+            ];
+        }
+
         $eligible = (int) ($db['topic_candidates']['eligible_for_run'] ?? 0);
         if ($eligible === 0) {
             $issues[] = [
@@ -385,13 +404,14 @@ class ReachBlogDiagnose extends BaseCommand
             $actions[] = 'In server-php/.env set BLOG_ROADMAP_OPTIMIZER_ENABLED=true, BLOG_AUTOMATION_ENABLED=true, BLOG_AI_GENERATION_ENABLED=true (keep BLOG_AUTO_PUBLISH_ENABLED=false until reviewed).';
         }
 
-        if (in_array('no_eligible_candidates', $codes, true)) {
-            $actions[] = 'Create/unlock topic candidates in Blog Command Centre → Roadmap (status candidate/scored).';
+        if (in_array('no_approved_clusters', $codes, true) || in_array('no_eligible_candidates', $codes, true)) {
+            $actions[] = 'Cold-start foundation + pilots: php spark reach:blog-bootstrap --optimize --dispatch';
+            $actions[] = 'Then drain jobs: php spark reach:work --queue blog,publishing,community,default --once --limit 20';
         }
 
         $actions[] = 'Manual smoke: php spark reach:blog-optimize-roadmap --force';
         $actions[] = 'Manual smoke: php spark reach:blog-dispatch --force';
-        $actions[] = 'Manual smoke: php spark reach:work --queue=default,blog,publishing --once --limit=10';
+        $actions[] = 'Manual smoke: php spark reach:work --queue blog,publishing,community,default --once --limit 10';
 
         return $actions;
     }

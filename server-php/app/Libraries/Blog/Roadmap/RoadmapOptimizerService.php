@@ -67,10 +67,17 @@ class RoadmapOptimizerService
         $discoverSummary = null;
         $candidates      = $this->loadCandidates($limit);
         // Safety net when discover cron is missing: top up the backlog from
-        // approved Knowledge topic clusters before scoring.
+        // approved Knowledge topic clusters before scoring. If Knowledge is
+        // empty, cold-start foundation clusters + pinned pilots.
         if ($candidates === [] && ! $dryRun && filter_var(env('BLOG_AUTO_DISCOVER_ON_OPTIMIZE', true), FILTER_VALIDATE_BOOL)) {
             $discoverSummary = $this->topUpCandidatesFromClusters();
             $candidates      = $this->loadCandidates($limit);
+            if ($candidates === []) {
+                $cold = new \App\Libraries\Blog\BlogColdStartService();
+                $coldSummary = $cold->bootstrap(max(1, (int) env('BLOG_ROADMAP_MAX_DAILY_CANDIDATES', 5)));
+                $discoverSummary = array_merge($discoverSummary ?? [], ['cold_start' => $coldSummary]);
+                $candidates = $this->loadCandidates($limit);
+            }
         }
         $portfolioCounts = $this->signals->portfolioStreamCounts();
         $targetMix       = $this->signals->portfolioTargetMix();

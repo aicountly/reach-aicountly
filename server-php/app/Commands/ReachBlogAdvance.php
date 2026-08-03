@@ -60,6 +60,38 @@ class ReachBlogAdvance extends BaseCommand
         $items   = $builder->get()->getResultArray();
         $created = [];
 
+        if ($items === [] && $id !== null && $id !== '') {
+            $row = $db->table('reach_content_items')
+                ->select('id, title, content_type, workflow_status, current_version_id, deleted_at')
+                ->where('id', (int) $id)
+                ->get()
+                ->getRowArray();
+
+            CLI::write(json_encode([
+                'event'   => 'blog_advance.completed',
+                'ts'      => gmdate('c'),
+                'scanned' => 0,
+                'items'   => [],
+                'lookup'  => $row ? [
+                    'id'                 => (int) $row['id'],
+                    'title'              => $row['title'] ?? null,
+                    'content_type'       => $row['content_type'] ?? null,
+                    'workflow_status'    => $row['workflow_status'] ?? null,
+                    'current_version_id' => $row['current_version_id'] ?? null,
+                    'deleted'            => ! empty($row['deleted_at']),
+                    'advanceable'        => false,
+                    'reason'             => 'workflow_status_not_in_advance_map',
+                    'advanceable_statuses' => array_keys(self::NEXT_BY_STATUS),
+                ] : [
+                    'id'     => (int) $id,
+                    'found'  => false,
+                    'reason' => 'content_item_not_found',
+                ],
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            return 0;
+        }
+
         foreach ($items as $item) {
             $contentItemId = (int) $item['id'];
             $status        = (string) $item['workflow_status'];

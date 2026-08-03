@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\Blog\BlogColdStartService;
 use App\Libraries\Blog\WorkBlockService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -14,6 +15,7 @@ use Throwable;
  *
  * Modes:
  *   (default)  Run DISCOVER_TOPICS from approved Knowledge topic clusters.
+ *              Auto-bootstraps foundation clusters + pilots if Knowledge is empty.
  *   --title=   Seed one candidate manually (use --pin to force CREATE_NEW).
  */
 class ReachBlogDiscoverTopics extends BaseCommand
@@ -21,21 +23,22 @@ class ReachBlogDiscoverTopics extends BaseCommand
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-discover-topics';
     protected $description = 'Discover or seed topic candidates for the blog roadmap.';
-    protected $usage       = 'reach:blog-discover-topics [--limit=10] [--title=...] [--pin] [--stream=marketing] [--enqueue]';
+    protected $usage       = 'reach:blog-discover-topics [--limit=10] [--title=...] [--pin] [--stream=marketing] [--enqueue] [--no-bootstrap]';
 
     public function run(array $params): int
     {
         $title  = CLI::getOption('title') ?? ($params['title'] ?? null);
         $limit  = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 10)));
-        $pin    = (bool) (CLI::getOption('pin') ?? ($params['pin'] ?? false));
+        $pin    = CLI::getOption('pin') !== null || array_key_exists('pin', $params);
         $stream = (string) (CLI::getOption('stream') ?? ($params['stream'] ?? 'marketing'));
-        $enqueue = (bool) (CLI::getOption('enqueue') ?? ($params['enqueue'] ?? false));
+        $enqueue = CLI::getOption('enqueue') !== null || array_key_exists('enqueue', $params);
+        $noBootstrap = CLI::getOption('no-bootstrap') !== null || array_key_exists('no-bootstrap', $params);
 
         try {
             if (is_string($title) && trim($title) !== '') {
                 $result = $this->seedCandidate(trim($title), $pin, $stream);
             } else {
-                $result = $this->discoverFromClusters($limit);
+                $result = $this->discoverFromClusters($limit, ! $noBootstrap);
             }
 
             if ($enqueue) {
@@ -59,22 +62,20 @@ class ReachBlogDiscoverTopics extends BaseCommand
     /**
      * @return array<string,mixed>
      */
-    private function discoverFromClusters(int $limit): array
+    private function discoverFromClusters(int $limit, bool $allowBootstrap): array
     {
-        $db = Database::connect();
-        if (! $db->tableExists('reach_topic_clusters')) {
-            throw new \RuntimeException('reach_topic_clusters table is missing — run migrations.');
+        $cold = new BlogColdStartService();
+        $bootstrap = null;
+
+        if ($allowBootstrap && $cold->countApprovedClusters() === 0) {
+            $bootstrap = $cold->bootstrap($limit);
         }
 
-        $approved = (int) $db->table('reach_topic_clusters')
-            ->where('status', 'approved')
-            ->where('deleted_at IS NULL', null, false)
-            ->countAllResults();
-
+        $approved = $cold->countApprovedClusters();
         if ($approved === 0) {
             throw new \RuntimeException(
                 'No approved topic clusters found. Approve clusters in Knowledge Foundation, '
-                . 'or seed a pilot with: php spark reach:blog-discover-topics --title="Your topic" --pin'
+                . 'or run: php spark reach:blog-bootstrap'
             );
         }
 
@@ -89,13 +90,23 @@ class ReachBlogDiscoverTopics extends BaseCommand
 
         $output = $svc->execute($id);
 
+        // Discover only fills gaps for clusters with no open candidate. If every
+        // cluster already had a spent candidate, seed pinned pilots so cron continues.
+        $created = (int) ($output['candidates_created'] ?? 0);
+        $pilotTopUp = null;
+        if ($allowBootstrap && $created === 0 && $cold->countEligibleCandidates() === 0) {
+            $pilotTopUp = $cold->ensurePilotCandidates($limit);
+        }
+
         return [
             'mode'                => 'discover_clusters',
             'approved_clusters'   => $approved,
             'work_block_id'       => $id,
             'clusters_considered' => $output['clusters_considered'] ?? 0,
-            'candidates_created'  => $output['candidates_created'] ?? 0,
+            'candidates_created'  => $created,
             'topic_candidate_ids' => $output['topic_candidate_ids'] ?? [],
+            'bootstrap'           => $bootstrap,
+            'pilot_top_up'        => $pilotTopUp,
         ];
     }
 
