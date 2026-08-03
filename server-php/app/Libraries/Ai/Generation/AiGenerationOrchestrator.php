@@ -216,12 +216,17 @@ class AiGenerationOrchestrator
             $this->runs->linkGroundingSnapshot($runId, (int) $snapshot['id']);
             $this->runs->markRunning($runId);
 
+            // Draft-length blog generation routinely exceeds 30s under structured output.
+            $timeout = in_array((string) ($request['task_type'] ?? ''), [
+                'draft_generation', 'content_expansion', 'section_regeneration',
+            ], true) ? 120 : 45;
+
             $input = new AiGenerationInput(
                 systemPrompt:    $systemPrompt,
                 userPrompt:      $userPrompt,
                 outputSchema:    $outputSchema,
                 modelKey:        $currentDecision->modelKey,
-                timeoutSeconds:  30,
+                timeoutSeconds:  $timeout,
                 requestId:       $request['uuid'] ?? null,
             );
 

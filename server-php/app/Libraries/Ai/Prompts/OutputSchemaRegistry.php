@@ -79,10 +79,28 @@ class OutputSchemaRegistry
         return [
             'blog_post' => [
                 'type'       => 'object',
-                'required'   => ['title', 'summary', 'body_html', 'body_markdown', 'body_plain_text', 'slug_suggestion', 'meta_title', 'meta_description', 'claims_used', 'citations_used', 'risk_notes'],
+                // Keep required aligned with properties so providers that enforce
+                // "strict" structured output do not reject the schema outright.
+                'required'   => [
+                    'title', 'summary', 'primary_cta', 'body_html', 'body_markdown',
+                    'body_plain_text', 'slug_suggestion', 'meta_title', 'meta_description',
+                    'claims_used', 'citations_used', 'risk_notes', 'reading_time_minutes',
+                    'sections',
+                ],
                 'properties' => array_merge($base, $seoMeta, [
                     'reading_time_minutes' => ['type' => 'integer', 'minimum' => 1],
-                    'sections'             => ['type' => 'array', 'items' => ['type' => 'object']],
+                    'sections'             => [
+                        'type'  => 'array',
+                        'items' => [
+                            'type'                 => 'object',
+                            'required'             => ['heading', 'body'],
+                            'additionalProperties' => false,
+                            'properties'           => [
+                                'heading' => ['type' => 'string'],
+                                'body'    => ['type' => 'string'],
+                            ],
+                        ],
+                    ],
                 ]),
                 'additionalProperties' => false,
             ],

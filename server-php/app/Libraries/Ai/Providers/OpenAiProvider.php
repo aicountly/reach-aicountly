@@ -90,11 +90,16 @@ class OpenAiProvider implements AiProviderInterface
         ];
 
         if (! empty($input->outputSchema)) {
+            // strict:false — our OutputSchemaRegistry schemas are draft-07 style and
+            // often include optional properties / open nested objects. OpenAI strict
+            // mode rejects those ("every property must be required"), which caused
+            // blog GENERATE_DRAFT to fail before any usable content was produced.
+            // Application-side StructuredOutputValidator still enforces the schema.
             $body['response_format'] = [
                 'type'        => 'json_schema',
                 'json_schema' => [
                     'name'   => 'output',
-                    'strict' => true,
+                    'strict' => false,
                     'schema' => $input->outputSchema,
                 ],
             ];
