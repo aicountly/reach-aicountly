@@ -901,7 +901,26 @@ class WorkBlockService
         $refreshed = $requests->findById((int) $request['id']);
 
         if ($refreshed['status'] !== 'completed') {
-            return $this->blockOnFlag($id, self::TYPE_CROSS_REVIEW, 'editorial_review_route_unavailable');
+            // Editorial AI failed/unavailable — still park for human review instead of
+            // leaving the item stuck forever in seo_review with a blocked CROSS_REVIEW.
+            try {
+                (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
+                    'work_block_id' => $id,
+                    'reason'        => 'cross_review_ai_failed_requires_human',
+                ]);
+            } catch (\Throwable) {
+            }
+
+            $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
+            $output = [
+                'requires_human'        => true,
+                'reason'                => 'editorial_review_failed',
+                'generation_request_id' => $request['id'],
+                'human_review_gate_id'  => $gateId,
+            ];
+            $this->markCompleted($id, $output);
+
+            return $output;
         }
 
         $run = $this->db->table('reach_ai_generation_runs r')
@@ -922,11 +941,13 @@ class WorkBlockService
             } catch (\Throwable) {
             }
 
+            $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
             $output = [
                 'generator_provider' => $generatorKey,
                 'reviewer_provider'  => $actualReviewer,
                 'same_provider'      => true,
                 'requires_human'     => true,
+                'human_review_gate_id' => $gateId,
             ];
             \App\Libraries\AuditLogger::record('blog.cross_review_same_provider', $output);
             $this->markCompleted($id, $output);
@@ -944,21 +965,7 @@ class WorkBlockService
         } catch (\Throwable) {
         }
 
-        $gateKey = "blog-{$contentItemId}-human_review_gate";
-        $gateRow = $this->db->table('reach_work_blocks')->where('idempotency_key', $gateKey)->get()->getRowArray();
-        if ($gateRow) {
-            $gateId = (int) $gateRow['id'];
-        } else {
-            $gateId = $this->create([
-                'block_type'         => self::TYPE_HUMAN_REVIEW_GATE,
-                'scope'              => 'blog',
-                'content_item_id'    => $contentItemId,
-                'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
-                'eligibility_status' => 'eligible',
-                'priority'           => 10,
-                'idempotency_key'    => $gateKey,
-            ]);
-        }
+        $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
 
         $output = [
             'generator_provider'    => $generatorKey,
@@ -970,6 +977,25 @@ class WorkBlockService
         $this->markCompleted($id, $output);
 
         return $output;
+    }
+
+    private function ensureHumanReviewGate(int $contentItemId, int $contentVersionId): int
+    {
+        $gateKey = "blog-{$contentItemId}-human_review_gate";
+        $gateRow = $this->db->table('reach_work_blocks')->where('idempotency_key', $gateKey)->get()->getRowArray();
+        if ($gateRow) {
+            return (int) $gateRow['id'];
+        }
+
+        return $this->create([
+            'block_type'         => self::TYPE_HUMAN_REVIEW_GATE,
+            'scope'              => 'blog',
+            'content_item_id'    => $contentItemId,
+            'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
+            'eligibility_status' => 'eligible',
+            'priority'           => 10,
+            'idempotency_key'    => $gateKey,
+        ]);
     }
 
     /**
