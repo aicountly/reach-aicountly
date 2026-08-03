@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Blog\BlogStateMachine;
 use App\Libraries\Blog\WorkBlockService;
 use CodeIgniter\CLI\BaseCommand;
@@ -19,10 +20,18 @@ use Throwable;
  */
 class ReachBlogAdvance extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-advance';
     protected $description = 'Enqueue next blog work block(s) for stuck brief/outline/draft items.';
     protected $usage       = 'reach:blog-advance [--id=] [--limit=20] [--dispatch] [--work]';
+    protected $options     = [
+        '--id'       => 'Only advance this content item id.',
+        '--limit'    => 'Max items to scan (default 20).',
+        '--dispatch' => 'Also force-dispatch eligible work blocks to the job queue.',
+        '--work'     => 'Print worker hint after enqueue.',
+    ];
 
     /** @var array<string, string> */
     private const NEXT_BY_STATUS = [
@@ -37,10 +46,10 @@ class ReachBlogAdvance extends BaseCommand
 
     public function run(array $params): int
     {
-        $id       = CLI::getOption('id') ?? ($params['id'] ?? null);
-        $limit    = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 20)));
-        $dispatch = (bool) (CLI::getOption('dispatch') ?? ($params['dispatch'] ?? false));
-        $work     = (bool) (CLI::getOption('work') ?? ($params['work'] ?? false));
+        $id       = $this->sparkOption('id', $params);
+        $limit    = max(1, (int) ($this->sparkOption('limit', $params, '20') ?? '20'));
+        $dispatch = $this->sparkFlag('dispatch', $params);
+        $work     = $this->sparkFlag('work', $params);
 
         $db  = Database::connect();
         $svc = new WorkBlockService();

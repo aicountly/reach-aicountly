@@ -2,8 +2,8 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Blog\BlogRedraftService;
-use App\Libraries\Blog\WorkBlockService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -13,26 +13,39 @@ use Throwable;
  * `php spark reach:blog-redraft` — re-queue GENERATE_DRAFT for stub/placeholder bodies.
  *
  * Typical production fix after "Untitled draft" versions landed in internal_review:
- *   php spark reach:blog-redraft --stubs --prefer=gemini --dispatch --work
+ *   php spark reach:blog-redraft --stubs --prefer=gemini
+ *   php spark reach:blog-redraft --id=3
  */
 class ReachBlogRedraft extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-redraft';
     protected $description = 'Re-generate genuine blog drafts for stub/placeholder bodies.';
-    protected $usage       = 'reach:blog-redraft [--id=] [--stubs] [--limit=20] [--dispatch] [--work] [--prefer=gemini]';
+    protected $usage       = 'reach:blog-redraft [--id=N] [--stubs] [--limit=20] [--dispatch] [--work] [--prefer=gemini]';
+    protected $options     = [
+        '--id'      => 'Content item id to redraft.',
+        '--stubs'   => 'Redraft all blog items whose current version is a stub body.',
+        '--limit'   => 'Max stub items to scan (default 20).',
+        '--dispatch'=> 'Print dispatch hint after queueing.',
+        '--work'    => 'Print worker hint after queueing.',
+        '--prefer'  => 'Hint which AI provider catalog preference to use (e.g. gemini).',
+    ];
 
     public function run(array $params): int
     {
-        $id       = CLI::getOption('id') ?? ($params['id'] ?? null);
-        $stubs    = (bool) (CLI::getOption('stubs') ?? ($params['stubs'] ?? false));
-        $limit    = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 20)));
-        $dispatch = (bool) (CLI::getOption('dispatch') ?? ($params['dispatch'] ?? false));
-        $work     = (bool) (CLI::getOption('work') ?? ($params['work'] ?? false));
-        $prefer   = (string) (CLI::getOption('prefer') ?? ($params['prefer'] ?? ''));
+        $id       = $this->sparkOption('id', $params);
+        if (($id === null || $id === '') && isset($params[0]) && is_numeric($params[0])) {
+            $id = (string) $params[0];
+        }
+        $stubs    = $this->sparkFlag('stubs', $params);
+        $limit    = max(1, (int) ($this->sparkOption('limit', $params, '20') ?? '20'));
+        $dispatch = $this->sparkFlag('dispatch', $params);
+        $work     = $this->sparkFlag('work', $params);
+        $prefer   = (string) ($this->sparkOption('prefer', $params, '') ?? '');
 
         if ($prefer !== '') {
-            // Soft hint for operators; seed catalog is separate.
             CLI::write("Hint: ensure AI routes prefer {$prefer} (php spark reach:ai-seed-catalog --prefer={$prefer})", 'yellow');
         }
 
@@ -41,7 +54,7 @@ class ReachBlogRedraft extends BaseCommand
         $done = [];
 
         $targets = [];
-        if ($id !== null && $id !== '') {
+        if ($id !== null && $id !== '' && ctype_digit((string) $id)) {
             $row = $db->table('reach_content_items')
                 ->select('id, title, workflow_status, current_version_id')
                 ->where('id', (int) $id)
@@ -56,7 +69,7 @@ class ReachBlogRedraft extends BaseCommand
         } elseif ($stubs) {
             $targets = $svc->findStubItems($limit);
         } else {
-            CLI::error('Pass --id=N or --stubs to select items.');
+            CLI::error('Pass --id=N or --stubs to select items. Example: php spark reach:blog-redraft --id=3');
             return 1;
         }
 
