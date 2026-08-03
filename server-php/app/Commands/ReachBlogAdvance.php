@@ -133,6 +133,14 @@ class ReachBlogAdvance extends BaseCommand
                 }
             }
 
+            // publishing + failed auth/deploy (no public_content_id) → re-PUBLISH, not VERIFY.
+            if ($status === BlogStateMachine::PUBLISHING
+                && $blockType === WorkBlockService::TYPE_VERIFY_PUBLICATION
+                && ! $this->hasSuccessfulDeployment($db, $contentItemId)
+            ) {
+                $blockType = WorkBlockService::TYPE_PUBLISH_BLOG;
+            }
+
             $existing = $db->table('reach_work_blocks')
                 ->where('content_item_id', $contentItemId)
                 ->where('block_type', $blockType)
@@ -142,10 +150,24 @@ class ReachBlogAdvance extends BaseCommand
             if ($existing > 0) {
                 // Re-open blocked human gates / VERIFY blocks so worker can re-enter
                 // after flags change or after publication deployments finish.
+                // Never reopen VERIFY when there is still no successful deployment.
                 if (in_array($blockType, [
                     WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
                     WorkBlockService::TYPE_VERIFY_PUBLICATION,
                 ], true)) {
+                    if ($blockType === WorkBlockService::TYPE_VERIFY_PUBLICATION
+                        && ! $this->hasSuccessfulDeployment($db, $contentItemId)
+                    ) {
+                        $created[] = [
+                            'content_item_id' => $contentItemId,
+                            'title'           => $item['title'] ?? null,
+                            'status'          => $status,
+                            'action'          => 'skipped_verify_until_publish_succeeds',
+                            'block_type'      => $blockType,
+                        ];
+                        continue;
+                    }
+
                     $blockedCount = $db->table('reach_work_blocks')
                         ->where('content_item_id', $contentItemId)
                         ->where('block_type', $blockType)
@@ -242,5 +264,24 @@ class ReachBlogAdvance extends BaseCommand
         }
 
         return 0;
+    }
+
+    private function hasSuccessfulDeployment(\CodeIgniter\Database\BaseConnection $db, int $contentItemId): bool
+    {
+        if ($contentItemId <= 0 || ! $db->tableExists('reach_publication_deployments')) {
+            return false;
+        }
+
+        $row = $db->table('reach_publication_deployments')
+            ->select('id')
+            ->where('content_item_id', $contentItemId)
+            ->where('public_content_id IS NOT NULL', null, false)
+            ->whereIn('status', ['published', 'verified', 'accepted', 'scheduled'])
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()
+            ->getRowArray();
+
+        return $row !== null;
     }
 }
