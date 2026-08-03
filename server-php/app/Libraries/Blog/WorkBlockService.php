@@ -1087,7 +1087,7 @@ class WorkBlockService
         }
 
         $pub = new PublicationDeploymentService($this->jobService);
-        $deploymentId = $pub->enqueuePublication($contentItemId, $contentVersionId, 'aicountly_com', 'schedule', $scheduledAt, null);
+        $deploymentId = $pub->enqueuePublication($contentItemId, $contentVersionId, (new \App\Libraries\Publishing\PublicationConnectionService())->resolveBlogConnectionKey(), 'schedule', $scheduledAt, null);
 
         try {
             // APPROVED is a prerequisite adjacency step for SCHEDULED; transitioning
@@ -1158,11 +1158,14 @@ class WorkBlockService
         } catch (\Throwable) {
         }
 
+        $connectionKey = (new \App\Libraries\Publishing\PublicationConnectionService())
+            ->resolveBlogConnectionKey();
+
         $pub = new PublicationDeploymentService($this->jobService);
         $deploymentId = $pub->enqueuePublication(
             $contentItemId,
             $contentVersionId,
-            'aicountly_com',
+            $connectionKey,
             'publish',
             null,
             null,
@@ -1508,7 +1511,7 @@ class WorkBlockService
         }
 
         $pub = new PublicationDeploymentService($this->jobService);
-        $deploymentId = $pub->enqueuePublication($contentItemId, $contentVersionId, 'aicountly_com', 'create_draft', null, null);
+        $deploymentId = $pub->enqueuePublication($contentItemId, $contentVersionId, (new \App\Libraries\Publishing\PublicationConnectionService())->resolveBlogConnectionKey(), 'create_draft', null, null);
 
         $output = ['deployment_id' => $deploymentId];
         $this->markCompleted($id, $output);

@@ -70,6 +70,9 @@ class PublicationDeploymentService
             }
         }
 
+        $connectionKey = (new \App\Libraries\Publishing\PublicationConnectionService())
+            ->resolveBlogConnectionKey($connectionKey === '' ? null : $connectionKey);
+
         $connection = $this->db->table('reach_publication_connections')
             ->where('connection_key', $connectionKey)
             ->where('enabled', true)

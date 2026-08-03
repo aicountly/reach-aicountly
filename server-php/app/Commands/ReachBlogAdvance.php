@@ -46,6 +46,7 @@ class ReachBlogAdvance extends BaseCommand
         // Fact-check soft-fails / parked review — human gate unless auto-publish applies.
         BlogStateMachine::CHANGES_REQUESTED => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
         BlogStateMachine::INTERNAL_REVIEW   => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
+        BlogStateMachine::PUBLISH_QUEUED    => WorkBlockService::TYPE_PUBLISH_BLOG,
     ];
 
     public function run(array $params): int
