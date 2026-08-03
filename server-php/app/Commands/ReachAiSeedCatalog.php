@@ -23,16 +23,18 @@ class ReachAiSeedCatalog extends BaseCommand
     protected $group       = 'Reach';
     protected $name        = 'reach:ai-seed-catalog';
     protected $description = 'Seed AI provider/model catalog and blog generation routes.';
-    protected $usage       = 'reach:ai-seed-catalog [--force-enable]';
+    protected $usage       = 'reach:ai-seed-catalog [--prefer=openai|gemini] [--force-enable]';
 
     public function run(array $params): int
     {
         $db = Database::connect();
         $now = date('Y-m-d H:i:s');
+        $prefer = strtolower((string) (CLI::getOption('prefer') ?? ($params['prefer'] ?? '')));
         $created = [
             'providers' => [],
             'models'    => [],
             'routes'    => [],
+            'fallbacks' => [],
         ];
 
         try {
@@ -74,9 +76,18 @@ class ReachAiSeedCatalog extends BaseCommand
                 'context_limit'=> 1000000,
             ], $now, $created);
 
-            // Prefer OpenAI for drafts when configured; else Gemini.
-            $primaryDraftModel = $this->envSet('AI_OPENAI_API_KEY') ? $gptMini : $geminiFlash;
-            $crossReviewModel  = ($primaryDraftModel === $gptMini) ? $geminiFlash : $gptMini;
+            // --prefer=gemini|openai overrides default OpenAI-first selection.
+            if ($prefer === 'gemini' && $geminiFlash > 0) {
+                $primaryDraftModel = $geminiFlash;
+                $fallbackDraftModel = $gptMini;
+            } elseif ($prefer === 'openai' && $gptMini > 0) {
+                $primaryDraftModel = $gptMini;
+                $fallbackDraftModel = $geminiFlash;
+            } else {
+                $primaryDraftModel = $this->envSet('AI_OPENAI_API_KEY') && $gptMini > 0 ? $gptMini : $geminiFlash;
+                $fallbackDraftModel = ($primaryDraftModel === $gptMini) ? $geminiFlash : $gptMini;
+            }
+            $crossReviewModel = ($primaryDraftModel === $gptMini) ? $geminiFlash : $gptMini;
 
             $routeSpecs = [
                 ['draft_generation', 'blog_post', $primaryDraftModel, 100],
@@ -87,18 +98,47 @@ class ReachAiSeedCatalog extends BaseCommand
                 ['editorial_review', null,        $crossReviewModel, 50],
             ];
 
+            $routeIds = [];
             foreach ($routeSpecs as [$task, $contentType, $modelId, $priority]) {
                 if ($modelId <= 0) {
                     continue;
                 }
-                $this->upsertRoute($db, $task, $contentType, $modelId, $priority, $now, $created);
+                $routeIds[] = [
+                    'id' => $this->upsertRoute($db, $task, $contentType, $modelId, $priority, $now, $created),
+                    'source_model_id' => $modelId,
+                    'task_type' => $task,
+                ];
+            }
+
+            // Ensure preferred model wins when older OpenAI routes still exist.
+            $this->demoteOtherPrimaryModels($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
+
+            if ($fallbackDraftModel > 0 && $fallbackDraftModel !== $primaryDraftModel) {
+                foreach ($routeIds as $route) {
+                    if (! in_array($route['task_type'], ['draft_generation', 'brief_generation'], true)) {
+                        continue;
+                    }
+                    if ($this->upsertFallback(
+                        $db,
+                        (int) $route['id'],
+                        (int) $route['source_model_id'],
+                        $fallbackDraftModel,
+                        ['budget_blocked', 'authentication_error', 'rate_limited', 'provider_unavailable', 'timeout', 'network_error'],
+                        $now,
+                    )) {
+                        $created['fallbacks'][] = $route['task_type'] . '->model#' . $fallbackDraftModel;
+                    }
+                }
             }
 
             CLI::write(json_encode([
                 'event'   => 'ai_seed_catalog.completed',
                 'ts'      => gmdate('c'),
+                'prefer'  => $prefer !== '' ? $prefer : 'auto',
+                'primary_model_id' => $primaryDraftModel,
+                'fallback_model_id'=> $fallbackDraftModel,
                 'created' => $created,
-                'hint'    => 'Retry draft: php spark reach:blog-advance --id=1 --dispatch  OR recreate GENERATE_DRAFT work block',
+                'hint'    => 'If OpenAI is out of quota: php spark reach:ai-seed-catalog --prefer=gemini then retry drafts.',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
             return 0;
@@ -204,7 +244,7 @@ class ReachAiSeedCatalog extends BaseCommand
         int $priority,
         string $now,
         array &$created,
-    ): void {
+    ): int {
         $builder = $db->table('reach_ai_model_routes')
             ->where('task_type', $taskType)
             ->where('deleted_at IS NULL', null, false)
@@ -223,7 +263,7 @@ class ReachAiSeedCatalog extends BaseCommand
                 'priority' => $priority,
                 'updated_at' => $now,
             ]);
-            return;
+            return (int) $row['id'];
         }
 
         $db->table('reach_ai_model_routes')->insert([
@@ -236,5 +276,72 @@ class ReachAiSeedCatalog extends BaseCommand
             'updated_at'       => $now,
         ]);
         $created['routes'][] = $taskType . '/' . ($contentType ?? '*');
+        return (int) $db->insertID();
+    }
+
+    /**
+     * @param list<string> $taskTypes
+     */
+    private function demoteOtherPrimaryModels($db, array $taskTypes, int $keepModelId, string $now): void
+    {
+        if ($keepModelId <= 0 || $taskTypes === []) {
+            return;
+        }
+
+        $db->table('reach_ai_model_routes')
+            ->whereIn('task_type', $taskTypes)
+            ->where('primary_model_id !=', $keepModelId)
+            ->where('deleted_at IS NULL', null, false)
+            ->update([
+                'priority'   => 10,
+                'updated_at' => $now,
+            ]);
+    }
+
+    /**
+     * @param list<string> $allowedCategories
+     */
+    private function upsertFallback(
+        $db,
+        int $routeId,
+        int $sourceModelId,
+        int $fallbackModelId,
+        array $allowedCategories,
+        string $now,
+    ): bool {
+        if ($routeId <= 0 || $sourceModelId <= 0 || $fallbackModelId <= 0 || $sourceModelId === $fallbackModelId) {
+            return false;
+        }
+        if (! $db->tableExists('reach_ai_model_fallbacks')) {
+            return false;
+        }
+
+        $row = $db->table('reach_ai_model_fallbacks')
+            ->where('route_id', $routeId)
+            ->where('source_model_id', $sourceModelId)
+            ->where('fallback_model_id', $fallbackModelId)
+            ->get()
+            ->getRowArray();
+
+        $data = [
+            'fallback_order'           => 1,
+            'allowed_error_categories' => json_encode(array_values($allowedCategories)),
+            'enabled'                  => true,
+            'updated_at'               => $now,
+        ];
+
+        if ($row) {
+            $db->table('reach_ai_model_fallbacks')->where('id', (int) $row['id'])->update($data);
+            return false;
+        }
+
+        $db->table('reach_ai_model_fallbacks')->insert(array_merge($data, [
+            'route_id'          => $routeId,
+            'source_model_id'   => $sourceModelId,
+            'fallback_model_id' => $fallbackModelId,
+            'created_at'        => $now,
+        ]));
+
+        return true;
     }
 }

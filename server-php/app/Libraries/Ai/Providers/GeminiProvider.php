@@ -32,7 +32,8 @@ class GeminiProvider implements AiProviderInterface
     public function __construct()
     {
         $this->classifier = new AiErrorClassifier();
-        $this->baseUrl    = rtrim($_ENV['AI_GEMINI_BASE_URL'] ?? 'https://generativelanguage.googleapis.com', '/');
+        $base = $this->envValue('AI_GEMINI_BASE_URL') ?: 'https://generativelanguage.googleapis.com';
+        $this->baseUrl = rtrim($base, '/');
     }
 
     public function getProviderKey(): string
@@ -42,8 +43,7 @@ class GeminiProvider implements AiProviderInterface
 
     public function isConfigured(): bool
     {
-        $key = $_ENV['AI_GEMINI_API_KEY'] ?? '';
-        return is_string($key) && strlen(trim($key)) > 0;
+        return $this->apiKey() !== '';
     }
 
     public function healthCheck(): AiProviderHealthResult
@@ -80,7 +80,7 @@ class GeminiProvider implements AiProviderInterface
 
         if (! empty($input->outputSchema)) {
             $generationConfig['responseMimeType'] = 'application/json';
-            $generationConfig['responseSchema'] = $input->outputSchema;
+            $generationConfig['responseSchema']   = $this->geminiSafeSchema($input->outputSchema);
         }
 
         $body = [
@@ -101,8 +101,20 @@ class GeminiProvider implements AiProviderInterface
         try {
             $response = $this->curlRequest('POST', $url, $body, $input->timeoutSeconds);
         } catch (\Throwable $e) {
-            $error = $this->classifyError($e);
-            throw new AiProviderException($error->message, $error, $e);
+            // Gemini often rejects complex JSON Schema; retry with JSON mime only.
+            if (! empty($input->outputSchema)) {
+                try {
+                    unset($body['generationConfig']['responseSchema']);
+                    $body['generationConfig']['responseMimeType'] = 'application/json';
+                    $response = $this->curlRequest('POST', $url, $body, $input->timeoutSeconds);
+                } catch (\Throwable $fallbackError) {
+                    $error = $this->classifyError($fallbackError);
+                    throw new AiProviderException($error->message, $error, $fallbackError);
+                }
+            } else {
+                $error = $this->classifyError($e);
+                throw new AiProviderException($error->message, $error, $e);
+            }
         }
 
         $durationMs         = (int) ((hrtime(true) - $start) / 1_000_000);
@@ -151,7 +163,48 @@ class GeminiProvider implements AiProviderInterface
 
     private function apiKeyQuery(): string
     {
-        return '?key=' . rawurlencode(trim((string) ($_ENV['AI_GEMINI_API_KEY'] ?? '')));
+        return '?key=' . rawurlencode($this->apiKey());
+    }
+
+    private function apiKey(): string
+    {
+        return $this->envValue('AI_GEMINI_API_KEY');
+    }
+
+    private function envValue(string $key): string
+    {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+        if ($v === false || $v === null) {
+            $v = function_exists('env') ? env($key) : null;
+        }
+
+        return is_string($v) ? trim($v) : '';
+    }
+
+    /**
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    private function geminiSafeSchema(array $schema): array
+    {
+        unset($schema['$schema'], $schema['$id'], $schema['$comment'], $schema['additionalProperties']);
+
+        foreach (['properties', 'items', 'definitions', '$defs'] as $key) {
+            if (! isset($schema[$key]) || ! is_array($schema[$key])) {
+                continue;
+            }
+            if ($key === 'items') {
+                $schema[$key] = $this->geminiSafeSchema($schema[$key]);
+                continue;
+            }
+            foreach ($schema[$key] as $name => $child) {
+                if (is_array($child)) {
+                    $schema[$key][$name] = $this->geminiSafeSchema($child);
+                }
+            }
+        }
+
+        return $schema;
     }
 
     /**

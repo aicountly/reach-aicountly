@@ -274,19 +274,28 @@ class AiGenerationOrchestrator
                 $this->circuitBreaker->recordFailure($providerKey, $e->getProviderError()->category);
                 $this->runs->markFailed($runId, $e->getProviderError());
 
-                if (! $e->isRetryable()) {
-                    $this->failRequest($requestId, $e->getProviderError()->category, $e->getProviderError()->message);
+                $category = $e->getProviderError()->category;
+                // Quota/auth failures are not "retry same provider", but should still
+                // hop to a configured fallback (e.g. OpenAI quota → Gemini).
+                $allowFallback = $e->isRetryable() || in_array($category, [
+                    AiProviderError::CATEGORY_BUDGET_BLOCKED,
+                    AiProviderError::CATEGORY_AUTHENTICATION,
+                    AiProviderError::CATEGORY_CONFIGURATION,
+                    AiProviderError::CATEGORY_PROVIDER_UNAVAIL,
+                ], true);
+
+                if (! $allowFallback) {
+                    $this->failRequest($requestId, $category, $e->getProviderError()->message);
                     return;
                 }
 
-                // Try fallback
                 $attemptedModelIds[] = $modelId;
                 $nextDecision = $currentDecision->routeId
-                    ? $this->fallback->resolveNext($currentDecision->routeId, $modelId, $e->getProviderError()->category, $attemptedModelIds)
+                    ? $this->fallback->resolveNext($currentDecision->routeId, $modelId, $category, $attemptedModelIds)
                     : null;
 
                 if (! $nextDecision) {
-                    $this->failRequest($requestId, $e->getProviderError()->category, 'No further fallback providers available.');
+                    $this->failRequest($requestId, $category, $e->getProviderError()->message . ' (no fallback available)');
                     return;
                 }
 
