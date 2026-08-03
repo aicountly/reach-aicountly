@@ -163,6 +163,8 @@ class ReachPubAuthCheck extends BaseCommand
 
         $decoded = is_string($raw) ? json_decode($raw, true) : null;
 
+        $bodySnippet = is_string($raw) ? mb_substr(trim($raw), 0, 400) : null;
+
         return [
             'ok'                 => $httpStatus > 0 && $httpStatus !== 401,
             'path'               => $path,
@@ -170,6 +172,7 @@ class ReachPubAuthCheck extends BaseCommand
             'curl_error'         => $curlError !== '' ? $curlError : null,
             'error_code'         => is_array($decoded) ? ($decoded['error_code'] ?? null) : null,
             'safe_error_message' => is_array($decoded) ? ($decoded['safe_error_message'] ?? null) : null,
+            'body_snippet'       => $bodySnippet,
         ];
     }
 }
