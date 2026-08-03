@@ -60,6 +60,12 @@ class ReachBlogDiagnose extends BaseCommand
                 'dispatch_window_open_ist'     => $this->isWithinDispatchWindow($nowIst),
             ],
             'database'         => $this->databaseSnapshot(),
+            'recent_failures'  => $this->recentFailures(),
+            'ai_keys'          => [
+                'openai'     => $this->envSet('AI_OPENAI_API_KEY'),
+                'gemini'     => $this->envSet('AI_GEMINI_API_KEY'),
+                'perplexity' => $this->envSet('AI_PERPLEXITY_API_KEY'),
+            ],
             'verdict'          => [],
             'next_actions'     => [],
         ];
@@ -400,6 +406,26 @@ class ReachBlogDiagnose extends BaseCommand
             ];
         }
 
+        $blogItems = $db['blog_content_items'] ?? [];
+        $failedItems = (int) ($blogItems['failed'] ?? 0);
+        $outlineReady = (int) ($blogItems['outline_ready'] ?? 0);
+        if ($failedItems > 0 || $outlineReady > 0) {
+            $issues[] = [
+                'severity' => 'warning',
+                'code'     => 'drafts_stuck_or_failed',
+                'message'  => "Blog items waiting on drafts: failed={$failedItems}, outline_ready={$outlineReady}. Jobs finished in ~1s usually means AI routing/key/schema failure — run reach:blog-failures.",
+            ];
+        }
+
+        $keys = $report['ai_keys'] ?? [];
+        if (empty($keys['openai']) && empty($keys['gemini'])) {
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'ai_keys_missing',
+                'message'  => 'Neither AI_OPENAI_API_KEY nor AI_GEMINI_API_KEY is set in the PHP environment — GENERATE_DRAFT cannot call a provider.',
+            ];
+        }
+
         return $issues;
     }
 
@@ -428,7 +454,15 @@ class ReachBlogDiagnose extends BaseCommand
 
         if (in_array('no_approved_clusters', $codes, true) || in_array('no_eligible_candidates', $codes, true)) {
             $actions[] = 'Cold-start foundation + pilots: php spark reach:blog-bootstrap --optimize --dispatch';
-            $actions[] = 'Then drain jobs: php spark reach:work --queue blog,publishing,community,default --once --limit 20';
+            $actions[] = 'Then drain jobs: php spark reach:work --queue blog,publishing,community,default --limit 20';
+        }
+
+        if (! empty($report['recent_failures'])) {
+            $actions[] = 'Inspect draft AI failures: php spark reach:blog-failures';
+            $actions[] = 'Retry stuck drafts: php spark reach:blog-advance --dispatch && php spark reach:work --queue blog,publishing,community,default --limit 20';
+        }
+        if (empty($report['ai_keys']['openai']) && empty($report['ai_keys']['gemini'])) {
+            $actions[] = 'Set AI_OPENAI_API_KEY or AI_GEMINI_API_KEY in api/.env then: php spark reach:ai-seed-catalog';
         }
 
         $actions[] = 'Manual smoke: php spark reach:blog-optimize-roadmap --force';
@@ -436,5 +470,48 @@ class ReachBlogDiagnose extends BaseCommand
         $actions[] = 'Manual smoke: php spark reach:work --queue blog,publishing,community,default --limit 20';
 
         return $actions;
+    }
+
+    private function envSet(string $key): bool
+    {
+        $v = $_ENV[$key] ?? getenv($key) ?: '';
+        return is_string($v) && trim($v) !== '';
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function recentFailures(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('reach_work_blocks')) {
+                return [];
+            }
+            $rows = $db->table('reach_work_blocks')
+                ->select('id, content_item_id, block_type, failure_classification, output_json, updated_at')
+                ->where('eligibility_status', 'failed')
+                ->where('block_type', 'GENERATE_DRAFT')
+                ->orderBy('id', 'DESC')
+                ->limit(5)
+                ->get()
+                ->getResultArray();
+            $out = [];
+            foreach ($rows as $row) {
+                $json = is_string($row['output_json'] ?? null)
+                    ? json_decode($row['output_json'], true)
+                    : ($row['output_json'] ?? []);
+                $out[] = [
+                    'work_block_id'          => (int) $row['id'],
+                    'content_item_id'        => (int) ($row['content_item_id'] ?? 0),
+                    'failure_classification' => $row['failure_classification'],
+                    'reason'                 => $json['reason'] ?? null,
+                    'updated_at'             => $row['updated_at'],
+                ];
+            }
+            return $out;
+        } catch (Throwable) {
+            return [];
+        }
     }
 }

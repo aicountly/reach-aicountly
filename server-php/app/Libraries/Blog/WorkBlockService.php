@@ -594,8 +594,13 @@ class WorkBlockService
         $refreshed = $requests->findById((int) $request['id']);
 
         if ($refreshed['status'] !== 'completed') {
+            $detail = $this->lastAiFailureDetail((int) $request['id']);
             $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
-            return $this->markFailed($id, self::TYPE_GENERATE_DRAFT, 'ai_generation_' . $refreshed['status']);
+            return $this->markFailed(
+                $id,
+                self::TYPE_GENERATE_DRAFT,
+                'ai_generation_' . $refreshed['status'] . ($detail !== '' ? ':' . $detail : ''),
+            );
         }
 
         $artifact = $this->db->table('reach_ai_generation_artifacts')
@@ -603,8 +608,15 @@ class WorkBlockService
             ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
 
         if (! $artifact || ($artifact['schema_validation_status'] ?? '') !== 'passed') {
+            $errors = is_string($artifact['schema_validation_errors'] ?? null)
+                ? $artifact['schema_validation_errors']
+                : json_encode($artifact['schema_validation_errors'] ?? []);
             $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
-            return $this->markFailed($id, self::TYPE_GENERATE_DRAFT, 'schema_validation_failed');
+            return $this->markFailed(
+                $id,
+                self::TYPE_GENERATE_DRAFT,
+                'schema_validation_failed:' . mb_substr((string) $errors, 0, 180),
+            );
         }
 
         $structured = is_string($artifact['structured_output_json'] ?? null)
@@ -1593,6 +1605,33 @@ class WorkBlockService
         } catch (\Throwable) {
             // Best-effort — do not mask the original generation failure.
         }
+    }
+
+    private function lastAiFailureDetail(int $generationRequestId): string
+    {
+        if ($generationRequestId <= 0 || ! $this->db->tableExists('reach_ai_generation_runs')) {
+            return '';
+        }
+
+        $run = $this->db->table('reach_ai_generation_runs')
+            ->select('error_category, redacted_error_message, status')
+            ->where('generation_request_id', $generationRequestId)
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()
+            ->getRowArray();
+
+        if (! $run) {
+            return 'no_provider_run';
+        }
+
+        $parts = array_filter([
+            (string) ($run['error_category'] ?? ''),
+            (string) ($run['redacted_error_message'] ?? ''),
+            (string) ($run['status'] ?? ''),
+        ]);
+
+        return mb_substr(implode('|', $parts), 0, 180);
     }
 
     /**
