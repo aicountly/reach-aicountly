@@ -47,6 +47,7 @@ class ReachBlogAdvance extends BaseCommand
         BlogStateMachine::CHANGES_REQUESTED => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
         BlogStateMachine::INTERNAL_REVIEW   => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
         BlogStateMachine::PUBLISH_QUEUED    => WorkBlockService::TYPE_PUBLISH_BLOG,
+        BlogStateMachine::PUBLISHING        => WorkBlockService::TYPE_VERIFY_PUBLICATION,
     ];
 
     public function run(array $params): int
@@ -139,25 +140,38 @@ class ReachBlogAdvance extends BaseCommand
                 ->countAllResults();
 
             if ($existing > 0) {
-                // Re-open blocked human gates so worker can re-enter auto-publish path
-                // after a deploy that enables BLOG_AUTO_PUBLISH_ENABLED.
-                if ($blockType === WorkBlockService::TYPE_HUMAN_REVIEW_GATE) {
-                    $db->table('reach_work_blocks')
+                // Re-open blocked human gates / VERIFY blocks so worker can re-enter
+                // after flags change or after publication deployments finish.
+                if (in_array($blockType, [
+                    WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
+                    WorkBlockService::TYPE_VERIFY_PUBLICATION,
+                ], true)) {
+                    $blockedCount = $db->table('reach_work_blocks')
                         ->where('content_item_id', $contentItemId)
                         ->where('block_type', $blockType)
                         ->where('eligibility_status', 'blocked')
-                        ->update([
-                            'eligibility_status' => 'eligible',
-                            'updated_at'         => date('Y-m-d H:i:s'),
-                        ]);
-                    $created[] = [
-                        'content_item_id' => $contentItemId,
-                        'title'           => $item['title'] ?? null,
-                        'status'          => $status,
-                        'action'          => 'reopened_human_review_gate',
-                        'block_type'      => $blockType,
-                    ];
-                    continue;
+                        ->countAllResults();
+                    if ($blockedCount > 0) {
+                        $db->table('reach_work_blocks')
+                            ->where('content_item_id', $contentItemId)
+                            ->where('block_type', $blockType)
+                            ->where('eligibility_status', 'blocked')
+                            ->update([
+                                'eligibility_status'     => 'eligible',
+                                'failure_classification' => null,
+                                'updated_at'             => date('Y-m-d H:i:s'),
+                            ]);
+                        $created[] = [
+                            'content_item_id' => $contentItemId,
+                            'title'           => $item['title'] ?? null,
+                            'status'          => $status,
+                            'action'          => $blockType === WorkBlockService::TYPE_VERIFY_PUBLICATION
+                                ? 'reopened_verify_publication'
+                                : 'reopened_human_review_gate',
+                            'block_type'      => $blockType,
+                        ];
+                        continue;
+                    }
                 }
 
                 $created[] = [

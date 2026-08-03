@@ -246,6 +246,32 @@ class ReachBlogDiagnose extends BaseCommand
             } else {
                 $snap['missing_table'][] = 'reach_content_items';
             }
+
+            if ($db->tableExists('reach_publication_deployments')) {
+                $snap['publication_deployments'] = $db->table('reach_publication_deployments')
+                    ->select('id, content_item_id, status, public_content_id, error_category, redacted_error, updated_at')
+                    ->orderBy('id', 'DESC')
+                    ->limit(15)
+                    ->get()
+                    ->getResultArray();
+            } else {
+                $snap['missing_table'][] = 'reach_publication_deployments';
+            }
+
+            if ($db->tableExists('reach_work_blocks') && $db->tableExists('reach_content_items')) {
+                $snap['publish_pipeline_blocks'] = $db->query(
+                    "SELECT wb.id, wb.content_item_id, wb.block_type, wb.eligibility_status,
+                            wb.failure_classification, wb.updated_at
+                     FROM reach_work_blocks wb
+                     INNER JOIN reach_content_items ci ON ci.id = wb.content_item_id
+                     WHERE ci.content_type = 'blog'
+                       AND ci.deleted_at IS NULL
+                       AND ci.workflow_status IN ('publish_queued', 'publishing', 'published', 'live')
+                       AND wb.block_type IN ('PUBLISH_BLOG', 'VERIFY_PUBLICATION', 'UPDATE_SITEMAP')
+                     ORDER BY wb.id DESC
+                     LIMIT 25"
+                )->getResultArray();
+            }
         } catch (Throwable $e) {
             $snap['ok'] = false;
             $snap['error'] = $e->getMessage();
@@ -417,6 +443,27 @@ class ReachBlogDiagnose extends BaseCommand
             ];
         }
 
+        $publishing = (int) ($blogItems['publishing'] ?? 0) + (int) ($blogItems['publish_queued'] ?? 0);
+        if ($publishing > 0) {
+            $deps = $db['publication_deployments'] ?? [];
+            $failedDeps = 0;
+            $publishedDeps = 0;
+            foreach ($deps as $dep) {
+                $st = (string) ($dep['status'] ?? '');
+                if ($st === 'failed') {
+                    $failedDeps++;
+                }
+                if (in_array($st, ['published', 'verified'], true)) {
+                    $publishedDeps++;
+                }
+            }
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'blogs_stuck_publishing',
+                'message'  => "{$publishing} blog(s) in publish_queued/publishing. Deployments in snapshot: published/verified={$publishedDeps}, failed={$failedDeps}. Run reach:blog-advance --dispatch then drain worker; inspect database.publication_deployments.",
+            ];
+        }
+
         $keys = $report['ai_keys'] ?? [];
         if (empty($keys['openai']) && empty($keys['gemini'])) {
             $issues[] = [
@@ -460,6 +507,11 @@ class ReachBlogDiagnose extends BaseCommand
         if (! empty($report['recent_failures'])) {
             $actions[] = 'Inspect draft AI failures: php spark reach:blog-failures';
             $actions[] = 'Retry stuck drafts: php spark reach:blog-advance --dispatch && php spark reach:work --queue blog,publishing,community,default --limit 20';
+        }
+        if (in_array('blogs_stuck_publishing', $codes, true)) {
+            $actions[] = 'Unstick publish: php spark reach:blog-advance --dispatch';
+            $actions[] = 'Drain: php spark reach:work --queue blog,publishing,community,default --limit 40';
+            $actions[] = 'If deployments failed, fix AICOUNTLY_PUBLIC_SITE_* token/signing key and re-run PUBLISH via advance.';
         }
         if (empty($report['ai_keys']['openai']) && empty($report['ai_keys']['gemini'])) {
             $actions[] = 'Set AI_OPENAI_API_KEY or AI_GEMINI_API_KEY in api/.env then: php spark reach:ai-seed-catalog';
