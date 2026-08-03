@@ -81,9 +81,15 @@ class GeminiProvider implements AiProviderInterface
             'thinkingConfig'  => ['thinkingBudget' => 0],
         ];
 
+        $userPrompt = $input->userPrompt;
+        $safeSchema = null;
         if (! empty($input->outputSchema)) {
+            $safeSchema = $this->geminiSafeSchema($input->outputSchema);
             $generationConfig['responseMimeType'] = 'application/json';
-            $generationConfig['responseSchema']   = $this->geminiSafeSchema($input->outputSchema);
+            $generationConfig['responseSchema']   = $safeSchema;
+            // Always reinforce shape in the prompt — Gemini may drop long body_*
+            // fields when schema enforcement is weak or falls back to JSON-only.
+            $userPrompt = $this->appendSchemaInstructions($userPrompt, $safeSchema);
         }
 
         $body = [
@@ -93,7 +99,7 @@ class GeminiProvider implements AiProviderInterface
             'contents' => [
                 [
                     'role'  => 'user',
-                    'parts' => [['text' => $input->userPrompt]],
+                    'parts' => [['text' => $userPrompt]],
                 ],
             ],
             'generationConfig' => $generationConfig,
@@ -105,7 +111,7 @@ class GeminiProvider implements AiProviderInterface
             $response = $this->curlRequest('POST', $url, $body, $input->timeoutSeconds);
         } catch (\Throwable $e) {
             // Gemini often rejects complex JSON Schema; retry with JSON mime only.
-            if (! empty($input->outputSchema)) {
+            if ($safeSchema !== null) {
                 try {
                     unset($body['generationConfig']['responseSchema']);
                     $body['generationConfig']['responseMimeType'] = 'application/json';
@@ -238,29 +244,93 @@ class GeminiProvider implements AiProviderInterface
     }
 
     /**
+     * Convert app JSON Schema into a Gemini responseSchema-compatible subset.
+     *
+     * Gemini generateContent rejects many JSON Schema features (type unions,
+     * additionalProperties, oversized required lists). When rejected we fall
+     * back to JSON mime only — so this conversion must succeed often enough
+     * that long blog body fields are actually enforced.
+     *
      * @param array<string,mixed> $schema
      * @return array<string,mixed>
      */
     private function geminiSafeSchema(array $schema): array
     {
-        unset($schema['$schema'], $schema['$id'], $schema['$comment'], $schema['additionalProperties']);
+        unset(
+            $schema['$schema'],
+            $schema['$id'],
+            $schema['$comment'],
+            $schema['additionalProperties'],
+            $schema['$defs'],
+            $schema['definitions'],
+        );
 
-        foreach (['properties', 'items', 'definitions', '$defs'] as $key) {
-            if (! isset($schema[$key]) || ! is_array($schema[$key])) {
-                continue;
-            }
-            if ($key === 'items') {
-                $schema[$key] = $this->geminiSafeSchema($schema[$key]);
-                continue;
-            }
-            foreach ($schema[$key] as $name => $child) {
-                if (is_array($child)) {
-                    $schema[$key][$name] = $this->geminiSafeSchema($child);
-                }
+        // Prefer a single body field under structured output — coercer derives
+        // markdown/plain from body_html. Requiring three long duplicates often
+        // yields empty/truncated bodies under token pressure.
+        if (isset($schema['required']) && is_array($schema['required'])) {
+            $schema['required'] = array_values(array_filter(
+                $schema['required'],
+                static fn ($f) => ! in_array($f, ['body_markdown', 'body_plain_text'], true),
+            ));
+        }
+
+        if (isset($schema['type']) && is_array($schema['type'])) {
+            $types = array_values(array_filter(
+                $schema['type'],
+                static fn ($t) => is_string($t) && strtolower($t) !== 'null',
+            ));
+            $nullable = count($schema['type']) > count($types);
+            $schema['type'] = $types[0] ?? 'string';
+            if ($nullable) {
+                $schema['nullable'] = true;
             }
         }
 
+        if (isset($schema['properties']) && is_array($schema['properties'])) {
+            $ordered = [];
+            // Fill substantive article text before SEO/meta so MAX_TOKENS truncations
+            // do not leave body_html empty.
+            $priority = ['title', 'summary', 'body_html', 'sections', 'body_markdown', 'body_plain_text'];
+            foreach ($priority as $name) {
+                if (isset($schema['properties'][$name]) && is_array($schema['properties'][$name])) {
+                    $ordered[$name] = $this->geminiSafeSchema($schema['properties'][$name]);
+                }
+            }
+            foreach ($schema['properties'] as $name => $child) {
+                if (isset($ordered[$name]) || ! is_array($child)) {
+                    continue;
+                }
+                $ordered[$name] = $this->geminiSafeSchema($child);
+            }
+            $schema['properties'] = $ordered;
+            $schema['propertyOrdering'] = array_keys($ordered);
+        }
+
+        if (isset($schema['items']) && is_array($schema['items'])) {
+            $schema['items'] = $this->geminiSafeSchema($schema['items']);
+        }
+
         return $schema;
+    }
+
+    /**
+     * @param array<string,mixed> $schema
+     */
+    private function appendSchemaInstructions(string $userPrompt, array $schema): string
+    {
+        $required = is_array($schema['required'] ?? null) ? $schema['required'] : [];
+        $requiredList = $required !== [] ? implode(', ', $required) : 'title, summary, body_html';
+
+        return $userPrompt
+            . "\n\n---\nOUTPUT RULES (mandatory):\n"
+            . "- Respond with one JSON object only (no markdown fences).\n"
+            . "- Required keys: {$requiredList}.\n"
+            . "- body_html MUST be a complete HTML article: multiple <h2>/<h3>/<p>/<ul><li> sections,"
+            . " at least 900 words of real prose. Never placeholders like \"Untitled draft\".\n"
+            . "- Prefer putting the full article in body_html; body_markdown and body_plain_text may mirror it.\n"
+            . "- If you include sections[], each item needs heading + body with real paragraphs.\n"
+            . "- Do not leave body_html empty or under ~400 characters.\n";
     }
 
     /**

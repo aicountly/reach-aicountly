@@ -88,4 +88,26 @@ final class StructuredOutputCoercerTest extends TestCase
             'Bookkeeping Checklist for Indian SMEs',
         ));
     }
+
+    public function testSynthesizesBodyFromSectionsWhenBodiesEmpty(): void
+    {
+        $schema = OutputSchemaRegistry::get('blog_post');
+        $coercer = new StructuredOutputCoercer();
+        $para = str_repeat(
+            'Indian SMEs should reconcile purchase invoices before claiming ITC on GSTR-3B. ',
+            10
+        );
+        $data = $coercer->coerce([
+            'title'    => 'GST ITC checklist for SMEs',
+            'sections' => [
+                ['heading' => 'Why ITC matters', 'body' => $para],
+                ['heading' => 'Monthly checklist', 'body' => $para],
+            ],
+        ], $schema);
+
+        $errors = (new StructuredOutputValidator())->validate($data, $schema);
+        $this->assertSame([], $errors, implode('; ', $errors));
+        $this->assertStringContainsString('Why ITC matters', $data['body_html']);
+        $this->assertGreaterThanOrEqual(200, str_word_count($data['body_plain_text']));
+    }
 }

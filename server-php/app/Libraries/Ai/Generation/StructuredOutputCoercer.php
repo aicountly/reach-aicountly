@@ -130,8 +130,95 @@ final class StructuredOutputCoercer
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
+    private function normalizeAlternateBodyKeys(array $data): array
+    {
+        $aliases = [
+            'body_html'       => ['html', 'content_html', 'article_html', 'content'],
+            'body_markdown'   => ['markdown', 'content_markdown', 'article_markdown'],
+            'body_plain_text' => ['plain_text', 'text', 'article', 'body', 'content_text'],
+        ];
+        foreach ($aliases as $canonical => $keys) {
+            if (trim((string) ($data[$canonical] ?? '')) !== '') {
+                continue;
+            }
+            foreach ($keys as $key) {
+                $candidate = $data[$key] ?? null;
+                if (is_string($candidate) && trim($candidate) !== '') {
+                    $data[$canonical] = trim($candidate);
+                    break;
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Build body fields from sections[] when the model filled outline content
+     * but left body_html/markdown/plain empty (common Gemini partial outputs).
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function synthesizeBodyFromSections(array $data): array
+    {
+        $html  = trim((string) ($data['body_html'] ?? ''));
+        $md    = trim((string) ($data['body_markdown'] ?? ''));
+        $plain = trim((string) ($data['body_plain_text'] ?? ''));
+        if ($html !== '' || $md !== '' || $plain !== '') {
+            return $data;
+        }
+
+        $sections = $data['sections'] ?? null;
+        if (! is_array($sections) || $sections === []) {
+            return $data;
+        }
+
+        $htmlParts  = [];
+        $mdParts    = [];
+        $plainParts = [];
+        foreach ($sections as $section) {
+            if (! is_array($section)) {
+                continue;
+            }
+            $heading = trim((string) ($section['heading'] ?? $section['title'] ?? ''));
+            $body    = trim((string) ($section['body'] ?? $section['content'] ?? $section['text'] ?? ''));
+            if ($heading === '' && $body === '') {
+                continue;
+            }
+            if ($heading !== '') {
+                $safeH = htmlspecialchars($heading, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $htmlParts[]  = '<h2>' . $safeH . '</h2>';
+                $mdParts[]    = '## ' . $heading;
+                $plainParts[] = $heading;
+            }
+            if ($body !== '') {
+                $safeB = htmlspecialchars($body, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $htmlParts[]  = '<p>' . nl2br($safeB) . '</p>';
+                $mdParts[]    = $body;
+                $plainParts[] = $body;
+            }
+        }
+
+        if ($htmlParts === []) {
+            return $data;
+        }
+
+        $data['body_html']       = implode("\n", $htmlParts);
+        $data['body_markdown']   = implode("\n\n", $mdParts);
+        $data['body_plain_text'] = implode("\n\n", $plainParts);
+
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
     private function deriveBodyFields(array $data): array
     {
+        $data  = $this->normalizeAlternateBodyKeys($data);
+        $data  = $this->synthesizeBodyFromSections($data);
         $html  = trim((string) ($data['body_html'] ?? ''));
         $md    = trim((string) ($data['body_markdown'] ?? ''));
         $plain = trim((string) ($data['body_plain_text'] ?? ''));
@@ -154,6 +241,9 @@ final class StructuredOutputCoercer
         if ($md === '' && $plain !== '') {
             $md = $plain;
         }
+        if ($md === '' && $html !== '') {
+            $md = trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
 
         // Clear stub bodies so they do not pass minLength via title echo.
         if (self::isStubBody($html, $md, $plain, $title)) {
@@ -162,15 +252,11 @@ final class StructuredOutputCoercer
             $plain = '';
             unset($data['body_html'], $data['body_markdown'], $data['body_plain_text']);
         } else {
-            if ($html !== '') {
-                $data['body_html'] = $html;
-            }
-            if ($md !== '') {
-                $data['body_markdown'] = $md;
-            }
-            if ($plain !== '') {
-                $data['body_plain_text'] = $plain;
-            }
+            // Always materialise all three body representations so optional
+            // minLength properties are not left as empty strings from the model.
+            $data['body_html']       = $html;
+            $data['body_markdown']   = $md !== '' ? $md : $plain;
+            $data['body_plain_text'] = $plain !== '' ? $plain : trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         }
 
         if ($title === '' && $plain !== '') {

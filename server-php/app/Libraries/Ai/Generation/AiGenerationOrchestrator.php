@@ -155,6 +155,7 @@ class AiGenerationOrchestrator
 
         $systemPrompt = $this->buildSystemPrompt($promptVersion, $groundingContext, $request);
         $userPrompt   = $this->buildUserPrompt($promptVersion, $request);
+        $userPrompt   = $this->appendTaskOutputRequirements($userPrompt, $request);
 
         // --- Security: injection detection on rendered prompts ---
         if ($this->injectionDetector->detect($userPrompt)) {
@@ -221,9 +222,11 @@ class AiGenerationOrchestrator
                 'draft_generation', 'content_expansion', 'section_regeneration',
             ], true) ? 120 : 45;
 
+            // Full blog JSON (HTML + sections) routinely needs >8k output tokens;
+            // truncation was leaving body_html empty while title/summary survived.
             $maxTokens = in_array((string) ($request['task_type'] ?? ''), [
                 'draft_generation', 'content_expansion', 'section_regeneration',
-            ], true) ? 8192 : 4096;
+            ], true) ? 16384 : 4096;
 
             $input = new AiGenerationInput(
                 systemPrompt:    $systemPrompt,
@@ -404,6 +407,31 @@ class AiGenerationOrchestrator
 
         $params = json_decode($request['request_parameters_json'] ?? '{}', true);
         return 'Generate a ' . ($request['content_type'] ?? 'piece of content') . ' based on the grounding context provided. ' . ($params['instructions'] ?? '');
+    }
+
+    /**
+     * Reinforce long-form blog body requirements regardless of prompt-template wording.
+     *
+     * @param array<string,mixed> $request
+     */
+    private function appendTaskOutputRequirements(string $userPrompt, array $request): string
+    {
+        $task = (string) ($request['task_type'] ?? '');
+        $type = (string) ($request['content_type'] ?? '');
+        if ($task !== 'draft_generation' || $type !== 'blog_post') {
+            return $userPrompt;
+        }
+
+        $params = json_decode($request['request_parameters_json'] ?? '{}', true);
+        $minWords = max(200, (int) ($params['min_word_count'] ?? 900));
+
+        return $userPrompt
+            . "\n\nCRITICAL DRAFT REQUIREMENTS:\n"
+            . "- Produce a complete blog article of at least {$minWords} words.\n"
+            . "- Populate body_html with real HTML sections (<h2>, <p>, lists). No stubs.\n"
+            . "- Also fill body_markdown and body_plain_text with the same article (or leave them for derivation from body_html).\n"
+            . "- sections[] should contain the same outline with heading + body paragraphs.\n"
+            . "- Never output placeholders such as \"Untitled draft\", \"TBD\", or title-only bodies.\n";
     }
 
     /**

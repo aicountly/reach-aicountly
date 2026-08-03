@@ -81,9 +81,11 @@ class OutputSchemaRegistry
                 'type'       => 'object',
                 // Keep required aligned with properties so providers that enforce
                 // "strict" structured output do not reject the schema outright.
+                // Require one substantive body; coercer derives markdown/plain so
+                // providers are not forced to emit three long duplicates (token truncation).
                 'required'   => [
-                    'title', 'summary', 'primary_cta', 'body_html', 'body_markdown',
-                    'body_plain_text', 'slug_suggestion', 'meta_title', 'meta_description',
+                    'title', 'summary', 'primary_cta', 'body_html',
+                    'slug_suggestion', 'meta_title', 'meta_description',
                     'claims_used', 'citations_used', 'risk_notes', 'reading_time_minutes',
                     'sections',
                 ],
