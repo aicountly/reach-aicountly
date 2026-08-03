@@ -60,7 +60,7 @@ class BlogStateMachine
         self::FACT_VERIFIED        => [self::SEO_REVIEW, self::INTERNAL_REVIEW],
         self::SEO_REVIEW           => [self::INTERNAL_REVIEW, self::CHANGES_REQUESTED, self::REJECTED],
         self::INTERNAL_REVIEW      => [self::APPROVED, self::CHANGES_REQUESTED, self::REJECTED],
-        self::CHANGES_REQUESTED    => [self::DRAFT, self::OUTLINE_DRAFT, self::ARCHIVED],
+        self::CHANGES_REQUESTED    => [self::DRAFT, self::OUTLINE_DRAFT, self::INTERNAL_REVIEW, self::ARCHIVED],
         self::APPROVED             => [self::SCHEDULED, self::PUBLISH_QUEUED, self::ARCHIVED],
         // Scheduled items may be force-published, returned to approved, or —
         // after a successful public verify of a due schedule — moved to

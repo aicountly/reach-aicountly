@@ -42,6 +42,8 @@ class ReachBlogAdvance extends BaseCommand
         BlogStateMachine::DRAFT            => WorkBlockService::TYPE_FACT_VERIFY,
         BlogStateMachine::FACT_VERIFIED    => WorkBlockService::TYPE_SEO_OPTIMIZE,
         BlogStateMachine::SEO_REVIEW       => WorkBlockService::TYPE_CROSS_REVIEW,
+        // Fact-check soft-fails land here; send to human gate instead of dead-ending.
+        BlogStateMachine::CHANGES_REQUESTED => WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
     ];
 
     public function run(array $params): int
