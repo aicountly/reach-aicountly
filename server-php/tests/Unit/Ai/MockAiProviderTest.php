@@ -48,6 +48,11 @@ class MockAiProviderTest extends CIUnitTestCase
         $this->assertSame(350, $result->outputTokens);
         $this->assertIsArray($result->parsedJson);
         $this->assertArrayHasKey('title', $result->parsedJson);
+        $this->assertGreaterThanOrEqual(
+            200,
+            str_word_count((string) ($result->parsedJson['body_plain_text'] ?? '')),
+            'Mock success output must clear GENERATE_DRAFT word-count gates',
+        );
     }
 
     public function testMalformedScenarioReturnsBadJson(): void

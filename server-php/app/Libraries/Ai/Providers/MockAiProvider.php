@@ -136,19 +136,37 @@ class MockAiProvider implements AiProviderInterface
 
     private function defaultOutput(AiGenerationInput $input): array
     {
+        // GENERATE_DRAFT (and blog_post schema) require a real article: minLength
+        // on body fields plus WorkBlockService's ≥200-word gate. Keep this
+        // deterministic and long enough for Feature acceptance tests.
+        $paragraph = 'Indian SMEs should reconcile purchase invoices, maintain books of account, '
+            . 'and file GST returns on time to avoid interest, late fees, and notice risk. '
+            . 'A practical monthly checklist covers GSTR-1 reporting, GSTR-3B payment, '
+            . 'input tax credit eligibility, vendor compliance, and cash-flow planning for tax dues. ';
+        $plain = trim(str_repeat($paragraph, 8));
+        $html  = '<h2>Overview</h2><p>' . htmlspecialchars($paragraph) . '</p>'
+            . '<h2>Monthly checklist</h2><p>' . htmlspecialchars(str_repeat($paragraph, 3)) . '</p>'
+            . '<h2>Common mistakes</h2><p>' . htmlspecialchars(str_repeat($paragraph, 2)) . '</p>'
+            . '<h2>Next steps</h2><p>' . htmlspecialchars(str_repeat($paragraph, 2)) . '</p>';
+
         return [
-            'title'          => 'Mock Generated Title',
-            'summary'        => 'A mock-generated summary for testing purposes.',
-            'body_html'      => '<p>Mock generated body content for testing.</p>',
-            'body_markdown'  => 'Mock generated body content for testing.',
-            'body_plain_text' => 'Mock generated body content for testing.',
-            'slug_suggestion' => 'mock-generated-title',
-            'meta_title'     => 'Mock Generated Title | Aicountly',
-            'meta_description' => 'A mock-generated meta description for testing purposes.',
-            'primary_cta'    => 'Learn More',
-            'claims_used'    => [],
-            'citations_used' => [],
-            'risk_notes'     => [],
+            'title'            => 'Mock Generated Title',
+            'summary'          => 'A practical mock-generated guide covering GST filing, bookkeeping, and compliance basics for Indian SMEs.',
+            'body_html'        => $html,
+            'body_markdown'    => "## Overview\n\n{$plain}",
+            'body_plain_text'  => $plain,
+            'slug_suggestion'  => 'mock-generated-title',
+            'meta_title'       => 'Mock Generated Title | Aicountly',
+            'meta_description' => 'A mock-generated meta description covering GST and bookkeeping guidance for small businesses.',
+            'primary_cta'      => 'Learn More',
+            'reading_time_minutes' => max(1, (int) ceil(str_word_count($plain) / 200)),
+            'sections'         => [
+                ['heading' => 'Overview', 'body' => $paragraph],
+                ['heading' => 'Monthly checklist', 'body' => str_repeat($paragraph, 3)],
+            ],
+            'claims_used'      => [],
+            'citations_used'   => [],
+            'risk_notes'       => [],
         ];
     }
 }
