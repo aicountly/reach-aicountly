@@ -62,9 +62,17 @@ class AiErrorClassifierTest extends CIUnitTestCase
         $this->assertFalse($error->isRetryable());
     }
 
-    public function testFallsBackToUnknown(): void
+    public function testFallsBackToUnknownButKeepsMessage(): void
     {
         $error = $this->classifier->classify(new \RuntimeException('Some completely unexpected error'));
         $this->assertSame(AiProviderError::CATEGORY_UNKNOWN, $error->category);
+        $this->assertSame('Some completely unexpected error', $error->message);
+    }
+
+    public function testClassifiesInvalidSchemaRequest(): void
+    {
+        $error = $this->classifier->classify(new \RuntimeException('Invalid schema for response_format[\'json_schema\']'));
+        $this->assertSame(AiProviderError::CATEGORY_INVALID_REQUEST, $error->category);
+        $this->assertStringContainsString('json_schema', $error->message);
     }
 }

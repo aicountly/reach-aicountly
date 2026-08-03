@@ -36,9 +36,10 @@ class OpenAiProvider implements AiProviderInterface
     public function __construct()
     {
         $this->classifier = new AiErrorClassifier();
-        $this->baseUrl    = rtrim($_ENV['AI_OPENAI_BASE_URL'] ?? 'https://api.openai.com/v1', '/');
+        $base = $this->envValue('AI_OPENAI_BASE_URL') ?: 'https://api.openai.com/v1';
+        $this->baseUrl = rtrim($base, '/');
         // Normalise so CHAT_URL prefix works regardless
-        $this->baseUrl    = preg_replace('#/v1$#', '', $this->baseUrl);
+        $this->baseUrl = preg_replace('#/v1$#', '', $this->baseUrl) ?? $this->baseUrl;
     }
 
     public function getProviderKey(): string
@@ -48,8 +49,8 @@ class OpenAiProvider implements AiProviderInterface
 
     public function isConfigured(): bool
     {
-        $key = $_ENV['AI_OPENAI_API_KEY'] ?? '';
-        return is_string($key) && strlen(trim($key)) > 0;
+        $key = $this->apiKey();
+        return $key !== '';
     }
 
     public function healthCheck(): AiProviderHealthResult
@@ -90,17 +91,15 @@ class OpenAiProvider implements AiProviderInterface
         ];
 
         if (! empty($input->outputSchema)) {
-            // strict:false — our OutputSchemaRegistry schemas are draft-07 style and
-            // often include optional properties / open nested objects. OpenAI strict
-            // mode rejects those ("every property must be required"), which caused
-            // blog GENERATE_DRAFT to fail before any usable content was produced.
-            // Application-side StructuredOutputValidator still enforces the schema.
+            // Prefer json_schema (strict:false). If OpenAI rejects the schema shape,
+            // fall back to json_object so drafts can still complete; app-side
+            // StructuredOutputValidator remains the source of truth.
             $body['response_format'] = [
                 'type'        => 'json_schema',
                 'json_schema' => [
                     'name'   => 'output',
                     'strict' => false,
-                    'schema' => $input->outputSchema,
+                    'schema' => $this->openaiSafeSchema($input->outputSchema),
                 ],
             ];
         }
@@ -113,8 +112,23 @@ class OpenAiProvider implements AiProviderInterface
                 $input->timeoutSeconds,
             );
         } catch (\Throwable $e) {
-            $error = $this->classifyError($e);
-            throw new AiProviderException($error->message, $error, $e);
+            if (! empty($input->outputSchema) && $this->isSchemaRejection($e)) {
+                try {
+                    $body['response_format'] = ['type' => 'json_object'];
+                    $response = $this->curlRequest(
+                        'POST',
+                        $this->baseUrl . self::CHAT_URL,
+                        $body,
+                        $input->timeoutSeconds,
+                    );
+                } catch (\Throwable $fallbackError) {
+                    $error = $this->classifyError($fallbackError);
+                    throw new AiProviderException($error->message, $error, $fallbackError);
+                }
+            } else {
+                $error = $this->classifyError($e);
+                throw new AiProviderException($error->message, $error, $e);
+            }
         }
 
         $durationMs        = (int) ((hrtime(true) - $start) / 1_000_000);
@@ -166,14 +180,18 @@ class OpenAiProvider implements AiProviderInterface
             CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
-                'Authorization: Bearer ' . ($_ENV['AI_OPENAI_API_KEY'] ?? ''),
+                'Authorization: Bearer ' . $this->apiKey(),
             ],
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
 
         if ($method === 'POST' && $body !== null) {
+            $payload = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($payload === false) {
+                throw new \RuntimeException('Failed to encode OpenAI request body as JSON.');
+            }
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
         }
 
         $raw    = curl_exec($ch);
@@ -208,5 +226,60 @@ class OpenAiProvider implements AiProviderInterface
     {
         $redacted = preg_replace('/sk-[A-Za-z0-9\-_]+/', '[REDACTED]', $msg) ?? $msg;
         return $redacted;
+    }
+
+    private function apiKey(): string
+    {
+        return $this->envValue('AI_OPENAI_API_KEY');
+    }
+
+    private function envValue(string $key): string
+    {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+        if ($v === false || $v === null) {
+            $v = function_exists('env') ? env($key) : null;
+        }
+
+        return is_string($v) ? trim($v) : '';
+    }
+
+    private function isSchemaRejection(\Throwable $e): bool
+    {
+        $msg = strtolower($e->getMessage());
+        return str_contains($msg, 'json_schema')
+            || str_contains($msg, 'response_format')
+            || str_contains($msg, 'invalid schema')
+            || str_contains($msg, 'schema is too')
+            || (str_contains($msg, '400') && str_contains($msg, 'schema'));
+    }
+
+    /**
+     * Strip draft-07 / CI-only keys OpenAI json_schema often rejects even with strict:false.
+     *
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    private function openaiSafeSchema(array $schema): array
+    {
+        unset($schema['$schema'], $schema['$id'], $schema['$comment']);
+
+        foreach (['properties', 'items', 'additionalProperties', 'definitions', '$defs'] as $key) {
+            if (! isset($schema[$key])) {
+                continue;
+            }
+            if (is_array($schema[$key])) {
+                if ($key === 'properties' || $key === 'definitions' || $key === '$defs') {
+                    foreach ($schema[$key] as $propName => $propSchema) {
+                        if (is_array($propSchema)) {
+                            $schema[$key][$propName] = $this->openaiSafeSchema($propSchema);
+                        }
+                    }
+                } elseif ($key === 'items' || $key === 'additionalProperties') {
+                    $schema[$key] = $this->openaiSafeSchema($schema[$key]);
+                }
+            }
+        }
+
+        return $schema;
     }
 }
