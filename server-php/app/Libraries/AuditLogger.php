@@ -515,8 +515,11 @@ class AuditLogger
                 'reason'        => $reason !== null ? substr($reason, 0, 510) : null,
                 'request_id'    => $resolvedRequestId !== null ? substr((string) $resolvedRequestId, 0, 64) : null,
                 'job_id'        => $jobId,
-                'ip_address'    => $req->getIPAddress(),
-                'user_agent'    => substr((string) $req->getUserAgent(), 0, 510),
+                'ip_address'    => method_exists($req, 'getIPAddress') ? $req->getIPAddress() : null,
+                // CLIRequest has no getUserAgent(); workers/cron must not fail audit writes.
+                'user_agent'    => method_exists($req, 'getUserAgent')
+                    ? substr((string) $req->getUserAgent(), 0, 510)
+                    : 'cli',
             ];
             (new AuditLogModel())->insert($row);
         } catch (\Throwable $e) {

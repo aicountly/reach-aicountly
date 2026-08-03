@@ -13,7 +13,7 @@ const OK_STATUSES = ['OK', 'CONNECTED', 'ENABLED'];
 function badgeVariant(status) {
   if (OK_STATUSES.includes(status)) return 'success';
   if (status === 'MISCONFIGURED' || status === 'ERROR') return 'danger';
-  if (status === 'MOCK') return 'warning';
+  if (status === 'MOCK' || status === 'STALE' || status === 'WARN') return 'warning';
   return 'muted';
 }
 
@@ -25,6 +25,25 @@ function countProviders(map) {
   const entries = Object.entries(map ?? {});
   const configured = entries.filter(([, state]) => state === 'CONFIGURED').length;
   return { configured, total: entries.length };
+}
+
+/** Roadmap card: OK only when optimiser is enabled and last run looks fresh. */
+function roadmapStatus(enabled, lastRun) {
+  if (!enabled) return 'DISABLED';
+  if (!lastRun) return 'NO DATA';
+  if (lastRun.status === 'skipped' || lastRun.skipped_reason) return 'WARN';
+  const runDate = lastRun.run_for_date;
+  if (runDate) {
+    const run = new Date(`${runDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ageDays = Math.floor((today - run) / 86400000);
+    if (!Number.isNaN(ageDays) && ageDays >= 2) return 'STALE';
+  }
+  if ((lastRun.candidates_scored ?? 0) === 0 && (lastRun.decisions_created ?? 0) === 0) {
+    return 'WARN';
+  }
+  return 'OK';
 }
 
 /**
@@ -40,7 +59,14 @@ function buildCards(data) {
   const providers = data.ai_providers ?? {};
   const optimizer = data.optimizer ?? {};
 
-  const inProduction = (workflow.draft ?? 0) + (workflow.idea ?? 0);
+  const briefStage = (workflow.brief_draft ?? 0) + (workflow.brief_ready ?? 0)
+    + (workflow.outline_draft ?? 0) + (workflow.outline_ready ?? 0)
+    + (workflow.idea ?? 0) + (workflow.roadmap_planned ?? 0);
+  const draftStage = (workflow.draft ?? 0) + (workflow.draft_generating ?? 0)
+    + (workflow.fact_verifying ?? 0) + (workflow.fact_verified ?? 0);
+  const reviewStage = (workflow.seo_review ?? 0) + (workflow.internal_review ?? 0)
+    + (workflow.changes_requested ?? 0);
+  const inProduction = briefStage + draftStage + reviewStage;
   const textProviders = countProviders(providers.text);
   const imageProviders = countProviders(providers.image);
   const lastRun = optimizer.last_run;
@@ -53,9 +79,9 @@ function buildCards(data) {
       link: ROUTES.BCC_PIPELINE_DRAFTS,
       status: inProduction > 0 ? 'OK' : 'NO DATA',
       metrics: [
-        metric('ideas', workflow.idea ?? 0),
-        metric('drafts', workflow.draft ?? 0),
-        metric('awaiting review', (workflow.seo_review ?? 0) + (workflow.internal_review ?? 0)),
+        metric('briefs/outlines', briefStage),
+        metric('drafts', draftStage),
+        metric('awaiting review', reviewStage),
       ],
     },
     {
@@ -63,7 +89,12 @@ function buildCards(data) {
       title: 'Roadmap',
       icon: Map,
       link: ROUTES.BCC_ROADMAP_OPTIMIZER,
-      status: !optimizer.enabled ? 'DISABLED' : lastRun ? 'OK' : 'NO DATA',
+      status: roadmapStatus(optimizer.enabled, lastRun),
+      detail: lastRun?.skipped_reason
+        ? `Last run skipped: ${lastRun.skipped_reason}`
+        : lastRun?.status === 'skipped'
+          ? 'Last optimiser run was skipped'
+          : undefined,
       metrics: [
         metric('last run', lastRun?.run_for_date),
         metric('scored', lastRun?.candidates_scored),

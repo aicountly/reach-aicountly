@@ -62,6 +62,9 @@ BLOG_PUBLIC_PUBLISHER_ENABLED=true
 ## 4. Worker / cron install (root or Reach cPanel, per existing convention)
 
 ```cron
+# Enqueue eligible blog work blocks (required — without this, blocks never become jobs).
+0,30 0-8,19-23 * * * cd /path/to/server-php && /usr/bin/php spark reach:blog-dispatch >> writable/logs/blog-dispatch.log 2>&1
+# Daily roadmap optimiser — if server TZ is UTC use: 0 19 * * *
 30 0 * * * cd /path/to/server-php && /usr/bin/php spark reach:blog-optimize-roadmap >> writable/logs/blog-optimizer.log 2>&1
 * * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --queue=default,blog,publishing --once --limit=20 >> writable/logs/worker.log 2>&1
 * * * * * cd /path/to/server-php && /usr/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1

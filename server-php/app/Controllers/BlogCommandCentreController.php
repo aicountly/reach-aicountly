@@ -19,9 +19,17 @@ class BlogCommandCentreController extends BaseApiController
         $db    = Database::connect();
         $flags = new BlogFeatureFlags();
 
+        // Include automation states (brief_*, outline_*, draft_generating, …).
+        // Older Overview only counted classic idea/draft and wrongly showed
+        // "NO DATA" while a blog was sitting in brief_ready / outline_ready.
         $workflowStatuses = [
-            'idea', 'draft', 'seo_review', 'internal_review', 'approved',
-            'scheduled', 'published', 'rejected', 'archived',
+            'idea', 'topic_candidate', 'topic_scored', 'roadmap_planned',
+            'brief_draft', 'brief_ready', 'outline_draft', 'outline_ready',
+            'draft_generating', 'draft', 'fact_verifying', 'fact_verified',
+            'seo_review', 'internal_review', 'changes_requested', 'approved',
+            'scheduled', 'publish_queued', 'publishing', 'published',
+            'verification_pending', 'live', 'blocked', 'failed', 'rejected',
+            'archived',
         ];
         $workflowCounts = [];
         foreach ($workflowStatuses as $status) {

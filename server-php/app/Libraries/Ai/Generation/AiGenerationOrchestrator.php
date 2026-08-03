@@ -296,6 +296,9 @@ class AiGenerationOrchestrator
     private function failRequest(int $requestId, string $reason, string $message): void
     {
         $this->requests->updateStatus($requestId, 'failed');
+        // Always write to app log — AuditLogger can fail in CLI contexts and
+        // previously swallowed the only copy of the failure reason.
+        log_message('error', "AI generation request {$requestId} failed: {$reason} — {$message}");
         AuditLogger::record('ai.generation_failed', [
             'request_id' => $requestId,
             'reason'     => $reason,

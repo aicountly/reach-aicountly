@@ -1,27 +1,49 @@
-# REACH Worker and Cron Guide — Phase 0
+# REACH Worker and Cron Guide
 
 This document targets cPanel-style shared-hosting environments where we
 cannot rely on Redis, systemd, or long-lived processes. Adapt as needed
 for VPS/container hosting (which can just run `spark reach:work` under
 supervisord).
 
+For the full blog-automation deploy sequence (flags, public publisher,
+Search Console), also see
+[`docs/blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md`](../blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md).
+
 ## Commands
 
 - **Worker (loop):**
   ```
   php /home/<cpanel-user>/reach-aicountly/server-php/spark reach:work \
-      --queue=default --sleep=2 --lease=300 --worker-id=w1
+      --queue=default,blog,publishing --sleep=2 --lease=300 --worker-id=w1
   ```
   Runs until either `writable/stop-reach-worker` exists or the process is
   killed. Emits structured JSON to stdout suitable for log rotation.
 
 - **Worker (single pass, cron-friendly):**
   ```
-  php spark reach:work --queue=default --once --limit=5 --worker-id=cron
+  php spark reach:work --queue=default,blog,publishing --once --limit=20 --worker-id=cron
   ```
-  Reserves and executes at most 5 jobs, then exits. Combined with a
-  1-minute cron, this gives 5 concurrent job attempts per minute per
-  worker slot.
+  Reserves and executes at most N jobs, then exits. Combined with a
+  1-minute cron, this drains the job queues without a long-lived process.
+
+  **CRITICAL:** Blog automation enqueues on the `blog` queue (and
+  publishing on `publishing`). A worker started with only
+  `--queue=default` will **never** process those jobs.
+
+- **Blog dispatch (enqueue eligible work blocks):**
+  ```
+  php spark reach:blog-dispatch
+  ```
+  Only runs inside the Asia/Kolkata windows `00:00–08:59` and
+  `19:00–23:59` unless `--force` is passed. Without this cron, work
+  blocks stay `eligible` and never become jobs.
+
+- **Roadmap optimiser (daily):**
+  ```
+  php spark reach:blog-optimize-roadmap
+  ```
+  Preferred window is `00:00–00:59` Asia/Kolkata. Pass `--force` to
+  override for manual smoke tests.
 
 - **Scheduler / housekeeping:**
   ```
@@ -29,31 +51,66 @@ supervisord).
   ```
   - Recovers leases past their `lease_expires_at` back to `pending`.
   - Prunes completed / dead-lettered / cancelled jobs older than N days
-    (default 30, adjust with `--prune-days=`).
-  - Advances scheduled jobs whose `available_at` has arrived (no-op today
-    because `JobService::reserve` already respects the timestamp).
+    (default 14, adjust with `--prune-days=`).
+  - Enqueues Phase 2 daily housekeeping jobs.
+
+- **One-shot diagnose (run in cPanel Terminal):**
+  ```
+  php spark reach:blog-diagnose
+  ```
+  Reports flags, WRITEPATH/log presence, topic candidates, work blocks,
+  jobs, and a verdict with next actions. Exit code `2` means blocking
+  issues were found.
 
 ## Cron examples
 
 cPanel → **Cron Jobs**. All entries assume the app is installed at
-`/home/<user>/reach-aicountly/server-php`. Adjust the PHP binary path.
+`/home/<user>/reach-aicountly/server-php`. Adjust the PHP binary path
+(`which php` / `ls /usr/local/bin/php /usr/bin/php`).
 
 ```cron
-# Every minute — one queue pass, up to 5 jobs per invocation.
-* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default --once --limit=5 --worker-id=cron >> writable/logs/worker.log 2>&1
+# Every 30 minutes during allowed IST hours — enqueue blog work blocks.
+0,30 0-8,19-23 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-dispatch >> writable/logs/blog-dispatch.log 2>&1
+
+# Daily roadmap optimiser — 00:30 Asia/Kolkata.
+# If the server clock is UTC, use: 0 19 * * *  (19:00 UTC = 00:30 IST).
+30 0 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-optimize-roadmap >> writable/logs/blog-optimizer.log 2>&1
+
+# Every minute — drain default + blog + publishing queues.
+* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing --once --limit=20 --worker-id=cron >> writable/logs/worker.log 2>&1
 
 # Every minute — recover expired leases, prune old jobs (idempotent, cheap).
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 ```
 
+**If `writable/logs/` stays empty**, the crontab `cd` path is wrong, the
+PHP binary path is wrong, or these cron lines were never installed. Cron
+log files are created only by the `>> writable/logs/...` redirects — the
+PHP commands do not create those filenames by themselves.
+
 For a "second worker slot" without needing two long-lived processes,
-duplicate the first entry with a different `--worker-id=cron2` and offset
+duplicate the worker entry with a different `--worker-id=cron2` and offset
 the minute by using two entries; cron's minimum granularity is one minute
 so add a `sleep` to stagger:
 
 ```cron
-* * * * * (sleep 20; cd ...; php spark reach:work --once --limit=5 --worker-id=cron2)
+* * * * * (sleep 20; cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing --once --limit=5 --worker-id=cron2 >> writable/logs/worker.log 2>&1)
 ```
+
+## Required `.env` flags for blogs to be saved
+
+Safe defaults ship **off**. For a pilot that creates briefs/drafts (but
+does not auto-publish):
+
+```env
+BLOG_ROADMAP_OPTIMIZER_ENABLED=true
+BLOG_AUTOMATION_ENABLED=true
+BLOG_AI_GENERATION_ENABLED=true
+BLOG_AUTO_PUBLISH_ENABLED=false
+```
+
+Also ensure eligible rows exist in `reach_topic_candidates`
+(`status` = `candidate` or `scored`, not locked, not in cooldown).
 
 ## Graceful stop pattern
 
@@ -74,21 +131,28 @@ can be rotated with cPanel's standard log-rotate config or an in-app
 weekly cron:
 
 ```cron
-0 0 * * 0 mv server-php/writable/logs/worker.log server-php/writable/logs/worker.log.$(date +\%Y\%m\%d)
+0 0 * * 0 mv /home/<user>/reach-aicountly/server-php/writable/logs/worker.log /home/<user>/reach-aicountly/server-php/writable/logs/worker.log.$(date +\%Y\%m\%d)
 ```
 
 ## Failure recovery playbook
 
-1. **All jobs stuck in `processing`:** likely a worker crash mid-job.
+1. **No files under `writable/logs/`:** crontab missing or wrong `cd` /
+   PHP path. Run `php spark reach:blog-diagnose`, then install the four
+   cron lines above.
+2. **All jobs stuck in `processing`:** likely a worker crash mid-job.
    Wait for `reach:schedule` to recover leases (runs every minute), or
    run `php spark reach:schedule` manually.
-2. **Handler always fails:** inspect `error_message` and `attempts` in
+3. **Blog jobs stuck `pending` forever:** worker is probably still on
+   `--queue=default` only. Switch to `--queue=default,blog,publishing`.
+4. **Work blocks stay `eligible`:** `reach:blog-dispatch` cron is missing
+   or outside the IST window (use `--force` for a manual smoke).
+5. **Handler always fails:** inspect `error_message` and `attempts` in
    the Job Monitor. If it's the handler code, fix + deploy, then retry
    the dead-letter jobs from the UI.
-3. **Rate-limited outbound (Engage/Console):** back off by pausing the
+6. **Rate-limited outbound (Engage/Console):** back off by pausing the
    worker (`touch stop-reach-worker`), increasing `sleep`, or reducing
    `--limit`.
-4. **Bot dispatch surge:** the `bot.dispatch` route is IP+user throttled
+7. **Bot dispatch surge:** the `bot.dispatch` route is IP+user throttled
    (30/min/user); if you need higher throughput, add a dedicated `bots`
    queue and start a second worker slot for it.
 
@@ -102,6 +166,9 @@ weekly cron:
 - Every job lifecycle transition emits an audit event
   (`job.enqueued|reserved|completed|retried|failed|cancelled`) that
   fans out to Console via `reach.*`.
+- Blog Command Centre → Overview reflects content/deploy counts; empty
+  Production/Publishing means no saved blogs / published deployments yet,
+  not that AI keys are missing (AI Ops OK only means providers are configured).
 
 ## Do NOT do
 
@@ -113,3 +180,6 @@ weekly cron:
   should carry `request_id` for correlation.
 - Do **not** touch `writable/htmlpurifier` from cron; it's populated on
   first use and safe to leave alone.
+- Do **not** install only the Phase 0 worker/schedule crons and expect
+  blogs to generate — you also need `reach:blog-dispatch` and
+  `reach:blog-optimize-roadmap`.

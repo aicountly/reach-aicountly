@@ -83,17 +83,23 @@ class BlogStateMachine
 
     /** @var array<string, string> */
     private const NEXT_WORK_BLOCK = [
-        self::PUBLISH_QUEUED  => WorkBlockService::TYPE_PUBLISH_BLOG,
-        self::PUBLISHING      => WorkBlockService::TYPE_VERIFY_PUBLICATION,
-        self::FACT_VERIFYING  => WorkBlockService::TYPE_FACT_VERIFY,
+        // Content production chain (automation must not stall after brief).
+        self::BRIEF_READY      => WorkBlockService::TYPE_GENERATE_OUTLINE,
+        self::OUTLINE_READY    => WorkBlockService::TYPE_GENERATE_DRAFT,
+        self::DRAFT            => WorkBlockService::TYPE_FACT_VERIFY,
+        self::FACT_VERIFIED    => WorkBlockService::TYPE_SEO_OPTIMIZE,
+        self::SEO_REVIEW       => WorkBlockService::TYPE_CROSS_REVIEW,
+        self::PUBLISH_QUEUED   => WorkBlockService::TYPE_PUBLISH_BLOG,
+        self::PUBLISHING       => WorkBlockService::TYPE_VERIFY_PUBLICATION,
+        self::FACT_VERIFYING   => WorkBlockService::TYPE_FACT_VERIFY,
         self::DRAFT_GENERATING => WorkBlockService::TYPE_GENERATE_DRAFT,
-        self::ROADMAP_PLANNED => WorkBlockService::TYPE_OPTIMIZE_ROADMAP,
-        self::REFRESH_PENDING => WorkBlockService::TYPE_REFRESH_CONTENT,
+        self::ROADMAP_PLANNED  => WorkBlockService::TYPE_OPTIMIZE_ROADMAP,
+        self::REFRESH_PENDING  => WorkBlockService::TYPE_REFRESH_CONTENT,
         // Going live must be followed by a real sitemap-presence check, not
         // an assumption that "published" implies "indexed" or even "in the
         // sitemap yet". WorkBlockService::executeUpdateSitemap() chains a
         // CHECK_INDEXING block itself once the sitemap check completes.
-        self::LIVE            => WorkBlockService::TYPE_UPDATE_SITEMAP,
+        self::LIVE             => WorkBlockService::TYPE_UPDATE_SITEMAP,
     ];
 
     private BaseConnection $db;
