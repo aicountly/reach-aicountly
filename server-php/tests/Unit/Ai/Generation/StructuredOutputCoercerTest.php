@@ -110,4 +110,22 @@ final class StructuredOutputCoercerTest extends TestCase
         $this->assertStringContainsString('Why ITC matters', $data['body_html']);
         $this->assertGreaterThanOrEqual(200, str_word_count($data['body_plain_text']));
     }
+
+    public function testTruncatesOversizedSummaryToSchemaMaxLength(): void
+    {
+        $schema = OutputSchemaRegistry::get('blog_post');
+        $coercer = new StructuredOutputCoercer();
+        $plain = str_repeat('File GSTR-1 on time and reconcile B2B invoices carefully. ', 20);
+        $data = $coercer->coerce([
+            'title'           => 'GST filing checklist for small businesses',
+            'summary'         => str_repeat('A very long summary about GST filing for SMEs. ', 80),
+            'body_html'       => '<p>' . htmlspecialchars($plain) . '</p>',
+            'body_markdown'   => $plain,
+            'body_plain_text' => $plain,
+        ], $schema);
+
+        $errors = (new StructuredOutputValidator())->validate($data, $schema);
+        $this->assertSame([], $errors, implode('; ', $errors));
+        $this->assertLessThanOrEqual(1024, mb_strlen((string) $data['summary']));
+    }
 }

@@ -68,6 +68,29 @@ final class StructuredOutputCoercer
             $data    = array_intersect_key($data, $allowed);
         }
 
+        // Gemini often overshoots summary/meta maxLength; truncate rather than fail.
+        $data = $this->truncateToSchemaLimits($data, $properties);
+
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @param array<string,array<string,mixed>> $properties
+     * @return array<string,mixed>
+     */
+    private function truncateToSchemaLimits(array $data, array $properties): array
+    {
+        foreach ($properties as $field => $prop) {
+            if (! is_array($prop) || ! array_key_exists($field, $data) || ! is_string($data[$field])) {
+                continue;
+            }
+            $max = (int) ($prop['maxLength'] ?? 0);
+            if ($max > 0 && mb_strlen($data[$field]) > $max) {
+                $data[$field] = mb_substr($data[$field], 0, $max);
+            }
+        }
+
         return $data;
     }
 
