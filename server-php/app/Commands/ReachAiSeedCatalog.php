@@ -89,16 +89,18 @@ class ReachAiSeedCatalog extends BaseCommand
             // When OpenAI key exists but prefer is empty, still default openai — ops
             // must pass --prefer=gemini after OpenAI quota exhaustion.
             if ($prefer === 'gemini' && $geminiFlash > 0) {
-                $primaryDraftModel = $geminiFlash;
+                $primaryDraftModel  = $geminiFlash;
                 $fallbackDraftModel = $gptMini;
+                $crossReviewModel   = $geminiFlash; // do not send reviews to out-of-quota OpenAI
             } elseif ($prefer === 'openai' && $gptMini > 0) {
-                $primaryDraftModel = $gptMini;
+                $primaryDraftModel  = $gptMini;
                 $fallbackDraftModel = $geminiFlash;
+                $crossReviewModel   = $geminiFlash > 0 ? $geminiFlash : $gptMini;
             } else {
-                $primaryDraftModel = $this->envSet('AI_OPENAI_API_KEY') && $gptMini > 0 ? $gptMini : $geminiFlash;
+                $primaryDraftModel  = $this->envSet('AI_OPENAI_API_KEY') && $gptMini > 0 ? $gptMini : $geminiFlash;
                 $fallbackDraftModel = ($primaryDraftModel === $gptMini) ? $geminiFlash : $gptMini;
+                $crossReviewModel   = ($primaryDraftModel === $gptMini && $geminiFlash > 0) ? $geminiFlash : $primaryDraftModel;
             }
-            $crossReviewModel = ($primaryDraftModel === $gptMini) ? $geminiFlash : $gptMini;
 
             $routeSpecs = [
                 ['draft_generation', 'blog_post', $primaryDraftModel, 100],
@@ -124,6 +126,10 @@ class ReachAiSeedCatalog extends BaseCommand
             // Ensure preferred model wins when older OpenAI / retired Gemini routes exist.
             $this->repointTaskRoutes($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
             $this->demoteOtherPrimaryModels($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
+            if ($crossReviewModel > 0) {
+                $this->repointTaskRoutes($db, ['editorial_review'], $crossReviewModel, $now);
+                $this->demoteOtherPrimaryModels($db, ['editorial_review'], $crossReviewModel, $now);
+            }
 
             if ($fallbackDraftModel > 0 && $fallbackDraftModel !== $primaryDraftModel) {
                 foreach ($routeIds as $route) {
