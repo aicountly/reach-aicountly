@@ -211,9 +211,13 @@ cd web && npm ci && npm run build
 # Every 30 minutes during allowed hours (server TZ should be Asia/Kolkata OR command converts)
 0,30 0-8,19-23 * * * cd /path/to/server-php && /usr/bin/php spark reach:blog-dispatch >> writable/logs/blog-dispatch.log 2>&1
 
+# Daily topic discovery — 00:15 Asia/Kolkata (before optimiser). Needs approved Knowledge clusters.
+# If server clock is UTC: 45 18 * * *
+15 0 * * * cd /path/to/server-php && /usr/bin/php spark reach:blog-discover-topics --limit=10 >> writable/logs/blog-discover.log 2>&1
+
 # Daily roadmap optimiser — 00:30 Asia/Kolkata.
 # The command refuses to run outside 00:00-00:59 IST unless --force is passed, so
-# it is safe even if the server clock is not Asia/Kolkata.
+# it is safe even if the server clock is not Asia/Kolkata. UTC hosts: 0 19 * * *
 30 0 * * * cd /path/to/server-php && /usr/bin/php spark reach:blog-optimize-roadmap >> writable/logs/blog-optimizer.log 2>&1
 
 # Existing worker (must keep running) — CRITICAL: reach:work only drains the queue(s)
@@ -222,9 +226,16 @@ cd web && npm ci && npm run build
 # App\Libraries\Publishing\Jobs\PublicationDeploymentService::enqueuePublicationJob).
 # A worker started with only "--queue=default" (as originally shipped) NEVER
 # processes those jobs — they sit "queued" forever. --queue accepts a
-# comma-separated list so one worker cron line drains all three:
-* * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --queue=default,blog,publishing --once --limit=20 >> writable/logs/worker.log 2>&1
+# comma-separated list so one worker cron line drains all three (+ community):
+* * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --queue=default,blog,publishing,community --once --limit=20 >> writable/logs/worker.log 2>&1
 * * * * * cd /path/to/server-php && /usr/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
+*/5 * * * * cd /path/to/server-php && /usr/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
+```
+
+After deploy (API keys already in `.env`):
+
+```bash
+php spark reach:ai-seed-catalog
 ```
 
 **Worker validation after deploy:** run `php spark reach:work --queue=default,blog,publishing --once --limit=1` manually once and confirm the `worker.start` log line lists all three queues, then check `SELECT queue, status, count(*) FROM reach_jobs GROUP BY queue, status;` — `blog` and `publishing` rows must not accumulate indefinitely in `pending`/`reserved` status.

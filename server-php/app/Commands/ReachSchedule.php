@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
+use Config\Database;
 use Config\Services;
 
 /**
@@ -11,6 +12,7 @@ use Config\Services;
  *
  *   1. Recover leases that have expired past `lease_expires_at`.
  *   2. Prune completed / dead-letter / cancelled jobs older than N days.
+ *   3. Self-heal empty AI model routes (blog drafts cannot run without them).
  *
  * Intended to run every minute via cron:
  *   * * * * * cd /path/to/server-php && php spark reach:schedule
@@ -33,15 +35,44 @@ class ReachSchedule extends BaseCommand
         // Dispatch scheduled Phase 2 jobs once per day (idempotent)
         $this->dispatchDailyJobs($svc);
 
+        $aiSeeded = $this->ensureAiCatalogSeeded();
+
         $out = json_encode([
             'event'     => 'schedule.tick',
             'ts'        => gmdate('c'),
             'recovered' => $recovered,
             'pruned'    => $pruned,
             'prune_days'=> $days,
+            'ai_catalog_seeded' => $aiSeeded,
         ], JSON_UNESCAPED_SLASHES);
         CLI::write($out);
         return 0;
+    }
+
+    /**
+     * Production once shipped with empty reach_ai_model_routes — drafts failed
+     * before any provider call. Re-seed automatically when the table is empty.
+     */
+    private function ensureAiCatalogSeeded(): bool
+    {
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('reach_ai_model_routes')) {
+                return false;
+            }
+            $count = (int) $db->table('reach_ai_model_routes')
+                ->where('enabled', true)
+                ->where('deleted_at IS NULL', null, false)
+                ->countAllResults();
+            if ($count > 0) {
+                return false;
+            }
+            $this->call('reach:ai-seed-catalog');
+            return true;
+        } catch (\Throwable $e) {
+            log_message('error', 'reach:schedule AI catalog seed failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**

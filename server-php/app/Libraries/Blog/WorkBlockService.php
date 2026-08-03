@@ -594,6 +594,7 @@ class WorkBlockService
         $refreshed = $requests->findById((int) $request['id']);
 
         if ($refreshed['status'] !== 'completed') {
+            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
             return $this->markFailed($id, self::TYPE_GENERATE_DRAFT, 'ai_generation_' . $refreshed['status']);
         }
 
@@ -602,6 +603,7 @@ class WorkBlockService
             ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
 
         if (! $artifact || ($artifact['schema_validation_status'] ?? '') !== 'passed') {
+            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
             return $this->markFailed($id, self::TYPE_GENERATE_DRAFT, 'schema_validation_failed');
         }
 
@@ -641,8 +643,28 @@ class WorkBlockService
      */
     private function executeFactVerify(int $id, array $block): array
     {
+        $contentItemId = (int) ($block['content_item_id'] ?? 0);
+
+        // Flag off must not dead-end the automation chain at draft.
         if (! $this->flags->isEnabled('fact_verification')) {
-            return $this->blockOnFlag($id, self::TYPE_FACT_VERIFY, 'fact_verification_disabled');
+            if ($contentItemId > 0) {
+                try {
+                    (new BlogStateMachine($this))->transition(
+                        $contentItemId,
+                        BlogStateMachine::FACT_VERIFIED,
+                        null,
+                        ['work_block_id' => $id, 'reason' => 'fact_verification_skipped_flag_off'],
+                    );
+                } catch (\Throwable) {
+                }
+            }
+            $output = [
+                'skipped'    => true,
+                'reason'     => 'fact_verification_disabled',
+                'block_type' => self::TYPE_FACT_VERIFY,
+            ];
+            $this->markCompleted($id, $output);
+            return $output;
         }
 
         $contentVersionId = (int) ($block['content_version_id'] ?? 0);
@@ -659,7 +681,6 @@ class WorkBlockService
             throw new \RuntimeException("Content version {$contentVersionId} not found");
         }
 
-        $contentItemId = (int) ($block['content_item_id'] ?? 0);
         if ($contentItemId > 0) {
             try {
                 (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::FACT_VERIFYING, null, ['work_block_id' => $id]);
@@ -870,11 +891,38 @@ class WorkBlockService
             return $output;
         }
 
+        // Successful cross-provider review still requires a human gate before
+        // APPROVED/publish — park the item in INTERNAL_REVIEW.
+        try {
+            (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
+                'work_block_id' => $id,
+                'reason'        => 'cross_review_completed',
+            ]);
+        } catch (\Throwable) {
+        }
+
+        $gateKey = "blog-{$contentItemId}-human_review_gate";
+        $gateRow = $this->db->table('reach_work_blocks')->where('idempotency_key', $gateKey)->get()->getRowArray();
+        if ($gateRow) {
+            $gateId = (int) $gateRow['id'];
+        } else {
+            $gateId = $this->create([
+                'block_type'         => self::TYPE_HUMAN_REVIEW_GATE,
+                'scope'              => 'blog',
+                'content_item_id'    => $contentItemId,
+                'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
+                'eligibility_status' => 'eligible',
+                'priority'           => 10,
+                'idempotency_key'    => $gateKey,
+            ]);
+        }
+
         $output = [
-            'generator_provider' => $generatorKey,
-            'reviewer_provider'  => $actualReviewer,
-            'same_provider'      => false,
+            'generator_provider'    => $generatorKey,
+            'reviewer_provider'     => $actualReviewer,
+            'same_provider'         => false,
             'generation_request_id' => $request['id'],
+            'human_review_gate_id'  => $gateId,
         ];
         $this->markCompleted($id, $output);
 
@@ -1530,6 +1578,21 @@ class WorkBlockService
         ]);
 
         return $output;
+    }
+
+    private function moveDraftGeneratingToFailed(int $contentItemId, BlogStateMachine $stateMachine, int $workBlockId): void
+    {
+        if ($contentItemId <= 0) {
+            return;
+        }
+        try {
+            $stateMachine->transition($contentItemId, BlogStateMachine::FAILED, null, [
+                'work_block_id' => $workBlockId,
+                'reason'        => 'generate_draft_failed',
+            ]);
+        } catch (\Throwable) {
+            // Best-effort — do not mask the original generation failure.
+        }
     }
 
     /**

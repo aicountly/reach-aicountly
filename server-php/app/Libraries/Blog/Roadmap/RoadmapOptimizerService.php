@@ -64,7 +64,14 @@ class RoadmapOptimizerService
             return $summary;
         }
 
-        $candidates = $this->loadCandidates($limit);
+        $discoverSummary = null;
+        $candidates      = $this->loadCandidates($limit);
+        // Safety net when discover cron is missing: top up the backlog from
+        // approved Knowledge topic clusters before scoring.
+        if ($candidates === [] && ! $dryRun && filter_var(env('BLOG_AUTO_DISCOVER_ON_OPTIMIZE', true), FILTER_VALIDATE_BOOL)) {
+            $discoverSummary = $this->topUpCandidatesFromClusters();
+            $candidates      = $this->loadCandidates($limit);
+        }
         $portfolioCounts = $this->signals->portfolioStreamCounts();
         $targetMix       = $this->signals->portfolioTargetMix();
 
@@ -190,6 +197,7 @@ class RoadmapOptimizerService
             'work_blocks_created'  => $workBlockCount,
             'dry_run'              => $dryRun,
             'ranked'               => $ranked,
+            'auto_discover'        => $discoverSummary,
         ];
 
         $this->completeRun($runId, 'completed', $summary, $weights, $started);
@@ -199,6 +207,60 @@ class RoadmapOptimizerService
         }
 
         return $summary;
+    }
+
+    /**
+     * Create candidates from approved Knowledge topic clusters when the
+     * optimiser backlog is empty (covers missing discover cron).
+     *
+     * @return array<string,mixed>
+     */
+    private function topUpCandidatesFromClusters(): array
+    {
+        $limit = max(1, (int) env('BLOG_ROADMAP_MAX_DAILY_CANDIDATES', 10));
+        $svc   = new WorkBlockService();
+        $key   = 'discover-topics-optimize-' . date('Y-m-d');
+
+        $existing = $this->db()->table('reach_work_blocks')
+            ->where('idempotency_key', $key)
+            ->get()
+            ->getRowArray();
+
+        if ($existing) {
+            $status = (string) ($existing['eligibility_status'] ?? '');
+            if ($status === 'completed') {
+                return [
+                    'work_block_id'      => (int) $existing['id'],
+                    'skipped'            => true,
+                    'reason'             => 'discover_already_ran_today',
+                    'candidates_created' => 0,
+                ];
+            }
+            $id = (int) $existing['id'];
+            $this->db()->table('reach_work_blocks')->where('id', $id)->update([
+                'eligibility_status' => 'eligible',
+                'updated_at'         => date('Y-m-d H:i:s'),
+            ]);
+        } else {
+            $id = $svc->create([
+                'block_type'         => WorkBlockService::TYPE_DISCOVER_TOPICS,
+                'eligibility_status' => 'eligible',
+                'priority'           => 5,
+                'input_json'         => ['limit' => $limit],
+                'idempotency_key'    => $key,
+            ]);
+        }
+
+        try {
+            $output = $svc->execute($id);
+            return array_merge(['work_block_id' => $id], $output);
+        } catch (\Throwable $e) {
+            return [
+                'work_block_id'      => $id,
+                'error'              => $e->getMessage(),
+                'candidates_created' => 0,
+            ];
+        }
     }
 
     private function createRun(string $forDate): int

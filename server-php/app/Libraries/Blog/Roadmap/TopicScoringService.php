@@ -99,6 +99,18 @@ class TopicScoringService
         $totalScore = max(0.0, round($rawTotal - $deductionTotal, 2));
         $inputs['missing_signals'] = array_values(array_unique($missingSignals));
 
+        // Cold-start: discovered/seeded topics have no Search Console history, so
+        // raw score stays near 0 and the optimiser HOLDs forever. Apply a floor
+        // so cron can CREATE_NEW without requiring human pin every time.
+        if ($this->shouldApplyColdStartFloor($candidate, $signals, $missingSignals)) {
+            $floor = (float) $this->envValue('BLOG_ROADMAP_COLD_START_SCORE', '55');
+            if ($totalScore < $floor) {
+                $inputs['cold_start_applied'] = true;
+                $inputs['cold_start_from']    = $totalScore;
+                $totalScore = $floor;
+            }
+        }
+
         return [
             'total_score'     => $totalScore,
             'factors'         => $factors,
@@ -107,6 +119,49 @@ class TopicScoringService
             'weights'         => $weights->toArray(),
             'inputs'          => $inputs,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $candidate
+     * @param array<string,mixed> $signals
+     * @param list<string> $missingSignals
+     */
+    private function shouldApplyColdStartFloor(array $candidate, array $signals, array $missingSignals): bool
+    {
+        if (! filter_var($this->envValue('BLOG_ROADMAP_COLD_START_ENABLED', 'true'), FILTER_VALIDATE_BOOL)) {
+            return false;
+        }
+
+        // Near-duplicate / cannibalisation must still HOLD even on cold start.
+        if (! empty($signals['near_duplicate']) || ! empty($signals['cannibalisation'])) {
+            return false;
+        }
+
+        $source = (string) ($candidate['source'] ?? '');
+        if (in_array($source, ['work_block_discover_topics', 'cli_seed', 'manual_pilot'], true)) {
+            return true;
+        }
+
+        return in_array('content_identity', $missingSignals, true)
+            && empty($signals['impressions'])
+            && empty($signals['clicks']);
+    }
+
+    private function envValue(string $key, string $default): string
+    {
+        if (function_exists('env')) {
+            $value = env($key, $default);
+            if ($value !== null && $value !== false) {
+                return (string) $value;
+            }
+        }
+
+        $fromEnv = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+        if ($fromEnv === false || $fromEnv === null || $fromEnv === '') {
+            return $default;
+        }
+
+        return (string) $fromEnv;
     }
 
     /**

@@ -51,6 +51,23 @@ final class TopicScoringServiceTest extends TestCase
         $this->assertContains('product_priority', $score['inputs']['missing_signals']);
     }
 
+    public function testColdStartFloorAppliesForDiscoveredTopics(): void
+    {
+        putenv('BLOG_ROADMAP_COLD_START_ENABLED=true');
+        putenv('BLOG_ROADMAP_COLD_START_SCORE=55');
+        $_ENV['BLOG_ROADMAP_COLD_START_ENABLED'] = 'true';
+        $_ENV['BLOG_ROADMAP_COLD_START_SCORE'] = '55';
+
+        $score = $this->service->scoreCandidate(
+            ['id' => 9, 'source' => 'work_block_discover_topics', 'evidence_ready' => true],
+            ['missing_signals' => ['content_identity'], 'evidence_ready' => true],
+            ScoringWeights::defaults(),
+        );
+
+        $this->assertSame(55.0, $score['total_score']);
+        $this->assertTrue($score['inputs']['cold_start_applied'] ?? false);
+    }
+
     public function testDeductionsSubtractFromTotal(): void
     {
         $signals = [

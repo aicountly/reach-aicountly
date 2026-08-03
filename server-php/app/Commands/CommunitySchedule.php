@@ -2,9 +2,13 @@
 
 namespace App\Commands;
 
+use App\Enums\CommunityAnswerStatus;
+use App\Libraries\Community\OfficialAnswerPublishingService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
+use Config\Database;
 use Config\Services;
+use Throwable;
 
 /**
  * `php spark community:schedule` — periodic housekeeping for Community Q&A.
@@ -19,7 +23,7 @@ use Config\Services;
  * human, an approved intake feed), which this tick has no visibility into.
  * Everything scheduled here is infrastructure-only: detecting drift and
  * retrying/reconciling already-known records, never selecting new content
- * to act on.
+ * to act on. Due scheduled publishes are published here (lifecycle promise).
  *
  * Every enqueue below carries an idempotency_key derived from the current
  * time bucket so that overlapping or backed-up cron ticks cannot fan out
@@ -30,7 +34,7 @@ class CommunitySchedule extends BaseCommand
 {
     protected $group       = 'Reach';
     protected $name        = 'community:schedule';
-    protected $description = 'Housekeeping tick for Community Q&A: deployment retries, publication reconciliation, public-site change sync, daily analytics.';
+    protected $description = 'Housekeeping tick for Community Q&A: scheduled publish, deployment retries, reconciliation, sync, analytics.';
     protected $usage       = 'community:schedule';
 
     public function run(array $params): int
@@ -41,6 +45,7 @@ class CommunitySchedule extends BaseCommand
         $today  = date('Y-m-d');
 
         $enqueuedIds = [];
+        $publishedDue = $this->publishDueScheduledAnswers();
 
         // Every tick: sweep deployments whose backoff window has elapsed.
         $enqueuedIds['deployment_retry_sweep'] = $svc->enqueue(
@@ -93,11 +98,60 @@ class CommunitySchedule extends BaseCommand
         }
 
         CLI::write(json_encode([
-            'event'    => 'community_schedule.tick',
-            'ts'       => gmdate('c'),
-            'enqueued' => $enqueuedIds,
+            'event'          => 'community_schedule.tick',
+            'ts'             => gmdate('c'),
+            'enqueued'       => $enqueuedIds,
+            'scheduled_publish' => $publishedDue,
         ], JSON_UNESCAPED_SLASHES));
 
         return 0;
+    }
+
+    /**
+     * Publish answers that were approved and scheduled for a past time.
+     * Lifecycle.schedule() promises a dispatcher; this is that dispatcher.
+     *
+     * @return array{attempted:int,published:int,failed:int}
+     */
+    private function publishDueScheduledAnswers(): array
+    {
+        $stats = ['attempted' => 0, 'published' => 0, 'failed' => 0];
+
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('reach_community_official_answers')) {
+                return $stats;
+            }
+
+            $due = $db->table('reach_community_official_answers')
+                ->select('id')
+                ->where('status', CommunityAnswerStatus::Scheduled->value)
+                ->where('scheduled_at IS NOT NULL', null, false)
+                ->where('scheduled_at <=', date('Y-m-d H:i:s'))
+                ->orderBy('scheduled_at', 'ASC')
+                ->limit(10)
+                ->get()
+                ->getResultArray();
+
+            if ($due === []) {
+                return $stats;
+            }
+
+            $publisher = new OfficialAnswerPublishingService();
+            foreach ($due as $row) {
+                $stats['attempted']++;
+                try {
+                    $publisher->publish((int) $row['id'], null);
+                    $stats['published']++;
+                } catch (Throwable $e) {
+                    $stats['failed']++;
+                    log_message('error', 'community scheduled publish failed for answer ' . $row['id'] . ': ' . $e->getMessage());
+                }
+            }
+        } catch (Throwable $e) {
+            log_message('error', 'community scheduled publish sweep failed: ' . $e->getMessage());
+        }
+
+        return $stats;
     }
 }

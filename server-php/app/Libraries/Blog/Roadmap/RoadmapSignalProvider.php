@@ -46,11 +46,20 @@ class RoadmapSignalProvider
             $coverage = $this->clusterCoverage($clusterId);
             if ($coverage !== null) {
                 $signals['cluster_coverage'] = $coverage;
+                // Low coverage ⇒ high content gap (was gathered but never scored).
+                $signals['content_gap'] = max(0.0, min(1.0, 1.0 - (float) $coverage));
             } else {
                 $missingSignals[] = 'cluster_coverage';
+                // Unknown coverage for a clustered topic ⇒ treat as a full gap.
+                $signals['content_gap'] = 1.0;
             }
         } else {
             $missingSignals[] = 'cluster_coverage';
+            // Manual/seeded topics without a cluster still need a gap signal
+            // or they score 0 and never CREATE_NEW.
+            if (! isset($signals['content_gap'])) {
+                $signals['content_gap'] = 1.0;
+            }
         }
 
         if (array_key_exists('evidence_ready', $candidate)) {

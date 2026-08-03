@@ -55,7 +55,7 @@ class BlogStateMachine
         self::OUTLINE_DRAFT        => [self::OUTLINE_READY, self::CHANGES_REQUESTED],
         self::OUTLINE_READY        => [self::DRAFT_GENERATING, self::DRAFT],
         self::DRAFT_GENERATING     => [self::DRAFT, self::FAILED],
-        self::DRAFT                => [self::FACT_VERIFYING, self::SEO_REVIEW, self::INTERNAL_REVIEW, self::ARCHIVED],
+        self::DRAFT                => [self::FACT_VERIFYING, self::FACT_VERIFIED, self::SEO_REVIEW, self::INTERNAL_REVIEW, self::ARCHIVED],
         self::FACT_VERIFYING       => [self::FACT_VERIFIED, self::FAILED, self::CHANGES_REQUESTED],
         self::FACT_VERIFIED        => [self::SEO_REVIEW, self::INTERNAL_REVIEW],
         self::SEO_REVIEW           => [self::INTERNAL_REVIEW, self::CHANGES_REQUESTED, self::REJECTED],
@@ -77,7 +77,7 @@ class BlogStateMachine
         self::UNPUBLISHED          => [self::ARCHIVED, self::DRAFT],
         self::REJECTED             => [self::ARCHIVED, self::DRAFT],
         self::ARCHIVED             => [self::DRAFT, self::IDEA],
-        self::FAILED               => [self::DRAFT, self::BLOCKED, self::ARCHIVED],
+        self::FAILED               => [self::DRAFT, self::DRAFT_GENERATING, self::OUTLINE_READY, self::BLOCKED, self::ARCHIVED],
         self::BLOCKED              => [self::APPROVED, self::ARCHIVED],
     ];
 

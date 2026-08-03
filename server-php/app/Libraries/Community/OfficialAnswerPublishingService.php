@@ -425,11 +425,20 @@ class OfficialAnswerPublishingService
 
     private function handlePublishFailure(int $deploymentId, int $answerId, string $priorStatus, array $result): void
     {
+        $deployment = $this->deployModel->find($deploymentId) ?? [];
+        $attempts   = max(1, (int) ($deployment['attempt_count'] ?? 1));
+        $maxAttempts = max(1, (int) ($deployment['max_attempts'] ?? 5));
+        $exhausted  = $attempts >= $maxAttempts;
+
+        // First failure must enter retrying + next_retry_at so community:schedule
+        // retry sweep can pick it up (previously stuck forever as status=failed).
         $this->deployModel->update($deploymentId, [
-            'status'            => 'failed',
-            'last_error'        => $result['safe_error_message'] ?? 'unknown',
+            'status'              => $exhausted ? 'dead_letter' : 'retrying',
+            'attempt_count'       => $attempts,
+            'last_error'          => substr((string) ($result['safe_error_message'] ?? 'unknown'), 0, 500),
             'last_error_category' => $result['error_category'] ?? 'unknown',
-            'updated_at'        => date('Y-m-d H:i:s'),
+            'next_retry_at'       => $exhausted ? null : date('Y-m-d H:i:s', time() + $this->backoffSeconds($attempts)),
+            'updated_at'          => date('Y-m-d H:i:s'),
         ]);
 
         $this->answerRepo->transitionStatus(

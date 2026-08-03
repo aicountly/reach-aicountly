@@ -72,15 +72,28 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 # Every 30 minutes during allowed IST hours — enqueue blog work blocks.
 0,30 0-8,19-23 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-dispatch >> writable/logs/blog-dispatch.log 2>&1
 
+# Daily topic discovery — 00:15 Asia/Kolkata (before optimiser).
+# If the server clock is UTC, use: 45 18 * * *  (18:45 UTC = 00:15 IST).
+15 0 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-discover-topics --limit=10 >> writable/logs/blog-discover.log 2>&1
+
 # Daily roadmap optimiser — 00:30 Asia/Kolkata.
 # If the server clock is UTC, use: 0 19 * * *  (19:00 UTC = 00:30 IST).
 30 0 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-optimize-roadmap >> writable/logs/blog-optimizer.log 2>&1
 
-# Every minute — drain default + blog + publishing queues.
-* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing --once --limit=20 --worker-id=cron >> writable/logs/worker.log 2>&1
+# Every minute — drain default + blog + publishing + community queues.
+* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing,community --once --limit=20 --worker-id=cron >> writable/logs/worker.log 2>&1
 
-# Every minute — recover expired leases, prune old jobs (idempotent, cheap).
+# Every minute — recover expired leases, prune old jobs, self-heal empty AI routes.
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
+
+# Every 5 minutes — Community Q&A housekeeping (scheduled publish + retries).
+*/5 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
+```
+
+After every deploy (with AI keys already in `.env`):
+
+```bash
+php spark reach:ai-seed-catalog
 ```
 
 **If `writable/logs/` stays empty**, the crontab `cd` path is wrong, the

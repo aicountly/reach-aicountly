@@ -26,11 +26,13 @@ class ReachBlogAdvance extends BaseCommand
 
     /** @var array<string, string> */
     private const NEXT_BY_STATUS = [
-        BlogStateMachine::BRIEF_READY   => WorkBlockService::TYPE_GENERATE_OUTLINE,
-        BlogStateMachine::OUTLINE_READY => WorkBlockService::TYPE_GENERATE_DRAFT,
-        BlogStateMachine::DRAFT         => WorkBlockService::TYPE_FACT_VERIFY,
-        BlogStateMachine::FACT_VERIFIED => WorkBlockService::TYPE_SEO_OPTIMIZE,
-        BlogStateMachine::SEO_REVIEW    => WorkBlockService::TYPE_CROSS_REVIEW,
+        BlogStateMachine::BRIEF_READY      => WorkBlockService::TYPE_GENERATE_OUTLINE,
+        BlogStateMachine::OUTLINE_READY    => WorkBlockService::TYPE_GENERATE_DRAFT,
+        BlogStateMachine::DRAFT_GENERATING => WorkBlockService::TYPE_GENERATE_DRAFT,
+        BlogStateMachine::FAILED           => WorkBlockService::TYPE_GENERATE_DRAFT,
+        BlogStateMachine::DRAFT            => WorkBlockService::TYPE_FACT_VERIFY,
+        BlogStateMachine::FACT_VERIFIED    => WorkBlockService::TYPE_SEO_OPTIMIZE,
+        BlogStateMachine::SEO_REVIEW       => WorkBlockService::TYPE_CROSS_REVIEW,
     ];
 
     public function run(array $params): int
