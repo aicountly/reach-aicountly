@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Ai\Providers\GeminiProvider;
 use App\Libraries\Ai\Providers\OpenAiProvider;
 use App\Libraries\Ai\Providers\PerplexityProvider;
@@ -20,16 +21,22 @@ use Throwable;
  */
 class ReachAiSeedCatalog extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:ai-seed-catalog';
     protected $description = 'Seed AI provider/model catalog and blog generation routes.';
     protected $usage       = 'reach:ai-seed-catalog [--prefer=openai|gemini] [--force-enable]';
+    protected $options     = [
+        '--prefer'       => 'Primary provider for draft/brief routes: openai|gemini.',
+        '--force-enable' => 'Force-enable providers even if env keys look empty.',
+    ];
 
     public function run(array $params): int
     {
         $db = Database::connect();
         $now = date('Y-m-d H:i:s');
-        $prefer = strtolower((string) (CLI::getOption('prefer') ?? ($params['prefer'] ?? '')));
+        $prefer = strtolower((string) ($this->sparkOption('prefer', $params, '') ?? ''));
         $created = [
             'providers' => [],
             'models'    => [],
@@ -69,14 +76,18 @@ class ReachAiSeedCatalog extends BaseCommand
                 'context_limit'=> 128000,
             ], $now, $created);
 
+            // gemini-2.0-flash is retired on Google AI; use 2.5 Flash.
             $geminiFlash = $this->upsertModel($db, $geminiId, [
-                'model_key'    => 'gemini-2.0-flash',
-                'display_name' => 'Gemini 2.0 Flash',
+                'model_key'    => 'gemini-2.5-flash',
+                'display_name' => 'Gemini 2.5 Flash',
                 'model_family' => 'gemini',
                 'context_limit'=> 1000000,
             ], $now, $created);
+            $this->disableModelKey($db, $geminiId, 'gemini-2.0-flash', $now);
 
             // --prefer=gemini|openai overrides default OpenAI-first selection.
+            // When OpenAI key exists but prefer is empty, still default openai — ops
+            // must pass --prefer=gemini after OpenAI quota exhaustion.
             if ($prefer === 'gemini' && $geminiFlash > 0) {
                 $primaryDraftModel = $geminiFlash;
                 $fallbackDraftModel = $gptMini;
@@ -110,7 +121,8 @@ class ReachAiSeedCatalog extends BaseCommand
                 ];
             }
 
-            // Ensure preferred model wins when older OpenAI routes still exist.
+            // Ensure preferred model wins when older OpenAI / retired Gemini routes exist.
+            $this->repointTaskRoutes($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
             $this->demoteOtherPrimaryModels($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
 
             if ($fallbackDraftModel > 0 && $fallbackDraftModel !== $primaryDraftModel) {
@@ -293,7 +305,44 @@ class ReachAiSeedCatalog extends BaseCommand
             ->where('primary_model_id !=', $keepModelId)
             ->where('deleted_at IS NULL', null, false)
             ->update([
+                'enabled'    => false,
                 'priority'   => 10,
+                'updated_at' => $now,
+            ]);
+    }
+
+    /**
+     * Point existing task routes at the preferred model so prefer=gemini actually
+     * replaces OpenAI primaries instead of only inserting parallel rows.
+     *
+     * @param list<string> $taskTypes
+     */
+    private function repointTaskRoutes($db, array $taskTypes, int $modelId, string $now): void
+    {
+        if ($modelId <= 0 || $taskTypes === []) {
+            return;
+        }
+
+        $db->table('reach_ai_model_routes')
+            ->whereIn('task_type', $taskTypes)
+            ->where('deleted_at IS NULL', null, false)
+            ->update([
+                'primary_model_id' => $modelId,
+                'enabled'          => true,
+                'updated_at'       => $now,
+            ]);
+    }
+
+    private function disableModelKey($db, int $providerId, string $modelKey, string $now): void
+    {
+        if ($providerId <= 0 || $modelKey === '') {
+            return;
+        }
+        $db->table('reach_ai_models')
+            ->where('provider_id', $providerId)
+            ->where('model_key', $modelKey)
+            ->update([
+                'enabled'    => false,
                 'updated_at' => $now,
             ]);
     }

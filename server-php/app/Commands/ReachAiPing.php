@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\AiProviderRegistry;
 use CodeIgniter\CLI\BaseCommand;
@@ -13,15 +14,21 @@ use Throwable;
  */
 class ReachAiPing extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:ai-ping';
     protected $description = 'Smoke-test OpenAI/Gemini connectivity and a tiny structured generation call.';
-    protected $usage       = 'reach:ai-ping [--provider=openai] [--generate]';
+    protected $usage       = 'reach:ai-ping [--provider=openai|gemini] [--generate]';
+    protected $options     = [
+        '--provider' => 'Provider key to test (openai|gemini|perplexity|mock).',
+        '--generate' => 'Also run a tiny structured generation call.',
+    ];
 
     public function run(array $params): int
     {
-        $providerKey = (string) (CLI::getOption('provider') ?? ($params['provider'] ?? 'openai'));
-        $doGenerate  = CLI::getOption('generate') !== null || array_key_exists('generate', $params);
+        $providerKey = (string) ($this->sparkOption('provider', $params, 'openai') ?? 'openai');
+        $doGenerate  = $this->sparkFlag('generate', $params);
 
         $registry = new AiProviderRegistry();
         $report   = [
@@ -58,7 +65,7 @@ class ReachAiPing extends BaseCommand
                             'ping' => ['type' => 'string'],
                         ],
                     ],
-                    modelKey: $providerKey === 'gemini' ? 'gemini-2.0-flash' : 'gpt-4o-mini',
+                    modelKey: $providerKey === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini',
                     maxOutputTokens: 64,
                     timeoutSeconds: 45,
                 ));
