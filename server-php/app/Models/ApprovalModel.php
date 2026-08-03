@@ -18,9 +18,13 @@ class ApprovalModel extends Model
         'subject_type', 'subject_id', 'summary', 'requested_by',
         'decision', 'decided_by', 'decided_at', 'note',
         'console_synced_at', 'metadata',
+        'stage', 'stage_config',
     ];
 
-    protected array $casts = ['metadata' => '?json-array'];
+    protected array $casts = [
+        'metadata'     => '?json-array',
+        'stage_config' => '?json-array',
+    ];
 
     public function pendingCount(): int
     {

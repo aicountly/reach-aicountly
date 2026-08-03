@@ -5,7 +5,6 @@ namespace App\Libraries;
 use App\Models\Content\ContentItemModel;
 use App\Models\Content\ContentValidationModel;
 use App\Models\ApprovalModel;
-use App\Libraries\ApprovalPolicy;
 use App\Libraries\NotificationService;
 
 /**
@@ -52,7 +51,6 @@ class ContentWorkflowService
 
     private ContentItemModel      $items;
     private ApprovalModel         $approvals;
-    private ApprovalPolicy        $policy;
     private NotificationService   $notifications;
     private AuditLogger           $audit;
 
@@ -60,7 +58,6 @@ class ContentWorkflowService
     {
         $this->items         = new ContentItemModel();
         $this->approvals     = new ApprovalModel();
-        $this->policy        = new ApprovalPolicy();
         $this->notifications = new NotificationService();
         $this->audit         = new AuditLogger();
     }
@@ -150,37 +147,49 @@ class ContentWorkflowService
             throw new \RuntimeException("Content item {$contentItemId} not found.");
         }
 
+        // Ensure stage rows exist (handles items submitted before stage was writable).
+        $requiredStages = $this->requiredStages($item);
+        $requesterActor = ['id' => $item['created_by_user_id'] ?? $actor['id'] ?? null];
+        $this->initApprovalStages($contentItemId, $requiredStages, $requesterActor);
+
         $approval = $this->getCurrentStageApproval($contentItemId, $stage);
         if (!$approval) {
             throw new \RuntimeException("No pending approval found for stage '{$stage}'.");
         }
 
-        $result = $this->policy->canApprove(
-            subject:    ['type' => 'content_item', 'id' => $contentItemId],
-            approval:   $approval,
-            actor:      ['id' => $actor['id'] ?? null, 'role' => $actor['role'] ?? null],
-            extra:      ['comment' => $comment]
-        );
-
-        if (!$result->isAllowed()) {
-            throw new \RuntimeException($result->reason());
+        // Route already enforces content.approve; still block same-actor self-approval.
+        $actorId     = (int) ($actor['id'] ?? 0);
+        $requestedBy = (int) ($approval['requested_by'] ?? 0);
+        if ($actorId > 0 && $requestedBy > 0 && $actorId === $requestedBy) {
+            throw new \RuntimeException(
+                'Self-approval is not allowed. Another user with content.approve must approve this item.'
+            );
         }
 
-        $this->approvals->update($approval['id'], [
-            'status'       => 'approved',
-            'reviewed_by'  => $actor['id'] ?? null,
-            'reviewed_at'  => date('Y-m-d H:i:s'),
-            'review_notes' => $comment,
-        ]);
+        // UI approve actions send final_approval; complete any still-pending
+        // earlier stages so the item can reach workflow_status=approved.
+        $stagesToApprove = ($stage === 'final_approval')
+            ? $requiredStages
+            : [$stage];
+
+        foreach ($stagesToApprove as $stageName) {
+            $row = $this->getCurrentStageApproval($contentItemId, $stageName);
+            if (!$row) {
+                continue;
+            }
+            $this->approvals->update($row['id'], [
+                'decision'   => 'approved',
+                'decided_by' => $actor['id'] ?? null,
+                'decided_at' => date('Y-m-d H:i:s'),
+                'note'       => $comment !== '' ? $comment : null,
+            ]);
+        }
 
         $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_APPROVED, 'content', $contentItemId, null, null, [
             'stage' => $stage,
         ]);
 
-        // Check if all required stages are approved → final transition
-        $requiredStages = $this->requiredStages($item);
-        $allApproved    = $this->allStagesApproved($contentItemId, $requiredStages);
-        if ($allApproved) {
+        if ($this->allStagesApproved($contentItemId, $requiredStages)) {
             $this->items->update($contentItemId, [
                 'workflow_status' => 'approved',
                 'approval_status' => 'approved',
@@ -204,10 +213,10 @@ class ContentWorkflowService
         $approval = $this->getCurrentStageApproval($contentItemId, $stage);
         if ($approval) {
             $this->approvals->update($approval['id'], [
-                'status'       => 'rejected',
-                'reviewed_by'  => $actor['id'] ?? null,
-                'reviewed_at'  => date('Y-m-d H:i:s'),
-                'review_notes' => $reason,
+                'decision'   => 'rejected',
+                'decided_by' => $actor['id'] ?? null,
+                'decided_at' => date('Y-m-d H:i:s'),
+                'note'       => $reason,
             ]);
         }
 
@@ -267,17 +276,21 @@ class ContentWorkflowService
     private function initApprovalStages(int $contentItemId, array $stages, array $actor): void
     {
         foreach ($stages as $stage) {
-            $existing = $this->getCurrentStageApproval($contentItemId, $stage);
+            $existing = $this->approvals
+                ->where('subject_type', 'content_item')
+                ->where('subject_id', $contentItemId)
+                ->where('stage', $stage)
+                ->first();
             if ($existing) {
                 continue;
             }
             $this->approvals->insert([
-                'subject_type'  => 'content_item',
-                'subject_id'    => $contentItemId,
-                'status'        => 'pending',
-                'stage'         => $stage,
-                'requested_by'  => $actor['id'] ?? null,
-                'requested_at'  => date('Y-m-d H:i:s'),
+                'subject_type' => 'content_item',
+                'subject_id'   => $contentItemId,
+                'decision'     => 'pending',
+                'stage'        => $stage,
+                'requested_by' => $actor['id'] ?? null,
+                'summary'      => "Content item stage: {$stage}",
             ]);
         }
     }
@@ -288,7 +301,7 @@ class ContentWorkflowService
             ->where('subject_type', 'content_item')
             ->where('subject_id', $contentItemId)
             ->where('stage', $stage)
-            ->where('status', 'pending')
+            ->where('decision', 'pending')
             ->first();
     }
 
@@ -299,7 +312,7 @@ class ContentWorkflowService
                 ->where('subject_type', 'content_item')
                 ->where('subject_id', $contentItemId)
                 ->where('stage', $stage)
-                ->where('status', 'approved')
+                ->where('decision', 'approved')
                 ->countAllResults();
             if (!$approved) {
                 return false;
