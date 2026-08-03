@@ -38,16 +38,24 @@ class ContentItemController extends BaseContentController
 
     public function index()
     {
+        $workflowStatus = $this->request->getGet('workflow_status');
         $filters = [
-            'content_type'    => $this->request->getGet('content_type'),
-            'workflow_status' => $this->request->getGet('workflow_status'),
-            'approval_status' => $this->request->getGet('approval_status'),
-            'risk_level'      => $this->request->getGet('risk_level'),
+            'content_type'       => $this->request->getGet('content_type'),
+            'approval_status'    => $this->request->getGet('approval_status'),
+            'risk_level'         => $this->request->getGet('risk_level'),
             'primary_product_id' => $this->request->getGet('product_id'),
-            'market_id'       => $this->request->getGet('market_id'),
-            'search'          => $this->request->getGet('search'),
+            'market_id'          => $this->request->getGet('market_id'),
+            'search'             => $this->request->getGet('search'),
         ];
-        $filters = array_filter($filters);
+
+        // Support comma-separated statuses for BCC queues (e.g. internal_review,seo_review).
+        if (is_string($workflowStatus) && str_contains($workflowStatus, ',')) {
+            $filters['workflow_statuses'] = array_values(array_filter(array_map('trim', explode(',', $workflowStatus))));
+        } elseif ($workflowStatus) {
+            $filters['workflow_status'] = $workflowStatus;
+        }
+
+        $filters = array_filter($filters, static fn ($v) => $v !== null && $v !== '' && $v !== []);
 
         [, $limit] = $this->pagination();
         $items = $this->contentItems->listPaged($filters, $limit);
@@ -59,6 +67,35 @@ class ContentItemController extends BaseContentController
         $item = $this->findItem($id);
         if ($item instanceof \CodeIgniter\HTTP\ResponseInterface) {
             return $item;
+        }
+
+        $include = (string) ($this->request->getGet('include') ?? '');
+        if ($include !== '' && str_contains($include, 'current_version')) {
+            $db = \Config\Database::connect();
+            $versionId = (int) ($item['current_version_id'] ?? 0);
+            if ($versionId > 0) {
+                $version = $db->table('reach_content_versions')
+                    ->where('id', $versionId)
+                    ->where('content_item_id', $item['id'])
+                    ->get()
+                    ->getRowArray();
+                $item['current_version'] = $version ?: null;
+            } else {
+                $item['current_version'] = null;
+            }
+
+            $profile = $db->table('reach_blog_publication_profiles')
+                ->where('content_item_id', $item['id'])
+                ->get()
+                ->getRowArray();
+            $item['publication_profile'] = $profile ?: null;
+
+            $media = $db->table('reach_content_media_requirements')
+                ->where('content_item_id', $item['id'])
+                ->orderBy('id', 'ASC')
+                ->get()
+                ->getResultArray();
+            $item['media_requirements'] = $media;
         }
 
         $item['knowledge_maps'] = $this->mapping->getMappings($item['id']);

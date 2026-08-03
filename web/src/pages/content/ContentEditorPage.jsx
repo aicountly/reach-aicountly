@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { contentService } from '../../services/contentService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
@@ -12,8 +12,8 @@ function RichEditor({ value, onChange, disabled }) {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      rows={14}
-      placeholder="Write your content here…"
+      rows={18}
+      placeholder="Write your content here (HTML supported)…"
       style={{ width: '100%', borderRadius: 4, border: '1px solid #d1d5db', padding: '8px 10px', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
     />
   );
@@ -22,7 +22,12 @@ function RichEditor({ value, onChange, disabled }) {
 export function ContentEditorPage() {
   const { id } = useParams();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
+
   const [item, setItem]       = useState(null);
+  const [title, setTitle]     = useState('');
+  const [summary, setSummary] = useState('');
   const [body, setBody]       = useState({ body_html: '', body_markdown: '', body_plain_text: '', change_summary: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -31,20 +36,18 @@ export function ContentEditorPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await contentService.getItem(id);
+      const data = await contentService.getItem(id, 'current_version');
       setItem(data);
-      // Populate with current version body
-      if (data.current_version_id) {
-        const versions = await contentService.listVersions(id);
-        const cur = (versions.versions || []).find((v) => v.is_current);
-        if (cur) {
-          setBody({
-            body_html:       cur.body_html || '',
-            body_markdown:   cur.body_markdown || '',
-            body_plain_text: cur.body_plain_text || '',
-            change_summary:  '',
-          });
-        }
+      setTitle(data.title || '');
+      setSummary(data.summary || data.current_version?.summary || '');
+      const cur = data.current_version;
+      if (cur) {
+        setBody({
+          body_html:       cur.body_html || '',
+          body_markdown:   cur.body_markdown || '',
+          body_plain_text: cur.body_plain_text || '',
+          change_summary:  '',
+        });
       }
     } catch (e) {
       setError(e.message);
@@ -60,9 +63,16 @@ export function ContentEditorPage() {
     setSaving(true);
     setError(null);
     try {
-      const versionData = { ...body };
-      await contentService.updateItem(id, { title: item.title, version: versionData });
-      nav(ROUTES.CONTENT_DETAIL.replace(':id', id));
+      await contentService.updateItem(id, {
+        title,
+        summary,
+        version: {
+          ...body,
+          title,
+          summary,
+        },
+      });
+      nav(returnTo || ROUTES.CONTENT_DETAIL.replace(':id', id));
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -73,13 +83,37 @@ export function ContentEditorPage() {
   if (error && !item) return <Alert variant="danger">{error}</Alert>;
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div style={{ maxWidth: 960 }}>
       <div className="page-header">
-        <h1>Edit: {item?.title}</h1>
+        <h1>Edit blog content</h1>
+        <p className="text-sm text-muted">
+          Saving creates a new immutable version. If this post was already approved, high-risk items may need re-approval before publish.
+        </p>
       </div>
       {error && <Alert variant="danger">{error}</Alert>}
       <Card>
         <form onSubmit={handleSave}>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={saving}
+              required
+              style={{ width: '100%', borderRadius: 4, border: '1px solid #d1d5db', padding: '7px 10px', fontSize: 14, fontWeight: 600 }}
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Summary</label>
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              rows={3}
+              disabled={saving}
+              style={{ width: '100%', borderRadius: 4, border: '1px solid #d1d5db', padding: '7px 10px', fontSize: 13 }}
+            />
+          </div>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Content Body (HTML)</label>
             <RichEditor
@@ -89,7 +123,7 @@ export function ContentEditorPage() {
             />
           </div>
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Plain Text</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Plain Text (fallback)</label>
             <textarea
               value={body.body_plain_text}
               onChange={(e) => setBody((b) => ({ ...b, body_plain_text: e.target.value }))}
@@ -108,12 +142,20 @@ export function ContentEditorPage() {
             />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-            <button type="button" className="btn btn-ghost" onClick={() => nav(-1)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save new version'}</button>
+            <button type="button" className="btn btn-ghost" onClick={() => (returnTo ? nav(returnTo) : nav(-1))}>Cancel</button>
           </div>
         </form>
       </Card>
+
+      {body.body_html && (
+        <Card title="Live preview" style={{ marginTop: 16 }}>
+          <div
+            className="bcc-article-preview__body"
+            dangerouslySetInnerHTML={{ __html: body.body_html }}
+          />
+        </Card>
+      )}
     </div>
   );
 }
-

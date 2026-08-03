@@ -54,7 +54,11 @@ export const BCC_SECTIONS = [
     label: 'Verification and Approvals',
     path: ROUTES.BCC_VERIFICATION,
     leaves: [
-      { label: 'Verification Queue', path: ROUTES.BCC_VERIFICATION, treatment: 'SCAFFOLD', end: true },
+      {
+        label: 'Verification Queue',
+        path: ROUTES.BCC_VERIFICATION,
+        treatment: 'NEW',
+      },
       { label: 'Unsupported Claims', path: ROUTES.BCC_VERIFICATION_CLAIMS, treatment: 'SCAFFOLD' },
       { label: 'Source Review', path: ROUTES.BCC_VERIFICATION_SOURCES, treatment: 'SCAFFOLD' },
       { label: 'Risk Review', path: ROUTES.BCC_VERIFICATION_RISK, treatment: 'SCAFFOLD' },
@@ -84,9 +88,7 @@ export const BCC_SECTIONS = [
       {
         label: 'Published Blogs',
         path: ROUTES.BCC_PUBLISHED,
-        treatment: 'SHARED',
-        embed: 'published',
-        requires: 'publishing.view',
+        treatment: 'NEW',
       },
       {
         label: 'Publishing Calendar',

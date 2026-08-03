@@ -1,41 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Send } from 'lucide-react';
+import { Eye, Pencil, ExternalLink } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
-import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { extractImageUrls } from './BlogArticlePreview';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
-function reviewPath(id) {
-  return `/blog-command-centre/verification/review/${id}`;
-}
+const LIVE_STATUSES = 'published,live,publishing,publish_queued,verification_pending';
 
 /**
- * Ready to Publish — approved blog items with edit + publish actions.
+ * Published / live blogs — open full content and edit (new version) after go-live.
  */
-export function ReadyToPublishPage() {
+export function BlogPublishedManagePage() {
   const [items, setItems] = useState([]);
   const [previews, setPreviews] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [publishingId, setPublishingId] = useState(null);
-  const [notice, setNotice] = useState(null);
   const nav = useNavigate();
   const { has } = usePermission();
-  const canPublish = has('publishing.publish');
   const canEdit = has('content.edit');
 
   const load = useCallback(() => {
     setLoading(true);
-    setError(null);
     contentService.listItems({
       content_type: 'blog',
-      workflow_status: 'approved',
-      approval_status: 'approved',
+      workflow_status: LIVE_STATUSES,
     })
       .then(async (d) => {
         const list = d.items ?? d ?? [];
@@ -57,45 +49,27 @@ export function ReadyToPublishPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const publish = async (item) => {
-    if (!window.confirm(`Publish “${item.title}” to AICOUNTLY.com now?`)) return;
-    setPublishingId(item.id);
-    setNotice(null);
-    setError(null);
-    try {
-      await contentService.publishItem(item.id, item.current_version_id);
-      setNotice(`Queued publish for “${item.title}”. Check Publishing Attempts while the worker runs.`);
-      load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setPublishingId(null);
-    }
-  };
-
-  if (loading) return <Loader label="Loading approved blogs…" />;
+  if (loading) return <Loader label="Loading published blogs…" />;
 
   return (
     <div>
       <div className="page-header" style={{ marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0 }}>Ready to Publish</h2>
+          <h2 style={{ margin: 0 }}>Published Blogs</h2>
           <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-            Human-approved blogs. Review or edit the final draft, then publish to the live site.
+            Live and recently published posts. Edit creates a new version — republish after changes if needed.
           </p>
         </div>
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
-      {notice && <Alert variant="success">{notice}</Alert>}
 
       {items.length === 0 && !error && (
         <div className="empty-state">
-          <p>No blog items are ready to publish.</p>
+          <p>No published blog items yet.</p>
           <p className="text-sm text-muted">
-            Approve drafts from{' '}
-            <Link to={ROUTES.BCC_VERIFICATION}>Verification Queue</Link>
-            {' '}first. Approved posts will appear here.
+            After you approve and publish from{' '}
+            <Link to={ROUTES.BCC_PUBLISHING_READY}>Ready to Publish</Link>, posts appear here.
           </p>
         </div>
       )}
@@ -107,7 +81,9 @@ export function ReadyToPublishPage() {
           const thumb = full?.publication_profile?.featured_image_reference
             || extractImageUrls(version?.body_html || '')[0]
             || null;
-          const excerpt = version?.summary || item.summary || version?.body_plain_text?.slice(0, 200);
+          const liveUrl = full?.publication_profile?.canonical_url
+            || item.canonical_url
+            || null;
 
           return (
             <article key={item.id} className="bcc-review-card">
@@ -117,43 +93,34 @@ export function ReadyToPublishPage() {
                 )}
               </div>
               <div className="bcc-review-card__body">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <ContentStatusBadge status={item.workflow_status} />
-                  <ContentRiskBadge level={item.risk_level} />
-                </div>
-                <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>{item.title}</h3>
+                <ContentStatusBadge status={item.workflow_status} />
+                <h3 style={{ margin: '8px 0 6px', fontSize: 16 }}>{item.title}</h3>
                 <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>/{item.slug}</div>
-                {excerpt && (
+                {(version?.summary || item.summary) && (
                   <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
-                    {excerpt.length > 200 ? `${excerpt.slice(0, 200)}…` : excerpt}
+                    {(version?.summary || item.summary || '').slice(0, 200)}
                   </p>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => nav(reviewPath(item.id))}
+                    onClick={() => nav(`/blog-command-centre/verification/review/${item.id}`)}
                   >
-                    <Eye size={13} /> View full post
+                    <Eye size={13} /> View content
                   </button>
                   {canEdit && (
                     <Link
-                      to={`${ROUTES.CONTENT_EDIT.replace(':id', item.id)}?returnTo=${encodeURIComponent(ROUTES.BCC_PUBLISHING_READY)}`}
-                      className="btn btn-secondary btn-sm"
+                      to={`${ROUTES.CONTENT_EDIT.replace(':id', item.id)}?returnTo=${encodeURIComponent(ROUTES.BCC_PUBLISHED)}`}
+                      className="btn btn-primary btn-sm"
                     >
-                      <Pencil size={13} /> Edit before publish
+                      <Pencil size={13} /> Edit published content
                     </Link>
                   )}
-                  {canPublish && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      disabled={publishingId === item.id}
-                      onClick={() => publish(item)}
-                    >
-                      <Send size={13} />
-                      {publishingId === item.id ? 'Publishing…' : 'Publish now'}
-                    </button>
+                  {liveUrl && (
+                    <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                      <ExternalLink size={13} /> Open live
+                    </a>
                   )}
                 </div>
               </div>
@@ -165,4 +132,4 @@ export function ReadyToPublishPage() {
   );
 }
 
-export default ReadyToPublishPage;
+export default BlogPublishedManagePage;

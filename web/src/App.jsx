@@ -192,6 +192,9 @@ import { RoadmapOptimizerPage } from './pages/blog-command-centre/roadmap/Roadma
 import { ReadyToPublishPage } from './pages/blog-command-centre/ReadyToPublishPage.jsx';
 import { EmergencyUnpublishPage } from './pages/blog-command-centre/EmergencyUnpublishPage.jsx';
 import { PortfolioPerformancePage } from './pages/blog-command-centre/PortfolioPerformancePage.jsx';
+import { BlogReviewQueuePage } from './pages/blog-command-centre/BlogReviewQueuePage.jsx';
+import { BlogReviewDetailPage } from './pages/blog-command-centre/BlogReviewDetailPage.jsx';
+import { BlogPublishedManagePage } from './pages/blog-command-centre/BlogPublishedManagePage.jsx';
 import { BlogPortfolioSettingsPage } from './pages/blog-command-centre/settings/BlogPortfolioSettingsPage.jsx';
 import { AutomationWindowPage } from './pages/blog-command-centre/settings/AutomationWindowPage.jsx';
 import { PublicationRulesPage } from './pages/blog-command-centre/settings/PublicationRulesPage.jsx';
@@ -261,7 +264,8 @@ export default function App() {
           <Route path="pipeline/editorial" element={<BlogSharedEmbed embed="content-editorial" />} />
           <Route path="pipeline/research" element={<BlogScaffoldPage />} />
 
-          <Route path="verification" element={<BlogScaffoldPage />} />
+          <Route path="verification" element={<BlogReviewQueuePage />} />
+          <Route path="verification/review/:id" element={<BlogReviewDetailPage />} />
           <Route path="verification/unsupported-claims" element={<BlogScaffoldPage />} />
           <Route path="verification/source-review" element={<BlogScaffoldPage />} />
           <Route path="verification/risk-review" element={<BlogScaffoldPage />} />
@@ -277,7 +281,7 @@ export default function App() {
           <Route path="publishing/deployments" element={<BlogSharedEmbed embed="deployments" />} />
           <Route path="publishing/rollback" element={<BlogSharedEmbed embed="rollback" />} />
           <Route path="publishing/emergency-unpublish" element={<EmergencyUnpublishPage />} />
-          <Route path="published" element={<BlogSharedEmbed embed="published" />} />
+          <Route path="published" element={<BlogPublishedManagePage />} />
 
           <Route path="seo" element={<Navigate to="search" replace />} />
           <Route path="seo/search" element={<BlogDeepLinkRedirect />} />

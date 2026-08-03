@@ -120,18 +120,42 @@ class ContentItemService
             }
         }
 
-        $needsNewVersion = !empty($versionData) && in_array($item['workflow_status'], ['approved', 'scheduled', 'ready_for_publication'], true);
+        // Versions are immutable — any body edit creates a new current version.
+        $hasVersionPayload = !empty($versionData) && (
+            array_key_exists('body_html', $versionData)
+            || array_key_exists('body_markdown', $versionData)
+            || array_key_exists('body_plain_text', $versionData)
+            || array_key_exists('summary', $versionData)
+            || array_key_exists('title', $versionData)
+            || array_key_exists('structured_payload', $versionData)
+            || array_key_exists('change_summary', $versionData)
+        );
 
-        if ($needsNewVersion) {
+        $postPublishStatuses = [
+            'approved', 'scheduled', 'ready_for_publication',
+            'publish_queued', 'publishing', 'published', 'live', 'verification_pending',
+        ];
+        $needsReapproval = $hasVersionPayload && in_array($item['workflow_status'], $postPublishStatuses, true);
+
+        if ($needsReapproval) {
+            // Editing after approval/publish must revoke the old checksum approval path
+            // by dropping back to draft so the human gate runs again.
             $data['workflow_status'] = 'draft';
-            $data['approval_status'] = 'not_required';
+            $data['approval_status'] = 'pending';
         }
 
         $this->items->update($id, $data);
 
         $version = null;
-        if ($needsNewVersion && !empty($versionData)) {
-            $version = $this->createVersion($id, $data['title'] ?? $item['title'], $versionData, $actor, 'Post-approval edit');
+        if ($hasVersionPayload) {
+            $changeSummary = (string) ($versionData['change_summary'] ?? ($needsReapproval ? 'Post-approval edit' : 'Editorial edit'));
+            $version = $this->createVersion(
+                $id,
+                $data['title'] ?? $versionData['title'] ?? $item['title'],
+                $versionData,
+                $actor,
+                $changeSummary
+            );
             $this->items->update($id, ['current_version_id' => $version['id']]);
         }
 

@@ -33,7 +33,11 @@ export const contentService = {
     const qs = new URLSearchParams(params).toString();
     return request('GET', `/content/items${qs ? `?${qs}` : ''}`);
   },
-  getItem: (id) => request('GET', `/content/items/${id}`),
+  getItem: (id, include) => {
+    const qs = include ? `?include=${encodeURIComponent(include)}` : '';
+    return request('GET', `/content/items/${id}${qs}`);
+  },
+  getVersion: (id, versionId) => request('GET', `/content/items/${id}/versions/${versionId}`),
   createItem: (data) => request('POST', '/content/items', data),
   updateItem: (id, data) => request('PUT', `/content/items/${id}`, data),
   deleteItem: (id, reason) => request('DELETE', `/content/items/${id}`, { reason }),

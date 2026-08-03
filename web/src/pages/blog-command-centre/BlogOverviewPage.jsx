@@ -76,7 +76,7 @@ function buildCards(data) {
       key: 'production',
       title: 'Production',
       icon: Factory,
-      link: ROUTES.BCC_PIPELINE_DRAFTS,
+      link: reviewStage > 0 ? ROUTES.BCC_VERIFICATION : ROUTES.BCC_PIPELINE_DRAFTS,
       status: inProduction > 0 ? 'OK' : 'NO DATA',
       metrics: [
         metric('briefs/outlines', briefStage),
