@@ -78,7 +78,7 @@ If the connection shows `unhealthy`:
 1. Navigate to Publishing → Connections.
 2. Click "Check Health" to run an immediate health check.
 3. Review `last_health_error` for the failure reason.
-4. Verify the public site `REACH_SERVICE_TOKEN` and `REACH_SIGNING_KEY` environment variables match Reach's configuration.
+4. Verify aicountly.com `AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN` and `AICOUNTLY_PUBLIC_SITE_SIGNING_KEY` match Reach's configuration.
 
 ---
 

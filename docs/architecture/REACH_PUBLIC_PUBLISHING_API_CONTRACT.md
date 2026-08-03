@@ -480,9 +480,10 @@ Rate limit exceeded: HTTP 429 with `Retry-After: <seconds>`.
 ## 12. Public-Site Environment Variables Required
 
 ```
-REACH_SERVICE_TOKEN=          # Must match AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN
-REACH_SIGNING_KEY=            # Must match AICOUNTLY_PUBLIC_SITE_SIGNING_KEY
-REACH_KEY_ID=reach-v1         # Must match AICOUNTLY_PUBLIC_SITE_KEY_ID
+AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN=   # Same value on Reach and aicountly.com
+AICOUNTLY_PUBLIC_SITE_SIGNING_KEY=     # Same value on Reach and aicountly.com
+AICOUNTLY_PUBLIC_SITE_KEY_ID=reach-v1  # Same value on Reach and aicountly.com
+AICOUNTLY_PUBLIC_SITE_MAX_SKEW_SECONDS=300  # Public-site timestamp skew (optional)
 REACH_TIMESTAMP_TOLERANCE=60  # Seconds
 REACH_NONCE_TTL=300           # Seconds
 REACH_MAX_BODY_BYTES=2097152  # 2 MB

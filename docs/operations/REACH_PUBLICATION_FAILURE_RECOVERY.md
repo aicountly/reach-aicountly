@@ -45,9 +45,9 @@ The retry service handles this automatically. If the deployment does not recover
 
 ### auth_error
 
-1. Verify `AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN` in Reach `.env` matches `REACH_SERVICE_TOKEN` on the public site.
-2. Verify `AICOUNTLY_PUBLIC_SITE_SIGNING_KEY` matches `REACH_SIGNING_KEY` on the public site.
-3. Verify `AICOUNTLY_PUBLIC_SITE_KEY_ID` matches `REACH_KEY_ID` on the public site.
+1. Verify `AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN` in Reach `.env` matches the same key/value on aicountly.com.
+2. Verify `AICOUNTLY_PUBLIC_SITE_SIGNING_KEY` matches on both sides.
+3. Verify `AICOUNTLY_PUBLIC_SITE_KEY_ID` matches on both sides (default `reach-v1`).
 4. Check clock synchronisation between Reach and public site servers (timestamp tolerance is 60 seconds).
 5. After fixing credentials, re-queue the deployment.
 

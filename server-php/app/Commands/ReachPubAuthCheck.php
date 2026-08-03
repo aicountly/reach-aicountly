@@ -55,21 +55,22 @@ class ReachPubAuthCheck extends BaseCommand
                 'error' => $healthErr,
             ],
             'match_on_public_site' => [
-                'REACH_SERVICE_TOKEN' => 'must equal AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN',
-                'REACH_SIGNING_KEY'   => 'must equal AICOUNTLY_PUBLIC_SITE_SIGNING_KEY',
-                'REACH_KEY_ID'        => 'must equal AICOUNTLY_PUBLIC_SITE_KEY_ID (default reach-v1)',
+                'AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN'     => 'same value as Reach api/.env',
+                'AICOUNTLY_PUBLIC_SITE_SIGNING_KEY'       => 'same value as Reach api/.env',
+                'AICOUNTLY_PUBLIC_SITE_KEY_ID'            => 'same value as Reach api/.env (default reach-v1)',
+                'AICOUNTLY_PUBLIC_SITE_MAX_SKEW_SECONDS'  => 'optional on public site (default 300)',
             ],
             'next' => [],
         ];
 
         if ($baseUrl === '' || $token === '' || $signing === '') {
-            $report['next'][] = 'Set AICOUNTLY_PUBLIC_SITE_BASE_URL, _SERVICE_TOKEN, and _SIGNING_KEY in api/.env';
-            $report['next'][] = 'Mirror the same values as REACH_SERVICE_TOKEN / REACH_SIGNING_KEY / REACH_KEY_ID on aicountly.com';
+            $report['next'][] = 'Set AICOUNTLY_PUBLIC_SITE_BASE_URL, _SERVICE_TOKEN, and _SIGNING_KEY in Reach api/.env';
+            $report['next'][] = 'Use the same AICOUNTLY_PUBLIC_SITE_* names and values on aicountly.com (not REACH_SERVICE_TOKEN / REACH_SIGNING_KEY).';
         } elseif (! $healthOk) {
             $report['next'][] = 'Public /reach/v1/health failed — confirm publisher is deployed on aicountly.com and BASE_URL is correct.';
             $report['next'][] = 'curl -sS ' . $baseUrl . '/reach/v1/health';
         } else {
-            $report['next'][] = 'Health OK. If deployments still return authentication_error, tokens/signing keys do not match the public site.';
+            $report['next'][] = 'Health OK. If deployments still return authentication_error, AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN / _SIGNING_KEY / _KEY_ID do not match between Reach and aicountly.com.';
             $report['next'][] = 'After fixing tokens: php spark reach:blog-advance --dispatch && php spark reach:work --queue blog,publishing,community,default --limit 40';
         }
 

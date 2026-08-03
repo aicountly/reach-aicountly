@@ -75,8 +75,8 @@ Two mechanisms prevent replayed requests:
 |--------|---------|----------------|
 | `AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN` | `.env` file (Reach) | DB, logs, frontend |
 | `AICOUNTLY_PUBLIC_SITE_SIGNING_KEY` | `.env` file (Reach) | DB, logs, frontend |
-| `REACH_SERVICE_TOKEN` | `.env` file (public site) | DB, logs, frontend |
-| `REACH_SIGNING_KEY` | `.env` file (public site) | DB, logs, frontend |
+| `AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN` | `.env` on Reach and aicountly.com | DB, logs, frontend |
+| `AICOUNTLY_PUBLIC_SITE_SIGNING_KEY` | `.env` on Reach and aicountly.com | DB, logs, frontend |
 
 The `HmacSigner` class in Reach never includes raw secrets in any generated header except the `Authorization: Bearer` header (which contains the service token only, not the signing key).
 
