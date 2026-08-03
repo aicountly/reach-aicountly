@@ -87,16 +87,21 @@ class ReachBlogFailures extends BaseCommand
                 'routes'             => [],
             ];
             if ($db->tableExists('reach_ai_model_routes')) {
-                $routes = $db->table('reach_ai_model_routes r')
-                    ->select('r.task_type, r.content_type, r.priority, r.is_enabled, m.model_key, p.provider_key, p.is_enabled AS provider_enabled')
-                    ->join('reach_ai_models m', 'm.id = r.model_id', 'left')
-                    ->join('reach_ai_providers p', 'p.id = m.provider_id', 'left')
-                    ->whereIn('r.task_type', ['draft_generation', 'brief_generation', 'editorial_review'])
-                    ->orderBy('r.task_type', 'ASC')
-                    ->orderBy('r.priority', 'DESC')
-                    ->get()
-                    ->getResultArray();
-                $aiConfig['routes'] = $routes;
+                try {
+                    $routes = $db->table('reach_ai_model_routes r')
+                        ->select('r.task_type, r.content_type, r.priority, r.enabled, m.model_key, m.enabled AS model_enabled, p.provider_key, p.status AS provider_status')
+                        ->join('reach_ai_models m', 'm.id = r.primary_model_id', 'left')
+                        ->join('reach_ai_providers p', 'p.id = m.provider_id', 'left')
+                        ->where('r.deleted_at IS NULL', null, false)
+                        ->whereIn('r.task_type', ['draft_generation', 'brief_generation', 'editorial_review'])
+                        ->orderBy('r.task_type', 'ASC')
+                        ->orderBy('r.priority', 'DESC')
+                        ->get()
+                        ->getResultArray();
+                    $aiConfig['routes'] = $routes;
+                } catch (Throwable $e) {
+                    $aiConfig['routes_error'] = $e->getMessage();
+                }
             }
 
             $items = [];
