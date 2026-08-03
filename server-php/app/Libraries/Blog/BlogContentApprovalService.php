@@ -70,6 +70,15 @@ class BlogContentApprovalService
             throw new \RuntimeException("Content version {$contentVersionId} does not belong to item {$contentItemId}");
         }
 
+        // Approvals FK approved_by → reach_actors (same id as reach_users when mirrored).
+        $actorId = \App\Libraries\ActorRegistry::idForUser($approverId);
+        if ($actorId === null || $actorId <= 0) {
+            throw new \RuntimeException(
+                "Approver #{$approverId} is missing from reach_actors; cannot record blog approval."
+            );
+        }
+        $approverId = $actorId;
+
         $checksum = $this->checksumForVersion($contentVersionId);
         $now      = date('Y-m-d H:i:s');
 
