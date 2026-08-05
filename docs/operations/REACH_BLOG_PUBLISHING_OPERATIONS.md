@@ -42,11 +42,27 @@ safeguards keep that off the listing:
    already on the site. Use this to clean those up:
 
    ```bash
-   php spark reach:blog-listing-audit                     # report only
-   php spark reach:blog-listing-audit --unpublish --fix   # take down + re-draft
-   php spark reach:blog-dispatch --force
+   php spark reach:blog-listing-audit                      # report only
+   php spark reach:blog-listing-audit --republish --covers # stale live copy + missing cover
+   php spark reach:blog-listing-audit --unpublish --fix    # placeholder bodies only
    php spark reach:work --queue blog,publishing --limit 40
    ```
+
+   **A healthy row in Reach does not mean a healthy card on the listing.** The
+   public site holds its own copy, taken at deploy time. If an article was
+   deployed while its body was still a placeholder and never republished after
+   the rewrite, Reach shows 1,000 words of real content while the listing still
+   renders "Untitled draft........". The report surfaces this as `live_copy`:
+
+   ```json
+   "live_copy": { "deployed_version_id": 1, "current_version_id": 2, "stale": true }
+   ```
+
+   `--republish` pushes the current approved version for those items.
+   `enqueuePublication` still enforces approval and full readiness, so a
+   republish fails loudly (e.g. "SEO profile is missing") rather than shipping
+   an incomplete payload. `--covers` queues cover generation for articles with
+   no featured image.
 
    The report flags placeholder bodies, unusable excerpts, missing covers and
    missing alt text per content item. `--unpublish` takes placeholder articles
@@ -166,6 +182,19 @@ To unpublish a blog post:
 ---
 
 ## Slug Changes
+
+Slugs are built by applying `[^a-z0-9]` to a **lowercased** title. Applying it
+to the raw title treats every capital as a separator and deletes it — that bug
+put posts live at `/blogs/ow-to-ile-1-ithout-ommon-istakes` instead of
+`/blogs/how-to-file-gstr-1-without-common-mistakes`. Fixed in
+`WorkBlockService::buildUniqueSlug` and `ContentItemModel::buildUniqueSlug`;
+new content is unaffected.
+
+`reach:blog-listing-audit` reports already-published items whose stored slug
+matches the old buggy output exactly, with the slug it should have had in
+`expected_slug`. It does **not** rewrite them: a live URL change needs the
+redirect handling below, and changing it silently would orphan any existing
+inbound links. Decide per post whether the SEO gain is worth the redirect.
 
 If a blog post's slug is changed after publication:
 

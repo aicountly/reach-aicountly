@@ -6,8 +6,11 @@ namespace App\Commands;
 
 use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Blog\BlogRedraftService;
+use App\Libraries\Blog\WorkBlockService;
+use App\Libraries\JobService;
 use App\Libraries\Publishing\Blog\BlogMetadataService;
 use App\Libraries\Publishing\Blog\PublishableContentGuard;
+use App\Libraries\Publishing\Jobs\PublicationDeploymentService;
 use App\Libraries\Publishing\Jobs\PublicationRollbackService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -42,13 +45,22 @@ class ReachBlogListingAudit extends BaseCommand
         'published', 'verification_pending', 'live',
     ];
 
+    /**
+     * Deployment statuses that mean "this copy is on the public site now".
+     * 'rolled_back' counts: a rollback reverts to a prior version but the
+     * article stays live.
+     */
+    private const LIVE_DEPLOYMENT_STATUSES = ['published', 'verified', 'rolled_back'];
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-listing-audit';
     protected $description = 'Audit published blogs for placeholder bodies, unusable excerpts and missing covers.';
-    protected $usage       = 'reach:blog-listing-audit [--fix] [--unpublish] [--limit=50] [--all]';
+    protected $usage       = 'reach:blog-listing-audit [--fix] [--unpublish] [--republish] [--covers] [--limit=50] [--all]';
     protected $options     = [
         '--fix'       => 'Re-queue a genuine draft for every placeholder body found.',
         '--unpublish' => 'Take placeholder articles down from the public site now.',
+        '--republish' => 'Push the current approved version for articles whose live copy is stale.',
+        '--covers'    => 'Queue cover generation for articles with no featured image.',
         '--limit'     => 'Max items to scan (default 50).',
         '--all'       => 'Scan every blog item, not just published/queued ones.',
     ];
@@ -57,6 +69,8 @@ class ReachBlogListingAudit extends BaseCommand
     {
         $fix       = $this->sparkFlag('fix', $params);
         $unpublish = $this->sparkFlag('unpublish', $params);
+        $republish = $this->sparkFlag('republish', $params);
+        $covers    = $this->sparkFlag('covers', $params);
         $all       = $this->sparkFlag('all', $params);
         $limit     = max(1, (int) ($this->sparkOption('limit', $params, '50') ?? '50'));
 
@@ -106,10 +120,34 @@ class ReachBlogListingAudit extends BaseCommand
                 $problems[] = 'No usable excerpt — the listing card would show placeholder text';
             }
 
-            if (trim((string) ($profile['featured_image_reference'] ?? '')) === '') {
+            $noCover = trim((string) ($profile['featured_image_reference'] ?? '')) === '';
+            if ($noCover) {
                 $problems[] = 'No featured image — the listing card would render without a cover';
             } elseif (trim((string) ($profile['featured_image_alt'] ?? '')) === '') {
                 $problems[] = 'Featured image has no alt text';
+            }
+
+            // What the public site is actually serving. A healthy row in Reach
+            // says nothing about the live copy: if the article was deployed
+            // while its body was still a placeholder and never republished
+            // after the rewrite, the listing keeps showing the old text.
+            $liveCopy = $this->liveCopyState($db, (int) $item['id'], (int) ($item['current_version_id'] ?? 0));
+            if ($liveCopy['stale']) {
+                $problems[] = sprintf(
+                    'Live copy is an older version (deployed version %d, current %d) — the public site still shows the old text',
+                    $liveCopy['deployed_version_id'],
+                    $liveCopy['current_version_id'],
+                );
+            } elseif ($liveCopy['deployment_id'] === null && in_array((string) $item['workflow_status'], ['published', 'live', 'verification_pending'], true)) {
+                $problems[] = 'Marked published in Reach but has no deployment — the live copy did not come from this connector';
+            }
+
+            $mangledSlug = self::mangledSlug((string) ($item['title'] ?? ''), (string) ($item['slug'] ?? ''));
+            if ($mangledSlug !== null) {
+                $problems[] = sprintf(
+                    'Slug lost its capitalised words to a slugify bug (expected "%s") — see "Slug Changes" before rewriting a live URL',
+                    $mangledSlug,
+                );
             }
 
             if ($problems === []) {
@@ -120,8 +158,10 @@ class ReachBlogListingAudit extends BaseCommand
                 'content_item_id' => (int) $item['id'],
                 'title'           => $item['title'] ?? null,
                 'slug'            => $item['slug'] ?? null,
+                'expected_slug'   => $mangledSlug,
                 'workflow_status' => $item['workflow_status'] ?? null,
                 'words'           => $verdict['words'],
+                'live_copy'       => $liveCopy,
                 'problems'        => $problems,
             ];
 
@@ -144,6 +184,26 @@ class ReachBlogListingAudit extends BaseCommand
                 }
             }
 
+            // Push the approved current version to the public site. Only for
+            // items whose body is already publishable — a stub gets redrafted,
+            // not republished — and enqueuePublication still enforces approval
+            // and readiness, so this cannot shortcut either gate.
+            if ($republish && ! $stubBody && $liveCopy['stale']) {
+                $finding['republish'] = $this->republishItem(
+                    (int) $item['id'],
+                    (int) ($item['current_version_id'] ?? 0),
+                );
+            }
+
+            // A cover is generated from the article itself when the gallery has
+            // nothing relevant, so this is safe to queue for any real article.
+            if ($covers && ! $stubBody && $noCover) {
+                $finding['cover'] = $this->queueCover(
+                    (int) $item['id'],
+                    (int) ($item['current_version_id'] ?? 0),
+                );
+            }
+
             $findings[] = $finding;
         }
 
@@ -159,16 +219,105 @@ class ReachBlogListingAudit extends BaseCommand
             'flagged'     => count($findings),
             'unpublished' => $tallied('takedown', 'unpublished'),
             'fixed'       => $tallied('action', 'redraft_queued'),
+            'republished' => $tallied('republish', 'queued'),
+            'covers'      => $tallied('cover', 'queued'),
             'findings'    => $findings,
             'next'        => $findings === [] ? [] : [
-                'php spark reach:blog-listing-audit --unpublish --fix',
-                'php spark reach:blog-dispatch --force',
+                'php spark reach:blog-listing-audit --republish --covers   # stale live copies + missing covers',
+                'php spark reach:blog-listing-audit --unpublish --fix      # placeholder bodies only',
                 'php spark reach:work --queue blog,publishing --limit 40',
-                'Approve the rewritten drafts in Reach — republish stays human-gated.',
+                'Approve the rewritten drafts in Reach — republish of a redrafted article stays human-gated.',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
         return 0;
+    }
+
+    /**
+     * What the public site is serving for this item, and whether it lags the
+     * current version in Reach.
+     *
+     * @return array{deployment_id:?int, status:?string, public_content_id:?int, deployed_version_id:int, current_version_id:int, stale:bool}
+     */
+    private function liveCopyState(\CodeIgniter\Database\BaseConnection $db, int $contentItemId, int $currentVersionId): array
+    {
+        $deployment = $db->table('reach_publication_deployments')
+            ->where('content_item_id', $contentItemId)
+            ->whereIn('status', self::LIVE_DEPLOYMENT_STATUSES)
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()->getRowArray();
+
+        $deployedVersionId = (int) ($deployment['content_version_id'] ?? 0);
+
+        return [
+            'deployment_id'       => isset($deployment['id']) ? (int) $deployment['id'] : null,
+            'status'              => $deployment['status'] ?? null,
+            'public_content_id'   => isset($deployment['public_content_id']) ? (int) $deployment['public_content_id'] : null,
+            'deployed_version_id' => $deployedVersionId,
+            'current_version_id'  => $currentVersionId,
+            'stale'               => $deployedVersionId > 0 && $currentVersionId > 0 && $deployedVersionId !== $currentVersionId,
+        ];
+    }
+
+    /**
+     * The slug this title should have produced, returned only when the stored
+     * slug is exactly what the old lowercase-after-strip bug would emit. Being
+     * that specific keeps deliberately customised slugs out of the report.
+     */
+    private static function mangledSlug(string $title, string $slug): ?string
+    {
+        $title = trim($title);
+        if ($title === '' || $slug === '') {
+            return null;
+        }
+
+        $correct = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($title)) ?? '', '-');
+        $buggy   = trim(strtolower(preg_replace('/[^a-z0-9]+/', '-', $title) ?? ''), '-');
+
+        return ($slug === $buggy && $buggy !== $correct) ? $correct : null;
+    }
+
+    /**
+     * Re-deploy the current version so the public copy matches Reach.
+     * enqueuePublication enforces approval and readiness itself.
+     */
+    private function republishItem(int $contentItemId, int $contentVersionId): string
+    {
+        if ($contentVersionId <= 0) {
+            return 'skipped_no_current_version';
+        }
+
+        try {
+            (new PublicationDeploymentService(new JobService()))
+                ->enqueuePublication($contentItemId, $contentVersionId, 'aicountly_com', 'publish');
+
+            return 'queued';
+        } catch (Throwable $e) {
+            return 'failed: ' . mb_substr($e->getMessage(), 0, 160);
+        }
+    }
+
+    /** Queue cover generation for an article that has none. */
+    private function queueCover(int $contentItemId, int $contentVersionId): string
+    {
+        try {
+            $workBlocks = new WorkBlockService();
+            $blockId    = $workBlocks->create([
+                'block_type'         => WorkBlockService::TYPE_GENERATE_IMAGE,
+                'scope'              => 'blog',
+                'content_item_id'    => $contentItemId,
+                'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
+                'eligibility_status' => 'eligible',
+                'priority'           => 5,
+                'idempotency_key'    => "blog-{$contentItemId}-listing-audit-cover-" . gmdate('YmdHis'),
+                'input_json'         => ['reason' => 'listing_audit_missing_cover'],
+            ]);
+
+            return $blockId > 0 ? 'queued' : 'failed: work block not created';
+        } catch (Throwable $e) {
+            return 'failed: ' . mb_substr($e->getMessage(), 0, 160);
+        }
     }
 
     /**
@@ -180,7 +329,7 @@ class ReachBlogListingAudit extends BaseCommand
     {
         $deployment = $db->table('reach_publication_deployments')
             ->where('content_item_id', $contentItemId)
-            ->whereIn('status', ['published', 'verified', 'rolled_back'])
+            ->whereIn('status', self::LIVE_DEPLOYMENT_STATUSES)
             ->orderBy('id', 'DESC')
             ->limit(1)
             ->get()->getRowArray();

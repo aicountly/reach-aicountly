@@ -2031,8 +2031,11 @@ class WorkBlockService
 
     public function buildUniqueSlug(string $title): string
     {
-        $base = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $title) ?? ''));
-        $base = trim($base, '-') ?: ('topic-' . bin2hex(random_bytes(4)));
+        // Lowercase FIRST: [^a-z0-9] treats every uppercase letter as a
+        // separator, so running it on the raw title silently ate the capital
+        // in every word — "How to File GSTR-1" became "ow-to-ile-1".
+        $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(trim($title))) ?? '', '-')
+            ?: ('topic-' . bin2hex(random_bytes(4)));
         $slug = $base;
         $i    = 1;
         while ($this->db->table('reach_content_items')->where('slug', $slug)->countAllResults() > 0) {
