@@ -41,7 +41,10 @@ class OfficialAnswerController extends BaseApiController
                 return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
             }
 
-            $items = $this->repo->listByStatus($status !== '' ? $status : 'draft_requested', $perPage);
+            // Empty status = "All" in the UI — list everything. The old
+            // 'draft_requested' default made the All view silently show a
+            // single status and hide failed/generated drafts entirely.
+            $items = $this->repo->listByStatus($status !== '' ? $status : null, $perPage);
 
             return $this->response->setJSON([
                 'data' => is_array($items) ? $items : [],

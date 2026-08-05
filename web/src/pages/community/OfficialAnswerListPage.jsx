@@ -3,20 +3,35 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
+// Values mirror App\Enums\CommunityAnswerStatus — the old list used
+// invented statuses (draft/generated/pending_approval) that exist nowhere,
+// so most filters returned nothing.
 const STATUS_OPTS = [
   { value: '', label: 'All' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'generated', label: 'Generated' },
-  { value: 'pending_approval', label: 'Pending approval' },
+  { value: 'draft_requested', label: 'Draft requested' },
+  { value: 'generating', label: 'Generating' },
+  { value: 'draft_generated', label: 'Draft generated' },
+  { value: 'validation_failed', label: 'Validation failed' },
+  { value: 'moderation_required', label: 'Moderation required' },
+  { value: 'editorial_review', label: 'Editorial review' },
+  { value: 'professional_review', label: 'Professional review' },
+  { value: 'changes_requested', label: 'Changes requested' },
   { value: 'approved', label: 'Approved' },
+  { value: 'scheduled', label: 'Scheduled' },
   { value: 'published', label: 'Published' },
   { value: 'withdrawn', label: 'Withdrawn' },
 ];
 const STATUS_CLASS = {
-  draft: 'badge--neutral',
-  generated: 'badge--info',
-  pending_approval: 'badge--warning',
+  draft_requested: 'badge--neutral',
+  generating: 'badge--info',
+  draft_generated: 'badge--info',
+  validation_failed: 'badge--error',
+  moderation_required: 'badge--warning',
+  editorial_review: 'badge--warning',
+  professional_review: 'badge--warning',
+  changes_requested: 'badge--warning',
   approved: 'badge--info',
+  scheduled: 'badge--info',
   published: 'badge--success',
   withdrawn: 'badge--error',
 };

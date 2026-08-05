@@ -135,9 +135,14 @@ class OfficialAnswerRepository
         ]);
     }
 
-    public function listByStatus(string $status, int $limit = 100): array
+    public function listByStatus(?string $status, int $limit = 100): array
     {
-        return $this->answerModel->where('status', $status)->limit($limit)->findAll();
+        $builder = $this->answerModel->orderBy('id', 'DESC')->limit($limit);
+        if ($status !== null && $status !== '') {
+            $builder = $builder->where('status', $status);
+        }
+
+        return $builder->findAll();
     }
 
     public function countByStatus(): array
