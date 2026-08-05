@@ -71,7 +71,7 @@ class ReachAiSeedCatalog extends BaseCommand
 
             // Text models are env-driven so upgrades never require a code change.
             $openaiModelKey = trim((string) (env('AI_OPENAI_DEFAULT_MODEL') ?: 'gpt-5-mini'));
-            $geminiModelKey = trim((string) (env('AI_GEMINI_DEFAULT_MODEL') ?: 'gemini-2.5-pro'));
+            $geminiModelKey = trim((string) (env('AI_GEMINI_DEFAULT_MODEL') ?: 'gemini-2.5-flash'));
 
             $openaiModel = $this->upsertModel($db, $openaiId, [
                 'model_key'    => $openaiModelKey,
