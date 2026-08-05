@@ -59,6 +59,11 @@ class JobHandlerRegistry
         // Phase 2 blog automation / publishing
         $this->handlers['reach.publication']                         = new PublicationJob();
         $this->handlers['reach.blog_work_block']                     = new BlogWorkBlockJob();
+        // Content base + cover gallery (2026-08 automation revamp)
+        $this->handlers['reach.content_base_sync']                   = new \App\Jobs\ContentBaseSyncJob();
+        $this->handlers['reach.gallery_deficit_alert']               = new \App\Jobs\GalleryDeficitAlertJob();
+        // SEO Command Centre daily snapshots
+        $this->handlers['reach.seo_snapshot']                        = new \App\Jobs\SeoSnapshotJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

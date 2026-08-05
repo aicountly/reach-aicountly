@@ -69,47 +69,48 @@ class ReachAiSeedCatalog extends BaseCommand
                 'configured'           => $this->envSet('AI_PERPLEXITY_API_KEY'),
             ], $now, $created);
 
-            $gptMini = $this->upsertModel($db, $openaiId, [
-                'model_key'    => 'gpt-4o-mini',
-                'display_name' => 'GPT-4o mini',
-                'model_family' => 'gpt-4o',
+            // Text models are env-driven so upgrades never require a code change.
+            $openaiModelKey = trim((string) (env('AI_OPENAI_DEFAULT_MODEL') ?: 'gpt-5-mini'));
+            $geminiModelKey = trim((string) (env('AI_GEMINI_DEFAULT_MODEL') ?: 'gemini-2.5-pro'));
+
+            $openaiModel = $this->upsertModel($db, $openaiId, [
+                'model_key'    => $openaiModelKey,
+                'display_name' => 'OpenAI ' . $openaiModelKey,
+                'model_family' => explode('-', $openaiModelKey)[0] . '-' . (explode('-', $openaiModelKey)[1] ?? ''),
                 'context_limit'=> 128000,
             ], $now, $created);
 
-            // gemini-2.0-flash is retired on Google AI; use 2.5 Flash.
-            $geminiFlash = $this->upsertModel($db, $geminiId, [
-                'model_key'    => 'gemini-2.5-flash',
-                'display_name' => 'Gemini 2.5 Flash',
+            $geminiModel = $this->upsertModel($db, $geminiId, [
+                'model_key'    => $geminiModelKey,
+                'display_name' => 'Gemini ' . $geminiModelKey,
                 'model_family' => 'gemini',
                 'context_limit'=> 1000000,
             ], $now, $created);
+            // Retired on Google AI.
             $this->disableModelKey($db, $geminiId, 'gemini-2.0-flash', $now);
 
-            // --prefer=gemini|openai overrides default OpenAI-first selection.
-            // When OpenAI key exists but prefer is empty, still default openai — ops
-            // must pass --prefer=gemini after OpenAI quota exhaustion.
-            if ($prefer === 'gemini' && $geminiFlash > 0) {
-                $primaryDraftModel  = $geminiFlash;
-                $fallbackDraftModel = $gptMini;
-                $crossReviewModel   = $geminiFlash; // do not send reviews to out-of-quota OpenAI
-            } elseif ($prefer === 'openai' && $gptMini > 0) {
-                $primaryDraftModel  = $gptMini;
-                $fallbackDraftModel = $geminiFlash;
-                $crossReviewModel   = $geminiFlash > 0 ? $geminiFlash : $gptMini;
-            } else {
-                $primaryDraftModel  = $this->envSet('AI_OPENAI_API_KEY') && $gptMini > 0 ? $gptMini : $geminiFlash;
-                $fallbackDraftModel = ($primaryDraftModel === $gptMini) ? $geminiFlash : $gptMini;
-                $crossReviewModel   = ($primaryDraftModel === $gptMini && $geminiFlash > 0) ? $geminiFlash : $primaryDraftModel;
-            }
+            // Strict alternation needs BOTH providers routable for every blog
+            // task; provider_preference hints pick per run. --prefer only
+            // decides who wins when no hint is present.
+            $openaiFirst = $prefer !== 'gemini';
+            [$hiModel, $loModel] = $openaiFirst
+                ? [$openaiModel, $geminiModel]
+                : [$geminiModel, $openaiModel];
 
-            $routeSpecs = [
-                ['draft_generation', 'blog_post', $primaryDraftModel, 100],
-                ['draft_generation', null,        $primaryDraftModel, 50],
-                ['brief_generation', 'generic',   $primaryDraftModel, 100],
-                ['brief_generation', null,        $primaryDraftModel, 50],
-                ['editorial_review', 'blog_post', $crossReviewModel, 100],
-                ['editorial_review', null,        $crossReviewModel, 50],
-            ];
+            $routeSpecs = [];
+            foreach ([
+                ['draft_generation', 'blog_post'],
+                ['draft_generation', null],
+                ['brief_generation', 'generic'],
+                ['brief_generation', null],
+                ['editorial_review', 'blog_post'],
+                ['editorial_review', null],
+                ['content_revision', 'blog_post'],
+                ['content_revision', null],
+            ] as [$task, $contentType]) {
+                $routeSpecs[] = [$task, $contentType, $hiModel, 100];
+                $routeSpecs[] = [$task, $contentType, $loModel, 90];
+            }
 
             $routeIds = [];
             foreach ($routeSpecs as [$task, $contentType, $modelId, $priority]) {
@@ -123,29 +124,30 @@ class ReachAiSeedCatalog extends BaseCommand
                 ];
             }
 
-            // Ensure preferred model wins when older OpenAI / retired Gemini routes exist.
-            $this->repointTaskRoutes($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
-            $this->demoteOtherPrimaryModels($db, ['draft_generation', 'brief_generation'], $primaryDraftModel, $now);
-            if ($crossReviewModel > 0) {
-                $this->repointTaskRoutes($db, ['editorial_review'], $crossReviewModel, $now);
-                $this->demoteOtherPrimaryModels($db, ['editorial_review'], $crossReviewModel, $now);
-            }
+            // Disable routes still pointing at models outside the current pair
+            // (e.g. retired gpt-4o-mini / gemini-2.5-flash primaries).
+            $this->demoteOtherPrimaryModels(
+                $db,
+                ['draft_generation', 'brief_generation', 'editorial_review', 'content_revision'],
+                array_values(array_filter([$openaiModel, $geminiModel])),
+                $now,
+            );
 
-            if ($fallbackDraftModel > 0 && $fallbackDraftModel !== $primaryDraftModel) {
-                foreach ($routeIds as $route) {
-                    if (! in_array($route['task_type'], ['draft_generation', 'brief_generation'], true)) {
-                        continue;
-                    }
-                    if ($this->upsertFallback(
-                        $db,
-                        (int) $route['id'],
-                        (int) $route['source_model_id'],
-                        $fallbackDraftModel,
-                        ['budget_blocked', 'authentication_error', 'rate_limited', 'provider_unavailable', 'timeout', 'network_error'],
-                        $now,
-                    )) {
-                        $created['fallbacks'][] = $route['task_type'] . '->model#' . $fallbackDraftModel;
-                    }
+            // Mutual failover: each provider's route falls back to the other.
+            foreach ($routeIds as $route) {
+                $fallbackModel = ((int) $route['source_model_id'] === $openaiModel) ? $geminiModel : $openaiModel;
+                if ($fallbackModel <= 0) {
+                    continue;
+                }
+                if ($this->upsertFallback(
+                    $db,
+                    (int) $route['id'],
+                    (int) $route['source_model_id'],
+                    $fallbackModel,
+                    ['budget_blocked', 'authentication_error', 'rate_limited', 'provider_unavailable', 'timeout', 'network_error'],
+                    $now,
+                )) {
+                    $created['fallbacks'][] = $route['task_type'] . '->model#' . $fallbackModel;
                 }
             }
 
@@ -153,10 +155,10 @@ class ReachAiSeedCatalog extends BaseCommand
                 'event'   => 'ai_seed_catalog.completed',
                 'ts'      => gmdate('c'),
                 'prefer'  => $prefer !== '' ? $prefer : 'auto',
-                'primary_model_id' => $primaryDraftModel,
-                'fallback_model_id'=> $fallbackDraftModel,
+                'openai_model_id'  => $openaiModel,
+                'gemini_model_id'  => $geminiModel,
                 'created' => $created,
-                'hint'    => 'If OpenAI is out of quota: php spark reach:ai-seed-catalog --prefer=gemini then retry drafts.',
+                'hint'    => 'Both providers stay routable; scheduled drafts alternate via reach_ai_provider_rotation.',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
             return 0;
@@ -299,43 +301,23 @@ class ReachAiSeedCatalog extends BaseCommand
 
     /**
      * @param list<string> $taskTypes
+     * @param list<int>    $keepModelIds
      */
-    private function demoteOtherPrimaryModels($db, array $taskTypes, int $keepModelId, string $now): void
+    private function demoteOtherPrimaryModels($db, array $taskTypes, array $keepModelIds, string $now): void
     {
-        if ($keepModelId <= 0 || $taskTypes === []) {
+        $keepModelIds = array_values(array_filter($keepModelIds, static fn ($id) => (int) $id > 0));
+        if ($keepModelIds === [] || $taskTypes === []) {
             return;
         }
 
         $db->table('reach_ai_model_routes')
             ->whereIn('task_type', $taskTypes)
-            ->where('primary_model_id !=', $keepModelId)
+            ->whereNotIn('primary_model_id', $keepModelIds)
             ->where('deleted_at IS NULL', null, false)
             ->update([
                 'enabled'    => false,
                 'priority'   => 10,
                 'updated_at' => $now,
-            ]);
-    }
-
-    /**
-     * Point existing task routes at the preferred model so prefer=gemini actually
-     * replaces OpenAI primaries instead of only inserting parallel rows.
-     *
-     * @param list<string> $taskTypes
-     */
-    private function repointTaskRoutes($db, array $taskTypes, int $modelId, string $now): void
-    {
-        if ($modelId <= 0 || $taskTypes === []) {
-            return;
-        }
-
-        $db->table('reach_ai_model_routes')
-            ->whereIn('task_type', $taskTypes)
-            ->where('deleted_at IS NULL', null, false)
-            ->update([
-                'primary_model_id' => $modelId,
-                'enabled'          => true,
-                'updated_at'       => $now,
             ]);
     }
 

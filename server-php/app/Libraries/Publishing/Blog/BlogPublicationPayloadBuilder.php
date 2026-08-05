@@ -64,6 +64,49 @@ class BlogPublicationPayloadBuilder
         $rawBody  = (string) ($version['body_html'] ?? $snapshot['body_html'] ?? $blogDetails['body_html'] ?? '');
         $safeBody = (new HtmlSanitizer())->purify($rawBody);
 
+        // Internal-link automation: append the marked "Related reading"
+        // section (2–4 registry links by product/category affinity) exactly
+        // once at payload build. Prose is never rewritten; routine-authored
+        // drafts that already carry the marker are left untouched. Each
+        // injected link is recorded in reach_content_internal_links so the
+        // INTERNAL_LINK block's HTTP validation covers it.
+        try {
+            $registry    = new \App\Libraries\Publishing\LinkRegistryService($this->db);
+            $siteBase    = rtrim((string) env('AICOUNTLY_PUBLIC_SITE_BASE_URL', 'https://aicountly.com'), '/');
+            $selfPath    = '/blogs/' . rawurlencode((string) ($item['slug'] ?? ''));
+            $productSlug = $this->resolveProductSlug($contentItemId);
+            $suggested   = $registry->suggestFor(
+                $productSlug,
+                (string) ($profile['category'] ?? ''),
+                $selfPath,
+                3,
+            );
+            $withLinks = $registry->appendRelatedSection($safeBody, $suggested, $siteBase);
+            if ($withLinks !== $safeBody) {
+                $safeBody = $withLinks;
+                $linkService = new BlogInternalLinkService();
+                foreach ($suggested as $link) {
+                    $exists = $this->db->table('reach_content_internal_links')
+                        ->where('source_content_item_id', $contentItemId)
+                        ->where('target_public_url', $siteBase . $link['url_path'])
+                        ->countAllResults() > 0;
+                    if (! $exists) {
+                        $linkService->addLink(
+                            $contentItemId,
+                            $contentVersionId,
+                            $link['title'],
+                            $siteBase . $link['url_path'],
+                            null,
+                            'auto_related_reading',
+                        );
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Link automation must never block a publish.
+            log_message('warning', 'Link injection skipped: ' . $e->getMessage());
+        }
+
         // Structured data
         $structuredData = $this->db->table('reach_content_structured_data')
             ->where('content_item_id', $contentItemId)
@@ -139,6 +182,27 @@ class BlogPublicationPayloadBuilder
         ];
 
         return $payload;
+    }
+
+    /**
+     * Product affinity comes from the content-base candidate's "[product]"
+     * note tag when present; absent one, suggestions fall back to
+     * category/evergreen links.
+     */
+    private function resolveProductSlug(int $contentItemId): ?string
+    {
+        try {
+            $notes = (string) ($this->db->table('reach_topic_candidates')
+                ->select('notes')
+                ->where('content_item_id', $contentItemId)
+                ->get()->getRowArray()['notes'] ?? '');
+            if (preg_match('/^\[product\]\s*(\S+)/m', $notes, $m)) {
+                return $m[1];
+            }
+        } catch (\Throwable) {
+        }
+
+        return null;
     }
 
     /**

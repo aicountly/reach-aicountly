@@ -24,11 +24,12 @@ export const BCC_SECTIONS = [
     label: 'Roadmap',
     path: ROUTES.BCC_ROADMAP,
     leaves: [
-      { label: 'Topic Candidates', path: ROUTES.BCC_ROADMAP_CANDIDATES, treatment: 'SCAFFOLD' },
-      { label: 'Scored Roadmap', path: ROUTES.BCC_ROADMAP_SCORED, treatment: 'SCAFFOLD' },
+      { label: 'Content Base', path: `${ROUTES.BCC_ROADMAP}/content-base`, treatment: 'FULL' },
+      { label: 'Topic Candidates', path: ROUTES.BCC_ROADMAP_CANDIDATES, treatment: 'FULL' },
+      { label: 'Scored Roadmap', path: ROUTES.BCC_ROADMAP_SCORED, treatment: 'FULL' },
       { label: 'Content Gaps', path: ROUTES.BCC_ROADMAP_GAPS, treatment: 'SCAFFOLD' },
       { label: 'Refresh Recommendations', path: ROUTES.BCC_ROADMAP_REFRESH, treatment: 'SCAFFOLD' },
-      { label: 'Optimizer History', path: ROUTES.BCC_ROADMAP_OPTIMIZER, treatment: 'SCAFFOLD' },
+      { label: 'Optimizer History', path: ROUTES.BCC_ROADMAP_OPTIMIZER, treatment: 'FULL' },
       {
         label: 'Topic Clusters',
         path: ROUTES.BCC_ROADMAP_CLUSTERS,

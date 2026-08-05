@@ -69,8 +69,12 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 (`which php` / `ls /usr/local/bin/php /usr/bin/php`).
 
 ```cron
-# Every 30 minutes during allowed IST hours — enqueue blog work blocks.
-0,30 0-8,19-23 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-dispatch >> writable/logs/blog-dispatch.log 2>&1
+# Every 2 hours 21:00–09:00 IST — enqueue blog work blocks (API blog route,
+# ~6 blogs/day). The window itself is enforced by the command from portfolio
+# settings, so an extra firing outside it is a harmless no-op.
+# Server clock IST:
+0 21,23,1,3,5,7 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-dispatch >> writable/logs/blog-dispatch.log 2>&1
+# Server clock UTC equivalent: 30 15,17,19,21,23,1 * * *
 
 # Daily topic discovery — 00:15 Asia/Kolkata (before optimiser).
 # If the server clock is UTC, use: 45 18 * * *  (18:45 UTC = 00:15 IST).
@@ -88,7 +92,15 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 
 # Every 5 minutes — Community Q&A housekeeping (scheduled publish + retries).
 */5 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
+
+# Every 30 minutes — community agent work selection (disclosed identities;
+# window 09:00–19:00 IST and daily caps enforced inside the service).
+*/30 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:agents-run >> writable/logs/community-agents.log 2>&1
 ```
+
+Daily jobs handled by `reach:schedule` (no extra cron lines needed):
+05:00 SEO rank/backlink snapshots · 06:00 content-base sync ·
+09:00 cover-gallery deficit email.
 
 After every deploy (with AI keys already in `.env`):
 

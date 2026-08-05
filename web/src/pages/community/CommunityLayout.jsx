@@ -6,6 +6,7 @@ const navItems = [
   { to: '/community/questions',   label: 'Question Inbox' },
   { to: '/community/answers',     label: 'Official Answers' },
   { to: '/community/identities',  label: 'Identities' },
+  { to: '/community/agents',      label: 'Agent Operations' },
   { to: '/community/moderation',  label: 'Moderation Queue' },
   { to: '/community/deployments', label: 'Deployments' },
   { to: '/community/analytics',   label: 'Analytics' },

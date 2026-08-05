@@ -209,7 +209,13 @@ class PublicationDeploymentService
         $publisher = PublicSitePublisherFactory::make();
 
         try {
-            $builder  = new BlogPublicationPayloadBuilder();
+            $itemType = (string) ($this->db->table('reach_content_items')
+                ->select('content_type')
+                ->where('id', $deployment['content_item_id'])
+                ->get()->getRowArray()['content_type'] ?? 'blog');
+            $builder = $itemType === 'knowledge_base'
+                ? new \App\Libraries\Publishing\KnowledgeBase\KnowledgeBasePublicationPayloadBuilder()
+                : new BlogPublicationPayloadBuilder();
             $payload  = $builder->build((int) $deployment['content_item_id'], (int) $deployment['content_version_id']);
             $checksum = $builder->checksum($payload);
 
@@ -294,6 +300,31 @@ class PublicationDeploymentService
             'completed_at'       => $now,
             'updated_at'         => $now,
         ]);
+
+        // Keep the internal-link registry current: a published URL becomes
+        // linkable from future blogs/KB articles immediately.
+        if ($status === 'published') {
+            try {
+                $item = $this->db->table('reach_content_items')
+                    ->select('title, slug, content_type')
+                    ->where('id', $deployment['content_item_id'])
+                    ->get()->getRowArray() ?? [];
+                $slug = (string) ($item['slug'] ?? '');
+                if ($slug !== '') {
+                    $isKb = ($item['content_type'] ?? 'blog') === 'knowledge_base';
+                    (new \App\Libraries\Publishing\LinkRegistryService($this->db))->recordPublished(
+                        ($isKb ? '/help/' : '/blogs/') . rawurlencode($slug),
+                        (string) ($item['title'] ?? $slug),
+                        $isKb ? 'knowledge_base' : 'blog',
+                        null,
+                        null,
+                        (int) $deployment['content_item_id'],
+                    );
+                }
+            } catch (\Throwable $e) {
+                log_message('warning', 'Link registry record skipped: ' . $e->getMessage());
+            }
+        }
 
         AuditLogger::record('publishing.accepted', [
             'deployment_id'    => $deploymentId,
@@ -381,20 +412,31 @@ class PublicationDeploymentService
             ->where('id', $deployment['content_version_id'])
             ->get()->getRowArray()['version_number'] ?? 1;
 
+        $item = $this->db->table('reach_content_items')
+            ->select('uuid, content_type')
+            ->where('id', $deployment['content_item_id'])
+            ->get()->getRowArray() ?? [];
+        $contentType = ($item['content_type'] ?? 'blog') === 'knowledge_base' ? 'knowledge_base' : 'blog';
+
+        $requestId = (string) ($deployment['request_id'] ?? '');
+        if ($requestId === '') {
+            $requestId = 'pub-' . bin2hex(random_bytes(8));
+        }
+
         return [
             'api_version'                  => 1,
             'operation'                    => $subOperation,
             'reach_content_id'             => (int) $deployment['content_item_id'],
-            'reach_content_uuid'           => '',
+            'reach_content_uuid'           => (string) ($item['uuid'] ?? ''),
             'reach_content_version_id'     => (int) $deployment['content_version_id'],
             'reach_content_version_number' => (int) $versionNumber,
-            'content_type'                 => 'blog',
+            'content_type'                 => $contentType,
             'idempotency_key'              => $deployment['idempotency_key'] . ':' . $subOperation,
-            'request_id'                   => $deployment['request_id'] ?? '',
+            'request_id'                   => $requestId,
             'timestamp'                    => time(),
             'nonce'                        => bin2hex(random_bytes(16)),
             'payload_checksum'             => $checksum,
-            'publication_target'           => 'aicountly_com_blog',
+            'publication_target'           => $contentType === 'knowledge_base' ? 'aicountly_com_help' : 'aicountly_com_blog',
             'payload'                      => $payload,
         ];
     }

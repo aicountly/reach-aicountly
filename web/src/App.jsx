@@ -43,6 +43,12 @@ import { BotReportsPage } from './pages/bot/BotReportsPage';
 import { BotReportDetailPage } from './pages/bot/BotReportDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 
+import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
+import SeoLayout from './pages/seo-centre/SeoLayout.jsx';
+import { SeoOverviewPage } from './pages/seo-centre/SeoOverviewPage.jsx';
+import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx';
+import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
+import { SeoSuggestionsPage } from './pages/seo-centre/SeoSuggestionsPage.jsx';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { BotSettingsPage } from './pages/admin/BotSettingsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
@@ -90,6 +96,7 @@ import QuestionWorkspacePage        from './pages/community/QuestionWorkspacePag
 import OfficialAnswerListPage       from './pages/community/OfficialAnswerListPage.jsx';
 import OfficialAnswerEditorPage     from './pages/community/OfficialAnswerEditorPage.jsx';
 import OfficialIdentitiesPage       from './pages/community/OfficialIdentitiesPage.jsx';
+import AgentOperationsPage from './pages/community/AgentOperationsPage.jsx';
 import CommunityModerationQueuePage from './pages/community/CommunityModerationQueuePage.jsx';
 import CommunityPublishingMonitorPage from './pages/community/CommunityPublishingMonitorPage.jsx';
 import CommunityAnalyticsPage       from './pages/community/CommunityAnalyticsPage.jsx';
@@ -158,14 +165,9 @@ import IntelligenceOperationsPage       from './pages/intelligence/IntelligenceO
 // Phase 9: Readiness
 import ReadinessLayout                  from './pages/readiness/ReadinessLayout.jsx';
 import ReadinessOverviewPage            from './pages/readiness/ReadinessOverviewPage.jsx';
-import RecommendationBacklogPage        from './pages/readiness/RecommendationBacklogPage.jsx';
-import RefreshWorkspacePage             from './pages/readiness/RefreshWorkspacePage.jsx';
 import RefreshOutcomePage               from './pages/readiness/RefreshOutcomePage.jsx';
 import AttributionMaturityPage          from './pages/readiness/AttributionMaturityPage.jsx';
 import SecurityStatusPage               from './pages/readiness/SecurityStatusPage.jsx';
-import PrivacyStatusPage                from './pages/readiness/PrivacyStatusPage.jsx';
-import AiGovernancePage                 from './pages/readiness/AiGovernancePage.jsx';
-import MigrationStatusPage              from './pages/readiness/MigrationStatusPage.jsx';
 import OperationsDashboardPage          from './pages/readiness/OperationsDashboardPage.jsx';
 import DisasterRecoveryPage             from './pages/readiness/DisasterRecoveryPage.jsx';
 import TechnicalDebtPage                from './pages/readiness/TechnicalDebtPage.jsx';
@@ -186,6 +188,7 @@ import { BlogOverviewPage } from './pages/blog-command-centre/BlogOverviewPage.j
 import { BlogScaffoldPage } from './pages/blog-command-centre/BlogScaffoldPage.jsx';
 import { BlogSharedEmbed } from './pages/blog-command-centre/BlogSharedEmbed.jsx';
 import { BlogDeepLinkRedirect } from './pages/blog-command-centre/BlogDeepLinkRedirect.jsx';
+import { ContentBasePage } from './pages/blog-command-centre/roadmap/ContentBasePage.jsx';
 import { RoadmapCandidatesPage } from './pages/blog-command-centre/roadmap/RoadmapCandidatesPage.jsx';
 import { RoadmapScoredPage } from './pages/blog-command-centre/roadmap/RoadmapScoredPage.jsx';
 import { RoadmapOptimizerPage } from './pages/blog-command-centre/roadmap/RoadmapOptimizerPage.jsx';
@@ -250,6 +253,7 @@ export default function App() {
           <Route index element={<BlogOverviewPage />} />
 
           <Route path="roadmap" element={<Navigate to="candidates" replace />} />
+          <Route path="roadmap/content-base" element={<ContentBasePage />} />
           <Route path="roadmap/candidates" element={<RoadmapCandidatesPage />} />
           <Route path="roadmap/scored" element={<RoadmapScoredPage />} />
           <Route path="roadmap/gaps" element={<BlogScaffoldPage />} />
@@ -382,7 +386,7 @@ export default function App() {
           <Route path=":id/comments" element={<ContentCommentsPage />} />
           <Route path=":id/validations" element={<ContentValidationsPage />} />
           <Route path=":id/schedule" element={<ContentSchedulePage />} />
-          <Route path="calendar" element={<ContentListPage />} />
+          <Route path="calendar" element={<ContentCalendarPage />} />
         </Route>
 
         {/* Phase 4 — Publishing */}
@@ -408,6 +412,7 @@ export default function App() {
           <Route path="answers" element={<OfficialAnswerListPage />} />
           <Route path="answers/:uuid" element={<OfficialAnswerEditorPage />} />
           <Route path="identities" element={<OfficialIdentitiesPage />} />
+          <Route path="agents" element={<AgentOperationsPage />} />
           <Route path="moderation" element={<CommunityModerationQueuePage />} />
           <Route path="deployments" element={<CommunityPublishingMonitorPage />} />
           <Route path="analytics" element={<CommunityAnalyticsPage />} />
@@ -476,14 +481,9 @@ export default function App() {
         {/* Phase 9 — Product Readiness Centre */}
         <Route path="/readiness" element={<ReadinessLayout />}>
           <Route index element={<ReadinessOverviewPage />} />
-          <Route path="refresh" element={<RecommendationBacklogPage />} />
-          <Route path="refresh/:id" element={<RefreshWorkspacePage />} />
           <Route path="outcomes" element={<RefreshOutcomePage />} />
           <Route path="attribution" element={<AttributionMaturityPage />} />
           <Route path="security" element={<SecurityStatusPage />} />
-          <Route path="privacy" element={<PrivacyStatusPage />} />
-          <Route path="ai-governance" element={<AiGovernancePage />} />
-          <Route path="migrations" element={<MigrationStatusPage />} />
           <Route path="operations" element={<OperationsDashboardPage />} />
           <Route path="disaster-recovery" element={<DisasterRecoveryPage />} />
           <Route path="technical-debt" element={<TechnicalDebtPage />} />
@@ -500,6 +500,22 @@ export default function App() {
           <Route path="publications" element={<VideoPublicationListPage />} />
           <Route path="connections" element={<VideoConnectionsPage />} />
           <Route path="operations" element={<VideoOperationsDashboardPage />} />
+        </Route>
+
+        {/* Quality Centre — cover gallery + content base */}
+        <Route path="/quality/gallery" element={<MediaGalleryPage />} />
+
+        {/* SEO Command Centre */}
+        <Route path="/seo-centre" element={<SeoLayout />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<SeoOverviewPage />} />
+          <Route path="keywords" element={<TrackedKeywordsPage />} />
+          <Route path="backlinks" element={<BacklinksPage />} />
+          <Route path="suggestions" element={<SeoSuggestionsPage />} />
+          <Route path="search" element={<SearchIntelligencePage />} />
+          <Route path="indexnow" element={<IndexNowOperationsPage />} />
+          <Route path="sitemap" element={<SitemapOverviewPage />} />
+          <Route path="connections" element={<ConnectorConfigPage />} />
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />

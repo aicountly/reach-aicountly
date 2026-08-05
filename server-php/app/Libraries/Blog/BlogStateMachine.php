@@ -90,7 +90,11 @@ class BlogStateMachine
         self::BRIEF_READY      => WorkBlockService::TYPE_GENERATE_OUTLINE,
         self::OUTLINE_READY    => WorkBlockService::TYPE_GENERATE_DRAFT,
         self::DRAFT            => WorkBlockService::TYPE_FACT_VERIFY,
-        self::FACT_VERIFIED    => WorkBlockService::TYPE_SEO_OPTIMIZE,
+        // Cover image comes after verification passes (images are never
+        // Perplexity-verified); executeGenerateImage() self-chains
+        // SEO_OPTIMIZE whether the image succeeds or fails — image trouble
+        // must never stall publication.
+        self::FACT_VERIFIED    => WorkBlockService::TYPE_GENERATE_IMAGE,
         self::SEO_REVIEW       => WorkBlockService::TYPE_CROSS_REVIEW,
         self::PUBLISH_QUEUED   => WorkBlockService::TYPE_PUBLISH_BLOG,
         self::PUBLISHING       => WorkBlockService::TYPE_VERIFY_PUBLICATION,
@@ -264,11 +268,17 @@ class BlogStateMachine
             ->getRowArray();
 
         if ($existing) {
-            $existingId = (int) $existing['id'];
-            // Re-open a prior successor that never finished so retries can proceed.
-            if (in_array((string) ($existing['eligibility_status'] ?? ''), [
-                'pending', 'failed', 'blocked',
-            ], true)) {
+            $existingId     = (int) $existing['id'];
+            $existingStatus = (string) ($existing['eligibility_status'] ?? '');
+            // Re-open a prior successor that never finished so retries can
+            // proceed — and also a COMPLETED one when a newer content version
+            // arrives (the revision loop re-enters DRAFT with a new version;
+            // its FACT_VERIFY must actually run again, not be swallowed by
+            // the stale completed block).
+            $newerVersion = $versionId > 0 && $versionId !== (int) ($existing['content_version_id'] ?? 0);
+            if (in_array($existingStatus, ['pending', 'failed', 'blocked'], true)
+                || ($existingStatus === 'completed' && $newerVersion)
+            ) {
                 $this->db->table('reach_work_blocks')->where('id', $existingId)->update([
                     'eligibility_status' => 'eligible',
                     'content_version_id' => $versionId > 0 ? $versionId : ($existing['content_version_id'] ?? null),

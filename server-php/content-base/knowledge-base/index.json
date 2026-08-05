@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-05",
+  "notes": "Knowledge Base articles are generated ONLY by the Claude routine (Opus writes, Sonnet verifies). Products listed here must authenticate via my.aicountly.com or ourpeople.work. Tiers set daily quotas in reach_kb_product_cadence; entries here are topic seeds the routine works through in order.",
+  "products": [
+    {
+      "product_slug": "books",
+      "tier": "big",
+      "topics": [
+        { "key": "kb-books-getting-started", "title": "Getting started with Smart Books: company setup to first invoice", "article_type": "getting_started", "status": "planned" },
+        { "key": "kb-books-gst-filing", "title": "Preparing GST returns from Smart Books", "article_type": "how_to", "status": "planned" },
+        { "key": "kb-books-bank-import", "title": "Importing and reconciling bank statements", "article_type": "how_to", "status": "planned" },
+        { "key": "kb-books-year-end", "title": "Year-end closing checklist in Smart Books", "article_type": "how_to", "status": "planned" }
+      ]
+    },
+    {
+      "product_slug": "hrms",
+      "tier": "big",
+      "topics": [
+        { "key": "kb-hrms-payroll-run", "title": "Running your first payroll in HRMS", "article_type": "getting_started", "status": "planned" },
+        { "key": "kb-hrms-statutory", "title": "Configuring PF, ESI and PT deductions", "article_type": "how_to", "status": "planned" }
+      ]
+    },
+    {
+      "product_slug": "financial-reporting",
+      "tier": "normal",
+      "topics": [
+        { "key": "kb-fr-schedule-iii", "title": "Generating Schedule III statements", "article_type": "how_to", "status": "planned" }
+      ]
+    },
+    {
+      "product_slug": "auditor",
+      "tier": "normal",
+      "topics": [
+        { "key": "kb-auditor-engagement", "title": "Setting up an audit engagement", "article_type": "getting_started", "status": "planned" }
+      ]
+    },
+    {
+      "product_slug": "secretarial",
+      "tier": "normal",
+      "topics": [
+        { "key": "kb-secretarial-annual-filing", "title": "Tracking MCA annual filings", "article_type": "how_to", "status": "planned" }
+      ]
+    },
+    {
+      "product_slug": "our-people",
+      "tier": "normal",
+      "topics": [
+        { "key": "kb-ourpeople-onboarding", "title": "Employee onboarding on ourpeople.work", "article_type": "getting_started", "status": "planned" }
+      ]
+    },
+    { "product_slug": "contacts", "tier": "small", "topics": [ { "key": "kb-contacts-basics", "title": "Managing business contacts", "article_type": "getting_started", "status": "planned" } ] },
+    { "product_slug": "calendar", "tier": "small", "topics": [ { "key": "kb-calendar-basics", "title": "Compliance calendar basics", "article_type": "getting_started", "status": "planned" } ] },
+    { "product_slug": "chat", "tier": "small", "topics": [ { "key": "kb-chat-basics", "title": "Team chat: channels and mentions", "article_type": "getting_started", "status": "planned" } ] },
+    { "product_slug": "docs", "tier": "small", "topics": [ { "key": "kb-docs-basics", "title": "Creating and sharing documents", "article_type": "getting_started", "status": "planned" } ] },
+    { "product_slug": "vault", "tier": "small", "topics": [ { "key": "kb-vault-basics", "title": "Secure file storage in Vault", "article_type": "getting_started", "status": "planned" } ] },
+    { "product_slug": "manage", "tier": "small", "topics": [ { "key": "kb-manage-basics", "title": "Company, branch and FY context in Manage", "article_type": "getting_started", "status": "planned" } ] },
+    { "product_slug": "buddy", "tier": "small", "topics": [ { "key": "kb-pulse-basics", "title": "Getting insights from AI Pulse", "article_type": "getting_started", "status": "planned" } ] }
+  ]
+}

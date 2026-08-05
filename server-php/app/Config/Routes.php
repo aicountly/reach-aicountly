@@ -38,6 +38,14 @@ $routes->get('health', static function () {
 });
 
 /*
+ * Public signed media serving — the featured_image_url handed to
+ * aicountly.com resolves here. HMAC-signed per asset (MEDIA_SIGNING_KEY),
+ * deliberately outside the jwt group: the site-side hero fetcher cannot
+ * authenticate and refuses redirects.
+ */
+$routes->get('v1/public/media/(:segment)', 'Api\\V1\\Content\\MediaAssetController::serve/$1');
+
+/*
  * -----------------------------------------------------------------------------
  * Legacy path aliases (pre-/v1 distribution UI).
  * Keep until production frontend is fully on /api/v1/... paths.
@@ -83,6 +91,19 @@ $routes->group('v1', static function ($routes) {
     // ---------------------------------------------------------------------
     $routes->group('public', ['filter' => 'public-capture'], static function ($routes) {
         $routes->post('leads/capture', 'Api\\V1\\LeadController::publicCapture', ['filter' => ['throttle:public_capture', 'throttle:public_capture_token']]);
+    });
+
+    // ---------------------------------------------------------------------
+    // Inbound from the Claude Code routines (X-Automation-Token).
+    // Headless service auth, scoped to exactly these endpoints.
+    // ---------------------------------------------------------------------
+    $routes->group('automation', ['filter' => 'automation-token'], static function ($routes) {
+        $routes->get('content-base',    'Api\\V1\\Content\\AutomationIngestController::contentBase');
+        $routes->get('gallery/status',  'Api\\V1\\Content\\AutomationIngestController::galleryStatus');
+        $routes->get('link-registry',   'Api\\V1\\Content\\AutomationIngestController::linkRegistry');
+        $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');
+        $routes->post('blog-drafts',    'Api\\V1\\Content\\AutomationIngestController::storeBlogDraft');
+        $routes->post('kb-drafts',      'Api\\V1\\Content\\AutomationIngestController::storeKbDraft');
     });
 
     // ---------------------------------------------------------------------
@@ -134,6 +155,14 @@ $routes->group('v1', static function ($routes) {
         $routes->get('blog-command-centre/roadmap/optimizer-runs',   'BlogCommandCentreController::optimizerRuns',     ['filter' => 'permission:blog.view']);
         $routes->get('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::scoringWeights',    ['filter' => 'permission:blog.view']);
         $routes->put('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::updateScoringWeights', ['filter' => 'permission:blog.edit']);
+        // Repo-versioned content base (read-only in the console; edited in git)
+        $routes->get('blog/content-base', 'Api\\V1\\Content\\ContentBaseController::index', ['filter' => 'permission:blog.view']);
+
+        // Cover-image gallery (Quality Centre)
+        $routes->get('media/gallery',            'Api\\V1\\Content\\MediaGalleryController::index',    ['filter' => 'permission:blog.view']);
+        $routes->post('media/gallery',           'Api\\V1\\Content\\MediaGalleryController::upload',   ['filter' => 'permission:blog.edit']);
+        $routes->patch('media/gallery/(:num)',   'Api\\V1\\Content\\MediaGalleryController::update/$1', ['filter' => 'permission:blog.edit']);
+        $routes->get('media/gallery/deficit',    'Api\\V1\\Content\\MediaGalleryController::deficit',  ['filter' => 'permission:blog.view']);
 
         // Content calendar
         $routes->get('calendar/items',           'Api\\V1\\ContentCalendarController::index',      ['filter' => 'permission:blog.view']);
@@ -525,19 +554,19 @@ $routes->group('v1', static function ($routes) {
 
         // --- Phase 3: AI Control Centre — Dashboard & Health ---
         $routes->get('ai/dashboard',                                        'Api\\V1\\Ai\\AiDashboardController::dashboard',               ['filter' => 'permission:ai.view']);
-        $routes->get('ai/health',                                           'Api\\V1\\Ai\\AiDashboardController::health',                  ['filter' => 'permission:ai_provider.manage']);
+        $routes->get('ai/health',                                           'Api\\V1\\Ai\\AiDashboardController::health',                  ['filter' => 'permission:ai_provider.view']);
 
         // --- Phase 3: AI Providers ---
-        $routes->get('ai/providers',                                        'Api\\V1\\Ai\\AiProviderController::index',                    ['filter' => 'permission:ai_provider.manage']);
-        $routes->get('ai/providers/(:num)',                                 'Api\\V1\\Ai\\AiProviderController::show/$1',                  ['filter' => 'permission:ai_provider.manage']);
+        $routes->get('ai/providers',                                        'Api\\V1\\Ai\\AiProviderController::index',                    ['filter' => 'permission:ai_provider.view']);
+        $routes->get('ai/providers/(:num)',                                 'Api\\V1\\Ai\\AiProviderController::show/$1',                  ['filter' => 'permission:ai_provider.view']);
         $routes->patch('ai/providers/(:num)/status',                       'Api\\V1\\Ai\\AiProviderController::updateStatus/$1',          ['filter' => 'permission:ai_provider.manage']);
 
         // --- Phase 3: AI Models ---
-        $routes->get('ai/models',                                           'Api\\V1\\Ai\\AiModelController::index',                       ['filter' => 'permission:ai_provider.manage']);
+        $routes->get('ai/models',                                           'Api\\V1\\Ai\\AiModelController::index',                       ['filter' => 'permission:ai_provider.view']);
 
         // --- Phase 3: AI Usage & Budgets ---
-        $routes->get('ai/usage',                                            'Api\\V1\\Ai\\AiUsageController::usage',                       ['filter' => 'permission:ai_provider.manage']);
-        $routes->get('ai/budgets',                                          'Api\\V1\\Ai\\AiUsageController::budgets',                     ['filter' => 'permission:ai_provider.manage']);
+        $routes->get('ai/usage',                                            'Api\\V1\\Ai\\AiUsageController::usage',                       ['filter' => 'permission:ai_provider.view']);
+        $routes->get('ai/budgets',                                          'Api\\V1\\Ai\\AiUsageController::budgets',                     ['filter' => 'permission:ai_provider.view']);
         $routes->put('ai/budgets/(:num)',                                   'Api\\V1\\Ai\\AiUsageController::updateBudget/$1',             ['filter' => 'permission:ai_provider.manage']);
 
         // --- Phase 4: Publishing ---
@@ -619,6 +648,8 @@ $routes->group('v1', static function ($routes) {
 
         // --- Phase 5 remediation: role-routed operational agent runtime ---
         $routes->post('community/agents/dispatch',                          'Api\\V1\\Community\\CommunityAgentDispatchController::dispatch',          ['filter' => 'permission:community_agent.dispatch']);
+        $routes->get('community/agents/runs',                               'Api\\V1\\Community\\CommunityAgentDispatchController::runs',               ['filter' => 'permission:community.view']);
+        $routes->get('community/agents/status',                             'Api\\V1\\Community\\CommunityAgentDispatchController::status',             ['filter' => 'permission:community.view']);
 
         // Analytics
         $routes->get('community/analytics/overview',                         'Api\\V1\\Community\\CommunityAnalyticsController::overview',              ['filter' => 'permission:community_analytics.view']);
@@ -779,6 +810,14 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/indexnow/submit',                        'Api\\V1\\Intelligence\\IndexNowController::submit',                   ['filter' => 'permission:sitemap.submit']);
         $routes->post('intelligence/indexnow/submit-batch',                  'Api\\V1\\Intelligence\\IndexNowController::submitBatch',              ['filter' => 'permission:sitemap.submit']);
         $routes->post('intelligence/indexnow/retry-pending',                 'Api\\V1\\Intelligence\\IndexNowController::retryPending',             ['filter' => 'permission:sitemap.reconcile']);
+
+        // SEO Command Centre (aggregations over real GSC/IndexNow/publication data)
+        $routes->get('seo/overview',              'Api\\V1\\Intelligence\\SeoCommandCentreController::overview',           ['filter' => 'permission:seo.view']);
+        $routes->get('seo/tracked-keywords',              'Api\\V1\\Intelligence\\SeoCommandCentreController::keywords',           ['filter' => 'permission:seo.view']);
+        $routes->get('seo/tracked-keywords/(:num)/history', 'Api\\V1\\Intelligence\\SeoCommandCentreController::keywordHistory/$1', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/backlinks',             'Api\\V1\\Intelligence\\SeoCommandCentreController::backlinks',          ['filter' => 'permission:seo.view']);
+        $routes->get('seo/indexnow/submissions',  'Api\\V1\\Intelligence\\SeoCommandCentreController::indexnowSubmissions', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/suggestions',           'Api\\V1\\Intelligence\\SeoCommandCentreController::suggestions',        ['filter' => 'permission:seo.view']);
 
         // Phase 8: Search Console
         $routes->get('intelligence/search/connections',                      'Api\\V1\\Intelligence\\SearchConsoleController::connections',         ['filter' => 'permission:search.read']);

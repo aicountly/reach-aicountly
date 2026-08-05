@@ -51,9 +51,9 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-4">
-        <Tile label="Blog — drafts"           value={blog.drafts}        hint={`${blog.total || 0} total posts`}    icon={FileText}  to={ROUTES.BLOG_LIST} />
-        <Tile label="Blog — in review"        value={blog.in_review}     hint={`${blog.approved || 0} approved`}    icon={FileText}  to={ROUTES.BLOG_LIST} />
-        <Tile label="Blog — published"        value={blog.published}     hint={`${blog.pending_publishing || 0} pending publish`} icon={FileText} to={ROUTES.BLOG_LIST} />
+        <Tile label="Blog — drafts"           value={blog.drafts}        hint={`${blog.total || 0} total posts`}    icon={FileText}  to={ROUTES.BLOG_COMMAND_CENTRE} />
+        <Tile label="Blog — in review"        value={blog.in_review}     hint={`${blog.approved || 0} approved`}    icon={FileText}  to={ROUTES.BLOG_COMMAND_CENTRE} />
+        <Tile label="Blog — published"        value={blog.published}     hint={`${blog.pending_publishing || 0} pending publish`} icon={FileText} to={ROUTES.BLOG_COMMAND_CENTRE} />
         <Tile label="Campaigns — running"     value={camp.running}       hint={`${camp.total || 0} total`}          icon={Megaphone} to={ROUTES.CAMPAIGN_LIST} />
         <Tile label="Social — queue"          value={soc.queue}          hint={`${soc.posted || 0} posted`}         icon={Share2}    to={ROUTES.SOCIAL_QUEUE} />
         <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${leads.pushed || 0} pushed`}       icon={Users}     to={ROUTES.ENGAGE_PUSH} />

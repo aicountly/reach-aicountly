@@ -19,8 +19,10 @@ function generateRequestId() {
 async function request(path, options = {}) {
   const token = localStorage.getItem('reach_token');
   const requestId = options.requestId || generateRequestId();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    // FormData sets its own multipart boundary — never override it.
+    ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     'X-Request-Id': requestId,
     ...(options.headers || {}),
@@ -71,7 +73,10 @@ export const api = {
   get:    (path, params) => request(withQuery(path, params)),
   post:   (path, body)   => request(path, { method: 'POST', body: body ? JSON.stringify(body) : null }),
   put:    (path, body)   => request(path, { method: 'PUT',  body: body ? JSON.stringify(body) : null }),
+  patch:  (path, body)   => request(path, { method: 'PATCH', body: body ? JSON.stringify(body) : null }),
   delete: (path)         => request(path, { method: 'DELETE' }),
+  // Multipart upload — pass a FormData instance.
+  upload: (path, formData) => request(path, { method: 'POST', body: formData }),
 };
 
 export default api;

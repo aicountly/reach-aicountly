@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-05",
+  "notes": "Approved source for the question_curator community agent. Each seed becomes at most one curated question, posted by the disclosed AICOUNTLY Question Curator identity with the mandatory AI disclosure. Seeds must be genuinely useful questions our users search for — never engagement bait.",
+  "seeds": [
+    { "key": "q-gst-late-fee-waiver", "category": "gst", "question": "Is there any late-fee relief if I missed filing GSTR-3B for two months?", "context": "Small trader, regular scheme" },
+    { "key": "q-itc-blocked-17-5", "category": "gst", "question": "Which input tax credits are permanently blocked under Section 17(5)?", "context": "New accountant asking for a practical list" },
+    { "key": "q-tds-late-deposit-interest", "category": "tds-tcs", "question": "How is interest calculated when TDS is deposited late?", "context": "1.5% vs 1% confusion" },
+    { "key": "q-advance-tax-presumptive", "category": "income-tax", "question": "Do I need to pay advance tax if I opt for presumptive taxation under 44AD?", "context": "Freelancer / small business" },
+    { "key": "q-pf-applicability-startup", "category": "payroll-hr", "question": "At what employee count does PF registration become mandatory for a startup?", "context": "18-person startup planning to hire" },
+    { "key": "q-audit-limit-fy26", "category": "audit", "question": "What is the tax audit turnover limit for FY 2025-26 if most receipts are digital?", "context": "44AB thresholds" },
+    { "key": "q-director-kyc-deadline", "category": "company-law", "question": "What happens if a director misses the DIR-3 KYC deadline?", "context": "Deactivated DIN consequences" },
+    { "key": "q-eway-bill-threshold", "category": "gst", "question": "Is an e-way bill needed for intra-state movement below 50,000 rupees?", "context": "State-wise threshold differences" }
+  ]
+}

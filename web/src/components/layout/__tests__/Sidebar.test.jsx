@@ -27,12 +27,17 @@ describe('Sidebar', () => {
     });
     expect(screen.getAllByText('Blog Command Centre').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Blog Management')).not.toBeInTheDocument();
-    expect(screen.getByText('Bot Queue')).toBeInTheDocument();
+    // 2026-08 IA revamp: stubbed Marketing Bot section and duplicated
+    // channel links were removed; new Quality Centre + SEO sections exist.
+    expect(screen.queryByText('Bot Queue')).not.toBeInTheDocument();
+    expect(screen.queryByText('Campaigns')).not.toBeInTheDocument();
+    expect(screen.getByText('Cover Gallery')).toBeInTheDocument();
+    expect(screen.getByText('SEO Command Centre')).toBeInTheDocument();
     expect(screen.getByText('Audit Logs')).toBeInTheDocument();
     expect(screen.getByText('Job Monitor')).toBeInTheDocument();
     expect(screen.getAllByText('Community Q&A').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('AI Control Centre').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Video Automation').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Video')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.queryByText('YT Connections')).not.toBeInTheDocument();
     expect(screen.queryByText('Question Inbox')).not.toBeInTheDocument();

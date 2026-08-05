@@ -5,33 +5,22 @@
  * No provider API keys are ever stored or sent from the frontend.
  */
 
-const BASE = '/api/v1/ai';
+import { api } from './api';
 
-function authHeader() {
-  const token = localStorage.getItem('reach_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function request(method, path, body) {
-  const opts = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...authHeader(),
-    },
-  };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-
-  const res = await fetch(`${BASE}${path}`, opts);
-  const json = await res.json();
-
-  if (!res.ok || !json.ok) {
-    const msg = json?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
+// Delegates to the shared API client so VITE_API_URL, auth handling,
+// request ids and 401 redirects behave exactly like every other service
+// (the old hardcoded '/api/v1/ai' base broke local dev and skipped the
+// shared error handling entirely).
+function request(method, path, body) {
+  const fullPath = `v1/ai${path}`;
+  switch (method) {
+    case 'GET':    return api.get(fullPath);
+    case 'POST':   return api.post(fullPath, body);
+    case 'PUT':    return api.put(fullPath, body);
+    case 'PATCH':  return api.patch(fullPath, body);
+    case 'DELETE': return api.delete(fullPath);
+    default:       return Promise.reject(new Error(`Unsupported method ${method}`));
   }
-
-  return json.data ?? json;
 }
 
 // --- Generation ---

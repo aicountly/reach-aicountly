@@ -53,6 +53,76 @@ class CommunityAgentDispatchController extends BaseApiController
         }
     }
 
+    /**
+     * GET /community/agents/runs — dispatch history (success/blocked/failed),
+     * newest first, filterable by identity/action/status.
+     */
+    public function runs(): ResponseInterface
+    {
+        $db      = db_connect();
+        $builder = $db->table('reach_community_agent_runs r')
+            ->select('r.*, i.slug AS identity_slug, i.display_name AS identity_name')
+            ->join('reach_community_official_identities i', 'i.id = r.identity_id', 'left')
+            ->orderBy('r.id', 'DESC')
+            ->limit(min(200, max(1, (int) ($this->request->getGet('limit') ?: 100))));
+
+        foreach (['status' => 'r.outcome', 'action' => 'r.action'] as $param => $column) {
+            $value = trim((string) $this->request->getGet($param));
+            if ($value !== '') {
+                $builder->where($column, $value);
+            }
+        }
+        $identity = trim((string) $this->request->getGet('identity'));
+        if ($identity !== '') {
+            $builder->where('i.slug', $identity);
+        }
+
+        return $this->response->setJSON(['ok' => true, 'data' => ['runs' => $builder->get()->getResultArray()]]);
+    }
+
+    /**
+     * GET /community/agents/status — per-identity role, actions, caps and
+     * today's usage, plus whether the automation window is currently open.
+     */
+    public function status(): ResponseInterface
+    {
+        $db         = db_connect();
+        $identities = $db->table('reach_community_official_identities')
+            ->where('is_active', true)
+            ->orderBy('id', 'ASC')
+            ->get()->getResultArray();
+
+        $rows = [];
+        foreach ($identities as $identity) {
+            $actions = [];
+            foreach (CommunityOperationalAgentService::actionsForRole((string) $identity['operational_role']) as $action) {
+                $cap  = CommunityOperationalAgentService::dailyCapFor($action);
+                $used = (int) ($db->query(
+                    "SELECT COUNT(*) AS c FROM reach_community_agent_runs
+                     WHERE identity_id = ? AND action = ? AND outcome = 'success' AND created_at >= ?",
+                    [(int) $identity['id'], $action, date('Y-m-d 00:00:00')]
+                )->getRowArray()['c'] ?? 0);
+                $actions[] = [
+                    'action'       => $action,
+                    'daily_cap'    => $cap,
+                    'used_today'   => $used,
+                    'window_gated' => CommunityOperationalAgentService::isWindowGated($action),
+                ];
+            }
+            $rows[] = [
+                'slug'         => $identity['slug'],
+                'display_name' => $identity['display_name'],
+                'role'         => $identity['operational_role'],
+                'actions'      => $actions,
+            ];
+        }
+
+        return $this->response->setJSON(['ok' => true, 'data' => [
+            'window_open' => \App\Libraries\Community\CommunityAutomationWindow::isOpenNow(),
+            'identities'  => $rows,
+        ]]);
+    }
+
     private function unprocessable(string $message): ResponseInterface
     {
         return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'error' => $message]);

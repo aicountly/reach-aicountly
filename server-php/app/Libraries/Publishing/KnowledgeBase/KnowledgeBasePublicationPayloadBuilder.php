@@ -46,11 +46,14 @@ class KnowledgeBasePublicationPayloadBuilder
         $kbDetails = $this->db->table('reach_content_knowledge_base_details')
             ->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
 
-        $snapshot = is_string($version['snapshot_json'])
-            ? json_decode($version['snapshot_json'], true)
-            : ($version['snapshot_json'] ?? []);
+        // reach_content_versions has no snapshot_json column — body/summary
+        // live directly on the version row (the snapshot read was aspirational
+        // doc-driven code that always resolved to '').
+        $snapshot = is_string($version['snapshot_json'] ?? null)
+            ? (json_decode($version['snapshot_json'], true) ?: [])
+            : (array) ($version['snapshot_json'] ?? []);
 
-        $rawBody  = $snapshot['body_html'] ?? '';
+        $rawBody  = (string) (($version['body_html'] ?? '') ?: ($snapshot['body_html'] ?? ''));
         $safeBody = (new HtmlSanitizer())->purify($rawBody);
 
         // Structured data
@@ -92,7 +95,7 @@ class KnowledgeBasePublicationPayloadBuilder
             'title'                       => $item['title'] ?? '',
             'slug'                        => $seo['slug'] ?? $item['slug'] ?? '',
             'article_type'                => $profile['article_type'] ?? 'concept',
-            'summary'                     => $snapshot['summary'] ?? '',
+            'summary'                     => (string) (($version['summary'] ?? '') ?: ($snapshot['summary'] ?? '')),
             'body_html'                   => $safeBody,
             'product'                     => $productName,
             'module'                      => $moduleName,
