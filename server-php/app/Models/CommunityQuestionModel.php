@@ -24,9 +24,12 @@ class CommunityQuestionModel extends Model
         'assigned_to', 'status',
     ];
 
+    // tags / sensitivity_flags are native Postgres TEXT[] columns. The old
+    // 'json-array' casts serialised PHP arrays to JSON ("[]"), which Postgres
+    // rejects as a malformed array literal on write and which json_decode
+    // chokes on when reading a real PG literal ('{a,b}'). Writes go through
+    // CommunityQuestionRepository::save(), which encodes PG literals.
     protected array $casts = [
-        'tags'               => 'json-array',
-        'sensitivity_flags'  => 'json-array',
         'author_display_consent' => 'boolean',
         'personal_data_detected' => 'boolean',
     ];

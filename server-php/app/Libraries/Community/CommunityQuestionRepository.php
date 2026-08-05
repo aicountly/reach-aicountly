@@ -38,12 +38,36 @@ class CommunityQuestionRepository
 
     public function save(array $data): int
     {
+        // tags / sensitivity_flags are native Postgres TEXT[] — encode PHP
+        // arrays to PG array literals ('{}' / '{"a","b"}') before they hit
+        // the driver. Mirrors CommunityStewardService::categorize().
+        foreach (['tags', 'sensitivity_flags'] as $arrayColumn) {
+            if (array_key_exists($arrayColumn, $data) && is_array($data[$arrayColumn])) {
+                $data[$arrayColumn] = self::pgArrayLiteral($data[$arrayColumn]);
+            }
+        }
+
         if (empty($data['id'])) {
             $this->model->insert($data);
             return (int) $this->model->getInsertID();
         }
         $this->model->update($data['id'], $data);
         return (int) $data['id'];
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    public static function pgArrayLiteral(array $values): string
+    {
+        if ($values === []) {
+            return '{}';
+        }
+
+        return '{' . implode(',', array_map(
+            static fn ($value) => '"' . str_replace('"', '\\"', (string) $value) . '"',
+            array_values($values)
+        )) . '}';
     }
 
     public function transitionStatus(int $id, CommunityQuestionStatus $from, CommunityQuestionStatus $to): void
