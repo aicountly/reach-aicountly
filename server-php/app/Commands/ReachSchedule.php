@@ -121,5 +121,12 @@ class ReachSchedule extends BaseCommand
                 'idempotency_key' => "gallery-deficit-{$today}",
             ]);
         }
+
+        // 05:00 — SEO rank + backlink snapshots (GSC data lags ~2 days)
+        if ($hour === 5) {
+            $svc->enqueue('reach.seo_snapshot', ['date' => null], [
+                'idempotency_key' => "seo-snapshot-{$today}",
+            ]);
+        }
     }
 }

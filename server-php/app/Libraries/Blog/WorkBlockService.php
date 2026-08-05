@@ -1685,6 +1685,20 @@ class WorkBlockService
 
         $this->setIndexingStatus($contentItemId, $found ? 'sitemap_included' : 'not_submitted');
 
+        // Auto-submission: newly-live URLs go straight to IndexNow
+        // (Bing/Yandex-class engines; Google retired sitemap ping in 2023 and
+        // is covered by the sitemap itself + Search Console).
+        $indexnow = null;
+        if ($found && filter_var(env('INDEXNOW_ENABLED', 'false'), FILTER_VALIDATE_BOOL)) {
+            try {
+                $submission = (new \App\Libraries\Intelligence\IndexNowSubmissionService())
+                    ->submitUrl(1, $siteBase . $canonicalPath);
+                $indexnow = ['status' => $submission['status'] ?? 'unknown', 'id' => $submission['id'] ?? null];
+            } catch (\Throwable $e) {
+                $indexnow = ['status' => 'error', 'error' => mb_substr($e->getMessage(), 0, 160)];
+            }
+        }
+
         if ($found) {
             $checkAt = date('Y-m-d H:i:s', strtotime('+2 days'));
             $this->create([
@@ -1700,7 +1714,7 @@ class WorkBlockService
             ]);
         }
 
-        $output = ['content_item_id' => $contentItemId, 'slug' => $slug, 'sitemap_included' => $found];
+        $output = ['content_item_id' => $contentItemId, 'slug' => $slug, 'sitemap_included' => $found, 'indexnow' => $indexnow];
         $this->markCompleted($id, $output);
 
         return $output;

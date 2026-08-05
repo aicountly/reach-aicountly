@@ -810,6 +810,14 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/indexnow/submit-batch',                  'Api\\V1\\Intelligence\\IndexNowController::submitBatch',              ['filter' => 'permission:sitemap.submit']);
         $routes->post('intelligence/indexnow/retry-pending',                 'Api\\V1\\Intelligence\\IndexNowController::retryPending',             ['filter' => 'permission:sitemap.reconcile']);
 
+        // SEO Command Centre (aggregations over real GSC/IndexNow/publication data)
+        $routes->get('seo/overview',              'Api\\V1\\Intelligence\\SeoCommandCentreController::overview',           ['filter' => 'permission:seo.view']);
+        $routes->get('seo/tracked-keywords',              'Api\\V1\\Intelligence\\SeoCommandCentreController::keywords',           ['filter' => 'permission:seo.view']);
+        $routes->get('seo/tracked-keywords/(:num)/history', 'Api\\V1\\Intelligence\\SeoCommandCentreController::keywordHistory/$1', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/backlinks',             'Api\\V1\\Intelligence\\SeoCommandCentreController::backlinks',          ['filter' => 'permission:seo.view']);
+        $routes->get('seo/indexnow/submissions',  'Api\\V1\\Intelligence\\SeoCommandCentreController::indexnowSubmissions', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/suggestions',           'Api\\V1\\Intelligence\\SeoCommandCentreController::suggestions',        ['filter' => 'permission:seo.view']);
+
         // Phase 8: Search Console
         $routes->get('intelligence/search/connections',                      'Api\\V1\\Intelligence\\SearchConsoleController::connections',         ['filter' => 'permission:search.read']);
         $routes->post('intelligence/search/connections',                     'Api\\V1\\Intelligence\\SearchConsoleController::createConnection',    ['filter' => 'permission:search.connect']);

@@ -44,6 +44,11 @@ import { BotReportDetailPage } from './pages/bot/BotReportDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 
 import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
+import SeoLayout from './pages/seo-centre/SeoLayout.jsx';
+import { SeoOverviewPage } from './pages/seo-centre/SeoOverviewPage.jsx';
+import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx';
+import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
+import { SeoSuggestionsPage } from './pages/seo-centre/SeoSuggestionsPage.jsx';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { BotSettingsPage } from './pages/admin/BotSettingsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
@@ -509,6 +514,19 @@ export default function App() {
 
         {/* Quality Centre — cover gallery + content base */}
         <Route path="/quality/gallery" element={<MediaGalleryPage />} />
+
+        {/* SEO Command Centre */}
+        <Route path="/seo-centre" element={<SeoLayout />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<SeoOverviewPage />} />
+          <Route path="keywords" element={<TrackedKeywordsPage />} />
+          <Route path="backlinks" element={<BacklinksPage />} />
+          <Route path="suggestions" element={<SeoSuggestionsPage />} />
+          <Route path="search" element={<SearchIntelligencePage />} />
+          <Route path="indexnow" element={<IndexNowOperationsPage />} />
+          <Route path="sitemap" element={<SitemapOverviewPage />} />
+          <Route path="connections" element={<ConnectorConfigPage />} />
+        </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />
