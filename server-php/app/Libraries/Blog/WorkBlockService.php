@@ -44,6 +44,7 @@ class WorkBlockService
     public const TYPE_GENERATE_OUTLINE     = 'GENERATE_OUTLINE';
     public const TYPE_GENERATE_DRAFT       = 'GENERATE_DRAFT';
     public const TYPE_FACT_VERIFY          = 'FACT_VERIFY';
+    public const TYPE_REVISE_CONTENT       = 'REVISE_CONTENT';
     public const TYPE_GENERATE_IMAGE       = 'GENERATE_IMAGE';
     public const TYPE_SEO_OPTIMIZE         = 'SEO_OPTIMIZE';
     public const TYPE_INTERNAL_LINK        = 'INTERNAL_LINK';
@@ -204,6 +205,7 @@ class WorkBlockService
                 self::TYPE_GENERATE_OUTLINE  => $this->executeGenerateOutline($id, $block),
                 self::TYPE_GENERATE_DRAFT    => $this->executeGenerateDraft($id, $block),
                 self::TYPE_FACT_VERIFY       => $this->executeFactVerify($id, $block),
+                self::TYPE_REVISE_CONTENT    => $this->executeReviseContent($id, $block),
                 self::TYPE_GENERATE_IMAGE    => $this->executeGenerateImage($id, $block),
                 self::TYPE_SEO_OPTIMIZE      => $this->executeSeoOptimize($id, $block),
                 self::TYPE_INTERNAL_LINK     => $this->executeInternalLink($id, $block),
@@ -771,16 +773,37 @@ class WorkBlockService
             'publishable' => $verification->isPublishable($result),
         ];
 
+        // Perplexity's verdict is the authority — persist it on the item so the
+        // revision loop and reviewers can see exactly what failed and why.
+        if ($contentItemId > 0) {
+            try {
+                $this->db->table('reach_content_blog_details')
+                    ->where('content_item_id', $contentItemId)
+                    ->update([
+                        'last_verification_json' => json_encode($result, JSON_UNESCAPED_SLASHES),
+                        'updated_at'             => date('Y-m-d H:i:s'),
+                    ]);
+            } catch (\Throwable) {
+            }
+        }
+
         if ($contentItemId > 0) {
             try {
                 (new BlogStateMachine($this))->transition(
                     $contentItemId,
                     $output['publishable'] ? BlogStateMachine::FACT_VERIFIED : BlogStateMachine::CHANGES_REQUESTED,
                     null,
-                    ['work_block_id' => $id],
+                    ['work_block_id' => $id, 'content_version_id' => $contentVersionId],
                 );
             } catch (\Throwable) {
                 // Best-effort bookkeeping only; the verification result itself is authoritative.
+            }
+
+            // Bounded self-healing: let the generating provider fix or delete the
+            // claims Perplexity rejected, then re-verify. Attempts exhausted →
+            // the item stays in changes_requested for the human flow, as before.
+            if (! $output['publishable']) {
+                $output['revision'] = $this->chainRevisionIfAllowed($contentItemId, $contentVersionId, $result);
             }
         }
 
@@ -790,50 +813,414 @@ class WorkBlockService
     }
 
     /**
+     * @param array<string,mixed> $verification
+     * @return array<string,mixed>
+     */
+    private function chainRevisionIfAllowed(int $contentItemId, int $contentVersionId, array $verification): array
+    {
+        $maxAttempts = max(0, (int) env('BLOG_FACT_REVISION_MAX_ATTEMPTS', 2));
+
+        $details = $this->db->table('reach_content_blog_details')
+            ->where('content_item_id', $contentItemId)
+            ->get()->getRowArray() ?? [];
+        $attempts = (int) ($details['fact_revision_attempts'] ?? 0);
+
+        if ($attempts >= $maxAttempts) {
+            return ['chained' => false, 'reason' => "revision_attempts_exhausted:{$attempts}/{$maxAttempts}"];
+        }
+
+        $nextAttempt = $attempts + 1;
+        // Deliberately NOT via NEXT_WORK_BLOCK: changes_requested is also a
+        // human-flow state, and a static successor there would hijack manual
+        // rejections into automated rewrites.
+        $blockId = $this->create([
+            'block_type'         => self::TYPE_REVISE_CONTENT,
+            'scope'              => 'blog',
+            'content_item_id'    => $contentItemId,
+            'content_version_id' => $contentVersionId,
+            'idempotency_key'    => "blog-{$contentItemId}-revise-attempt-{$nextAttempt}",
+            'eligibility_status' => 'eligible',
+            'input_json'         => ['verification' => $verification, 'attempt' => $nextAttempt],
+        ]);
+
+        return ['chained' => true, 'work_block_id' => $blockId, 'attempt' => $nextAttempt];
+    }
+
+    /**
+     * Applies Perplexity's findings through the provider that generated the
+     * current version (never Perplexity itself — the verifier stays a pure
+     * judge so fail-closed verification is preserved), producing a new version
+     * that transitions back to DRAFT and re-enters FACT_VERIFY automatically.
+     *
+     * @param array<string,mixed> $block
+     * @return array<string,mixed>
+     */
+    private function executeReviseContent(int $id, array $block): array
+    {
+        if (! $this->flags->isEnabled('ai_generation')) {
+            return $this->blockOnFlag($id, self::TYPE_REVISE_CONTENT, 'ai_generation_disabled');
+        }
+
+        $contentItemId    = (int) ($block['content_item_id'] ?? 0);
+        $contentVersionId = (int) ($block['content_version_id'] ?? 0);
+        if ($contentItemId <= 0 || $contentVersionId <= 0) {
+            throw new \RuntimeException('REVISE_CONTENT work block requires content_item_id and content_version_id');
+        }
+
+        $input        = $this->decodeInput($block);
+        $verification = (array) ($input['verification'] ?? []);
+        $attempt      = (int) ($input['attempt'] ?? 1);
+        $unsupported  = array_values((array) ($verification['unsupported'] ?? []));
+
+        $version = $this->db->table('reach_content_versions')->where('id', $contentVersionId)->get()->getRowArray();
+        if (! $version) {
+            throw new \RuntimeException("Content version {$contentVersionId} not found");
+        }
+        $item = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [];
+
+        // Same provider as the generator; a revision is part of the same
+        // "turn" and must not advance the OpenAI/Gemini rotation.
+        $generatorRun = $this->db->table('reach_ai_generation_artifacts a')
+            ->join('reach_ai_generation_runs r', 'r.id = a.generation_run_id')
+            ->join('reach_ai_providers p', 'p.id = r.provider_id')
+            ->select('p.provider_key')
+            ->where('a.content_version_id', $contentVersionId)
+            ->orderBy('a.id', 'DESC')->limit(1)->get()->getRowArray();
+        $generatorKey = (string) ($generatorRun['provider_key'] ?? 'openai');
+
+        $claimLines = [];
+        foreach ($unsupported as $i => $claim) {
+            $text   = is_array($claim) ? (string) ($claim['claim'] ?? json_encode($claim, JSON_UNESCAPED_SLASHES)) : (string) $claim;
+            $reason = is_array($claim) ? (string) ($claim['reason'] ?? $claim['status'] ?? 'unsupported') : 'unsupported';
+            $claimLines[] = ($i + 1) . '. ' . $text . ' — verifier finding: ' . $reason;
+        }
+
+        $requests = new AiGenerationRequestService();
+        $request  = $requests->create([
+            'task_type'       => 'content_revision',
+            'content_type'    => 'blog_post',
+            'content_item_id' => $contentItemId,
+            'parameters'      => [
+                'title'               => $item['title'] ?? '',
+                'provider_preference' => $generatorKey,
+                'revision_attempt'    => $attempt,
+                'instructions'        => "The independent fact verifier (Perplexity) rejected the claims listed below. Revise the article: correct each claim using verifiable facts, or delete it entirely if it cannot be supported. Change NOTHING else — keep structure, tone, headings and all other content identical. Return the complete revised article in the same JSON schema (title, summary, body_html, body_markdown, body_plain_text).\n\nRejected claims:\n" . implode("\n", $claimLines) . "\n\nCurrent article:\n" . mb_substr((string) ($version['body_markdown'] ?: $version['body_html'] ?: $version['body_plain_text']), 0, 24000),
+            ],
+        ], ['type' => 'system']);
+
+        (new AiGenerationOrchestrator())->execute((int) $request['id']);
+        $refreshed = $requests->findById((int) $request['id']);
+
+        if ($refreshed['status'] !== 'completed') {
+            $detail = $this->lastAiFailureDetail((int) $request['id']);
+            return $this->markFailed(
+                $id,
+                self::TYPE_REVISE_CONTENT,
+                'ai_revision_' . $refreshed['status'] . ($detail !== '' ? ':' . $detail : ''),
+            );
+        }
+
+        $artifact = $this->db->table('reach_ai_generation_artifacts')
+            ->where('generation_request_id', $request['id'])
+            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+
+        $structured = is_string($artifact['structured_output_json'] ?? null)
+            ? json_decode($artifact['structured_output_json'], true)
+            : ($artifact['structured_output_json'] ?? []);
+
+        if (! is_array($structured) || trim((string) ($structured['body_html'] ?? $structured['body_markdown'] ?? '')) === '') {
+            return $this->markFailed($id, self::TYPE_REVISE_CONTENT, 'revision_returned_empty_body');
+        }
+
+        $newVersion = (new ContentVersionService())->createVersion($contentItemId, [
+            'title'           => $structured['title']           ?? ($version['title'] ?? ''),
+            'summary'         => $structured['summary']         ?? ($version['summary'] ?? null),
+            'body_html'       => $structured['body_html']       ?? '',
+            'body_markdown'   => $structured['body_markdown']   ?? null,
+            'body_plain_text' => $structured['body_plain_text'] ?? null,
+        ], ['type' => 'bot', 'service' => 'reach:work_block:revise_content'], "Fact-revision attempt {$attempt} (verifier findings applied)");
+
+        $this->db->table('reach_ai_generation_artifacts')->where('id', $artifact['id'])->update([
+            'content_version_id' => $newVersion['id'],
+        ]);
+
+        $this->db->table('reach_content_blog_details')
+            ->where('content_item_id', $contentItemId)
+            ->update([
+                'fact_revision_attempts' => $attempt,
+                'updated_at'             => date('Y-m-d H:i:s'),
+            ]);
+
+        // changes_requested -> draft re-enters FACT_VERIFY via NEXT_WORK_BLOCK;
+        // Perplexity re-verification concludes the loop.
+        (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::DRAFT, null, [
+            'work_block_id'      => $id,
+            'content_version_id' => $newVersion['id'],
+            'reason'             => 'fact_revision_applied',
+        ]);
+
+        $output = [
+            'content_item_id'       => $contentItemId,
+            'content_version_id'    => $newVersion['id'],
+            'generation_request_id' => $request['id'],
+            'attempt'               => $attempt,
+            'claims_addressed'      => count($claimLines),
+        ];
+        $this->markCompleted($id, $output);
+
+        return $output;
+    }
+
+    /**
+     * Cover image for a fact-verified draft. Pipeline items generate one via
+     * the same provider family that wrote the text (openai → gpt-image-1,
+     * gemini → Nano Banana Pro); Claude-routine items are assigned a cover
+     * from the curated gallery instead of spending on AI images. The binary
+     * is persisted through MediaAssetStore and exposed as a signed public
+     * URL that aicountly.com's HeroImageFetcher can pull. Failures never
+     * stall the chain: SEO_OPTIMIZE is always chained afterwards.
+     *
      * @param array<string,mixed> $block
      * @return array<string,mixed>
      */
     private function executeGenerateImage(int $id, array $block): array
     {
+        $contentItemId    = (int) ($block['content_item_id'] ?? 0);
+        $contentVersionId = (int) ($block['content_version_id'] ?? 0);
+
         if (! $this->flags->isEnabled('image_generation')) {
-            return $this->blockOnFlag($id, self::TYPE_GENERATE_IMAGE, 'image_generation_disabled');
+            // Part of the main chain now: a disabled flag skips the image but
+            // must not dead-end the item (mirrors the FACT_VERIFY skip path).
+            $this->chainSeoOptimize($contentItemId, $contentVersionId);
+            $output = ['skipped' => true, 'reason' => 'image_generation_disabled'];
+            $this->markCompleted($id, $output);
+
+            return $output;
+        }
+
+        $item    = $contentItemId > 0
+            ? ($this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [])
+            : [];
+        $details = $contentItemId > 0
+            ? ($this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [])
+            : [];
+
+        // Claude-routine drafts use the curated gallery (rotation-managed),
+        // not AI generation — 12+ blogs/day of AI covers is exactly the spend
+        // the gallery exists to avoid.
+        if (($details['origin'] ?? 'pipeline') === 'claude_routine') {
+            $output = $this->assignGalleryCover($contentItemId, $item, $details);
+            $this->chainSeoOptimize($contentItemId, $contentVersionId);
+            $this->markCompleted($id, $output);
+
+            return $output;
         }
 
         $input  = $this->decodeInput($block);
         $prompt = trim((string) ($input['prompt'] ?? ''));
+        if ($prompt === '' && $contentItemId > 0) {
+            $version = $contentVersionId > 0
+                ? $this->db->table('reach_content_versions')->where('id', $contentVersionId)->get()->getRowArray()
+                : null;
+            $prompt = (new \App\Libraries\Ai\Images\CoverPromptBuilder())->build(
+                (string) ($item['title'] ?? ''),
+                (string) ($version['summary'] ?? ''),
+                (string) ($details['portfolio_stream'] ?? ''),
+            );
+        }
         if ($prompt === '') {
-            throw new \RuntimeException('GENERATE_IMAGE work block requires input_json.prompt');
+            $this->chainSeoOptimize($contentItemId, $contentVersionId);
+            $output = ['image_failed' => true, 'reason' => 'no_prompt_available'];
+            $this->markCompleted($id, $output);
+
+            return $output;
         }
 
-        $registry     = new ImageProviderRegistry();
-        $requestedKey = (string) ($input['provider'] ?? $block['provider_route'] ?? '');
-        $configured   = array_keys($registry->configuredProviders());
-
+        $registry   = new ImageProviderRegistry();
+        $configured = array_keys($registry->configuredProviders());
         if ($configured === []) {
-            return $this->blockOnFlag($id, self::TYPE_GENERATE_IMAGE, 'no_image_provider_configured');
+            $this->chainSeoOptimize($contentItemId, $contentVersionId);
+            $output = ['image_failed' => true, 'reason' => 'no_image_provider_configured'];
+            $this->markCompleted($id, $output);
+
+            return $output;
         }
 
-        $providerKey = in_array($requestedKey, $configured, true) ? $requestedKey : $configured[0];
-        $provider    = $registry->get($providerKey);
+        // Same provider family as the text generator.
+        $generatorRun = $contentVersionId > 0 ? $this->db->table('reach_ai_generation_artifacts a')
+            ->join('reach_ai_generation_runs r', 'r.id = a.generation_run_id')
+            ->join('reach_ai_providers p', 'p.id = r.provider_id')
+            ->select('p.provider_key')
+            ->where('a.content_version_id', $contentVersionId)
+            ->orderBy('a.id', 'DESC')->limit(1)->get()->getRowArray() : null;
+        $textProvider = (string) ($generatorRun['provider_key'] ?? '');
+        $imageKeyMap  = ['openai' => 'openai_image', 'gemini' => 'gemini_image'];
+        $requestedKey = (string) ($input['provider'] ?? $imageKeyMap[$textProvider] ?? $block['provider_route'] ?? '');
+        $providerKey  = in_array($requestedKey, $configured, true) ? $requestedKey : $configured[0];
+        $provider     = $registry->get($providerKey);
 
-        $result = $provider->generateImage(new ImageGenerationInput(
+        $makeInput = static fn (string $model) => new ImageGenerationInput(
             prompt: $prompt,
-            modelKey: (string) ($input['model'] ?? ''),
+            modelKey: $model,
             width: (int) ($input['width'] ?? 1536),
             height: (int) ($input['height'] ?? 1024),
-        ));
+        );
 
-        // Binary payloads are deliberately not persisted in output_json.
-        $output = [
-            'provider_key'  => $result->providerKey,
-            'model_key'     => $result->modelKey,
-            'image_count'   => $result->imageCount,
-            'duration_ms'   => $result->durationMs,
-        ];
+        try {
+            try {
+                $result = $provider->generateImage($makeInput((string) ($input['model'] ?? '')));
+            } catch (\Throwable $e) {
+                $fallbackModel = trim((string) env('AI_GEMINI_IMAGE_FALLBACK_MODEL', 'gemini-2.5-flash-image'));
+                if ($providerKey === 'gemini_image' && $fallbackModel !== ''
+                    && str_contains(strtolower($e->getMessage()), 'not')  // NOT_FOUND / not available / not supported
+                ) {
+                    $result = $provider->generateImage($makeInput($fallbackModel));
+                } else {
+                    throw $e;
+                }
+            }
 
+            $binary = $this->firstImageBinary($result);
+            if ($binary === null) {
+                throw new \RuntimeException('image_provider_returned_no_usable_image');
+            }
+
+            $store = new \App\Libraries\Media\MediaAssetStore($this->db);
+            $asset = $store->storeBinary($binary, [
+                'kind'             => 'ai_generated',
+                'content_item_id'  => $contentItemId > 0 ? $contentItemId : null,
+                'prompt_used'      => $prompt,
+                'portfolio_stream' => $details['portfolio_stream'] ?? null,
+            ]);
+            $publicUrl = $store->publicUrl($asset);
+
+            if ($contentItemId > 0) {
+                $this->setFeaturedImage($contentItemId, $publicUrl, 'Illustration: ' . (string) ($item['title'] ?? 'cover image'));
+            }
+
+            $output = [
+                'provider_key' => $result->providerKey,
+                'model_key'    => $result->modelKey,
+                'image_count'  => $result->imageCount,
+                'duration_ms'  => $result->durationMs,
+                'asset_id'     => $asset['id'] ?? null,
+                'asset_uuid'   => $asset['asset_uuid'] ?? null,
+                'public_url'   => $publicUrl,
+            ];
+        } catch (\Throwable $e) {
+            // Image trouble must never stall publication.
+            $output = [
+                'image_failed' => true,
+                'reason'       => mb_substr($e->getMessage(), 0, 200),
+                'provider_key' => $providerKey,
+            ];
+        }
+
+        $this->chainSeoOptimize($contentItemId, $contentVersionId);
         $this->markCompleted($id, $output);
 
         return $output;
+    }
+
+    /**
+     * Least-recently-used gallery cover matching the item's stream/category;
+     * enforced reuse cooldown. No match → publish proceeds without a hero and
+     * the deficit counter picks it up.
+     *
+     * @param array<string,mixed> $item
+     * @param array<string,mixed> $details
+     * @return array<string,mixed>
+     */
+    private function assignGalleryCover(int $contentItemId, array $item, array $details): array
+    {
+        try {
+            $assignment = (new \App\Libraries\Media\MediaGalleryAssignmentService($this->db))
+                ->assignFor($contentItemId);
+        } catch (\Throwable $e) {
+            return ['image_failed' => true, 'reason' => 'gallery_assignment_error: ' . mb_substr($e->getMessage(), 0, 160)];
+        }
+
+        if ($assignment === null) {
+            return ['image_failed' => true, 'reason' => 'gallery_empty_or_cooling_down'];
+        }
+
+        $this->setFeaturedImage(
+            $contentItemId,
+            $assignment['public_url'],
+            'Illustration: ' . (string) ($item['title'] ?? 'cover image'),
+        );
+
+        return [
+            'gallery_assigned' => true,
+            'asset_id'         => $assignment['asset_id'],
+            'asset_uuid'       => $assignment['asset_uuid'],
+            'public_url'       => $assignment['public_url'],
+        ];
+    }
+
+    private function setFeaturedImage(int $contentItemId, string $url, string $alt): void
+    {
+        $this->ensurePublicationProfilesForItem($contentItemId);
+        $this->db->table('reach_blog_publication_profiles')
+            ->where('content_item_id', $contentItemId)
+            ->update([
+                'featured_image_reference' => mb_substr($url, 0, 512),
+                'featured_image_alt'       => mb_substr($alt, 0, 512),
+                'updated_at'               => date('Y-m-d H:i:s'),
+            ]);
+    }
+
+    private function firstImageBinary(\App\Libraries\Ai\Images\ImageGenerationResult $result): ?string
+    {
+        foreach ($result->images as $image) {
+            if (! empty($image['b64'])) {
+                $decoded = base64_decode((string) $image['b64'], true);
+                if ($decoded !== false && $decoded !== '') {
+                    return $decoded;
+                }
+            }
+            if (! empty($image['url'])) {
+                $fetched = $this->httpGet((string) $image['url']);
+                if ($fetched !== null && $fetched !== '') {
+                    return $fetched;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function chainSeoOptimize(int $contentItemId, int $contentVersionId): void
+    {
+        if ($contentItemId <= 0) {
+            return;
+        }
+
+        // Keeps the historical fact_verified successor key so pre-rewire items
+        // and idempotent retries coexist.
+        $key      = "blog-{$contentItemId}-fact_verified-" . self::TYPE_SEO_OPTIMIZE;
+        $existing = $this->db->table('reach_work_blocks')->where('idempotency_key', $key)->get()->getRowArray();
+
+        if ($existing) {
+            if (in_array((string) $existing['eligibility_status'], ['pending', 'failed', 'blocked'], true)) {
+                $this->db->table('reach_work_blocks')->where('id', $existing['id'])->update([
+                    'eligibility_status' => 'eligible',
+                    'content_version_id' => $contentVersionId > 0 ? $contentVersionId : ($existing['content_version_id'] ?? null),
+                    'updated_at'         => date('Y-m-d H:i:s'),
+                ]);
+            }
+
+            return;
+        }
+
+        $this->create([
+            'block_type'         => self::TYPE_SEO_OPTIMIZE,
+            'scope'              => 'blog',
+            'content_item_id'    => $contentItemId,
+            'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
+            'idempotency_key'    => $key,
+            'eligibility_status' => 'eligible',
+        ]);
     }
 
     /** Real rule-based SEO readiness scoring (no AI fabrication). */

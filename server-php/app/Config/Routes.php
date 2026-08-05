@@ -38,6 +38,14 @@ $routes->get('health', static function () {
 });
 
 /*
+ * Public signed media serving — the featured_image_url handed to
+ * aicountly.com resolves here. HMAC-signed per asset (MEDIA_SIGNING_KEY),
+ * deliberately outside the jwt group: the site-side hero fetcher cannot
+ * authenticate and refuses redirects.
+ */
+$routes->get('v1/public/media/(:segment)', 'Api\\V1\\Content\\MediaAssetController::serve/$1');
+
+/*
  * -----------------------------------------------------------------------------
  * Legacy path aliases (pre-/v1 distribution UI).
  * Keep until production frontend is fully on /api/v1/... paths.
