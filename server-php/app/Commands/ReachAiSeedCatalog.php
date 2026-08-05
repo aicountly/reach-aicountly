@@ -354,15 +354,20 @@ class ReachAiSeedCatalog extends BaseCommand
             return false;
         }
 
+        // Key on the UNIQUE constraint (route, source, order) — not on the
+        // fallback target. When the target model changes (e.g. a retired
+        // Gemini row swapped for its replacement), the order-1 slot must be
+        // UPDATED in place; keying on fallback_model_id inserted a duplicate
+        // order-1 row and died on uq_ai_fallback_route_src_order.
         $row = $db->table('reach_ai_model_fallbacks')
             ->where('route_id', $routeId)
             ->where('source_model_id', $sourceModelId)
-            ->where('fallback_model_id', $fallbackModelId)
+            ->where('fallback_order', 1)
             ->get()
             ->getRowArray();
 
         $data = [
-            'fallback_order'           => 1,
+            'fallback_model_id'        => $fallbackModelId,
             'allowed_error_categories' => json_encode(array_values($allowedCategories)),
             'enabled'                  => true,
             'updated_at'               => $now,
@@ -376,7 +381,7 @@ class ReachAiSeedCatalog extends BaseCommand
         $db->table('reach_ai_model_fallbacks')->insert(array_merge($data, [
             'route_id'          => $routeId,
             'source_model_id'   => $sourceModelId,
-            'fallback_model_id' => $fallbackModelId,
+            'fallback_order'    => 1,
             'created_at'        => $now,
         ]));
 
