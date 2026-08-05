@@ -91,6 +91,7 @@ import QuestionWorkspacePage        from './pages/community/QuestionWorkspacePag
 import OfficialAnswerListPage       from './pages/community/OfficialAnswerListPage.jsx';
 import OfficialAnswerEditorPage     from './pages/community/OfficialAnswerEditorPage.jsx';
 import OfficialIdentitiesPage       from './pages/community/OfficialIdentitiesPage.jsx';
+import AgentOperationsPage from './pages/community/AgentOperationsPage.jsx';
 import CommunityModerationQueuePage from './pages/community/CommunityModerationQueuePage.jsx';
 import CommunityPublishingMonitorPage from './pages/community/CommunityPublishingMonitorPage.jsx';
 import CommunityAnalyticsPage       from './pages/community/CommunityAnalyticsPage.jsx';
@@ -411,6 +412,7 @@ export default function App() {
           <Route path="answers" element={<OfficialAnswerListPage />} />
           <Route path="answers/:uuid" element={<OfficialAnswerEditorPage />} />
           <Route path="identities" element={<OfficialIdentitiesPage />} />
+          <Route path="agents" element={<AgentOperationsPage />} />
           <Route path="moderation" element={<CommunityModerationQueuePage />} />
           <Route path="deployments" element={<CommunityPublishingMonitorPage />} />
           <Route path="analytics" element={<CommunityAnalyticsPage />} />

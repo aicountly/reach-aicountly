@@ -647,6 +647,8 @@ $routes->group('v1', static function ($routes) {
 
         // --- Phase 5 remediation: role-routed operational agent runtime ---
         $routes->post('community/agents/dispatch',                          'Api\\V1\\Community\\CommunityAgentDispatchController::dispatch',          ['filter' => 'permission:community_agent.dispatch']);
+        $routes->get('community/agents/runs',                               'Api\\V1\\Community\\CommunityAgentDispatchController::runs',               ['filter' => 'permission:community.view']);
+        $routes->get('community/agents/status',                             'Api\\V1\\Community\\CommunityAgentDispatchController::status',             ['filter' => 'permission:community.view']);
 
         // Analytics
         $routes->get('community/analytics/overview',                         'Api\\V1\\Community\\CommunityAnalyticsController::overview',              ['filter' => 'permission:community_analytics.view']);
