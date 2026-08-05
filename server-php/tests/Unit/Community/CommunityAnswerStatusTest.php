@@ -98,4 +98,24 @@ final class CommunityAnswerStatusTest extends TestCase
         $this->expectException(\ValueError::class);
         CommunityAnswerStatus::from('not_a_real_status');
     }
+
+    public function testValidationFailedCanRetryGeneration(): void
+    {
+        $this->assertTrue(CommunityAnswerStatus::ValidationFailed->canTransitionTo(CommunityAnswerStatus::Generating));
+    }
+
+    public function testValidationFailedCanRecoverToDraftGenerated(): void
+    {
+        $this->assertTrue(CommunityAnswerStatus::ValidationFailed->canTransitionTo(CommunityAnswerStatus::DraftGenerated));
+    }
+
+    public function testChangesRequestedCanRetryGeneration(): void
+    {
+        $this->assertTrue(CommunityAnswerStatus::ChangesRequested->canTransitionTo(CommunityAnswerStatus::Generating));
+    }
+
+    public function testDraftGeneratedCanRegenerate(): void
+    {
+        $this->assertTrue(CommunityAnswerStatus::DraftGenerated->canTransitionTo(CommunityAnswerStatus::Generating));
+    }
 }

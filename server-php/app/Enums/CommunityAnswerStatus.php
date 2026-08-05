@@ -34,12 +34,16 @@ enum CommunityAnswerStatus: string
             self::Triaged            => [self::DraftRequested, self::Archived],
             self::DraftRequested     => [self::Generating, self::Archived],
             self::Generating         => [self::DraftGenerated, self::ValidationFailed],
-            self::DraftGenerated     => [self::ValidationFailed, self::ModerationRequired, self::EditorialReview],
-            self::ValidationFailed   => [self::DraftGenerated, self::Archived],
+            self::DraftGenerated     => [self::ValidationFailed, self::ModerationRequired, self::EditorialReview, self::Generating],
+            // Generating is re-enterable from failed/changes-requested states so
+            // an operator can retry AI generation instead of dead-ending: the 8
+            // seed answers that failed generation land in validation_failed with
+            // zero versions, and regeneration is their only forward path.
+            self::ValidationFailed   => [self::DraftGenerated, self::Generating, self::Archived],
             self::ModerationRequired => [self::DraftGenerated, self::Archived],
             self::EditorialReview    => [self::ProfessionalReview, self::ChangesRequested, self::Approved],
             self::ProfessionalReview => [self::ChangesRequested, self::Approved],
-            self::ChangesRequested   => [self::DraftGenerated],
+            self::ChangesRequested   => [self::DraftGenerated, self::Generating],
             self::Approved           => [self::Scheduled, self::Publishing],
             self::Scheduled          => [self::Publishing, self::Approved],
             self::Publishing         => [self::Published, self::VerificationFailed],

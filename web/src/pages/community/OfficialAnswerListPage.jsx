@@ -90,15 +90,17 @@ export default function OfficialAnswerListPage() {
             {answers.length === 0 ? (
               <tr><td colSpan={7} className="muted">No answers.</td></tr>
             ) : answers.map(a => (
+              // The API row's public identifier is `uuid` (external_id does not
+              // exist on this table) — using it keeps the Edit link resolvable.
               <tr key={a.id}>
-                <td><code className="text-xs">{a.external_id?.slice(0, 12)}…</code></td>
+                <td><code className="text-xs">{(a.uuid ?? a.external_id)?.slice(0, 12)}…</code></td>
                 <td><span className={`badge ${STATUS_CLASS[a.status] ?? 'badge--neutral'}`}>{a.status}</span></td>
                 <td>{a.risk_classification ?? '—'}</td>
                 <td>{a.ai_assisted ? 'Yes' : 'No'}</td>
                 <td>{a.human_reviewed ? 'Yes' : 'No'}</td>
                 <td>{a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}</td>
                 <td>
-                  <Link to={`/community/answers/${a.external_id}`} className="btn btn--sm">Edit</Link>
+                  <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="btn btn--sm">Edit</Link>
                 </td>
               </tr>
             ))}

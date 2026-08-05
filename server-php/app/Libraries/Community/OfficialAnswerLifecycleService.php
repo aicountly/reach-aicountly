@@ -175,10 +175,33 @@ class OfficialAnswerLifecycleService
     {
         $answerId = $this->resolveAnswerId($answerUuid);
 
-        return $this->validation->validateVersion(
+        $result = $this->validation->validateVersion(
             $answerId,
             $versionNumber ?? $this->currentVersionNumber($answerId)
         );
+
+        // The validation service only records findings; the status move lives
+        // here so a passing re-validation lifts an answer out of
+        // validation_failed / changes_requested and a failing one demotes a
+        // draft — otherwise the Validate action never changes anything.
+        $answer = $this->answerRepo->findById($answerId);
+        if ($answer !== null) {
+            $status = CommunityAnswerStatus::from($answer['status']);
+            $target = null;
+            if ($result['passed'] && in_array($status, [CommunityAnswerStatus::ValidationFailed, CommunityAnswerStatus::ChangesRequested], true)) {
+                $target = CommunityAnswerStatus::DraftGenerated;
+            } elseif (! $result['passed'] && $status === CommunityAnswerStatus::DraftGenerated) {
+                $target = CommunityAnswerStatus::ValidationFailed;
+            }
+            if ($target !== null && $status->canTransitionTo($target)) {
+                $this->answerRepo->transitionStatus($answerId, $status, $target);
+                $result['status'] = $target->value;
+            } else {
+                $result['status'] = $status->value;
+            }
+        }
+
+        return $result;
     }
 
     public function moderate(string $answerUuid, ?int $versionNumber = null, ?int $actorId = null): array
