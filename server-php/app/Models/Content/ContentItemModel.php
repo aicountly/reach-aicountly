@@ -109,8 +109,9 @@ class ContentItemModel extends Model
     /** Generate a slug from the title, ensuring uniqueness. */
     public function buildUniqueSlug(string $title, ?int $excludeId = null): string
     {
-        $base = strtolower(preg_replace('/[^a-z0-9]+/', '-', $title));
-        $base = trim($base, '-');
+        // Lowercase before the character class, not after: [^a-z0-9] treats
+        // every uppercase letter as a separator and eats it.
+        $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(trim($title))) ?? '', '-');
         $slug = $base;
         $i    = 1;
 
