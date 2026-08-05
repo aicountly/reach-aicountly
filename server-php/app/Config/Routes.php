@@ -100,6 +100,7 @@ $routes->group('v1', static function ($routes) {
     $routes->group('automation', ['filter' => 'automation-token'], static function ($routes) {
         $routes->get('content-base',    'Api\\V1\\Content\\AutomationIngestController::contentBase');
         $routes->get('gallery/status',  'Api\\V1\\Content\\AutomationIngestController::galleryStatus');
+        $routes->get('link-registry',   'Api\\V1\\Content\\AutomationIngestController::linkRegistry');
         $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');
         $routes->post('blog-drafts',    'Api\\V1\\Content\\AutomationIngestController::storeBlogDraft');
         $routes->post('kb-drafts',      'Api\\V1\\Content\\AutomationIngestController::storeKbDraft');

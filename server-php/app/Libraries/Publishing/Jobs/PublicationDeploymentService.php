@@ -301,6 +301,31 @@ class PublicationDeploymentService
             'updated_at'         => $now,
         ]);
 
+        // Keep the internal-link registry current: a published URL becomes
+        // linkable from future blogs/KB articles immediately.
+        if ($status === 'published') {
+            try {
+                $item = $this->db->table('reach_content_items')
+                    ->select('title, slug, content_type')
+                    ->where('id', $deployment['content_item_id'])
+                    ->get()->getRowArray() ?? [];
+                $slug = (string) ($item['slug'] ?? '');
+                if ($slug !== '') {
+                    $isKb = ($item['content_type'] ?? 'blog') === 'knowledge_base';
+                    (new \App\Libraries\Publishing\LinkRegistryService($this->db))->recordPublished(
+                        ($isKb ? '/help/' : '/blogs/') . rawurlencode($slug),
+                        (string) ($item['title'] ?? $slug),
+                        $isKb ? 'knowledge_base' : 'blog',
+                        null,
+                        null,
+                        (int) $deployment['content_item_id'],
+                    );
+                }
+            } catch (\Throwable $e) {
+                log_message('warning', 'Link registry record skipped: ' . $e->getMessage());
+            }
+        }
+
         AuditLogger::record('publishing.accepted', [
             'deployment_id'    => $deploymentId,
             'public_content_id'=> $response['public_content_id'] ?? null,

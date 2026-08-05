@@ -37,6 +37,19 @@ class AutomationIngestController extends BaseApiController
         return $this->ok((new MediaGalleryDeficitService())->report());
     }
 
+    /**
+     * Linkable-URL inventory for authoring-time internal links: the routine
+     * weaves 2–4 of these into each draft (and may add its own marked
+     * related-reading section, which the payload builder then leaves as-is).
+     */
+    public function linkRegistry()
+    {
+        return $this->ok([
+            'site_base' => rtrim((string) env('AICOUNTLY_PUBLIC_SITE_BASE_URL', 'https://aicountly.com'), '/'),
+            'links'     => (new \App\Libraries\Publishing\LinkRegistryService())->excerpt(150),
+        ]);
+    }
+
     public function kbPlan()
     {
         return $this->ok((new KnowledgeBaseDraftIngestService())->plan());
