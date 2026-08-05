@@ -113,7 +113,12 @@ class AiGenerationOrchestrator
         $this->requests->updateStatus($requestId, 'processing');
 
         try {
-            $decision = $this->router->route($request['task_type'], $request['content_type'] ?? null);
+            $requestParams = json_decode($request['request_parameters_json'] ?? '{}', true) ?: [];
+            $routingHints  = [];
+            if (! empty($requestParams['provider_preference'])) {
+                $routingHints['provider_preference'] = (string) $requestParams['provider_preference'];
+            }
+            $decision = $this->router->route($request['task_type'], $request['content_type'] ?? null, $routingHints);
         } catch (\Throwable $e) {
             $this->failRequest($requestId, 'routing_failed', 'No route available: ' . $e->getMessage());
             return;

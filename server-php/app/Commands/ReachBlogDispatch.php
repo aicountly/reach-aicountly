@@ -27,8 +27,8 @@ class ReachBlogDispatch extends BaseCommand
             $out = json_encode([
                 'event'   => 'blog_dispatch.skipped',
                 'reason'  => 'outside_automation_window',
-                'tz'      => 'Asia/Kolkata',
-                'now'     => $this->nowKolkata()->format('H:i'),
+                'tz'      => $this->windowTimezone(),
+                'now'     => $this->nowInWindowTz()->format('H:i'),
             ], JSON_UNESCAPED_SLASHES);
             CLI::write($out);
             return 0;
@@ -65,15 +65,10 @@ class ReachBlogDispatch extends BaseCommand
 
     private function isWithinAutomationWindow(): bool
     {
-        $now   = $this->nowKolkata();
-        $mins  = ((int) $now->format('H')) * 60 + (int) $now->format('i');
+        $now  = $this->nowInWindowTz();
+        $mins = ((int) $now->format('H')) * 60 + (int) $now->format('i');
 
-        $windows = [
-            [0, 8 * 60 + 59],
-            [19 * 60, 23 * 60 + 59],
-        ];
-
-        foreach ($windows as [$start, $end]) {
+        foreach ($this->configuredWindows() as [$start, $end]) {
             if ($mins >= $start && $mins <= $end) {
                 return true;
             }
@@ -82,8 +77,90 @@ class ReachBlogDispatch extends BaseCommand
         return false;
     }
 
-    private function nowKolkata(): DateTimeImmutable
+    /**
+     * Windows come from reach_blog_portfolio_config.settings_json.automation_window
+     * (editable in Blog Command Centre → Settings → Automation Window); the
+     * hardcoded 21:00–09:00 IST pair is only the fallback for a missing or
+     * malformed config.
+     *
+     * @return list<array{0:int,1:int}> minute-of-day ranges
+     */
+    private function configuredWindows(): array
     {
-        return new DateTimeImmutable('now', new DateTimeZone('Asia/Kolkata'));
+        $fallback = [
+            [0, 8 * 60 + 59],
+            [21 * 60, 23 * 60 + 59],
+        ];
+
+        $windows = [];
+        foreach ($this->windowConfig()['windows'] ?? [] as $window) {
+            $start = $this->parseMinutes((string) ($window['start'] ?? ''));
+            $end   = $this->parseMinutes((string) ($window['end'] ?? ''));
+            if ($start !== null && $end !== null && $end >= $start) {
+                $windows[] = [$start, $end];
+            }
+        }
+
+        return $windows !== [] ? $windows : $fallback;
+    }
+
+    private function parseMinutes(string $time): ?int
+    {
+        if (! preg_match('/^(\d{1,2}):(\d{2})$/', $time, $m)) {
+            return null;
+        }
+        $hours = (int) $m[1];
+        $mins  = (int) $m[2];
+        if ($hours > 23 || $mins > 59) {
+            return null;
+        }
+
+        return $hours * 60 + $mins;
+    }
+
+    private function windowTimezone(): string
+    {
+        $tz = (string) ($this->windowConfig()['timezone'] ?? '');
+
+        try {
+            new DateTimeZone($tz);
+        } catch (\Throwable) {
+            $tz = '';
+        }
+
+        return $tz !== '' ? $tz : 'Asia/Kolkata';
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function windowConfig(): array
+    {
+        static $config = null;
+        if ($config !== null) {
+            return $config;
+        }
+
+        $config = [];
+
+        try {
+            $row = db_connect()->table('reach_blog_portfolio_config')
+                ->orderBy('id', 'ASC')->limit(1)->get()->getRowArray();
+            $settings = is_string($row['settings_json'] ?? null)
+                ? (json_decode($row['settings_json'], true) ?: [])
+                : (array) ($row['settings_json'] ?? []);
+            $config = is_array($settings['automation_window'] ?? null)
+                ? $settings['automation_window']
+                : [];
+        } catch (\Throwable) {
+            $config = [];
+        }
+
+        return $config;
+    }
+
+    private function nowInWindowTz(): DateTimeImmutable
+    {
+        return new DateTimeImmutable('now', new DateTimeZone($this->windowTimezone()));
     }
 }

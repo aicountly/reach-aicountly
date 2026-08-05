@@ -573,6 +573,9 @@ class WorkBlockService
         $stateMachine = new BlogStateMachine($this);
         $stateMachine->transition($contentItemId, BlogStateMachine::DRAFT_GENERATING, null, ['work_block_id' => $id]);
 
+        $rotation          = new \App\Libraries\Ai\ProviderRotationService($this->db);
+        $preferredProvider = $rotation->preferredNext(\App\Libraries\Ai\ProviderRotationService::SCOPE_BLOG_DRAFT);
+
         $requests = new AiGenerationRequestService();
         $request  = $requests->create([
             'task_type'       => 'draft_generation',
@@ -587,6 +590,9 @@ class WorkBlockService
                 'max_word_count'      => $brief['max_word_count'] ?? 1800,
                 'tone'                => $brief['tone'] ?? 'professional, plain-language',
                 'instructions'        => 'Write a complete, accurate blog article of at least 900 words grounded only in the provided context. Return full body_html, body_markdown, and body_plain_text with real sections — never placeholders like "Untitled draft". Use only verifiable claims.',
+                // Strict alternation hint; the actual generator is recorded
+                // after the artifact is accepted (failover-safe).
+                'provider_preference' => $preferredProvider,
             ],
         ], ['type' => 'system']);
 
@@ -665,6 +671,19 @@ class WorkBlockService
         $this->db->table('reach_ai_generation_artifacts')->where('id', $artifact['id'])->update([
             'content_version_id' => $version['id'],
         ]);
+
+        $actualGenerator = $this->db->table('reach_ai_generation_runs r')
+            ->join('reach_ai_providers p', 'p.id = r.provider_id')
+            ->select('p.provider_key')
+            ->where('r.generation_request_id', $request['id'])
+            ->orderBy('r.id', 'DESC')->limit(1)->get()->getRowArray();
+        if (! empty($actualGenerator['provider_key'])) {
+            $rotation->recordActual(
+                \App\Libraries\Ai\ProviderRotationService::SCOPE_BLOG_DRAFT,
+                (string) $actualGenerator['provider_key'],
+                (int) $request['id'],
+            );
+        }
 
         $stateMachine->transition($contentItemId, BlogStateMachine::DRAFT, null, [
             'work_block_id'       => $id,
@@ -894,6 +913,9 @@ class WorkBlockService
                 'instructions' => 'Review this blog draft for factual consistency, tone and structure. Return JSON with keys approved (boolean) and notes (string).',
                 'generator_provider' => $generatorKey,
                 'expected_reviewer'  => $expectedReviewer,
+                // Route the review to the opposite provider; the same-provider
+                // audit below remains the backstop when no such route exists.
+                'provider_preference' => $expectedReviewer,
             ],
         ], ['type' => 'system']);
 

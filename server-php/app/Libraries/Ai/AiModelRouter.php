@@ -38,6 +38,11 @@ class AiModelRouter
 
         $db = db_connect();
 
+        // Soft preference: a provider hint boosts matching routes to the top
+        // but never excludes the others — if the preferred provider has no
+        // enabled route the next-best one still matches.
+        $preferredProvider = trim((string) ($hints['provider_preference'] ?? ''));
+
         $query = "
             SELECT
                 r.id            AS route_id,
@@ -56,12 +61,13 @@ class AiModelRouter
               AND (r.valid_from IS NULL OR r.valid_from <= NOW())
               AND (r.valid_until IS NULL OR r.valid_until > NOW())
             ORDER BY
+                (p.provider_key = ?) DESC,
                 (r.content_type IS NOT NULL) DESC,
                 r.priority DESC
             LIMIT 1
         ";
 
-        $row = $db->query($query, [$taskType, $contentType ?? $taskType])->getRowArray();
+        $row = $db->query($query, [$taskType, $contentType ?? $taskType, $preferredProvider])->getRowArray();
 
         if (! $row) {
             throw new AiRoutingException(
