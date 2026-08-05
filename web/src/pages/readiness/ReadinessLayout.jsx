@@ -1,15 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 
+// 2026-08 revamp: the Recommendations backlog (its backend was never built),
+// and the hardcoded-prose Privacy / AI Governance / Migrations pages were
+// removed — every remaining entry is backed by a real endpoint.
 const navItems = [
   { to: '/readiness',                   label: 'Overview',           end: true },
-  { to: '/readiness/refresh',           label: 'Recommendations' },
   { to: '/readiness/outcomes',          label: 'Outcomes' },
   { to: '/readiness/attribution',       label: 'Attribution' },
   { to: '/readiness/security',          label: 'Security' },
-  { to: '/readiness/privacy',           label: 'Privacy' },
-  { to: '/readiness/ai-governance',     label: 'AI Governance' },
-  { to: '/readiness/migrations',        label: 'Migrations' },
   { to: '/readiness/operations',        label: 'Operations' },
   { to: '/readiness/disaster-recovery', label: 'Disaster Recovery' },
   { to: '/readiness/technical-debt',    label: 'Technical Debt' },
