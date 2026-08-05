@@ -106,8 +106,8 @@ class CommunityQuestionClassificationService
 
     private function storeClassification(int $questionId, array $data): void
     {
-        $db = db_connect();
-        $db->table('reach_community_question_classifications')->upsert([
+        $db  = db_connect();
+        $row = [
             'question_id'                 => $questionId,
             'product_classification'      => $data['product_classification'],
             'category_classification'     => $data['category_classification'],
@@ -118,7 +118,23 @@ class CommunityQuestionClassificationService
             'classified_at'               => date('Y-m-d H:i:s'),
             'classified_by'               => $data['classified_by'],
             'model_slug'                  => $data['model_slug'],
-        ]);
+        ];
+
+        // Manual upsert: the table has no unique constraint on question_id,
+        // so QueryBuilder::upsert() dies with "No constraint found for
+        // upsert." — and adding one now would need an out-of-band migration
+        // on a table that may already hold duplicates.
+        $existing = $db->table('reach_community_question_classifications')
+            ->where('question_id', $questionId)
+            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+
+        if ($existing) {
+            $db->table('reach_community_question_classifications')
+                ->where('id', $existing['id'])
+                ->update($row);
+        } else {
+            $db->table('reach_community_question_classifications')->insert($row);
+        }
     }
 
     private function detectRiskLevel(string $text): string

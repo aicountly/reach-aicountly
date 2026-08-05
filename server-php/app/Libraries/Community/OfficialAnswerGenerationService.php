@@ -192,31 +192,48 @@ If the answer requires professional advice, set requires_professional_review to 
 PROMPT;
     }
 
+    /**
+     * Real Phase-3 flow: create a generation request row, run the
+     * orchestrator against its ID, read the structured artifact back. (The
+     * original implementation targeted an orchestrator API that never
+     * existed — AiGenerationOrchestrator::execute() takes a request id, and
+     * AiGenerationInput has no contentType/prompt/context parameters — so
+     * every non-mock community generation fatally failed on first use.)
+     */
     private function invokeOrchestrator(string $contentType, string $prompt, array $groundingCtx, ?int $actorId): array
     {
-        // Delegate to the Phase 3 AiGenerationOrchestrator.
-        // Community answers use the same provider/model/budget infrastructure.
-        $orchestrator = new AiGenerationOrchestrator();
+        $requests = new AiGenerationRequestService();
+        $request  = $requests->create([
+            // Routed via reach_ai_model_routes; reach:ai-seed-catalog seeds
+            // community_answer routes for both providers.
+            'task_type'    => 'community_answer',
+            'content_type' => 'generic',
+            'parameters'   => [
+                'instructions'  => $prompt,
+                'answer_schema' => $contentType,
+                'product'       => (string) ($groundingCtx['product'] ?? ''),
+                'jurisdiction'  => (string) ($groundingCtx['jurisdiction'] ?? ''),
+            ],
+        ], ['type' => 'system', 'user_id' => $actorId]);
 
-        // Build a minimal generation input compatible with the orchestrator.
-        // In production, this would be a queued job; here we build it inline.
-        $input = new \App\Libraries\Ai\AiGenerationInput(
-            contentType:  $contentType,
-            prompt:       $prompt,
-            systemPrompt: 'You are an expert AICOUNTLY support team member drafting official responses.',
-            context:      $groundingCtx,
-            maxTokens:    2048,
-            actorId:      $actorId
-        );
+        (new AiGenerationOrchestrator())->execute((int) $request['id']);
+        $refreshed = $requests->findById((int) $request['id']);
+        if (($refreshed['status'] ?? '') !== 'completed') {
+            throw new \RuntimeException('community_answer_generation_' . ($refreshed['status'] ?? 'unknown'));
+        }
 
-        $result  = $orchestrator->execute($input);
-        $aiOutput = json_decode($result['artifact']['content'] ?? '{}', true) ?? [];
-        $genRefs  = [
-            'generation_request_id'  => $result['request_id'] ?? null,
-            'generation_run_id'      => $result['run_id'] ?? null,
-            'generation_artifact_id' => $result['artifact_id'] ?? null,
-            'model_route'            => $result['model_route'] ?? null,
-            'prompt_version'         => $result['prompt_version'] ?? null,
+        $artifact = db_connect()->table('reach_ai_generation_artifacts')
+            ->where('generation_request_id', $request['id'])
+            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray() ?? [];
+
+        $aiOutput = is_string($artifact['structured_output_json'] ?? null)
+            ? (json_decode($artifact['structured_output_json'], true) ?: [])
+            : (array) ($artifact['structured_output_json'] ?? []);
+
+        $genRefs = [
+            'generation_request_id'  => (int) $request['id'],
+            'generation_run_id'      => $artifact['generation_run_id'] ?? null,
+            'generation_artifact_id' => $artifact['id'] ?? null,
         ];
 
         return [$aiOutput, $genRefs];

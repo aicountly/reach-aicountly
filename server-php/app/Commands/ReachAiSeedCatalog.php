@@ -107,6 +107,7 @@ class ReachAiSeedCatalog extends BaseCommand
                 ['editorial_review', null],
                 ['content_revision', 'blog_post'],
                 ['content_revision', null],
+                ['community_answer', null],
             ] as [$task, $contentType]) {
                 $routeSpecs[] = [$task, $contentType, $hiModel, 100];
                 $routeSpecs[] = [$task, $contentType, $loModel, 90];
@@ -128,7 +129,7 @@ class ReachAiSeedCatalog extends BaseCommand
             // (e.g. retired gpt-4o-mini / gemini-2.5-flash primaries).
             $this->demoteOtherPrimaryModels(
                 $db,
-                ['draft_generation', 'brief_generation', 'editorial_review', 'content_revision'],
+                ['draft_generation', 'brief_generation', 'editorial_review', 'content_revision', 'community_answer'],
                 array_values(array_filter([$openaiModel, $geminiModel])),
                 $now,
             );
