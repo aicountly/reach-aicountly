@@ -381,20 +381,31 @@ class PublicationDeploymentService
             ->where('id', $deployment['content_version_id'])
             ->get()->getRowArray()['version_number'] ?? 1;
 
+        $item = $this->db->table('reach_content_items')
+            ->select('uuid, content_type')
+            ->where('id', $deployment['content_item_id'])
+            ->get()->getRowArray() ?? [];
+        $contentType = ($item['content_type'] ?? 'blog') === 'knowledge_base' ? 'knowledge_base' : 'blog';
+
+        $requestId = (string) ($deployment['request_id'] ?? '');
+        if ($requestId === '') {
+            $requestId = 'pub-' . bin2hex(random_bytes(8));
+        }
+
         return [
             'api_version'                  => 1,
             'operation'                    => $subOperation,
             'reach_content_id'             => (int) $deployment['content_item_id'],
-            'reach_content_uuid'           => '',
+            'reach_content_uuid'           => (string) ($item['uuid'] ?? ''),
             'reach_content_version_id'     => (int) $deployment['content_version_id'],
             'reach_content_version_number' => (int) $versionNumber,
-            'content_type'                 => 'blog',
+            'content_type'                 => $contentType,
             'idempotency_key'              => $deployment['idempotency_key'] . ':' . $subOperation,
-            'request_id'                   => $deployment['request_id'] ?? '',
+            'request_id'                   => $requestId,
             'timestamp'                    => time(),
             'nonce'                        => bin2hex(random_bytes(16)),
             'payload_checksum'             => $checksum,
-            'publication_target'           => 'aicountly_com_blog',
+            'publication_target'           => $contentType === 'knowledge_base' ? 'aicountly_com_help' : 'aicountly_com_blog',
             'payload'                      => $payload,
         ];
     }
