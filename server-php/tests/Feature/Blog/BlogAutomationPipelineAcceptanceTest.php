@@ -652,8 +652,8 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
             'content_item_id' => $contentItemId,
             'version_number' => 1,
             'title' => 'E2E fixture draft',
-            'body_html' => '<p>Deterministic fixture body.</p>',
-            'body_plain_text' => 'Deterministic fixture body.',
+            'body_html' => self::fixtureBodyHtml(),
+            'body_plain_text' => strip_tags(self::fixtureBodyHtml()),
             'is_current' => true,
             'created_at' => $now,
         ], $versionOverrides));
@@ -662,5 +662,26 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $db->table('reach_content_items')->where('id', $contentItemId)->update(['current_version_id' => $contentVersionId]);
 
         return [$contentItemId, $contentVersionId];
+    }
+
+    /**
+     * A fixture body long enough to clear PublishableContentGuard, which
+     * blocks stub/short bodies from reaching the public listing. Tests that
+     * exercise rejection paths override body_html with a short string.
+     */
+    private static function fixtureBodyHtml(): string
+    {
+        $paragraph = 'Registered businesses reconcile their purchase invoices against the '
+            . 'supplier filings available on the portal before claiming any credit for the period. '
+            . 'The reconciliation confirms that each invoice carries the correct identification '
+            . 'number, taxable value and rate, and that the supplier has actually reported the '
+            . 'transaction in the corresponding return. ';
+
+        $body = '<h2>Reconciliation before filing</h2>';
+        for ($i = 0; $i < 8; $i++) {
+            $body .= '<p>' . $paragraph . '</p>';
+        }
+
+        return $body;
     }
 }
