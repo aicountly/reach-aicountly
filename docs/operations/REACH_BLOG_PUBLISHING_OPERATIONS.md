@@ -37,17 +37,36 @@ safeguards keep that off the listing:
    failed, and nothing is sent to the public site. The excerpt falls back
    through profile excerpt → version summary → meta description → derived
    excerpt, skipping any candidate that is not real prose.
-3. **Audit command** — for content that is already live:
+3. **Audit command** — for content that is already live. The guards above are
+   preventive: they stop the *next* bad publish, and do nothing about a post
+   already on the site. Use this to clean those up:
 
    ```bash
-   php spark reach:blog-listing-audit            # report only
-   php spark reach:blog-listing-audit --fix      # re-queue genuine drafts
+   php spark reach:blog-listing-audit                     # report only
+   php spark reach:blog-listing-audit --unpublish --fix   # take down + re-draft
    php spark reach:blog-dispatch --force
    php spark reach:work --queue blog,publishing --limit 40
    ```
 
    The report flags placeholder bodies, unusable excerpts, missing covers and
-   missing alt text per content item.
+   missing alt text per content item. `--unpublish` takes placeholder articles
+   off the public site immediately (only placeholder bodies — a real article
+   with a missing cover is not pulled down). `--fix` re-queues a genuine draft.
+
+   Each finding reports its `takedown` outcome:
+
+   | Value | Meaning |
+   |---|---|
+   | `unpublished` | Removed from the public site |
+   | `no_active_deployment` | Not published through Reach's connector — remove it on aicountly.com directly |
+   | `unpublish_rejected_by_public_site` | The site refused; check connection health |
+   | `unpublish_failed: …` | Local error, e.g. the deployment has no `public_content_id` |
+
+   **The rewritten article does not republish by itself.** Redrafting resets the
+   item to `outline_ready` with `approval_status = pending`, so it re-enters the
+   normal human approval gate. That gate is deliberate and this command does not
+   bypass it — after the worker generates the new draft, approve it in Reach and
+   publish as usual.
 
 ### Cover images
 

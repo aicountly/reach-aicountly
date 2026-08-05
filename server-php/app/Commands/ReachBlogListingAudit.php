@@ -8,6 +8,7 @@ use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Blog\BlogRedraftService;
 use App\Libraries\Publishing\Blog\BlogMetadataService;
 use App\Libraries\Publishing\Blog\PublishableContentGuard;
+use App\Libraries\Publishing\Jobs\PublicationRollbackService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -19,11 +20,17 @@ use Throwable;
  *
  * Reports every blog item that is published (or queued to publish) but would
  * render as a fake card on the public listing: a placeholder body, an excerpt
- * that is not real prose, or a missing cover image. With --fix, placeholder
- * bodies are re-queued for a genuine draft via BlogRedraftService.
+ * that is not real prose, or a missing cover image.
+ *
+ * Two remediations, usually run together:
+ *   --unpublish  takes the fake article down from aicountly.com now, so
+ *                readers stop seeing it while the rewrite is generated.
+ *   --fix        re-queues a genuine draft via BlogRedraftService. The
+ *                rewritten article still needs human approval before it
+ *                republishes — that gate is not bypassed here.
  *
  *   php spark reach:blog-listing-audit
- *   php spark reach:blog-listing-audit --fix --limit=20
+ *   php spark reach:blog-listing-audit --unpublish --fix
  */
 class ReachBlogListingAudit extends BaseCommand
 {
@@ -38,18 +45,20 @@ class ReachBlogListingAudit extends BaseCommand
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-listing-audit';
     protected $description = 'Audit published blogs for placeholder bodies, unusable excerpts and missing covers.';
-    protected $usage       = 'reach:blog-listing-audit [--fix] [--limit=50] [--all]';
+    protected $usage       = 'reach:blog-listing-audit [--fix] [--unpublish] [--limit=50] [--all]';
     protected $options     = [
-        '--fix'   => 'Re-queue a genuine draft for every placeholder body found.',
-        '--limit' => 'Max items to scan (default 50).',
-        '--all'   => 'Scan every blog item, not just published/queued ones.',
+        '--fix'       => 'Re-queue a genuine draft for every placeholder body found.',
+        '--unpublish' => 'Take placeholder articles down from the public site now.',
+        '--limit'     => 'Max items to scan (default 50).',
+        '--all'       => 'Scan every blog item, not just published/queued ones.',
     ];
 
     public function run(array $params): int
     {
-        $fix   = $this->sparkFlag('fix', $params);
-        $all   = $this->sparkFlag('all', $params);
-        $limit = max(1, (int) ($this->sparkOption('limit', $params, '50') ?? '50'));
+        $fix       = $this->sparkFlag('fix', $params);
+        $unpublish = $this->sparkFlag('unpublish', $params);
+        $all       = $this->sparkFlag('all', $params);
+        $limit     = max(1, (int) ($this->sparkOption('limit', $params, '50') ?? '50'));
 
         $db       = Database::connect();
         $guard    = new PublishableContentGuard();
@@ -116,6 +125,14 @@ class ReachBlogListingAudit extends BaseCommand
                 'problems'        => $problems,
             ];
 
+            // Takedown first: a reader looking at the listing right now sees a
+            // fake article, and the rewrite takes minutes. Only placeholder
+            // bodies are taken down — a real article with a missing cover is
+            // not worth pulling off the site.
+            if ($unpublish && $stubBody) {
+                $finding['takedown'] = $this->unpublishItem($db, (int) $item['id']);
+            }
+
             if ($fix && $stubBody) {
                 try {
                     $result            = (new BlogRedraftService())->redraft((int) $item['id']);
@@ -130,20 +147,60 @@ class ReachBlogListingAudit extends BaseCommand
             $findings[] = $finding;
         }
 
+        $tallied = static fn (string $key, string $value): int => count(array_filter(
+            $findings,
+            static fn (array $f): bool => ($f[$key] ?? '') === $value,
+        ));
+
         CLI::write(json_encode([
-            'event'    => 'blog_listing_audit.completed',
-            'ts'       => gmdate('c'),
-            'scanned'  => count($items),
-            'flagged'  => count($findings),
-            'fixed'    => count(array_filter($findings, static fn (array $f): bool => ($f['action'] ?? '') === 'redraft_queued')),
-            'findings' => $findings,
-            'next'     => $findings === [] ? [] : [
-                'php spark reach:blog-listing-audit --fix',
+            'event'       => 'blog_listing_audit.completed',
+            'ts'          => gmdate('c'),
+            'scanned'     => count($items),
+            'flagged'     => count($findings),
+            'unpublished' => $tallied('takedown', 'unpublished'),
+            'fixed'       => $tallied('action', 'redraft_queued'),
+            'findings'    => $findings,
+            'next'        => $findings === [] ? [] : [
+                'php spark reach:blog-listing-audit --unpublish --fix',
                 'php spark reach:blog-dispatch --force',
                 'php spark reach:work --queue blog,publishing --limit 40',
+                'Approve the rewritten drafts in Reach — republish stays human-gated.',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
         return 0;
+    }
+
+    /**
+     * Take one placeholder article off the public site via the deployment
+     * connector. Mirrors ContentPublishController::unpublish, including which
+     * deployment statuses still count as live.
+     */
+    private function unpublishItem(\CodeIgniter\Database\BaseConnection $db, int $contentItemId): string
+    {
+        $deployment = $db->table('reach_publication_deployments')
+            ->where('content_item_id', $contentItemId)
+            ->whereIn('status', ['published', 'verified', 'rolled_back'])
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()->getRowArray();
+
+        if (! $deployment) {
+            // Either never published through Reach, or pushed by the legacy
+            // publisher — in both cases the takedown has to happen on the
+            // public site itself, so say so rather than reporting success.
+            return 'no_active_deployment';
+        }
+
+        try {
+            $done = (new PublicationRollbackService())->unpublish(
+                (int) $deployment['id'],
+                'Placeholder body detected by reach:blog-listing-audit',
+            );
+
+            return $done ? 'unpublished' : 'unpublish_rejected_by_public_site';
+        } catch (Throwable $e) {
+            return 'unpublish_failed: ' . mb_substr($e->getMessage(), 0, 120);
+        }
     }
 }
