@@ -4,6 +4,25 @@ import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
 
+/** category_tags arrives as a JSONB string from Postgres or an array once edited. */
+function assetTags(asset) {
+  const raw = asset?.category_tags;
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function isUnmatchable(asset) {
+  return assetTags(asset).length === 0 && !asset?.portfolio_stream;
+}
+
 export function MediaGalleryPage() {
   const [assets, setAssets] = useState([]);
   const [deficit, setDeficit] = useState(null);
@@ -61,6 +80,26 @@ export function MediaGalleryPage() {
     }
   };
 
+  // Covers are matched to articles by tag/stream relevance, so an untagged
+  // asset never gets assigned. Tagging is the fix, not another upload.
+  const handleRetag = async (asset) => {
+    const current = assetTags(asset).join(', ');
+    const next = window.prompt(
+      `Tags for asset ${asset.id} (comma-separated, e.g. "gst, compliance, invoicing").\n` +
+        'Covers are matched to articles by these tags — untagged covers are never assigned.',
+      current,
+    );
+    if (next === null) return;
+    const parsed = next.split(',').map((t) => t.trim()).filter(Boolean);
+    try {
+      await mediaGalleryService.update(asset.id, { category_tags: parsed });
+      setNotice(`Updated tags for asset ${asset.id}.`);
+      load();
+    } catch (err) {
+      setError(err?.message || 'Update failed.');
+    }
+  };
+
   if (loading) return <Loader label="Loading cover gallery…" />;
 
   return (
@@ -100,6 +139,12 @@ export function MediaGalleryPage() {
           ) : (
             <Alert variant="success">
               No deficit — {deficit.available} rotation-ready covers for {deficit.needed} upcoming entries.
+            </Alert>
+          )}
+          {deficit.untagged > 0 && (
+            <Alert variant="warning">
+              {deficit.untagged} active cover(s) have no tags or stream. Covers are assigned by topical
+              relevance, so untagged ones are never picked — tag them below to bring them into rotation.
             </Alert>
           )}
         </Card>
@@ -147,11 +192,23 @@ export function MediaGalleryPage() {
                   <div>
                     <span className={`badge ${asset.status === 'active' ? 'badge--success' : 'badge--muted'}`}>{asset.status}</span>
                     {' '}<span className="text-muted">{asset.kind}</span>
+                    {asset.status === 'active' && isUnmatchable(asset) && (
+                      <> <span className="badge badge--warning">untagged · never assigned</span></>
+                    )}
+                  </div>
+                  <div className="text-muted">
+                    {assetTags(asset).length > 0 ? assetTags(asset).join(', ') : 'no tags'}
+                    {asset.portfolio_stream ? ` · ${asset.portfolio_stream}` : ''}
                   </div>
                   <div className="text-muted">Used {asset.times_used}× {asset.last_used_at ? `· last ${String(asset.last_used_at).slice(0, 10)}` : ''}</div>
-                  <button type="button" className="btn btn--secondary btn--sm" style={{ marginTop: '0.25rem' }} onClick={() => handleRetire(asset)}>
-                    {asset.status === 'active' ? 'Retire' : 'Reactivate'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
+                    <button type="button" className="btn btn--secondary btn--sm" onClick={() => handleRetag(asset)}>
+                      Edit tags
+                    </button>
+                    <button type="button" className="btn btn--secondary btn--sm" onClick={() => handleRetire(asset)}>
+                      {asset.status === 'active' ? 'Retire' : 'Reactivate'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

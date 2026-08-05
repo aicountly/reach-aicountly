@@ -14,24 +14,61 @@ class BlogMetadataService
      */
     public function estimateReadingTime(string $bodyHtml): int
     {
-        $text = strip_tags($bodyHtml);
-        $words = str_word_count($text);
+        $words = PublishableContentGuard::countWords(PublishableContentGuard::toPlainText($bodyHtml));
+
         return max(1, (int) ceil($words / self::WORDS_PER_MINUTE));
     }
 
     /**
      * Derive a plain-text excerpt from HTML body.
+     *
+     * The listing card shows this verbatim, so it must read as prose: block
+     * tags become word boundaries (otherwise "</h2><p>" fuses two words),
+     * leading headings are skipped in favour of the first real paragraph, and
+     * truncation is multibyte-safe.
      */
     public function deriveExcerpt(string $bodyHtml, int $maxLength = 200): string
     {
-        $text = strip_tags($bodyHtml);
-        $text = preg_replace('/\s+/', ' ', trim($text));
-        if (strlen($text) <= $maxLength) {
+        $text = PublishableContentGuard::toPlainText($this->preferFirstParagraph($bodyHtml));
+        if ($text === '') {
+            return '';
+        }
+
+        // Collapse decorative punctuation runs ("......") that would otherwise
+        // eat the whole excerpt.
+        $text = trim(preg_replace('/([.\-–—_])\1{3,}/u', '', $text) ?? $text);
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+
+        if (mb_strlen($text) <= $maxLength) {
             return $text;
         }
-        $truncated = substr($text, 0, $maxLength);
-        $lastSpace = strrpos($truncated, ' ');
-        return ($lastSpace !== false ? substr($truncated, 0, $lastSpace) : $truncated) . '…';
+
+        $truncated = mb_substr($text, 0, $maxLength);
+        $lastSpace = mb_strrpos($truncated, ' ');
+
+        $cut = $lastSpace !== false ? mb_substr($truncated, 0, $lastSpace) : $truncated;
+
+        return rtrim($cut, " \t\n\r\0\x0B,;:.-") . '…';
+    }
+
+    /**
+     * Prefer the first substantive <p> over a leading heading/table of
+     * contents, falling back to the whole body when there is no usable one.
+     */
+    private function preferFirstParagraph(string $bodyHtml): string
+    {
+        if (! preg_match_all('/<p\b[^>]*>(.*?)<\/p>/is', $bodyHtml, $matches)) {
+            return $bodyHtml;
+        }
+
+        foreach ($matches[1] as $paragraph) {
+            $plain = PublishableContentGuard::toPlainText($paragraph);
+            if (PublishableContentGuard::countWords($plain) >= 12) {
+                return $paragraph;
+            }
+        }
+
+        return $bodyHtml;
     }
 
     /**

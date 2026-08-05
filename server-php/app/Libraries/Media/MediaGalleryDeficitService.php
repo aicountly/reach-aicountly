@@ -26,7 +26,7 @@ class MediaGalleryDeficitService
 
     /**
      * @return array{
-     *   needed:int, available:int, deficit:int, lookahead_days:int,
+     *   needed:int, available:int, untagged:int, deficit:int, lookahead_days:int,
      *   upcoming:list<array{key:string,title:string,target_date:string,cover_prompt:string,status:string}>
      * }
      */
@@ -60,13 +60,26 @@ class MediaGalleryDeficitService
             ? "AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '{$cooldownDays} days')"
             : '';
         $available = 0;
+        $untagged  = 0;
 
         try {
+            // Assignment is relevance-scored, so an asset with neither tags nor
+            // a portfolio stream can never be matched to an article — it is
+            // dead stock, not availability. Counted separately so operators can
+            // fix it by tagging rather than by uploading more images.
             $row = $this->db->query(
-                "SELECT COUNT(*) AS c FROM reach_media_gallery_assets
+                "SELECT
+                     COUNT(*) FILTER (
+                         WHERE category_tags <> '[]'::jsonb OR portfolio_stream IS NOT NULL
+                     ) AS matchable,
+                     COUNT(*) FILTER (
+                         WHERE category_tags = '[]'::jsonb AND portfolio_stream IS NULL
+                     ) AS untagged
+                 FROM reach_media_gallery_assets
                  WHERE status = 'active' AND kind = 'gallery_upload' {$cooldownSql}"
             )->getRowArray();
-            $available = (int) ($row['c'] ?? 0);
+            $available = (int) ($row['matchable'] ?? 0);
+            $untagged  = (int) ($row['untagged'] ?? 0);
         } catch (\Throwable) {
         }
 
@@ -75,6 +88,7 @@ class MediaGalleryDeficitService
         return [
             'needed'         => $needed,
             'available'      => $available,
+            'untagged'       => $untagged,
             'deficit'        => max(0, $needed - $available),
             'lookahead_days' => $lookaheadDays,
             'upcoming'       => $upcoming,

@@ -22,6 +22,55 @@ Before triggering publication for a blog post:
 
 ---
 
+## Public listing quality
+
+`aicountly.com/blogs` renders the payload's `excerpt`, `featured_image_url` and
+`reading_time_minutes` on each card, so a placeholder draft that reaches the
+site looks exactly like a real post ("Untitled draft........"). Three
+safeguards keep that off the listing:
+
+1. **Readiness gate** — `BlogReadinessService` blocks any item whose body is a
+   stub, is under `BLOG_MIN_PUBLISH_WORDS` (default 300), or is mostly
+   punctuation. It warns when no cover image is assigned.
+2. **Payload guard** — `BlogPublicationPayloadBuilder` re-runs the same check on
+   the sanitised body at build time. A failure throws, the deployment is marked
+   failed, and nothing is sent to the public site. The excerpt falls back
+   through profile excerpt → version summary → meta description → derived
+   excerpt, skipping any candidate that is not real prose.
+3. **Audit command** — for content that is already live:
+
+   ```bash
+   php spark reach:blog-listing-audit            # report only
+   php spark reach:blog-listing-audit --fix      # re-queue genuine drafts
+   php spark reach:blog-dispatch --force
+   php spark reach:work --queue blog,publishing --limit 40
+   ```
+
+   The report flags placeholder bodies, unusable excerpts, missing covers and
+   missing alt text per content item.
+
+### Cover images
+
+Gallery covers are assigned by topical relevance (`CoverRelevanceScorer`)
+against the article's category, portfolio stream, tags and title keywords —
+not by rotation order alone, which is what previously fronted a GST article
+with a landscape photo. Tuning:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `MEDIA_GALLERY_MIN_RELEVANCE` | `3` | Score floor an asset must clear to be assigned |
+| `MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK` | `false` | When true, falls back to any free cover instead of leaving the article without one |
+| `MEDIA_GALLERY_REUSE_COOLDOWN_DAYS` | `30` | Minimum gap before a cover is reused |
+| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Generate a cover for a routine blog when no gallery asset is relevant; set false to publish without one |
+| `BLOG_MIN_PUBLISH_WORDS` | `300` | Minimum publishable article length |
+
+If no gallery asset is relevant, a routine blog generates its own cover from
+the article title/summary rather than borrowing an unrelated image. Untagged
+gallery assets can never be matched — Quality → Media Gallery flags them and
+the deficit report counts them under `untagged`.
+
+---
+
 ## Triggering Publication
 
 Publication is triggered from the Blog Publishing list page:

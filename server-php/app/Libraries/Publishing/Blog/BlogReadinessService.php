@@ -65,6 +65,26 @@ class BlogReadinessService
             $blocking[] = 'Current version is superseded; a new version must be approved';
         }
 
+        // Gate 4b: the body must be a real article. Without this a placeholder
+        // draft publishes as a live post and the public listing renders
+        // "Untitled draft........" as the excerpt.
+        if ($version) {
+            // Same body resolution order as the payload builder, so readiness
+            // never blocks content that would in fact publish (and vice versa).
+            $snapshot = json_decode((string) ($version['snapshot_json'] ?? ''), true);
+            $body     = (string) ($version['body_html']
+                ?? (is_array($snapshot) ? ($snapshot['body_html'] ?? null) : null)
+                ?? '');
+
+            $verdict = (new PublishableContentGuard())->assessBody(
+                $body,
+                (string) ($version['title'] ?? $item['title'] ?? ''),
+            );
+            foreach ($verdict['reasons'] as $reason) {
+                $blocking[] = $reason;
+            }
+        }
+
         // Gate 5: validation status
         if ($item['validation_status'] === 'blocking' || $item['validation_status'] === 'failed') {
             $blocking[] = 'Unresolved critical validation findings';
@@ -118,6 +138,12 @@ class BlogReadinessService
         // Gate 11: author defined
         if ($profile && empty($profile['author_reference'])) {
             $blocking[] = 'Author reference is not defined';
+        }
+
+        // Gate 11b: cover image present (warning — a publish without a hero is
+        // allowed, but the listing card renders a blank tile).
+        if ($profile && trim((string) ($profile['featured_image_reference'] ?? '')) === '') {
+            $warnings[] = 'Featured image is not assigned; the listing card will render without a cover';
         }
 
         // Gate 12: featured image alt text
