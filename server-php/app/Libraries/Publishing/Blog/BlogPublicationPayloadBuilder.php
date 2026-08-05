@@ -64,6 +64,19 @@ class BlogPublicationPayloadBuilder
         $rawBody  = (string) ($version['body_html'] ?? $snapshot['body_html'] ?? $blogDetails['body_html'] ?? '');
         $safeBody = (new HtmlSanitizer())->purify($rawBody);
 
+        // Placeholder bodies must never reach aicountly.com/blogs — the public
+        // listing renders the excerpt verbatim, so an "Untitled draft........"
+        // row shows up as a real article. Failing here marks the deployment
+        // failed (PublicationDeploymentService catches it) instead of shipping
+        // a fake post; `php spark reach:blog-listing-audit --fix` re-drafts it.
+        $guard       = new PublishableContentGuard();
+        $bodyVerdict = $guard->assessBody($safeBody, (string) ($item['title'] ?? ''));
+        if (! $bodyVerdict['publishable']) {
+            throw new \RuntimeException(
+                'Content is not publishable: ' . implode('; ', $bodyVerdict['reasons'])
+            );
+        }
+
         // Internal-link automation: append the marked "Related reading"
         // section (2–4 registry links by product/category affinity) exactly
         // once at payload build. Prose is never rewritten; routine-authored
@@ -154,9 +167,14 @@ class BlogPublicationPayloadBuilder
         $payload = [
             'title'                => $item['title'] ?? '',
             'slug'                 => $seo['slug'] ?? $item['slug'] ?? '',
-            'excerpt'              => !empty($profile['excerpt'])
-                                     ? $profile['excerpt']
-                                     : $this->metadata->deriveExcerpt($safeBody),
+            // Listing cards show this: take the first candidate that reads as
+            // real prose, never a stub excerpt saved alongside a good body.
+            'excerpt'              => $guard->firstUsableExcerpt([
+                $profile['excerpt'] ?? null,
+                $version['summary'] ?? ($snapshot['summary'] ?? null),
+                $seo['meta_description'] ?? null,
+                $this->metadata->deriveExcerpt($safeBody),
+            ]) ?: $this->metadata->deriveExcerpt($safeBody),
             'body_html'            => $safeBody,
             'body_markdown'        => $bodyMarkdown,
             'meta_title'           => $seo['meta_title'] ?? $item['title'] ?? '',
@@ -169,7 +187,12 @@ class BlogPublicationPayloadBuilder
             'reviewer_name'        => $protectedReviewerName ?? '',
             'reviewer_reference'   => $profile['reviewer_reference'] ?? '',
             'featured_image_url'   => $profile['featured_image_reference'] ?? $blogDetails['featured_image_url'] ?? '',
-            'featured_image_alt'   => $profile['featured_image_alt'] ?? '',
+            'featured_image_alt'   => trim((string) ($profile['featured_image_alt'] ?? '')) !== ''
+                                     ? $profile['featured_image_alt']
+                                     : CoverAltTextBuilder::build(
+                                         (string) ($item['title'] ?? ''),
+                                         (string) ($profile['category'] ?? ''),
+                                     ),
             'internal_links'       => $internalLinks,
             'citations'            => [],
             'faq'                  => $faqCandidates,

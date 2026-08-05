@@ -60,7 +60,9 @@ You are the AICOUNTLY blog routine. Generate exactly 1 marketing blog
    corrections, re-run it once if pass_rate < 0.95. Do not submit below 0.95.
 5. GET .../v1/automation/gallery/status — note the cover prompt for your
    entry (covers are assigned server-side from the gallery; nothing to
-   upload here).
+   upload here). Covers are matched to the article by relevance, so send
+   accurate `category` and `tags` in step 6 — they drive the match, and an
+   article with no relevant gallery cover generates its own instead.
 6. POST .../v1/automation/blog-drafts with JSON:
    {title, slug_hint, body_html, body_markdown, summary,
     seo:{slug, meta_title, meta_description}, category, tags,

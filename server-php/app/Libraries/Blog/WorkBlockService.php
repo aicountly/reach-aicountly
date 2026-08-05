@@ -1004,16 +1004,26 @@ class WorkBlockService
         $details = $contentItemId > 0
             ? ($this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [])
             : [];
+        $galleryMiss = null;
 
-        // Claude-routine drafts use the curated gallery (rotation-managed),
+        // Claude-routine drafts try the curated gallery first (rotation-managed),
         // not AI generation — 12+ blogs/day of AI covers is exactly the spend
-        // the gallery exists to avoid.
+        // the gallery exists to avoid. When no gallery asset is topically
+        // relevant we fall through to AI generation rather than fronting the
+        // article with an unrelated stock photo; that costs one image on the
+        // rare miss instead of every post.
         if (($details['origin'] ?? 'pipeline') === 'claude_routine') {
             $output = $this->assignGalleryCover($contentItemId, $item, $details);
-            $this->chainSeoOptimize($contentItemId, $contentVersionId);
-            $this->markCompleted($id, $output);
+            $aiFallback = filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL);
 
-            return $output;
+            if (empty($output['image_failed']) || ! $aiFallback) {
+                $this->chainSeoOptimize($contentItemId, $contentVersionId);
+                $this->markCompleted($id, $output);
+
+                return $output;
+            }
+
+            $galleryMiss = $output;
         }
 
         $input  = $this->decodeInput($block);
@@ -1022,15 +1032,21 @@ class WorkBlockService
             $version = $contentVersionId > 0
                 ? $this->db->table('reach_content_versions')->where('id', $contentVersionId)->get()->getRowArray()
                 : null;
+            // The published category is a sharper theme than the portfolio
+            // stream, so the cover matches what the listing card says.
+            $category = (string) ($this->db->table('reach_blog_publication_profiles')
+                ->select('category')
+                ->where('content_item_id', $contentItemId)
+                ->get()->getRowArray()['category'] ?? '');
             $prompt = (new \App\Libraries\Ai\Images\CoverPromptBuilder())->build(
                 (string) ($item['title'] ?? ''),
                 (string) ($version['summary'] ?? ''),
-                (string) ($details['portfolio_stream'] ?? ''),
+                $category !== '' ? $category : (string) ($details['portfolio_stream'] ?? ''),
             );
         }
         if ($prompt === '') {
             $this->chainSeoOptimize($contentItemId, $contentVersionId);
-            $output = ['image_failed' => true, 'reason' => 'no_prompt_available'];
+            $output = array_filter(['image_failed' => true, 'reason' => 'no_prompt_available', 'gallery_miss' => $galleryMiss]);
             $this->markCompleted($id, $output);
 
             return $output;
@@ -1040,7 +1056,7 @@ class WorkBlockService
         $configured = array_keys($registry->configuredProviders());
         if ($configured === []) {
             $this->chainSeoOptimize($contentItemId, $contentVersionId);
-            $output = ['image_failed' => true, 'reason' => 'no_image_provider_configured'];
+            $output = array_filter(['image_failed' => true, 'reason' => 'no_image_provider_configured', 'gallery_miss' => $galleryMiss]);
             $this->markCompleted($id, $output);
 
             return $output;
@@ -1095,10 +1111,10 @@ class WorkBlockService
             $publicUrl = $store->publicUrl($asset);
 
             if ($contentItemId > 0) {
-                $this->setFeaturedImage($contentItemId, $publicUrl, 'Illustration: ' . (string) ($item['title'] ?? 'cover image'));
+                $this->setFeaturedImage($contentItemId, $publicUrl, $this->coverAltText($contentItemId, $item));
             }
 
-            $output = [
+            $output = array_filter([
                 'provider_key' => $result->providerKey,
                 'model_key'    => $result->modelKey,
                 'image_count'  => $result->imageCount,
@@ -1106,14 +1122,16 @@ class WorkBlockService
                 'asset_id'     => $asset['id'] ?? null,
                 'asset_uuid'   => $asset['asset_uuid'] ?? null,
                 'public_url'   => $publicUrl,
-            ];
+                'gallery_miss' => $galleryMiss,
+            ], static fn ($v) => $v !== null);
         } catch (\Throwable $e) {
             // Image trouble must never stall publication.
-            $output = [
+            $output = array_filter([
                 'image_failed' => true,
                 'reason'       => mb_substr($e->getMessage(), 0, 200),
                 'provider_key' => $providerKey,
-            ];
+                'gallery_miss' => $galleryMiss,
+            ], static fn ($v) => $v !== null);
         }
 
         $this->chainSeoOptimize($contentItemId, $contentVersionId);
@@ -1123,9 +1141,11 @@ class WorkBlockService
     }
 
     /**
-     * Least-recently-used gallery cover matching the item's stream/category;
-     * enforced reuse cooldown. No match → publish proceeds without a hero and
-     * the deficit counter picks it up.
+     * Topically relevant gallery cover (scored against the article's category,
+     * stream, tags and title), least-recently-used among equally relevant
+     * assets, with the reuse cooldown enforced. No relevant asset → reported as
+     * a miss so the caller generates a cover from the article instead of
+     * attaching an unrelated photo.
      *
      * @param array<string,mixed> $item
      * @param array<string,mixed> $details
@@ -1141,13 +1161,13 @@ class WorkBlockService
         }
 
         if ($assignment === null) {
-            return ['image_failed' => true, 'reason' => 'gallery_empty_or_cooling_down'];
+            return ['image_failed' => true, 'reason' => 'gallery_no_relevant_cover'];
         }
 
         $this->setFeaturedImage(
             $contentItemId,
             $assignment['public_url'],
-            'Illustration: ' . (string) ($item['title'] ?? 'cover image'),
+            $this->coverAltText($contentItemId, $item),
         );
 
         return [
@@ -1155,7 +1175,30 @@ class WorkBlockService
             'asset_id'         => $assignment['asset_id'],
             'asset_uuid'       => $assignment['asset_uuid'],
             'public_url'       => $assignment['public_url'],
+            'relevance_score'  => $assignment['relevance_score'],
+            'match_reasons'    => $assignment['match_reasons'],
         ];
+    }
+
+    /**
+     * Alt text that describes the article, not the file — the readiness gate
+     * requires it and screen readers depend on it.
+     *
+     * @param array<string,mixed> $item
+     */
+    private function coverAltText(int $contentItemId, array $item): string
+    {
+        $category = $contentItemId > 0
+            ? (string) ($this->db->table('reach_blog_publication_profiles')
+                ->select('category')
+                ->where('content_item_id', $contentItemId)
+                ->get()->getRowArray()['category'] ?? '')
+            : '';
+
+        return \App\Libraries\Publishing\Blog\CoverAltTextBuilder::build(
+            (string) ($item['title'] ?? ''),
+            $category,
+        );
     }
 
     private function setFeaturedImage(int $contentItemId, string $url, string $alt): void
