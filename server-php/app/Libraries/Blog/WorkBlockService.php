@@ -1972,7 +1972,7 @@ class WorkBlockService
     // Helpers
     // -------------------------------------------------------------------
 
-    private function buildUniqueSlug(string $title): string
+    public function buildUniqueSlug(string $title): string
     {
         $base = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $title) ?? ''));
         $base = trim($base, '-') ?: ('topic-' . bin2hex(random_bytes(4)));
@@ -2005,7 +2005,7 @@ class WorkBlockService
      * Ensure SEO + blog publication profiles exist with the minimum fields
      * required by BlogReadinessService before schedule/publish.
      */
-    private function ensurePublicationProfilesForItem(int $contentItemId): void
+    public function ensurePublicationProfilesForItem(int $contentItemId): void
     {
         $item = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
         if (! $item) {

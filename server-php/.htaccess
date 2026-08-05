@@ -11,7 +11,7 @@ RewriteCond %{HTTP:Authorization} .
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
 # Block direct access to sensitive paths
-RewriteRule ^(app|database|writable|vendor)/ - [F,L]
+RewriteRule ^(app|database|writable|vendor|content-base)/ - [F,L]
 
 <FilesMatch "^\.env">
   <IfModule mod_authz_core.c>

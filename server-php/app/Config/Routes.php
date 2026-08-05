@@ -94,6 +94,18 @@ $routes->group('v1', static function ($routes) {
     });
 
     // ---------------------------------------------------------------------
+    // Inbound from the Claude Code routines (X-Automation-Token).
+    // Headless service auth, scoped to exactly these endpoints.
+    // ---------------------------------------------------------------------
+    $routes->group('automation', ['filter' => 'automation-token'], static function ($routes) {
+        $routes->get('content-base',    'Api\\V1\\Content\\AutomationIngestController::contentBase');
+        $routes->get('gallery/status',  'Api\\V1\\Content\\AutomationIngestController::galleryStatus');
+        $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');
+        $routes->post('blog-drafts',    'Api\\V1\\Content\\AutomationIngestController::storeBlogDraft');
+        $routes->post('kb-drafts',      'Api\\V1\\Content\\AutomationIngestController::storeKbDraft');
+    });
+
+    // ---------------------------------------------------------------------
     // Inbound from Console (X-Console-Token).
     // ---------------------------------------------------------------------
     $routes->group('portal', ['filter' => 'console-token'], static function ($routes) {
@@ -142,6 +154,14 @@ $routes->group('v1', static function ($routes) {
         $routes->get('blog-command-centre/roadmap/optimizer-runs',   'BlogCommandCentreController::optimizerRuns',     ['filter' => 'permission:blog.view']);
         $routes->get('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::scoringWeights',    ['filter' => 'permission:blog.view']);
         $routes->put('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::updateScoringWeights', ['filter' => 'permission:blog.edit']);
+        // Repo-versioned content base (read-only in the console; edited in git)
+        $routes->get('blog/content-base', 'Api\\V1\\Content\\ContentBaseController::index', ['filter' => 'permission:blog.view']);
+
+        // Cover-image gallery (Quality Centre)
+        $routes->get('media/gallery',            'Api\\V1\\Content\\MediaGalleryController::index',    ['filter' => 'permission:blog.view']);
+        $routes->post('media/gallery',           'Api\\V1\\Content\\MediaGalleryController::upload',   ['filter' => 'permission:blog.edit']);
+        $routes->patch('media/gallery/(:num)',   'Api\\V1\\Content\\MediaGalleryController::update/$1', ['filter' => 'permission:blog.edit']);
+        $routes->get('media/gallery/deficit',    'Api\\V1\\Content\\MediaGalleryController::deficit',  ['filter' => 'permission:blog.view']);
 
         // Content calendar
         $routes->get('calendar/items',           'Api\\V1\\ContentCalendarController::index',      ['filter' => 'permission:blog.view']);

@@ -106,5 +106,20 @@ class ReachSchedule extends BaseCommand
         if ($hour === 3) {
             $svc->enqueue('reach.content_refresh_detection', []);
         }
+
+        // 06:00 — sync repo content-base into topic candidates (idempotent per day)
+        if ($hour === 6) {
+            $svc->enqueue('reach.content_base_sync', ['date' => $today], [
+                'idempotency_key' => "content-base-sync-{$today}",
+            ]);
+        }
+
+        // 09:00 — superadmin cover-gallery deficit reminder (skips when no deficit)
+        if ($hour === 9) {
+            $svc->enqueue('reach.gallery_deficit_alert', ['date' => $today], [
+                'queue'           => 'notifications',
+                'idempotency_key' => "gallery-deficit-{$today}",
+            ]);
+        }
     }
 }

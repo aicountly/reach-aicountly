@@ -43,6 +43,7 @@ import { BotReportsPage } from './pages/bot/BotReportsPage';
 import { BotReportDetailPage } from './pages/bot/BotReportDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 
+import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { BotSettingsPage } from './pages/admin/BotSettingsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
@@ -186,6 +187,7 @@ import { BlogOverviewPage } from './pages/blog-command-centre/BlogOverviewPage.j
 import { BlogScaffoldPage } from './pages/blog-command-centre/BlogScaffoldPage.jsx';
 import { BlogSharedEmbed } from './pages/blog-command-centre/BlogSharedEmbed.jsx';
 import { BlogDeepLinkRedirect } from './pages/blog-command-centre/BlogDeepLinkRedirect.jsx';
+import { ContentBasePage } from './pages/blog-command-centre/roadmap/ContentBasePage.jsx';
 import { RoadmapCandidatesPage } from './pages/blog-command-centre/roadmap/RoadmapCandidatesPage.jsx';
 import { RoadmapScoredPage } from './pages/blog-command-centre/roadmap/RoadmapScoredPage.jsx';
 import { RoadmapOptimizerPage } from './pages/blog-command-centre/roadmap/RoadmapOptimizerPage.jsx';
@@ -250,6 +252,7 @@ export default function App() {
           <Route index element={<BlogOverviewPage />} />
 
           <Route path="roadmap" element={<Navigate to="candidates" replace />} />
+          <Route path="roadmap/content-base" element={<ContentBasePage />} />
           <Route path="roadmap/candidates" element={<RoadmapCandidatesPage />} />
           <Route path="roadmap/scored" element={<RoadmapScoredPage />} />
           <Route path="roadmap/gaps" element={<BlogScaffoldPage />} />
@@ -501,6 +504,9 @@ export default function App() {
           <Route path="connections" element={<VideoConnectionsPage />} />
           <Route path="operations" element={<VideoOperationsDashboardPage />} />
         </Route>
+
+        {/* Quality Centre — cover gallery + content base */}
+        <Route path="/quality/gallery" element={<MediaGalleryPage />} />
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />

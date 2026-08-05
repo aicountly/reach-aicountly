@@ -90,6 +90,9 @@ chmod -R 775 writable/cache writable/session writable/logs writable/uploads 2>/d
 echo "---- Running database migrations ----"
 CI_ENVIRONMENT=production "${PHP_BIN}" spark migrate --no-interaction 2>&1
 
+echo "---- Syncing repo content-base into topic candidates ----"
+CI_ENVIRONMENT=production "${PHP_BIN}" spark reach:content-base-sync 2>&1 || echo "WARNING: content-base sync failed (will retry on the daily schedule)"
+
 MARKER="writable/.reach_seed_complete"
 if [ -f "$MARKER" ]; then
   echo "Seeders already applied — skipping (marker: ${MARKER})"

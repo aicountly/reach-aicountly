@@ -209,7 +209,13 @@ class PublicationDeploymentService
         $publisher = PublicSitePublisherFactory::make();
 
         try {
-            $builder  = new BlogPublicationPayloadBuilder();
+            $itemType = (string) ($this->db->table('reach_content_items')
+                ->select('content_type')
+                ->where('id', $deployment['content_item_id'])
+                ->get()->getRowArray()['content_type'] ?? 'blog');
+            $builder = $itemType === 'knowledge_base'
+                ? new \App\Libraries\Publishing\KnowledgeBase\KnowledgeBasePublicationPayloadBuilder()
+                : new BlogPublicationPayloadBuilder();
             $payload  = $builder->build((int) $deployment['content_item_id'], (int) $deployment['content_version_id']);
             $checksum = $builder->checksum($payload);
 
