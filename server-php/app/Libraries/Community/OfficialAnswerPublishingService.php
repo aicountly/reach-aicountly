@@ -30,10 +30,12 @@ class OfficialAnswerPublishingService
         private readonly OfficialAnswerApprovalService  $approval       = new OfficialAnswerApprovalService(),
         private readonly CommunityDeploymentModel       $deployModel    = new CommunityDeploymentModel(),
         private readonly CommunityAnswerApprovalModel    $approvalModel  = new CommunityAnswerApprovalModel(),
-        private CommunityPublisherInterface              $publisher      = new CommunityPublicSitePublisher()
+        private CommunityPublisherInterface              $publisher      = new CommunityPublicSitePublisher(),
+        private ?CommunityPublicSiteSyncService          $sync           = null
     ) {
         // Allow factory injection for test environments
         $this->publisher = CommunityPublisherFactory::create();
+        $this->sync    ??= new CommunityPublicSiteSyncService($this->publisher);
     }
 
     /**
@@ -175,6 +177,16 @@ class OfficialAnswerPublishingService
         ], $actorId);
 
         try {
+            // The publish endpoint only *transitions* an existing public
+            // record; identity, question and answer must already be there or it
+            // returns 404. Reach never created them, which is why no community
+            // Q&A ever appeared on aicountly.com.
+            $sync = $this->sync->ensureAnswerExists($answer, $version);
+            if (! $sync['synced']) {
+                $this->handlePublishFailure($deploymentId, $answerId, $answer['status'], $sync);
+                throw new \RuntimeException("Publication failed: " . ($sync['safe_error_message'] ?? 'prerequisite sync failed'));
+            }
+
             $envelope = $this->buildPublishEnvelope($answer, $version, $idempotency);
             $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);
 
@@ -183,6 +195,7 @@ class OfficialAnswerPublishingService
                 throw new \RuntimeException("Publication failed: " . ($result['safe_error_message'] ?? 'unknown'));
             }
 
+            $result['prerequisite_sync'] = $sync['steps'];
             $this->handlePublishSuccess($deploymentId, $answerId, $result, $actorId);
             return $result;
 
@@ -281,6 +294,26 @@ class OfficialAnswerPublishingService
             'attempt_count' => $attempts,
             'updated_at'    => date('Y-m-d H:i:s'),
         ]);
+
+        $sync = $this->sync->ensureAnswerExists($answer, $version);
+        if (! $sync['synced']) {
+            $exhausted = ($attempts + 1) >= $maxAttempts;
+            $this->deployModel->update($deploymentId, [
+                'status'              => $exhausted ? 'dead_letter' : 'retrying',
+                'attempt_count'       => $attempts + 1,
+                'last_error'          => substr((string) ($sync['safe_error_message'] ?? 'prerequisite sync failed'), 0, 500),
+                'last_error_category' => $sync['error_category'] ?? 'unknown',
+                'next_retry_at'       => $exhausted ? null : date('Y-m-d H:i:s', time() + $this->backoffSeconds($attempts + 1)),
+                'updated_at'          => date('Y-m-d H:i:s'),
+            ]);
+
+            return [
+                'success'  => false,
+                'outcome'  => $exhausted ? 'dead_letter' : 'prerequisite_sync_failed',
+                'attempts' => $attempts + 1,
+                'steps'    => $sync['steps'],
+            ];
+        }
 
         $envelope = $this->buildPublishEnvelope($answer, $version, (string) $deployment['idempotency_key']);
         $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);

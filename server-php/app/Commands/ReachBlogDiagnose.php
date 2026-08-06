@@ -59,6 +59,7 @@ class ReachBlogDiagnose extends BaseCommand
                 'optimizer_preferred_hour_ist' => ((int) $nowIst->format('H') === 0),
                 'dispatch_window_open_ist'     => $this->isWithinDispatchWindow($nowIst),
             ],
+            'roadmap_caps'     => $this->roadmapCaps(),
             'database'         => $this->databaseSnapshot(),
             'recent_failures'  => $this->recentFailures(),
             'ai_keys'          => [
@@ -132,6 +133,30 @@ class ReachBlogDiagnose extends BaseCommand
     /**
      * @return array<string, mixed>
      */
+    /**
+     * The rolling weekly ceiling is the most common reason the panel shows
+     * "yesterday's blogs and nothing new" while every cron is healthy.
+     *
+     * @return array<string,mixed>
+     */
+    private function roadmapCaps(): array
+    {
+        try {
+            $stability = new \App\Libraries\Blog\Roadmap\StabilityController();
+            $caps      = $stability->capsSnapshot();
+            $since     = date('Y-m-d', strtotime('-7 days'));
+            $used      = $stability->countWeeklyCreateDecisions($since);
+
+            return $caps + [
+                'weekly_used'        => $used,
+                'weekly_window_from' => $since,
+                'weekly_cap_reached' => $used >= $caps['weekly_cap'],
+            ];
+        } catch (Throwable $e) {
+            return ['error' => mb_substr($e->getMessage(), 0, 200)];
+        }
+    }
+
     private function databaseSnapshot(): array
     {
         try {
@@ -327,6 +352,33 @@ class ReachBlogDiagnose extends BaseCommand
             ];
         }
 
+        $caps = $report['roadmap_caps'] ?? [];
+        if (! empty($caps['weekly_cap_below_daily'])) {
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'weekly_cap_below_daily_cap',
+                'message'  => sprintf(
+                    'BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS=%d is below BLOG_ROADMAP_MAX_DAILY_CANDIDATES=%d. '
+                    . 'One day of output consumes the entire rolling week, so the optimiser holds every candidate '
+                    . 'for the next six days and the panel shows no new blogs.',
+                    (int) $caps['weekly_cap'],
+                    (int) $caps['daily_cap'],
+                ),
+            ];
+        } elseif (! empty($caps['weekly_cap_reached'])) {
+            $issues[] = [
+                'severity' => 'warning',
+                'code'     => 'weekly_publication_cap_reached',
+                'message'  => sprintf(
+                    'The rolling weekly cap is spent (%d/%d CREATE decisions since %s). No new blog items will be '
+                    . 'created until the oldest decisions roll out of the 7-day window.',
+                    (int) ($caps['weekly_used'] ?? 0),
+                    (int) ($caps['weekly_cap'] ?? 0),
+                    (string) ($caps['weekly_window_from'] ?? '-'),
+                ),
+            ];
+        }
+
         if (! empty($report['stop_worker_file'])) {
             $issues[] = [
                 'severity' => 'blocking',
@@ -489,6 +541,14 @@ class ReachBlogDiagnose extends BaseCommand
             $actions[] = 'Install/fix cPanel cron lines from docs/blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md (must include reach:blog-dispatch + reach:work --queue=default,blog,publishing + reach:blog-optimize-roadmap + reach:schedule).';
             $actions[] = 'Confirm cron cd path is the real server-php directory that contains this WRITEPATH.';
             $actions[] = 'Confirm PHP binary with: which php; ls -la $(which php)';
+        }
+
+        if (in_array('weekly_cap_below_daily_cap', $codes, true)) {
+            $actions[] = 'Raise BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS in server-php/.env to at least 7x BLOG_ROADMAP_MAX_DAILY_CANDIDATES (or delete the line to use that as the default), then re-run: php spark reach:blog-optimize-roadmap --force';
+        }
+
+        if (in_array('weekly_publication_cap_reached', $codes, true)) {
+            $actions[] = 'The rolling weekly cap is spent. Raise BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS, or wait for the 7-day window to roll off, then: php spark reach:blog-optimize-roadmap --force';
         }
 
         if (in_array('stop_reach_worker_present', $codes, true)) {

@@ -423,6 +423,16 @@ class AiGenerationOrchestrator
     {
         $task = (string) ($request['task_type'] ?? '');
         $type = (string) ($request['content_type'] ?? '');
+
+        if ($task === 'community_answer' || str_starts_with($type, 'community_answer.')) {
+            return $userPrompt
+                . "\n\nCRITICAL ANSWER REQUIREMENTS:\n"
+                . "- Populate answer_body with the complete answer as HTML prose (at least 400 characters).\n"
+                . "- Populate short_answer with a 1–2 sentence summary (10–300 characters).\n"
+                . "- Emit every required key, using [] or false rather than omitting one.\n"
+                . "- Never output placeholders such as \"TBD\", \"Untitled draft\", or a title-only body.\n";
+        }
+
         if ($task !== 'draft_generation' || $type !== 'blog_post') {
             return $userPrompt;
         }

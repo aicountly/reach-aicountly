@@ -30,6 +30,26 @@ final class StabilityControllerTest extends TestCase
         $this->assertSame(3, $controller->weeklyPublicationCap());
     }
 
+    public function testWeeklyCapDefaultsToAFullWeekAtTheDailyRate(): void
+    {
+        // A weekly ceiling below the daily cap stops production after day one.
+        $controller = new StabilityController(maxDailyCandidates: 10);
+
+        $this->assertSame(70, $controller->weeklyPublicationCap());
+        $this->assertFalse($controller->capsSnapshot()['weekly_cap_below_daily']);
+    }
+
+    public function testCapsSnapshotFlagsAWeeklyCeilingBelowTheDailyCap(): void
+    {
+        $controller = new StabilityController(maxDailyCandidates: 10, maxWeeklyPublications: 5);
+
+        $snapshot = $controller->capsSnapshot();
+
+        $this->assertSame(10, $snapshot['daily_cap']);
+        $this->assertSame(5, $snapshot['weekly_cap']);
+        $this->assertTrue($snapshot['weekly_cap_below_daily']);
+    }
+
     public function testPortfolioOverConcentratedWhenActualExceedsTargetPlusMargin(): void
     {
         $controller = new StabilityController();

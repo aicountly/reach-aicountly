@@ -27,10 +27,26 @@ class CommunityPublisherFactory
         }
 
         $env = strtolower($_ENV['APP_ENV'] ?? 'production');
-        if ($env === 'testing' || !empty($_ENV['REACH_PUB_COMMUNITY_MOCK'])) {
+        if ($env === 'testing' || self::mockForced()) {
             return new MockCommunityPublisher();
         }
 
         return new CommunityPublicSitePublisher();
+    }
+
+    /**
+     * `REACH_PUB_COMMUNITY_MOCK=false` in a .env file is the string "false",
+     * which is truthy — the old `!empty()` check therefore swapped production
+     * in the mock publisher for anyone who wrote the flag out explicitly, and
+     * every publish silently succeeded without touching aicountly.com.
+     */
+    public static function mockForced(): bool
+    {
+        $raw = $_ENV['REACH_PUB_COMMUNITY_MOCK'] ?? getenv('REACH_PUB_COMMUNITY_MOCK');
+        if ($raw === false || $raw === null || $raw === '') {
+            return false;
+        }
+
+        return filter_var($raw, FILTER_VALIDATE_BOOL);
     }
 }

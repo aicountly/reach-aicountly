@@ -205,6 +205,16 @@ class RoadmapOptimizerService
             'dry_run'              => $dryRun,
             'ranked'               => $ranked,
             'auto_discover'        => $discoverSummary,
+            // Without this, a run that held every candidate because the rolling
+            // weekly ceiling was already spent looked identical to a run with
+            // nothing worth publishing.
+            'caps'                 => $this->stability->capsSnapshot() + [
+                'daily_selected'     => $dailySelected,
+                'weekly_used'        => $weeklyUsed,
+                'weekly_window_from' => $weeklySince,
+                'daily_cap_reached'  => $dailySelected >= $dailyCap,
+                'weekly_cap_reached' => $weeklyUsed >= $weeklyCap,
+            ],
         ];
 
         $this->completeRun($runId, 'completed', $summary, $weights, $started);

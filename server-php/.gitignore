@@ -19,3 +19,4 @@
 /.phpunit.cache/
 /build/
 /writable/.phpunit.cache/
+/writable/*.lock

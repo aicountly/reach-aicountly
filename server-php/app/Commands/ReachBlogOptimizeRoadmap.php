@@ -102,6 +102,25 @@ class ReachBlogOptimizeRoadmap extends BaseCommand
             CLI::write('Skipped: ' . $summary['skipped_reason']);
         }
 
+        $caps = $summary['caps'] ?? [];
+        if ($caps !== []) {
+            CLI::write(sprintf(
+                'Caps: daily %d/%d | weekly %d/%d (since %s)%s',
+                (int) ($caps['daily_selected'] ?? 0),
+                (int) ($caps['daily_cap'] ?? 0),
+                (int) ($caps['weekly_used'] ?? 0),
+                (int) ($caps['weekly_cap'] ?? 0),
+                (string) ($caps['weekly_window_from'] ?? '-'),
+                ! empty($caps['weekly_cap_reached']) ? '  << WEEKLY CAP REACHED — no new items until it rolls off' : '',
+            ));
+            if (! empty($caps['weekly_cap_below_daily'])) {
+                CLI::error(
+                    'BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS is lower than BLOG_ROADMAP_MAX_DAILY_CANDIDATES: '
+                    . 'one day of output consumes the whole week and production stops until it rolls off.'
+                );
+            }
+        }
+
         $ranked = $summary['ranked'] ?? [];
         if ($ranked === []) {
             CLI::write('No candidates processed.');
