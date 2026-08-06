@@ -284,6 +284,15 @@ PROMPT;
                 'instructions'  => $prompt,
                 'answer_schema' => $contentType,
                 'product'       => (string) ($groundingCtx['product'] ?? ''),
+                // AiGenerationOrchestrator::resolveProductSlug() reads
+                // 'product_slug'; passing only 'product' meant it always
+                // resolved null, so buildForIntent() ran with the non-numeric
+                // task type, fell through to ['intent' => ..., 'product' =>
+                // null], and every community answer was generated with no
+                // knowledge grounding — while the prompt told the model to
+                // cite AICOUNTLY knowledge sources. Send the key the
+                // orchestrator actually looks for, and only when there is one.
+                'product_slug'  => ((string) ($groundingCtx['product'] ?? '')) ?: null,
                 'jurisdiction'  => (string) ($groundingCtx['jurisdiction'] ?? ''),
                 // Strict OpenAI ⇄ Gemini alternation. Soft hint only: the
                 // router boosts the preferred provider's route but still
