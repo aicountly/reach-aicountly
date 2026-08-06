@@ -13,17 +13,39 @@ class MockSearchConsoleConnector implements SearchConsoleConnectorInterface
     private bool $enabled;
     private bool $shouldFail;
     private int  $quotaSimulationAfterRows;
+    private string $siteProperty;
     private array $callLog = [];
 
-    public function __construct(bool $enabled = true, bool $shouldFail = false, int $quotaSimulationAfterRows = 0)
-    {
+    public function __construct(
+        bool $enabled = true,
+        bool $shouldFail = false,
+        int $quotaSimulationAfterRows = 0,
+        string $siteProperty = 'sc-domain:example.com',
+    ) {
         $this->enabled                  = $enabled;
         $this->shouldFail               = $shouldFail;
         $this->quotaSimulationAfterRows = $quotaSimulationAfterRows;
+        $this->siteProperty             = $siteProperty;
     }
 
     public function providerName(): string { return 'mock_gsc'; }
     public function isEnabled(): bool      { return $this->enabled; }
+    public function siteProperty(): string { return $this->siteProperty; }
+
+    public function forSiteProperty(string $siteProperty): self
+    {
+        $siteProperty = trim($siteProperty);
+        if ($siteProperty === '' || $siteProperty === $this->siteProperty) {
+            return $this;
+        }
+
+        return new self(
+            enabled: $this->enabled,
+            shouldFail: $this->shouldFail,
+            quotaSimulationAfterRows: $this->quotaSimulationAfterRows,
+            siteProperty: $siteProperty,
+        );
+    }
 
     public function healthCheck(): ConnectorHealthResult
     {
@@ -67,7 +89,7 @@ class MockSearchConsoleConnector implements SearchConsoleConnectorInterface
                 'page_url'     => 'https://example.com/blog/post-1',
                 'query'        => 'accounting software',
                 'device'       => 'DESKTOP',
-                'country'      => 'IN',
+                'country'      => 'IND',
                 'clicks'       => 12,
                 'impressions'  => 340,
                 'ctr'          => 0.035,
@@ -86,7 +108,11 @@ class MockSearchConsoleConnector implements SearchConsoleConnectorInterface
 
     public function getSiteProperties(): array
     {
-        return ['sc-domain:example.com', 'https://example.com/'];
+        return array_values(array_unique([
+            $this->siteProperty,
+            'sc-domain:example.com',
+            'https://example.com/',
+        ]));
     }
 
     public function validateSiteProperty(string $property): bool

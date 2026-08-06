@@ -830,7 +830,13 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/search/connections/(:num)/ingest',       'Api\\V1\\Intelligence\\SearchConsoleController::ingest/$1',           ['filter' => 'permission:search.ingest']);
         $routes->post('intelligence/search/connections/(:num)/backfill',     'Api\\V1\\Intelligence\\SearchConsoleController::backfill/$1',         ['filter' => 'permission:search.backfill']);
         $routes->get('intelligence/search/connections/(:num)/status',        'Api\\V1\\Intelligence\\SearchConsoleController::status/$1',           ['filter' => 'permission:search.read']);
+        $routes->post('intelligence/search/connections/(:num)/health-check',  'Api\\V1\\Intelligence\\SearchConsoleController::healthCheck/$1',      ['filter' => 'permission:search.read']);
         $routes->get('intelligence/search/metrics',                          'Api\\V1\\Intelligence\\SearchConsoleController::metrics',             ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/config',                           'Api\\V1\\Intelligence\\SearchConsoleController::config',              ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/properties',                       'Api\\V1\\Intelligence\\SearchConsoleController::properties',          ['filter' => 'permission:search.connect']);
+        $routes->get('intelligence/search/runs',                             'Api\\V1\\Intelligence\\SearchConsoleController::runs',                ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/unmapped',                         'Api\\V1\\Intelligence\\SearchConsoleController::unmapped',            ['filter' => 'permission:search.read']);
+        $routes->post('intelligence/search/sync-identities',                 'Api\\V1\\Intelligence\\SearchConsoleController::syncIdentities',      ['filter' => 'permission:search.reconcile']);
 
         // Phase 8: Content Analytics
         $routes->get('intelligence/content/connections',                     'Api\\V1\\Intelligence\\ContentAnalyticsController::connections',      ['filter' => 'permission:analytics.read']);

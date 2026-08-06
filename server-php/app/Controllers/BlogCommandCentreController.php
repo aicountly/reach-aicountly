@@ -155,7 +155,10 @@ class BlogCommandCentreController extends BaseApiController
      */
     private function connectorStates(BlogFeatureFlags $flags): array
     {
-        $searchConsole = ['status' => 'DISABLED', 'detail' => 'Search Console is disabled for blogs.'];
+        $searchConsole = [
+            'status' => 'DISABLED',
+            'detail' => 'Search Console is disabled for blogs. Set BLOG_SEARCH_CONSOLE_ENABLED=true to surface live state here.',
+        ];
 
         if ($flags->isEnabled('search_console')) {
             $connector = ConnectorProviderFactory::searchConsole();
@@ -177,6 +180,11 @@ class BlogCommandCentreController extends BaseApiController
             }
         }
 
+        // Whether the card says CONNECTED or DISABLED, report what has actually
+        // been ingested. A connected connector with an empty fact table is a
+        // different problem from a switched-off one, and the card should say so.
+        $searchConsole += $this->searchIngestionSummary();
+
         return [
             'search_console' => $searchConsole,
             'ga4'            => [
@@ -186,6 +194,46 @@ class BlogCommandCentreController extends BaseApiController
                     : 'GA4 is disabled for blogs.',
             ],
         ];
+    }
+
+    /**
+     * How much search data has genuinely landed, and when it last did.
+     *
+     * @return array<string, mixed>
+     */
+    private function searchIngestionSummary(): array
+    {
+        $db      = Database::connect();
+        $summary = [
+            'facts_28d'          => 0,
+            'latest_metric_date' => null,
+            'last_ingest_at'     => null,
+            'unmapped_urls'      => 0,
+        ];
+
+        try {
+            if (SchemaGuard::hasTable($db, 'reach_search_metric_facts')) {
+                $row = $db->query(
+                    'SELECT COUNT(*) AS c, MAX(metric_date) AS latest, MAX(collected_at) AS collected
+                     FROM reach_search_metric_facts WHERE metric_date >= ?',
+                    [date('Y-m-d', strtotime('-28 days'))]
+                )->getRowArray() ?: [];
+
+                $summary['facts_28d']          = (int) ($row['c'] ?? 0);
+                $summary['latest_metric_date'] = $row['latest'] ?? null;
+                $summary['last_ingest_at']     = $row['collected'] ?? null;
+            }
+
+            if (SchemaGuard::hasTable($db, 'reach_content_mapping_findings')) {
+                $summary['unmapped_urls'] = (int) $db->table('reach_content_mapping_findings')
+                    ->where('resolution_status', 'unresolved')
+                    ->countAllResults();
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'BlogCommandCentreController::searchIngestionSummary: ' . $e->getMessage());
+        }
+
+        return $summary;
     }
 
     /**

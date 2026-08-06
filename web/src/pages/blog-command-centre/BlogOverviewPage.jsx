@@ -191,10 +191,13 @@ function buildCards(data) {
       link: ROUTES.BLOG_SEO,
       status: searchConsole.status ?? 'DISABLED',
       detail: searchConsole.detail,
+      // Facts ingested is the figure that separates "connected but nothing
+      // pulled yet" from "connected and working" — the property name alone
+      // never showed whether data was actually flowing.
       metrics: [
-        metric('provider', searchConsole.provider),
         metric('property', searchConsole.site_property),
-        metric('scheduled posts', workflow.scheduled ?? 0),
+        metric('facts (28d)', searchConsole.facts_28d ?? 0),
+        metric('freshest day', searchConsole.latest_metric_date),
       ],
     },
     {

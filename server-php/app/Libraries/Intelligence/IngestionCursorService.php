@@ -32,6 +32,18 @@ class IngestionCursorService
         ]);
     }
 
+    /**
+     * Move an in-flight backfill's window start without touching the remaining
+     * day count, so a chunked backfill advances instead of re-reading the same
+     * slice on every run.
+     */
+    public function setBackfillWindowStart(int $connectionId, string $streamType, string $fromDate): void
+    {
+        $this->cursorModel->upsertCursor($connectionId, $streamType, [
+            'backfill_from_date' => $fromDate,
+        ]);
+    }
+
     public function decrementBackfill(int $connectionId, string $streamType, int $daysProcessed = 1): void
     {
         $cursor = $this->cursorModel->getCursor($connectionId, $streamType);
