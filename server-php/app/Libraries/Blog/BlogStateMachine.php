@@ -146,6 +146,15 @@ class BlogStateMachine
             $this->assertPublishAllowed($contentItemId, $item);
         }
 
+        // publish_queued promises "this is going out". Items were reaching it
+        // with no SEO profile and no cover, then failing the publication gate
+        // on every dispatch for days — the state said queued, the reality was
+        // stuck, and nothing surfaced the difference. Refuse the transition
+        // instead, so the item stays where it is and the caller is told why.
+        if ($toState === self::PUBLISH_QUEUED && $fromState !== self::PUBLISH_QUEUED) {
+            $this->assertPublicationReady($contentItemId);
+        }
+
         $now = date('Y-m-d H:i:s');
         $this->db->table('reach_content_items')->where('id', $contentItemId)->update([
             'workflow_status' => $toState,
@@ -215,6 +224,29 @@ class BlogStateMachine
      *
      * @param array<string,mixed> $item
      */
+    /**
+     * Refuse to queue a publish that the publication gate will reject.
+     *
+     * BlogReadinessService is the same evaluation PublicationDeploymentService
+     * runs at dispatch. Running it here turns a silent dead end — an item
+     * parked in publish_queued, re-dispatched and re-failed indefinitely —
+     * into a refusal at the moment of the transition, carrying the reasons.
+     * Callers (BlogAutoPublishService, executePublishBlog) already surface a
+     * failed transition, so the reason reaches the operator instead of a log.
+     */
+    private function assertPublicationReady(int $contentItemId): void
+    {
+        $readiness = (new \App\Libraries\Publishing\Blog\BlogReadinessService())->evaluate($contentItemId);
+
+        if ($readiness['ready'] ?? false) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            'Content is not ready for publication: ' . implode('; ', $readiness['blocking'] ?? []),
+        );
+    }
+
     private function assertPublishAllowed(int $contentItemId, array $item): void
     {
         $riskLevel = strtoupper((string) ($item['risk_level'] ?? 'LOW'));
