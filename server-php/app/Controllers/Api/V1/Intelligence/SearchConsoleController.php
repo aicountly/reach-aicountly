@@ -258,7 +258,7 @@ class SearchConsoleController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_search_metric_facts')) {
+            if (! SchemaGuard::hasTable($db, 'reach_search_metric_facts')) {
                 return $this->response->setJSON(['data' => [
                     'rows'    => [],
                     'totals'  => null,
@@ -289,7 +289,7 @@ class SearchConsoleController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_ingestion_runs')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_ingestion_runs')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -314,7 +314,7 @@ class SearchConsoleController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_content_mapping_findings')) {
+            if (! SchemaGuard::hasTable($db, 'reach_content_mapping_findings')) {
                 return $this->response->setJSON(['data' => []]);
             }
 

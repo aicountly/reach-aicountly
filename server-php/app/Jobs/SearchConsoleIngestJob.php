@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Libraries\Intelligence\Connectors\GoogleSearchConsoleConnector;
 use App\Libraries\Intelligence\Connectors\ConnectorProviderFactory;
 use App\Libraries\Intelligence\SearchConsoleService;
+use App\Libraries\Database\SchemaGuard;
 use App\Libraries\JobContext;
 use App\Libraries\JobHandlerInterface;
 use App\Models\Intelligence\AnalyticsConnectionModel;
@@ -53,7 +54,7 @@ class SearchConsoleIngestJob implements JobHandlerInterface
         }
 
         $db = \Config\Database::connect();
-        if (! $db->tableExists('reach_analytics_connections')) {
+        if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
             return ['status' => 'skipped', 'reason' => 'Connector storage not migrated.'];
         }
 

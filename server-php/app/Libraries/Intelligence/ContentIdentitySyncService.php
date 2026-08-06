@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Intelligence;
 
+use App\Libraries\Database\SchemaGuard;
 use App\Libraries\Publishing\Seo\CanonicalUrlPolicy;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
@@ -47,7 +48,7 @@ class ContentIdentitySyncService
     {
         $result = ['scanned' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'without_url' => 0];
 
-        if (! $this->db->tableExists('reach_content_identities') || ! $this->db->tableExists('reach_content_items')) {
+        if (! SchemaGuard::hasTable($this->db, 'reach_content_identities') || ! SchemaGuard::hasTable($this->db, 'reach_content_items')) {
             return $result;
         }
 
@@ -87,7 +88,7 @@ class ContentIdentitySyncService
      */
     public function urlIndex(int $tenantId): array
     {
-        if (! $this->db->tableExists('reach_content_identities')) {
+        if (! SchemaGuard::hasTable($this->db, 'reach_content_identities')) {
             return [];
         }
 
@@ -161,7 +162,7 @@ class ContentIdentitySyncService
      */
     private function canonicalUrlFor(array $item): ?string
     {
-        if ($this->db->tableExists('reach_publication_deployments')) {
+        if (SchemaGuard::hasTable($this->db, 'reach_publication_deployments')) {
             $deployed = $this->db->table('reach_publication_deployments')
                 ->select('canonical_url')
                 ->where('content_item_id', (int) $item['id'])

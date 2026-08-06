@@ -212,7 +212,7 @@ class BlogCommandCentreController extends BaseApiController
         ];
 
         try {
-            if ($db->tableExists('reach_search_metric_facts')) {
+            if (SchemaGuard::hasTable($db, 'reach_search_metric_facts')) {
                 $row = $db->query(
                     'SELECT COUNT(*) AS c, MAX(metric_date) AS latest, MAX(collected_at) AS collected
                      FROM reach_search_metric_facts WHERE metric_date >= ?',
@@ -224,7 +224,7 @@ class BlogCommandCentreController extends BaseApiController
                 $summary['last_ingest_at']     = $row['collected'] ?? null;
             }
 
-            if ($db->tableExists('reach_content_mapping_findings')) {
+            if (SchemaGuard::hasTable($db, 'reach_content_mapping_findings')) {
                 $summary['unmapped_urls'] = (int) $db->table('reach_content_mapping_findings')
                     ->where('resolution_status', 'unresolved')
                     ->countAllResults();
