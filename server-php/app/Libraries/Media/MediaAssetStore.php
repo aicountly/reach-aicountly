@@ -96,7 +96,12 @@ class MediaAssetStore
      */
     public function publicUrl(array $asset): string
     {
-        $base = rtrim((string) env('REACH_PUBLIC_BASE_URL', 'https://reach.aicountly.org'), '/');
+        // REACH_APP_URL is the portal's public identity and is already
+        // required; REACH_PUBLIC_BASE_URL stays as an override for the rare
+        // deployment that serves media from a different host.
+        $base = rtrim((string) (env('REACH_PUBLIC_BASE_URL')
+            ?: env('REACH_APP_URL')
+            ?: 'https://reach.aicountly.org'), '/');
         $ext  = $asset['mime'] === 'image/webp' ? 'webp' : 'img';
 
         return $base . '/api/v1/public/media/' . $asset['asset_uuid'] . '.' . $ext
