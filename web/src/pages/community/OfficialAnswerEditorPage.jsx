@@ -94,8 +94,21 @@ export default function OfficialAnswerEditorPage() {
         await api.post(`v1/community/answers/${uuid}/run-moderation`, {});
         setActionMsg('Moderation run complete.');
       } else if (action === 'approve') {
-        await api.post(`v1/community/answers/${uuid}/approve`, { note: approvalNote });
-        setActionMsg('Approved.');
+        // The publish gate re-checks the approval TYPE, not just the status:
+        // a tier 2/3 answer approved as 'standard' reaches `approved`, then
+        // fails at publish and lands in verification_failed. The API defaults
+        // to 'standard', so an answer routed to professional review has to say
+        // so explicitly — the lifecycle put it in that state precisely because
+        // a qualified human sign-off is required.
+        await api.post(`v1/community/answers/${uuid}/approve`, {
+          note: approvalNote,
+          approval_type: answer.status === 'professional_review' ? 'professional_review' : 'standard',
+        });
+        setActionMsg(
+          answer.status === 'professional_review'
+            ? 'Approved as professional review.'
+            : 'Approved.',
+        );
       } else if (action === 'reject') {
         const reason = prompt('Rejection reason:') || '';
         if (!reason) { setBusy(false); return; }

@@ -43,6 +43,42 @@ class CommunityPublicRecordProvisioner
 
     private const DEFAULT_ROLE = 'answering';
 
+    /**
+     * Reach category → public category slug.
+     *
+     * The two systems grew separate taxonomies: Reach files questions under
+     * 'audit', 'accounting', 'payroll-hr', 'product-guides'; aicountly.com
+     * publishes 'audit-accounting', 'payroll', 'saas-product-help'. The
+     * receiver rejects anything it does not recognise with "Unknown community
+     * category.", and the fallback for that drops the category entirely — which
+     * files a tax-audit question under GST, the first category by sort order.
+     * Mapping the known divergences keeps content where a reader would look for
+     * it; anything unmapped is passed through unchanged, so a slug the public
+     * site already knows still works without an entry here.
+     *
+     * This is a bridge, not a design: the durable fix is one shared taxonomy.
+     */
+    private const CATEGORY_MAP = [
+        'audit'           => 'audit-accounting',
+        'accounting'      => 'audit-accounting',
+        'audit-accounting' => 'audit-accounting',
+        'payroll-hr'      => 'payroll',
+        'hr'              => 'payroll',
+        'product-guides'  => 'saas-product-help',
+        'books'           => 'saas-product-help',
+        'smart-books'     => 'saas-product-help',
+        'product'         => 'saas-product-help',
+        'banking'         => 'banking-brs',
+        'brs'             => 'banking-brs',
+        'technical'       => 'technical-api',
+        'api'             => 'technical-api',
+        'integration'     => 'technical-api',
+        'mca'             => 'mca-company-law',
+        'company-law'     => 'mca-company-law',
+        'tds'             => 'tds-tcs',
+        'tcs'             => 'tds-tcs',
+    ];
+
     public function __construct(
         private readonly CommunityPublisherInterface $publisher = new CommunityPublicSitePublisher(),
     ) {}
@@ -54,6 +90,18 @@ class CommunityPublicRecordProvisioner
     public static function publicRoleFor(?string $reachRole): string
     {
         return self::ROLE_MAP[strtolower(trim((string) $reachRole))] ?? self::DEFAULT_ROLE;
+    }
+
+    /**
+     * Translate a Reach category into the public site's category slug.
+     * Unmapped values pass through — the receiver knows its own slugs, and an
+     * unrecognised one still degrades to the default-category fallback.
+     */
+    public static function publicCategoryFor(?string $reachCategory): string
+    {
+        $slug = strtolower(trim((string) $reachCategory));
+
+        return self::CATEGORY_MAP[$slug] ?? $slug;
     }
 
     /**
@@ -153,7 +201,7 @@ class CommunityPublicRecordProvisioner
                 'ai_assisted'      => true,
                 'status'           => 'published',
                 'robots_directive' => 'index,follow',
-                'category_slug'    => (string) ($question['category'] ?? ''),
+                'category_slug'    => self::publicCategoryFor($question['category'] ?? null),
             ],
         ];
 

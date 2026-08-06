@@ -437,6 +437,12 @@ class OfficialAnswerPublishingService
             'response_checksum' => $result['payload_checksum'] ?? null,
             'deployed_at'      => date('Y-m-d H:i:s'),
             'updated_at'       => date('Y-m-d H:i:s'),
+            // Clear the failure from the attempt this retry just superseded.
+            // A succeeded row carrying last_error = "provisioning failed"
+            // reads as a half-broken publication to whoever looks next.
+            'last_error'          => null,
+            'last_error_category' => null,
+            'next_retry_at'       => null,
         ]);
 
         $this->answerRepo->save([

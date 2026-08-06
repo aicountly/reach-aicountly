@@ -37,6 +37,51 @@ class CommunityPublicRecordProvisionerTest extends CIUnitTestCase
     }
 
     /**
+     * Reach files questions under its own category names; aicountly.com
+     * publishes a different set. An unmapped category is rejected with
+     * "Unknown community category.", and the fallback for that drops the
+     * category entirely — filing a tax-audit question under GST, the first
+     * category by sort order. These are the divergences that exist today.
+     */
+    public function testMapsReachCategoriesToPublicSlugs(): void
+    {
+        $publicSlugs = [
+            'gst', 'income-tax', 'tds-tcs', 'mca-company-law', 'audit-accounting',
+            'payroll', 'banking-brs', 'saas-product-help', 'technical-api',
+        ];
+
+        $expected = [
+            'audit'          => 'audit-accounting',
+            'accounting'     => 'audit-accounting',
+            'payroll-hr'     => 'payroll',
+            'product-guides' => 'saas-product-help',
+            'books'          => 'saas-product-help',
+            'mca'            => 'mca-company-law',
+            'tds'            => 'tds-tcs',
+        ];
+
+        foreach ($expected as $reach => $public) {
+            $mapped = CommunityPublicRecordProvisioner::publicCategoryFor($reach);
+            $this->assertSame($public, $mapped, "'{$reach}' should map to '{$public}'");
+            $this->assertContains($mapped, $publicSlugs);
+        }
+    }
+
+    /**
+     * Slugs the public site already knows must survive untouched — the map
+     * only bridges the divergences, it is not an allow-list.
+     */
+    public function testPassesThroughSlugsThePublicSiteAlreadyKnows(): void
+    {
+        foreach (['gst', 'income-tax', 'tds-tcs', 'payroll', 'technical-api'] as $slug) {
+            $this->assertSame($slug, CommunityPublicRecordProvisioner::publicCategoryFor($slug));
+        }
+
+        $this->assertSame('', CommunityPublicRecordProvisioner::publicCategoryFor(null));
+        $this->assertSame('audit-accounting', CommunityPublicRecordProvisioner::publicCategoryFor('  AUDIT '));
+    }
+
+    /**
      * An unmapped or missing role must still produce a value the receiver
      * accepts — refusing to publish over a vocabulary gap would be worse than
      * posting under the most common role.
