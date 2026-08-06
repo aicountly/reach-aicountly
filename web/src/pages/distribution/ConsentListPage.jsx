@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDate } from '../../utils/formatDate';
 
 export default function ConsentListPage() {
   const [consents, setConsents] = useState([]);
@@ -88,7 +89,7 @@ export default function ConsentListPage() {
                   </span>
                 </td>
                 <td>{c.source ?? '—'}</td>
-                <td>{c.captured_at ? new Date(c.captured_at).toLocaleDateString() : '—'}</td>
+                <td>{c.captured_at ? formatDate(c.captured_at) : '—'}</td>
                 <td>
                   {c.status === 'granted' && (
                     <button className="btn btn--sm btn--error" onClick={() => handleRevoke(c.id)}>

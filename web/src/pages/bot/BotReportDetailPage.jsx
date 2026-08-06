@@ -7,6 +7,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
+import { formatDateTime } from '../../utils/formatDate';
 
 function J({ v }) {
   if (v == null || (typeof v === 'string' && v === '')) return <div className="text-sm text-muted">(none)</div>;
@@ -39,7 +40,7 @@ export function BotReportDetailPage() {
             <span className="badge badge-secondary">mode: {r.mode}</span>
             <ApprovalBadge status={r.approval_status} />
             <StatusBadge status={r.publishing_status || 'none'} />
-            <span className="text-xs text-muted">{r.created_at ? new Date(r.created_at).toLocaleString() : ''}</span>
+            <span className="text-xs text-muted">{r.created_at ? formatDateTime(r.created_at) : ''}</span>
           </div>
         </div>
       </div>

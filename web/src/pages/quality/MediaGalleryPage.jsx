@@ -3,6 +3,7 @@ import { mediaGalleryService } from '../../services/mediaGalleryService';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { formatDate } from '../../utils/formatDate';
 
 /** category_tags arrives as a JSONB string from Postgres or an array once edited. */
 function assetTags(asset) {
@@ -119,7 +120,7 @@ export function MediaGalleryPage() {
               <ul className="text-sm" style={{ paddingLeft: '1.25rem' }}>
                 {(deficit.upcoming || []).map((entry) => (
                   <li key={entry.key} style={{ marginBottom: '0.5rem' }}>
-                    <strong>{entry.title}</strong> {entry.target_date ? `(target ${entry.target_date})` : ''}
+                    <strong>{entry.title}</strong> {entry.target_date ? `(target ${formatDate(entry.target_date)})` : ''}
                     {entry.cover_prompt && (
                       <div className="text-muted">
                         Prompt: {entry.cover_prompt}{' '}
@@ -200,7 +201,7 @@ export function MediaGalleryPage() {
                     {assetTags(asset).length > 0 ? assetTags(asset).join(', ') : 'no tags'}
                     {asset.portfolio_stream ? ` · ${asset.portfolio_stream}` : ''}
                   </div>
-                  <div className="text-muted">Used {asset.times_used}× {asset.last_used_at ? `· last ${String(asset.last_used_at).slice(0, 10)}` : ''}</div>
+                  <div className="text-muted">Used {asset.times_used}× {asset.last_used_at ? `· last ${formatDate(asset.last_used_at)}` : ''}</div>
                   <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
                     <button type="button" className="btn btn--secondary btn--sm" onClick={() => handleRetag(asset)}>
                       Edit tags

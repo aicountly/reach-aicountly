@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
+import { formatDate, formatDateTime } from '../../utils/formatDate';
 
 // Keys mirror App\Enums\CommunityAnswerStatus — the old map used invented
 // statuses (draft/generated/pending_approval) that exist nowhere, so real
@@ -274,7 +275,7 @@ export default function OfficialAnswerEditorPage() {
               <dt>AI assisted</dt><dd>{answer.ai_assisted ? 'Yes' : 'No'}</dd>
               <dt>Human reviewed</dt><dd>{answer.human_reviewed ? 'Yes' : 'No'}</dd>
               <dt>Current version</dt><dd>{answer.current_version ?? 0}</dd>
-              <dt>Published at</dt><dd>{answer.published_at ?? '—'}</dd>
+              <dt>Published at</dt><dd>{formatDateTime(answer.published_at)}</dd>
               <dt>Public URL</dt><dd>
                 {answer.public_url
                   ? <a href={answer.public_url} target="_blank" rel="noreferrer">{answer.public_url}</a>
@@ -296,7 +297,7 @@ export default function OfficialAnswerEditorPage() {
                   <tr key={v.id}>
                     <td>{v.version_number}</td>
                     <td>{v.creation_reason ?? '—'}</td>
-                    <td>{v.created_at ? new Date(v.created_at).toLocaleDateString() : '—'}</td>
+                    <td>{v.created_at ? formatDate(v.created_at) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -6,6 +6,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { FilterBar } from '../../components/common/FilterBar';
+import { formatDateTime } from '../../utils/formatDate';
 
 const STATES = ['','pending_push','pushed','failed','duplicate','rejected','retry_scheduled'];
 
@@ -42,7 +43,7 @@ export function EngagePushPage() {
     { key: 'engage_push_status', label: 'Status', render: (r) => <StatusBadge status={r.engage_push_status} /> },
     { key: 'engage_lead_code',  label: 'Engage code', render: (r) => r.engage_lead_code || '—' },
     { key: 'engage_push_attempts', label: 'Attempts', render: (r) => r.engage_push_attempts ?? 0 },
-    { key: 'last_push_at', label: 'Last push', render: (r) => r.last_push_at ? new Date(r.last_push_at).toLocaleString() : '—' },
+    { key: 'last_push_at', label: 'Last push', render: (r) => r.last_push_at ? formatDateTime(r.last_push_at) : '—' },
     { key: 'last_push_error', label: 'Error', render: (r) => r.last_push_error ? <span className="text-danger text-xs" style={{ overflowWrap: 'anywhere' }}>{r.last_push_error}</span> : '—' },
     { key: 'actions', label: '', render: (r) => (
       ['pending_push','failed','retry_scheduled'].includes(r.engage_push_status)

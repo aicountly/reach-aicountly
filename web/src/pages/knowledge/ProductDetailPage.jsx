@@ -8,6 +8,7 @@ import { Loader } from '../../components/common/Loader';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { CompletenessGauge } from '../../components/knowledge/CompletenessGauge';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function ProductDetailPage() {
   const { id } = useParams();
@@ -151,12 +152,12 @@ export function ProductDetailPage() {
 
           <Card title="Metadata">
             <div className="text-xs text-muted">Created</div>
-            <div className="text-sm">{product.created_at ? new Date(product.created_at).toLocaleString() : '—'}</div>
+            <div className="text-sm">{product.created_at ? formatDateTime(product.created_at) : '—'}</div>
             <div className="text-xs text-muted mt-2">Updated</div>
-            <div className="text-sm">{product.updated_at ? new Date(product.updated_at).toLocaleString() : '—'}</div>
+            <div className="text-sm">{product.updated_at ? formatDateTime(product.updated_at) : '—'}</div>
             {product.approved_at && <>
               <div className="text-xs text-muted mt-2">Approved</div>
-              <div className="text-sm">{new Date(product.approved_at).toLocaleString()}</div>
+              <div className="text-sm">{formatDateTime(product.approved_at)}</div>
             </>}
           </Card>
         </div>

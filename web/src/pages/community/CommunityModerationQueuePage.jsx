@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 const FINDING_CLASS = {
   spam: 'badge--error',
@@ -91,7 +92,7 @@ export default function CommunityModerationQueuePage() {
               <td>{f.severity ?? '—'}</td>
               <td>{f.answer_version_id ?? '—'} {f.version_number ? `(v${f.version_number})` : ''}</td>
               <td className="td--truncate">{f.detail ?? '—'}</td>
-              <td>{f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}</td>
+              <td>{f.created_at ? formatDate(f.created_at) : '—'}</td>
               <td>
                 <button className="btn btn--sm btn--success mr-1" onClick={() => handleResolve(f.id)}>Resolve</button>
                 <button className="btn btn--sm btn--ghost" onClick={() => handleEscalate(f.id)}>Escalate</button>

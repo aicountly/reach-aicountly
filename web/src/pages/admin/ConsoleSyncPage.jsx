@@ -6,6 +6,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function ConsoleSyncPage() {
   const [data, setData] = useState(null);
@@ -22,7 +23,7 @@ export function ConsoleSyncPage() {
   useEffect(load, []);
 
   const columns = [
-    { key: 'attempted_at', label: 'When', render: (r) => r.attempted_at ? new Date(r.attempted_at).toLocaleString() : '—' },
+    { key: 'attempted_at', label: 'When', render: (r) => r.attempted_at ? formatDateTime(r.attempted_at) : '—' },
     { key: 'event_type', label: 'Event' },
     { key: 'response_status', label: 'HTTP' },
     { key: 'ok', label: 'Status', render: (r) => <StatusBadge status={r.ok ? 'ok' : 'failed'} /> },
@@ -46,7 +47,7 @@ export function ConsoleSyncPage() {
             <div className="stat-tile"><div className="stat-tile__label">Configured</div><div className="mt-1"><StatusBadge status={data.configured ? 'ready' : 'not_configured'} /></div></div>
             <div className="stat-tile"><div className="stat-tile__label">Ok (last hour)</div><div className="stat-tile__value">{data.ok_last_hour ?? 0}</div></div>
             <div className="stat-tile"><div className="stat-tile__label">Errors (last hour)</div><div className="stat-tile__value">{data.errors_last_hour ?? 0}</div></div>
-            <div className="stat-tile"><div className="stat-tile__label">Last ok</div><div className="text-sm">{data.last_ok_at ? new Date(data.last_ok_at).toLocaleString() : '—'}</div></div>
+            <div className="stat-tile"><div className="stat-tile__label">Last ok</div><div className="text-sm">{data.last_ok_at ? formatDateTime(data.last_ok_at) : '—'}</div></div>
           </div>
           <Card title="Recent events" padding={false}>
             <DataTable columns={columns} rows={data.recent_events || []} emptyMessage="No sync attempts recorded." />

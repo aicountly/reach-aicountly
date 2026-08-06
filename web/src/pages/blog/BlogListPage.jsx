@@ -12,6 +12,7 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { ROUTES } from '../../constants/routes';
 import { isBlogLegacyCreateDisabled } from '../../constants/blogFeatureFlags';
+import { formatDateTime } from '../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'idea','draft','seo_review','internal_review','approved','scheduled','published','rejected','archived'];
 
@@ -67,7 +68,7 @@ export function BlogListPage() {
     { key: 'approval_status', label: 'Approval', render: (r) => <ApprovalBadge status={r.approval_status} /> },
     { key: 'publishing_status', label: 'Publishing', render: (r) => <StatusBadge status={r.publishing_status || 'none'} /> },
     { key: 'bot_generated', label: 'Bot?', render: (r) => r.bot_generated ? 'Yes' : 'No' },
-    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleString() : '—' },
+    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDateTime(r.updated_at) : '—' },
     { key: 'actions', label: 'Actions', width: 110, render: (r) => (
       <button
         type="button"

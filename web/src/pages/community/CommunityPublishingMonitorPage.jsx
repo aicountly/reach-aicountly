@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_CLASS = {
   pending: 'badge--info',
@@ -92,7 +93,7 @@ export default function CommunityPublishingMonitorPage() {
                 <span className={`badge ${STATUS_CLASS[d.status] ?? 'badge--neutral'}`}>{d.status}</span>
               </td>
               <td>{d.attempt_count ?? 0}</td>
-              <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
+              <td>{d.updated_at ? formatDate(d.updated_at) : '—'}</td>
               <td>
                 {d.status === 'failed' && (
                   <button className="btn btn--sm mr-1" onClick={() => handleRetry(d.external_id)}>Retry</button>

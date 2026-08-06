@@ -4,6 +4,7 @@ import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { RoadmapEmptyState, TrendCell } from './roadmapShared';
 import { formatScore } from './roadmapFormat';
+import { formatDate } from '../../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'candidate', 'scored', 'planned', 'in_production', 'rejected'];
 const STREAM_OPTIONS = ['', 'marketing', 'product', 'problem_to_product'];
@@ -95,7 +96,7 @@ export function RoadmapCandidatesPage() {
                   <td>{formatScore(row.total_score)}</td>
                   <td><TrendCell value={row.trend_7d} /></td>
                   <td><TrendCell value={row.trend_28d} /></td>
-                  <td>{row.scored_for_date ?? '—'}</td>
+                  <td>{formatDate(row.scored_for_date)}</td>
                 </tr>
               ))}
             </tbody>

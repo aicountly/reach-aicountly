@@ -7,6 +7,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { formatDateTime } from '../../utils/formatDate';
 
 const EMPTY = { title: '', focus_keyword: '', secondary_keywords: '', target_url: '', brief: '', status: 'planning' };
 
@@ -48,7 +49,7 @@ export function SeoPlansPage() {
     { key: 'focus_keyword', label: 'Focus keyword' },
     { key: 'target_url', label: 'Target URL' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleString() : '—' },
+    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDateTime(r.updated_at) : '—' },
   ];
 
   return (

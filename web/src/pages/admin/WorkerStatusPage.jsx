@@ -6,6 +6,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function WorkerStatusPage() {
   const [data, setData] = useState(null);
@@ -30,7 +31,7 @@ export function WorkerStatusPage() {
   };
 
   const columns = [
-    { key: 'checked_at', label: 'When', render: (r) => r.checked_at ? new Date(r.checked_at).toLocaleString() : '—' },
+    { key: 'checked_at', label: 'When', render: (r) => r.checked_at ? formatDateTime(r.checked_at) : '—' },
     { key: 'ok', label: 'Status', render: (r) => <StatusBadge status={r.ok ? 'ok' : 'failed'} /> },
     { key: 'http_status', label: 'HTTP' },
     { key: 'latency_ms', label: 'Latency (ms)', render: (r) => r.latency_ms ?? '—' },
@@ -55,8 +56,8 @@ export function WorkerStatusPage() {
         <>
           <div className="grid grid-4 mb-4">
             <div className="stat-tile"><div className="stat-tile__label">Configured</div><div className="mt-1"><StatusBadge status={data.configured ? 'ready' : 'not_configured'} /></div></div>
-            <div className="stat-tile"><div className="stat-tile__label">Last ok</div><div className="text-sm">{data.last_ok?.checked_at ? new Date(data.last_ok.checked_at).toLocaleString() : '—'}</div></div>
-            <div className="stat-tile"><div className="stat-tile__label">Last error</div><div className="text-sm">{data.last_error?.checked_at ? new Date(data.last_error.checked_at).toLocaleString() : '—'}</div></div>
+            <div className="stat-tile"><div className="stat-tile__label">Last ok</div><div className="text-sm">{data.last_ok?.checked_at ? formatDateTime(data.last_ok.checked_at) : '—'}</div></div>
+            <div className="stat-tile"><div className="stat-tile__label">Last error</div><div className="text-sm">{data.last_error?.checked_at ? formatDateTime(data.last_error.checked_at) : '—'}</div></div>
             <div className="stat-tile"><div className="stat-tile__label">Latest latency</div><div className="stat-tile__value">{data.last_ok?.latency_ms ?? '—'}<span className="text-xs text-muted"> ms</span></div></div>
           </div>
           <Card title="Recent snapshots" padding={false}>

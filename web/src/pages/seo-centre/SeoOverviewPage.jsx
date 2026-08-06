@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { formatDate } from '../../utils/formatDate';
 
 export function SeoOverviewPage() {
   const [data, setData] = useState(null);
@@ -73,7 +74,7 @@ export function SeoOverviewPage() {
                 {data.recent_ranks.map((row, i) => (
                   <tr key={`${row.keyword}-${row.metric_date}-${i}`}>
                     <td>{row.keyword}</td>
-                    <td>{row.metric_date}</td>
+                    <td>{formatDate(row.metric_date)}</td>
                     <td>{row.avg_position ? Number(row.avg_position).toFixed(1) : '—'}</td>
                     <td>{row.clicks}</td>
                     <td>{row.impressions}</td>

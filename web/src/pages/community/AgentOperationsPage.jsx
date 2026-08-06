@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { formatDateTime } from '../../utils/formatDate';
 
 const STATUS_BADGES = {
   success: 'badge badge--success',
@@ -103,7 +104,7 @@ export function AgentOperationsPage() {
               <tbody>
                 {runs.map((run) => (
                   <tr key={run.id}>
-                    <td className="text-sm">{run.created_at}</td>
+                    <td className="text-sm">{formatDateTime(run.created_at)}</td>
                     <td>{run.identity_name || run.identity_slug || run.identity_id}</td>
                     <td>{run.action}</td>
                     <td><span className={STATUS_BADGES[run.outcome] || 'badge'}>{run.outcome}</span></td>

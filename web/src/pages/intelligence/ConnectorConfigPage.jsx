@@ -8,6 +8,7 @@ import {
   disableConnector,
   enableConnector,
 } from '../../services/intelligenceService.js';
+import { formatTime } from '../../utils/formatDate';
 
 const CATALOG = [
   {
@@ -443,7 +444,7 @@ export default function ConnectorConfigPage() {
                 </span>
                 {c.last_health_check_at && (
                   <span className="text-sm text-muted">
-                    Checked {new Date(c.last_health_check_at).toLocaleTimeString()}
+                    Checked {formatTime(c.last_health_check_at)}
                   </span>
                 )}
                 <button

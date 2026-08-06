@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDate } from '../../utils/formatDate';
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -75,7 +76,7 @@ export default function CampaignListPage() {
                     {(c.status ?? 'unknown').replace(/_/g, ' ')}
                   </span>
                 </td>
-                <td>{c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '—'}</td>
+                <td>{c.updated_at ? formatDate(c.updated_at) : '—'}</td>
                 <td>
                   <Link
                     to={`/distribution/campaigns/${c.id}`}

@@ -6,6 +6,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { FilterBar } from '../../components/common/FilterBar';
 import { Pagination } from '../../components/common/Pagination';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function AuditLogsPage() {
   const [rows, setRows] = useState([]);
@@ -27,7 +28,7 @@ export function AuditLogsPage() {
   useEffect(() => { load(); }, [load]);
 
   const columns = [
-    { key: 'created_at', label: 'When', render: (r) => r.created_at ? new Date(r.created_at).toLocaleString() : '—' },
+    { key: 'created_at', label: 'When', render: (r) => r.created_at ? formatDateTime(r.created_at) : '—' },
     { key: 'user_email', label: 'User', render: (r) => r.user_email || r.user_id || '—' },
     { key: 'action', label: 'Action' },
     { key: 'entity_type', label: 'Entity type' },

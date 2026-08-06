@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAiDashboard } from '../../services/aiService.js';
 import AiGenerationBadge from '../../components/ai/AiGenerationBadge.jsx';
+import { formatDateTime } from '../../utils/formatDate';
 
 export default function AiDashboardPage() {
   const [data, setData] = useState(null);
@@ -75,7 +76,7 @@ export default function AiDashboardPage() {
                     </td>
                     <td>{r.content_type}</td>
                     <td><AiGenerationBadge status={r.status} /></td>
-                    <td className="text-muted text-xs">{r.created_at}</td>
+                    <td className="text-muted text-xs">{formatDateTime(r.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

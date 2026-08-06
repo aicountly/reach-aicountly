@@ -3,6 +3,7 @@ import { mediaGalleryService } from '../../../services/mediaGalleryService';
 import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { Card } from '../../../components/common/Card';
+import { formatDate, formatDateTime } from '../../../utils/formatDate';
 
 const SYNC_LABELS = {
   synced: { label: 'Synced', className: 'badge badge--success' },
@@ -42,7 +43,7 @@ export function ContentBasePage() {
       <Card title={`Upcoming blog index (${entries.length} entries)`}>
         {lastSync ? (
           <p className="text-sm text-muted">
-            Last DB sync: {lastSync.ran_at} — {lastSync.created_count} created, {lastSync.updated_count} updated,
+            Last DB sync: {formatDateTime(lastSync.ran_at)} — {lastSync.created_count} created, {lastSync.updated_count} updated,
             {' '}{lastSync.retired_count} retired of {lastSync.entries_seen} entries.
           </p>
         ) : (
@@ -63,7 +64,7 @@ export function ContentBasePage() {
                     <td><code>{entry.key}</code></td>
                     <td>{entry.title}</td>
                     <td>{entry.portfolio_stream}</td>
-                    <td>{entry.target_date}</td>
+                    <td>{formatDate(entry.target_date)}</td>
                     <td>{entry.status}</td>
                     <td><span className={sync.className}>{sync.label}</span></td>
                     <td className="text-sm text-muted" style={{ maxWidth: '28rem' }}>{entry.brief_prompt}</td>

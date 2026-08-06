@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Map, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { getLatestSitemap, generateSitemapSnapshot } from '../../services/intelligenceService.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 function StatusIcon({ status }) {
   if (status === 'validated' || status === 'generated') {
@@ -127,7 +128,7 @@ export default function SitemapOverviewPage() {
             </div>
             <p className="text-sm text-muted" style={{ margin: '1rem 0 0' }}>
               {snapshot.generated_at
-                ? `Generated ${new Date(snapshot.generated_at).toLocaleString()}`
+                ? `Generated ${formatDateTime(snapshot.generated_at)}`
                 : 'Generated time unavailable'}
               {snapshot.generation_secs != null ? ` · ${snapshot.generation_secs}s` : ''}
             </p>

@@ -7,6 +7,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { formatDateTime } from '../../utils/formatDate';
 
 const EMPTY = { title: '', slug: '', url: '', purpose: '', campaign_id: '', body: '', status: 'draft' };
 
@@ -56,7 +57,7 @@ export function LandingListPage() {
     ) : '—' },
     { key: 'purpose', label: 'Purpose', render: (r) => r.meta?.purpose || '—' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleString() : '—' },
+    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDateTime(r.updated_at) : '—' },
   ];
 
   return (

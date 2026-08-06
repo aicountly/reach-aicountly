@@ -5,6 +5,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DailyPackSlot } from '../../components/content/DailyPackSlot';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDate, todayInputValue } from '../../utils/formatDate';
 
 /** Pack config editor — reads/writes reach_settings.daily_pack_config */
 function PackConfigPanel({ onClose }) {
@@ -79,7 +80,7 @@ export function DailyPackPage() {
   const [loading, setLoading]       = useState(true);
   const [genLoading, setGen]        = useState(false);
   const [error, setError]           = useState(null);
-  const [date, setDate]             = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate]             = useState(todayInputValue());
   const [showConfig, setShowConfig] = useState(false);
 
   const load = useCallback(async () => {
@@ -183,7 +184,7 @@ export function DailyPackPage() {
                   border: '1px solid ' + (selected === p.id ? '#bfdbfe' : '#e5e7eb'),
                 }}
               >
-                {p.pack_date}
+                {formatDate(p.pack_date)}
                 <div style={{ fontSize: 10, color: '#6b7280' }}>{p.pack_status}</div>
               </div>
             ))}
@@ -197,7 +198,7 @@ export function DailyPackPage() {
                 <Card style={{ marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>Pack for {packDetail.pack_date}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>Pack for {formatDate(packDetail.pack_date)}</div>
                       <div style={{ fontSize: 11, color: '#6b7280' }}>{packDetail.pack_status}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>

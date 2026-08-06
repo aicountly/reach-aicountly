@@ -1,4 +1,5 @@
 import { Telescope, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { formatDateTime } from '../../utils/formatDate';
 
 const OBSERVATIONS = [
   { id: 1, prompt: '"Best accounting software"', model: 'gpt-4o', entity: 'AiCountly', coverage: 'mentioned', citation_url: null, ran_at: '2026-07-15T07:30:00Z' },
@@ -55,7 +56,7 @@ export default function VisibilityObservationsPage() {
                 <td className="px-4 py-3 text-xs text-blue-600 truncate max-w-xs">
                   {o.citation_url ? <a href={o.citation_url} target="_blank" rel="noreferrer">{o.citation_url}</a> : <span className="text-gray-400">—</span>}
                 </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{new Date(o.ran_at).toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{formatDateTime(o.ran_at)}</td>
               </tr>
             ))}
           </tbody>

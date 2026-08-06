@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_LABELS = {
   draft: 'Draft',
@@ -109,7 +110,7 @@ export default function DeploymentListPage() {
                     </span>
                   </td>
                   <td>{d.attempt_count}</td>
-                  <td>{d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}</td>
+                  <td>{d.updated_at ? formatDate(d.updated_at) : '—'}</td>
                   <td>
                     <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm btn--secondary">View</Link>
                   </td>

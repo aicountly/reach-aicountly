@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/formatDate';
 export function VersionDiff({ versionA, versionB, fieldsChanged = [] }) {
   if (!versionA || !versionB) return null;
 
@@ -7,13 +8,13 @@ export function VersionDiff({ versionA, versionB, fieldsChanged = [] }) {
         <div style={{ flex: 1, padding: 12, background: '#fef2f2', borderRadius: 6, borderLeft: '4px solid #ef4444' }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>v{versionA.version_number} (older)</div>
           <div style={{ color: '#6b7280', fontSize: 11 }}>
-            {versionA.created_at ? new Date(versionA.created_at).toLocaleString() : '—'}
+            {versionA.created_at ? formatDateTime(versionA.created_at) : '—'}
           </div>
         </div>
         <div style={{ flex: 1, padding: 12, background: '#f0fdf4', borderRadius: 6, borderLeft: '4px solid #10b981' }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>v{versionB.version_number} (newer)</div>
           <div style={{ color: '#6b7280', fontSize: 11 }}>
-            {versionB.created_at ? new Date(versionB.created_at).toLocaleString() : '—'}
+            {versionB.created_at ? formatDateTime(versionB.created_at) : '—'}
           </div>
         </div>
       </div>

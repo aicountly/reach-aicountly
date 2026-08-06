@@ -7,6 +7,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
+import { formatDateTime } from '../../utils/formatDate';
 
 const NEXT_STATUS_MAP = {
   idea:            ['draft', 'archived'],
@@ -108,8 +109,8 @@ export function BlogDetailPage() {
               <div><div className="text-xs text-muted">Author</div><div className="text-sm">{post.author || '—'}</div></div>
               <div><div className="text-xs text-muted">Category</div><div className="text-sm">{post.category || '—'}</div></div>
               <div><div className="text-xs text-muted">Tags</div><div className="text-sm">{Array.isArray(post.tags) ? post.tags.join(', ') : (post.tags || '—')}</div></div>
-              <div><div className="text-xs text-muted">Scheduled at</div><div className="text-sm">{post.scheduled_at || '—'}</div></div>
-              <div><div className="text-xs text-muted">Published at</div><div className="text-sm">{post.published_at || '—'}</div></div>
+              <div><div className="text-xs text-muted">Scheduled at</div><div className="text-sm">{formatDateTime(post.scheduled_at)}</div></div>
+              <div><div className="text-xs text-muted">Published at</div><div className="text-sm">{formatDateTime(post.published_at)}</div></div>
             </div>
           </Card>
 
@@ -119,7 +120,7 @@ export function BlogDetailPage() {
               <div key={v.id} className="flex items-center justify-between" style={{ padding: '0.35rem 0', borderBottom: '1px solid var(--color-border)' }}>
                 <div>
                   <div className="text-sm font-semibold">v{v.version}</div>
-                  <div className="text-xs text-muted">{v.created_at ? new Date(v.created_at).toLocaleString() : ''}</div>
+                  <div className="text-xs text-muted">{v.created_at ? formatDateTime(v.created_at) : ''}</div>
                 </div>
                 <div className="text-xs text-muted">{v.change_reason || ''}</div>
               </div>

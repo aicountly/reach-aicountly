@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 function ProjectStatusBadge({ status }) {
   const colorMap = {
@@ -126,7 +127,7 @@ export default function VideoProjectListPage() {
                     {p.idea_title && <span className="text-muted ml-2 text-sm">from: {p.idea_title}</span>}
                   </td>
                   <td><ProjectStatusBadge status={p.status} /></td>
-                  <td>{p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '—'}</td>
+                  <td>{p.updated_at ? formatDate(p.updated_at) : '—'}</td>
                   <td>
                     <Link to={`/video/projects/${p.uuid}`} className="btn btn--sm btn--secondary">Open →</Link>
                   </td>

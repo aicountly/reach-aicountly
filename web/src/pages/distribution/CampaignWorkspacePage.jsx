@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDate } from '../../utils/formatDate';
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -35,8 +36,8 @@ function VersionCard({ version, campaignId, onAction }) {
 
       <dl className="definition-list">
         <dt>Created</dt>
-        <dd>{version.created_at ? new Date(version.created_at).toLocaleDateString() : '—'}</dd>
-        {version.approved_at && <><dt>Approved</dt><dd>{new Date(version.approved_at).toLocaleDateString()}</dd></>}
+        <dd>{version.created_at ? formatDate(version.created_at) : '—'}</dd>
+        {version.approved_at && <><dt>Approved</dt><dd>{formatDate(version.approved_at)}</dd></>}
         {version.rejection_reason && <><dt>Rejection reason</dt><dd>{version.rejection_reason}</dd></>}
       </dl>
 

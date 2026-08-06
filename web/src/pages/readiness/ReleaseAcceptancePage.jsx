@@ -6,6 +6,7 @@ import {
   getLatestReleaseAcceptance,
   getReleasePrerequisites,
 } from '../../services/readinessService.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 const RECOMMENDATIONS = [
   { value: 'ready_controlled', label: 'Ready for controlled production deployment' },
@@ -110,7 +111,7 @@ export default function ReleaseAcceptancePage() {
           </span>
           {' · '}
           {record.release_name}
-          {record.accepted_at ? ` · ${new Date(record.accepted_at).toLocaleString()}` : ''}
+          {record.accepted_at ? ` · ${formatDateTime(record.accepted_at)}` : ''}
         </div>
       ) : (
         <div className={`alert ${ready ? 'alert-success' : 'alert-warning'} mb-4`}>
