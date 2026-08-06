@@ -153,6 +153,7 @@ class ReachBlogRepublish extends BaseCommand
         $emitting = filter_var(env('BLOG_PUBLISH_REDIRECTS_ENABLED', false), FILTER_VALIDATE_BOOL);
 
         return [
+            'recent_deployments' => $this->recentDeployments($id),
             'content_item_id'    => $id,
             'title'              => $item['title'],
             'workflow_status'    => $item['workflow_status'],
@@ -174,6 +175,52 @@ class ReachBlogRepublish extends BaseCommand
                     . 'public site honours them is unverified — probe the old URL immediately afterwards.',
             },
         ];
+    }
+
+    /**
+     * The item's last few deployments, with why any of them failed.
+     *
+     * A deployment that fails leaves the previous successful one as the live
+     * record, so the drift report keeps showing the old URL and the re-publish
+     * looks like it silently did nothing. The failure reason is the only thing
+     * that distinguishes "never ran" from "ran and was rejected".
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function recentDeployments(int $contentItemId): array
+    {
+        $db = Database::connect();
+
+        $rows = $db->table('reach_publication_deployments')
+            ->select('id, operation, status, canonical_url, error_category, redacted_error, attempt_count, created_at, completed_at')
+            ->where('content_item_id', $contentItemId)
+            ->orderBy('id', 'DESC')
+            ->limit(5)
+            ->get()->getResultArray();
+
+        if ($rows === [] || ! SchemaGuard::hasTable($db, 'reach_jobs')) {
+            return $rows;
+        }
+
+        // A deployment stuck at "queued" with no job row was never dispatched;
+        // one with a failed job row was. They need different fixes.
+        foreach ($rows as &$row) {
+            // payload_json is JSONB: `LIKE` against it errors in Postgres
+            // ("operator does not exist: jsonb ~~ unknown"), so match the
+            // extracted field rather than the document.
+            $job = $db->query(
+                "SELECT id, status, attempts, max_attempts, error_message, available_at, reserved_at
+                 FROM reach_jobs
+                 WHERE (payload_json->>'deployment_id') = ?
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [(string) $row['id']]
+            )->getRowArray();
+
+            $row['job'] = $job ?: null;
+        }
+
+        return $rows;
     }
 
     private function publishSlug(int $contentItemId, string $fallback): string
