@@ -20,6 +20,8 @@ use App\Libraries\Database\SchemaGuard;
  */
 class ReachSchedule extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:schedule';
     protected $description = 'Housekeeping for the reach_jobs queue: recover expired leases and prune old jobs.';
@@ -27,7 +29,7 @@ class ReachSchedule extends BaseCommand
 
     public function run(array $params): int
     {
-        $days = max(1, (int) ($params['prune-days'] ?? CLI::getOption('prune-days') ?? 14));
+        $days = max(1, (int) ($this->sparkOption('prune-days', $params, '14') ?? '14'));
 
         $svc = Services::jobService();
         $recovered = $svc->recoverExpiredLeases();
