@@ -144,4 +144,41 @@ final class ReachBlogGenerateCoversCommandTest extends DatabaseTestCase
 
         $this->assertSame([], $this->coverBlocks($draft));
     }
+
+    public function testItemsWithCoverWorkAlreadyInFlightAreSkipped(): void
+    {
+        // CoverSweepService queues cover work for parked articles under its
+        // own daily key. Queueing a second block here would bill the same
+        // article for two generated images.
+        $id = $this->seedItem('Already being worked on');
+        Database::connect()->table('reach_work_blocks')->insert([
+            'block_type'         => 'GENERATE_IMAGE',
+            'scope'              => 'blog',
+            'content_item_id'    => $id,
+            'idempotency_key'    => 'blog-' . $id . '-cover-retry-' . date('Ymd'),
+            'eligibility_status' => 'eligible',
+        ]);
+
+        command('reach:blog-generate-covers --apply');
+
+        $this->assertCount(1, $this->coverBlocks($id), 'The sweep already owns this one');
+    }
+
+    public function testAnExhaustedCoverBlockDoesNotBlockANewAttempt(): void
+    {
+        // A block that already failed is not "in flight" — the whole point of
+        // this command is to give up-front items another go.
+        $id = $this->seedItem('Previously attempted');
+        Database::connect()->table('reach_work_blocks')->insert([
+            'block_type'         => 'GENERATE_IMAGE',
+            'scope'              => 'blog',
+            'content_item_id'    => $id,
+            'idempotency_key'    => 'blog-' . $id . '-cover-retry-yesterday',
+            'eligibility_status' => 'failed',
+        ]);
+
+        command('reach:blog-generate-covers --apply');
+
+        $this->assertCount(2, $this->coverBlocks($id));
+    }
 }

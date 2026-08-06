@@ -28,6 +28,14 @@ use Throwable;
  * image generation is switched off or unconfigured, because those blocks would
  * fail the moment a worker picked them up.
  *
+ * Not the same job as CoverSweepService, which runs on a schedule and re-queues
+ * cover work for articles *parked* by a failed cover_image validation, mostly
+ * so an uploaded gallery cover gets picked up. This is operator-driven and
+ * covers a population that sweep cannot see: items that never acquired a cover
+ * at all, and so never got a validation row to fail. Where the two populations
+ * overlap, this defers — an item with cover work already in flight is skipped,
+ * so the same article is never billed for two images.
+ *
  * Dry run by default.
  */
 class ReachBlogGenerateCovers extends BaseCommand
@@ -191,6 +199,21 @@ class ReachBlogGenerateCovers extends BaseCommand
             // No profile at all counts as no cover — reach:blog-fix-readiness
             // creates the profile, this fills the image it cannot derive.
             if ($profile && trim((string) ($profile['featured_image_reference'] ?? '')) !== '') {
+                continue;
+            }
+
+            // CoverSweepService re-queues cover work for *parked* articles
+            // under its own daily key, so an item in both populations would
+            // otherwise get two GENERATE_IMAGE blocks and be billed for two
+            // images. Skip anything that already has cover work in flight,
+            // whichever key created it.
+            $inFlight = $db->table('reach_work_blocks')
+                ->where('content_item_id', $id)
+                ->where('block_type', 'GENERATE_IMAGE')
+                ->whereIn('eligibility_status', ['pending', 'eligible', 'queued', 'running'])
+                ->countAllResults() > 0;
+
+            if ($inFlight) {
                 continue;
             }
 
