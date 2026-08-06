@@ -10,6 +10,8 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { usePermission } from '../../hooks/usePermission';
+import { deleteColumn } from '../../components/common/DeleteButton';
+import { useRowDelete } from '../../hooks/useRowDelete';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 
@@ -35,6 +37,11 @@ export function ProductListPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const { isDeleting, error: deleteError, remove } = useRowDelete({
+    onDelete: (r) => knowledgeService.deleteProduct(r.id),
+    onDone: load,
+  });
+
   const columns = [
     { key: 'name', label: 'Product', render: (r) => (
       <div>
@@ -52,6 +59,12 @@ export function ProductListPage() {
       <a href={r.public_url} target="_blank" rel="noreferrer" className="text-sm">↗</a>
     ) : '—' },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    ...deleteColumn({
+      canDelete: has('product.manage'),
+      isDeleting,
+      remove,
+      confirmMessage: (r) => `Delete product “${r.name}”? Its modules, features and claims stay linked to a removed product. This cannot be undone.`,
+    }),
   ];
 
   return (
@@ -79,6 +92,7 @@ export function ProductListPage() {
       </FilterBar>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {deleteError && <Alert variant="danger">{deleteError}</Alert>}
       {loading ? <Loader /> : (
         <DataTable
           columns={columns}

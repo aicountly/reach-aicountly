@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Edit2, FileText, MessageSquare, CheckSquare, Clock, GitBranch, Send } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Card } from '../../components/common/Card';
+import { DeleteButton } from '../../components/common/DeleteButton';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
@@ -17,6 +18,7 @@ const PUBLISHABLE = new Set(['approved', 'scheduled']);
 
 export function ContentDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { has } = usePermission();
   const [item, setItem]             = useState(null);
   const [transitions, setTrans]     = useState([]);
@@ -94,6 +96,24 @@ export function ContentDetailPage() {
     }
   };
 
+  // Archives a live item; a second delete on an archived item removes it.
+  const handleDelete = async () => {
+    const archived = item?.workflow_status === 'archived';
+    setActioning('delete');
+    try {
+      const res = await contentService.deleteItem(id, 'Deleted from Content Studio');
+      if (archived || res?.permanent) {
+        navigate(ROUTES.CONTENT);
+        return;
+      }
+      load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setActioning(null);
+    }
+  };
+
   if (loading) return <Loader />;
   if (error && !item) return <Alert variant="danger">{error}</Alert>;
   if (!item) return <Alert variant="warning">Content item not found.</Alert>;
@@ -155,6 +175,18 @@ export function ContentDetailPage() {
             <button className="btn btn-primary" onClick={handlePublish} disabled={actioning === 'publish'}>
               <Send size={13} /> Publish now
             </button>
+          )}
+          {canEdit && (
+            <DeleteButton
+              busy={actioning === 'delete'}
+              size={13}
+              className="btn btn-danger"
+              confirmMessage={item.workflow_status === 'archived'
+                ? `Permanently delete “${item.title}”? This cannot be undone.`
+                : `Delete “${item.title}”? This archives the item — delete it again to remove it permanently.`}
+              title={item.workflow_status === 'archived' ? 'Permanently delete item' : 'Archive item'}
+              onConfirm={handleDelete}
+            />
           )}
         </div>
       </div>

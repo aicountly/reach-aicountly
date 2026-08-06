@@ -104,6 +104,13 @@ final class MigrationLifecycleTest extends DatabaseTestCase
                     END LOOP;
                 END \$\$;
             ");
+
+            // The connection caches its table list, so after the nuclear drop
+            // tableExists('migrations') still answers "yes" — MigrationRunner then
+            // skips ensureTable() and every later query against the history table
+            // fails with "relation migrations does not exist", poisoning every test
+            // class that runs after this one.
+            $db->resetDataCache();
         }
 
         // ALWAYS recreate the runner after regress (success or failure) to flush
@@ -749,6 +756,13 @@ final class MigrationLifecycleTest extends DatabaseTestCase
                     END LOOP;
                 END \$\$;
             ");
+
+            // The connection caches its table list, so after the nuclear drop
+            // tableExists('migrations') still answers "yes" — MigrationRunner then
+            // skips ensureTable() and every later query against the history table
+            // fails with "relation migrations does not exist", poisoning every test
+            // class that runs after this one.
+            $this->db->resetDataCache();
         }
 
         // ALWAYS recreate runner after regress (success or failure) to flush

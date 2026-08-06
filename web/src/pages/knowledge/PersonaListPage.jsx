@@ -7,6 +7,9 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
+import { deleteColumn } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
+import { useRowDelete } from '../../hooks/useRowDelete';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 
@@ -30,6 +33,12 @@ export function PersonaListPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const { has } = usePermission();
+  const { isDeleting, error: deleteError, remove } = useRowDelete({
+    onDelete: (r) => knowledgeService.deletePersona(r.id),
+    onDone: load,
+  });
+
   const columns = [
     { key: 'name', label: 'Name', render: (r) => (
       <div>
@@ -44,6 +53,12 @@ export function PersonaListPage() {
     )},
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    ...deleteColumn({
+      canDelete: has('persona.manage'),
+      isDeleting,
+      remove,
+      confirmMessage: (r) => `Delete persona “${r.name}”? This cannot be undone.`,
+    }),
   ];
 
   return (
@@ -64,6 +79,7 @@ export function PersonaListPage() {
       </FilterBar>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {deleteError && <Alert variant="danger">{deleteError}</Alert>}
       {loading ? <Loader /> : (
         <DataTable columns={columns} rows={rows} emptyMessage="No personas defined yet." />
       )}

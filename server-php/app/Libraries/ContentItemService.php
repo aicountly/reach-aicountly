@@ -192,6 +192,40 @@ class ContentItemService
         return $this->items->find($id);
     }
 
+    /**
+     * Delete a content item.
+     *
+     * Two-step, mirroring the blog surface: a live item is archived first
+     * (recoverable), and deleting an already-archived item removes it from
+     * every listing via the model's soft delete. Published items must be
+     * unpublished before they can be removed permanently.
+     *
+     * @return array{permanent: bool, item: array|null}
+     */
+    public function delete(int $id, string $reason, array $actor = []): array
+    {
+        $item = $this->items->find($id);
+        if (!$item) {
+            throw new \RuntimeException("Content item {$id} not found.");
+        }
+
+        if (($item['workflow_status'] ?? '') !== 'archived') {
+            return ['permanent' => false, 'item' => $this->archive($id, $reason, $actor)];
+        }
+
+        if (($item['publication_status'] ?? '') === 'published') {
+            throw new \RuntimeException('Unpublish the content item before deleting it permanently.');
+        }
+
+        $this->items->delete($id);
+
+        $this->audit->log($actor['id'] ?? null, AuditLogger::CONTENT_DELETED, 'content', $id, $item, null, [
+            'reason' => $reason,
+        ]);
+
+        return ['permanent' => true, 'item' => null];
+    }
+
     private function createVersion(int $itemId, string $title, array $body, array $actor, string $summary): array
     {
         // Mark all existing versions as not-current first

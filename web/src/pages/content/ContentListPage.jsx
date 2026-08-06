@@ -6,11 +6,13 @@ import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
+import { DeleteButton } from '../../components/common/DeleteButton';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
+import { useRowDelete } from '../../hooks/useRowDelete';
 
 const CONTENT_TYPES = [
   '', 'blog', 'knowledge_base', 'community_question', 'community_answer',
@@ -34,6 +36,7 @@ export function ContentListPage() {
   const nav = useNavigate();
 
   const canCreate = has('content.create');
+  const canDelete = has('content.edit');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -44,6 +47,16 @@ export function ContentListPage() {
   }, [filters]);
 
   useEffect(() => { load(); }, [load]);
+
+  const { isDeleting, error: deleteError, remove } = useRowDelete({
+    onDelete: (row) => contentService.deleteItem(row.id, 'Deleted from Content Studio'),
+    onDone: load,
+  });
+
+  // First delete archives (recoverable); deleting an archived item removes it.
+  const deleteMessage = (row) => (row.workflow_status === 'archived'
+    ? `Permanently delete “${row.title || 'untitled'}”? This cannot be undone.`
+    : `Delete “${row.title || 'untitled'}”? This archives the item — delete it again to remove it permanently.`);
 
   const columns = [
     { key: 'type', label: 'Type', render: (r) => <ContentTypeBadge type={r.content_type} /> },
@@ -58,6 +71,22 @@ export function ContentListPage() {
     { key: 'due', label: 'Due', render: (r) => r.review_due_at ? new Date(r.review_due_at).toLocaleDateString() : '—' },
     { key: 'created', label: 'Created', render: (r) => new Date(r.created_at).toLocaleDateString() },
   ];
+
+  if (canDelete) {
+    columns.push({
+      key: 'actions',
+      label: 'Actions',
+      width: 110,
+      render: (r) => (
+        <DeleteButton
+          busy={isDeleting(r)}
+          confirmMessage={deleteMessage(r)}
+          title={r.workflow_status === 'archived' ? 'Permanently delete item' : 'Archive item'}
+          onConfirm={() => remove(r)}
+        />
+      ),
+    });
+  }
 
   return (
     <div>
@@ -102,6 +131,7 @@ export function ContentListPage() {
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {deleteError && <Alert variant="danger">{deleteError}</Alert>}
       {loading ? <Loader /> : (
         <Card padding={false}>
           <DataTable

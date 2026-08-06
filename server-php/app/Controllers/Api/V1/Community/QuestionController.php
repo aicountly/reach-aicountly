@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Community\CommunityDeletionService;
 use App\Libraries\Community\CommunityQuestionIntakeService;
 use App\Libraries\Community\CommunityQuestionRepository;
 use App\Libraries\AuditLogger;
@@ -116,6 +117,33 @@ class QuestionController extends BaseApiController
 
         AuditLogger::record(AuditLogger::COMMUNITY_QUESTION_STATUS_CHANGED, compact('uuid', 'newStatus'));
         return $this->response->setJSON(['success' => true]);
+    }
+
+    /**
+     * DELETE /community/questions/(:segment)
+     *
+     * Removes the question and its classifications, moderation findings and
+     * related-question links. Official answers block the delete unless the
+     * caller passes `with_answers` — then they are removed with the question.
+     */
+    public function destroy(string $uuid): ResponseInterface
+    {
+        $question = $this->repo->findByUuid($uuid);
+        if (!$question) {
+            return $this->response->setStatusCode(404)->setJSON(['ok' => false, 'error' => 'Question not found.']);
+        }
+
+        $body        = $this->input();
+        $reason      = trim((string) ($body['reason'] ?? ''));
+        $withAnswers = filter_var($body['with_answers'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        try {
+            (new CommunityDeletionService())->deleteQuestion($question, $this->userId(), $reason, $withAnswers);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'error' => $e->getMessage()]);
+        }
+
+        return $this->response->setJSON(['ok' => true, 'data' => ['deleted' => true]]);
     }
 
     /** GET /community/questions/stats */

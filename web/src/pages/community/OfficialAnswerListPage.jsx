@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
+import { useRowDelete } from '../../hooks/useRowDelete';
 
 // Values mirror App\Enums\CommunityAnswerStatus — the old list used
 // invented statuses (draft/generated/pending_approval) that exist nowhere,
@@ -44,9 +47,9 @@ export default function OfficialAnswerListPage() {
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
-    api.get('v1/community/answers', { status: status || undefined, page })
+    return api.get('v1/community/answers', { status: status || undefined, page })
       .then(r => {
         setAnswers(normalizeCommunityList(r));
         setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
@@ -54,6 +57,16 @@ export default function OfficialAnswerListPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [status, page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const { has } = usePermission();
+  const canDelete = has('community_answer.withdraw');
+
+  const { isDeleting, error: deleteError, remove } = useRowDelete({
+    onDelete: (a) => api.delete(`v1/community/answers/${a.uuid ?? a.external_id}`),
+    onDone: load,
+  });
 
   return (
     <div>
@@ -72,6 +85,7 @@ export default function OfficialAnswerListPage() {
 
       {loading && <p className="muted">Loading…</p>}
       {error && <p className="text-error">{error}</p>}
+      {deleteError && <p className="text-error">{deleteError}</p>}
 
       {!loading && !error && (
         <table className="data-table">
@@ -100,7 +114,20 @@ export default function OfficialAnswerListPage() {
                 <td>{a.human_reviewed ? 'Yes' : 'No'}</td>
                 <td>{a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}</td>
                 <td>
-                  <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="btn btn--sm">Edit</Link>
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="btn btn--sm">Edit</Link>
+                    {canDelete && (
+                      <DeleteButton
+                        busy={isDeleting(a)}
+                        disabled={a.status === 'published'}
+                        title={a.status === 'published'
+                          ? 'Withdraw the answer before deleting it'
+                          : 'Delete answer and its versions'}
+                        confirmMessage={'Delete this official answer with all its versions, approvals and deployment records? This cannot be undone.'}
+                        onConfirm={() => remove(a)}
+                      />
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

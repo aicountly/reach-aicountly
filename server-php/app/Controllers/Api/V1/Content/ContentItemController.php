@@ -159,8 +159,13 @@ class ContentItemController extends BaseContentController
         $reason = trim($body['reason'] ?? '');
 
         try {
-            $this->service->archive($item['id'], $reason ?: 'Deleted via API', $this->actor());
-            return $this->ok(['deleted' => true]);
+            $result = $this->service->delete($item['id'], $reason ?: 'Deleted via API', $this->actor());
+
+            return $this->ok([
+                'deleted'   => true,
+                'permanent' => $result['permanent'],
+                'message'   => $result['permanent'] ? 'Deleted.' : 'Archived.',
+            ]);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
         }

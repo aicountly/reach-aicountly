@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
 
 // Keys mirror App\Enums\CommunityAnswerStatus — the old map used invented
 // statuses (draft/generated/pending_approval) that exist nowhere, so real
@@ -34,6 +36,9 @@ const STATUS_HINT = {
 
 export default function OfficialAnswerEditorPage() {
   const { uuid } = useParams();
+  const navigate = useNavigate();
+  const { has } = usePermission();
+  const canDelete = has('community_answer.withdraw');
   const [answer, setAnswer]   = useState(null);
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +51,7 @@ export default function OfficialAnswerEditorPage() {
   const [approvalNote, setApprovalNote] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
   const [correctionNote, setCorrectionNote] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   function load() {
     setLoading(true);
@@ -120,6 +126,18 @@ export default function OfficialAnswerEditorPage() {
       setActionMsg('Error: ' + (e.response?.data?.error ?? e.message));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    setActionMsg('');
+    setDeleting(true);
+    try {
+      await api.delete(`v1/community/answers/${uuid}`);
+      navigate('/community/answers');
+    } catch (e) {
+      setActionMsg('Error: ' + (e.response?.data?.error ?? e.message));
+      setDeleting(false);
     }
   }
 
@@ -255,6 +273,18 @@ export default function OfficialAnswerEditorPage() {
               )}
               {availableActions.includes('restore') && (
                 <button className="btn btn--sm btn--success" onClick={() => handleAction('restore')} disabled={busy}>Restore</button>
+              )}
+              {canDelete && (
+                <DeleteButton
+                  busy={deleting}
+                  label="Delete answer"
+                  disabled={busy || answer.status === 'published'}
+                  title={answer.status === 'published'
+                    ? 'Withdraw the answer before deleting it'
+                    : 'Delete answer and its versions'}
+                  confirmMessage="Delete this official answer with all its versions, approvals and deployment records? This cannot be undone."
+                  onConfirm={handleDelete}
+                />
               )}
             </div>
           </div>

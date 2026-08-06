@@ -8,6 +8,9 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { ClaimRiskBadge } from '../../components/knowledge/ClaimRiskBadge';
+import { deleteColumn } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
+import { useRowDelete } from '../../hooks/useRowDelete';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const RISK_OPTIONS   = ['', 'low', 'medium', 'high', 'critical'];
@@ -33,6 +36,12 @@ export function ClaimListPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const { has } = usePermission();
+  const { isDeleting, error: deleteError, remove } = useRowDelete({
+    onDelete: (r) => knowledgeService.deleteClaim(r.id),
+    onDone: load,
+  });
+
   const columns = [
     { key: 'claim_text', label: 'Claim', render: (r) => (
       <div>
@@ -47,6 +56,12 @@ export function ClaimListPage() {
     { key: 'valid_from', label: 'Valid from', render: (r) => r.valid_from ? new Date(r.valid_from).toLocaleDateString() : '—' },
     { key: 'valid_until', label: 'Valid until', render: (r) => r.valid_until ? new Date(r.valid_until).toLocaleDateString() : '—' },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
+    ...deleteColumn({
+      canDelete: has('claim.manage'),
+      isDeleting,
+      remove,
+      confirmMessage: 'Delete this product claim? This cannot be undone.',
+    }),
   ];
 
   return (
@@ -70,6 +85,7 @@ export function ClaimListPage() {
       </FilterBar>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {deleteError && <Alert variant="danger">{deleteError}</Alert>}
       {loading ? <Loader /> : (
         <DataTable columns={columns} rows={rows} emptyMessage="No product claims defined yet." />
       )}

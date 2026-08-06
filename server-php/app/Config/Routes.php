@@ -605,6 +605,7 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community/questions/stats',                            'Api\\V1\\Community\\QuestionController::stats',                           ['filter' => 'permission:community.view']);
         $routes->get('community/questions/(:segment)',                       'Api\\V1\\Community\\QuestionController::show/$1',                         ['filter' => 'permission:community.view']);
         $routes->put('community/questions/(:segment)/status',                'Api\\V1\\Community\\QuestionController::updateStatus/$1',                 ['filter' => 'permission:community_question.edit']);
+        $routes->delete('community/questions/(:segment)',                    'Api\\V1\\Community\\QuestionController::destroy/$1',                      ['filter' => 'permission:community_question.moderate']);
 
         // Official Identities
         $routes->get('community/identities',                                 'Api\\V1\\Community\\OfficialIdentityController::index',                   ['filter' => 'permission:community.view']);
@@ -618,6 +619,7 @@ $routes->group('v1', static function ($routes) {
         $routes->post('community/answers',                                   'Api\\V1\\Community\\OfficialAnswerController::create',                    ['filter' => 'permission:community_answer.generate']);
         $routes->get('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::show/$1',                   ['filter' => 'permission:community.view']);
         $routes->put('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::update/$1',                 ['filter' => 'permission:community_answer.edit']);
+        $routes->delete('community/answers/(:segment)',                      'Api\\V1\\Community\\OfficialAnswerController::destroy/$1',                ['filter' => 'permission:community_answer.withdraw']);
         $routes->get('community/answers/(:segment)/versions',                'Api\\V1\\Community\\OfficialAnswerController::versions/$1',               ['filter' => 'permission:community.view']);
         $routes->post('community/answers/(:segment)/generate',               'Api\\V1\\Community\\OfficialAnswerController::generate/$1',               ['filter' => 'permission:community_answer.generate']);
         $routes->post('community/answers/(:segment)/validate',               'Api\\V1\\Community\\OfficialAnswerController::validateAnswer/$1',         ['filter' => 'permission:community_answer.review']);

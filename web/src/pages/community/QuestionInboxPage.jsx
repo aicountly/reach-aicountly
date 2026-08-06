@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
+import { useRowDelete } from '../../hooks/useRowDelete';
 
 const STATUS_OPTS = [
   { value: '', label: 'All' },
@@ -49,6 +52,14 @@ export default function QuestionInboxPage() {
 
   useEffect(() => { load(); }, [status, sort, page]); // eslint-disable-line
 
+  const { has } = usePermission();
+  const canDelete = has('community_question.moderate');
+
+  const { isDeleting, error: deleteError, remove } = useRowDelete({
+    onDelete: (q) => api.delete(`v1/community/questions/${q.uuid ?? q.external_id}`, { with_answers: true }),
+    onDone: load,
+  });
+
   return (
     <div>
       <div className="page-header">
@@ -72,6 +83,7 @@ export default function QuestionInboxPage() {
 
       {loading && <p className="muted">Loading…</p>}
       {error && <p className="text-error">{error}</p>}
+      {deleteError && <p className="text-error">{deleteError}</p>}
 
       {!loading && !error && (
         <table className="data-table">
@@ -100,7 +112,17 @@ export default function QuestionInboxPage() {
                 <td>{q.triage_score ?? '—'}</td>
                 <td>{q.source_received_at ? new Date(q.source_received_at).toLocaleDateString() : '—'}</td>
                 <td>
-                  <Link to={`/community/questions/${q.external_id}`} className="btn btn--sm">Open</Link>
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <Link to={`/community/questions/${q.uuid ?? q.external_id}`} className="btn btn--sm">Open</Link>
+                    {canDelete && (
+                      <DeleteButton
+                        busy={isDeleting(q)}
+                        confirmMessage={`Delete “${q.title || 'this question'}”? Its official answers, classifications and moderation findings are deleted with it. This cannot be undone.`}
+                        title="Delete question and its answers"
+                        onConfirm={() => remove(q)}
+                      />
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

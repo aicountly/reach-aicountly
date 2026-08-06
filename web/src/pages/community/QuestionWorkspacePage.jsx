@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
 
 const TRANSITION_STATUSES = ['triaged', 'in_progress', 'closed', 'spam'];
 
@@ -16,6 +18,11 @@ export default function QuestionWorkspacePage() {
   const [generating, setGenerating]       = useState(false);
   const [statusNote, setStatusNote]       = useState('');
   const [newStatus, setNewStatus]         = useState('');
+  const [deleting, setDeleting]           = useState(null);
+  const [actionError, setActionError]     = useState(null);
+  const { has } = usePermission();
+  const canDeleteQuestion = has('community_question.moderate');
+  const canDeleteAnswer   = has('community_answer.withdraw');
 
   function load() {
     setLoading(true);
@@ -55,6 +62,24 @@ export default function QuestionWorkspacePage() {
       .finally(() => setGenerating(false));
   }
 
+  function handleDeleteQuestion() {
+    setActionError(null);
+    setDeleting('question');
+    api.delete(`v1/community/questions/${uuid}`, { with_answers: true })
+      .then(() => navigate('/community/questions'))
+      .catch(e => { setActionError(e.message); setDeleting(null); });
+  }
+
+  function handleDeleteAnswer(answer) {
+    const answerUuid = answer.uuid ?? answer.external_id;
+    setActionError(null);
+    setDeleting(answerUuid);
+    api.delete(`v1/community/answers/${answerUuid}`)
+      .then(() => load())
+      .catch(e => setActionError(e.message))
+      .finally(() => setDeleting(null));
+  }
+
   if (loading) return <p className="muted">Loading question…</p>;
   if (error) return <p className="text-error">{error}</p>;
   if (!question) return <p className="text-error">Question not found.</p>;
@@ -64,8 +89,20 @@ export default function QuestionWorkspacePage() {
       <div className="page-header">
         <Link to="/community/questions" className="btn btn--sm btn--ghost mb-2">← Back to inbox</Link>
         <h1>{question.title}</h1>
-        <span className="badge badge--neutral">{question.status}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className="badge badge--neutral">{question.status}</span>
+          {canDeleteQuestion && (
+            <DeleteButton
+              busy={deleting === 'question'}
+              label="Delete question"
+              confirmMessage={`Delete “${question.title}”? Its official answers, classifications and moderation findings are deleted with it. This cannot be undone.`}
+              onConfirm={handleDeleteQuestion}
+            />
+          )}
+        </div>
       </div>
+
+      {actionError && <p className="text-error">{actionError}</p>}
 
       <div className="two-col-grid">
         <section className="card">
@@ -110,9 +147,20 @@ export default function QuestionWorkspacePage() {
             {answers.length === 0 ? (
               <p className="muted mb-2">No official answer yet.</p>
             ) : answers.map(a => (
-              <div key={a.id} className="list-item">
+              <div key={a.id} className="list-item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="badge badge--neutral">{a.status}</span>
-                <Link to={`/community/answers/${a.external_id}`} className="ml-2">{a.external_id}</Link>
+                <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="ml-2">{a.uuid ?? a.external_id}</Link>
+                {canDeleteAnswer && (
+                  <DeleteButton
+                    busy={deleting === (a.uuid ?? a.external_id)}
+                    disabled={a.status === 'published'}
+                    title={a.status === 'published'
+                      ? 'Withdraw the answer before deleting it'
+                      : 'Delete answer and its versions'}
+                    confirmMessage="Delete this official answer with all its versions, approvals and deployment records? This cannot be undone."
+                    onConfirm={() => handleDeleteAnswer(a)}
+                  />
+                )}
               </div>
             ))}
             <button className="btn btn--sm mt-2" onClick={handleGenerateAnswer} disabled={generating}>

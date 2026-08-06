@@ -4,6 +4,7 @@ namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
 use App\Enums\CommunityRiskTier;
+use App\Libraries\Community\CommunityDeletionService;
 use App\Libraries\Community\OfficialAnswerLifecycleService;
 use App\Libraries\Community\OfficialAnswerRepository;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -266,6 +267,28 @@ class OfficialAnswerController extends BaseApiController
         return $this->guard(fn () => $this->response->setJSON([
             'data' => $this->lifecycle->setRiskTierWithOverride($uuid, $tier, $reason, $userId),
         ]));
+    }
+
+    /**
+     * DELETE /community/answers/(:segment)
+     *
+     * Permanent removal of the answer with its versions, approvals,
+     * deployments and verifications. Published answers must be unpublished or
+     * withdrawn first — the deletion service enforces that.
+     */
+    public function destroy(string $uuid): ResponseInterface
+    {
+        $answer = $this->repo->findByUuid($uuid);
+        if ($answer === null) {
+            return $this->notFound();
+        }
+
+        $reason = trim((string) ($this->input()['reason'] ?? ''));
+
+        return $this->guard(function () use ($answer, $reason) {
+            (new CommunityDeletionService())->deleteAnswer($answer, $this->userId(), $reason);
+            return $this->response->setJSON(['ok' => true, 'data' => ['deleted' => true]]);
+        });
     }
 
     /** GET /community/answers/(:segment)/versions */
