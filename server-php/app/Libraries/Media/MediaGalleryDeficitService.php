@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Media;
 
+use App\Libraries\Ai\Images\CoverPromptBuilder;
 use App\Libraries\Blog\ContentBaseService;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
@@ -47,12 +48,28 @@ class MediaGalleryDeficitService
             if ($target !== '' && $target > $horizon) {
                 continue;
             }
+            $title  = (string) ($entry['title'] ?? '');
+            $hint   = (string) ($entry['cover_prompt'] ?? '');
+            $stream = (string) ($entry['portfolio_stream'] ?? '');
+
             $upcoming[] = [
                 'key'          => (string) ($entry['key'] ?? ''),
-                'title'        => (string) ($entry['title'] ?? ''),
+                'title'        => $title,
                 'target_date'  => $target,
-                'cover_prompt' => (string) ($entry['cover_prompt'] ?? ''),
                 'status'       => $status,
+                'stream'       => $stream,
+                // The raw scene note from the content base, kept for reference.
+                'cover_prompt' => $hint,
+                // What an operator actually pastes into ChatGPT or Gemini. The
+                // portfolio stream is deliberately NOT passed as the theme:
+                // "marketing" is an editorial bucket, and handing it to an
+                // image model puts megaphones and growth charts on a GST
+                // article. The title and scene note carry the subject.
+                'image_prompt' => (new CoverPromptBuilder())->buildForOperator($title, $hint),
+                // Tags decide whether the finished upload can ever be matched
+                // to this article, so the console should not make the operator
+                // reverse-engineer the scorer's vocabulary.
+                'suggested_tags' => $this->suggestedTags($title, $entry),
             ];
         }
 
@@ -93,5 +110,29 @@ class MediaGalleryDeficitService
             'lookahead_days' => $lookaheadDays,
             'upcoming'       => $upcoming,
         ];
+    }
+
+    /**
+     * Tags that will actually match this article once the cover is uploaded.
+     *
+     * Derived with the scorer's own tokenizer, so what is suggested is what
+     * will be compared: sub-3-character tokens are dropped (ai, hr, pf), as are
+     * generic words (guide, complete, indian). One shared token already clears
+     * the relevance floor; four gives room for the article's title to be
+     * rewritten without stranding the cover.
+     *
+     * @param array<string,mixed> $entry
+     * @return list<string>
+     */
+    private function suggestedTags(string $title, array $entry): array
+    {
+        $keywords = (new CoverRelevanceScorer())->articleKeywords(
+            $title,
+            (string) ($entry['product_slug'] ?? ''),
+            array_map('strval', (array) ($entry['tags'] ?? [])),
+            (string) ($entry['seed_keyword'] ?? ''),
+        );
+
+        return array_slice($keywords, 0, 4);
     }
 }

@@ -21,6 +21,7 @@ use App\Jobs\CommunityPublicationReconciliationJob;
 use App\Jobs\CommunitySyncChangesJob;
 use App\Jobs\CommunityDeploymentRetrySweepJob;
 use App\Jobs\PublicationJob;
+use App\Jobs\BlogCoverSweepJob;
 use App\Jobs\BlogWorkBlockJob;
 use RuntimeException;
 
@@ -59,6 +60,7 @@ class JobHandlerRegistry
         // Phase 2 blog automation / publishing
         $this->handlers['reach.publication']                         = new PublicationJob();
         $this->handlers['reach.blog_work_block']                     = new BlogWorkBlockJob();
+        $this->handlers['reach.blog_cover_sweep']                    = new BlogCoverSweepJob();
         // Content base + cover gallery (2026-08 automation revamp)
         $this->handlers['reach.content_base_sync']                   = new \App\Jobs\ContentBaseSyncJob();
         $this->handlers['reach.gallery_deficit_alert']               = new \App\Jobs\GalleryDeficitAlertJob();

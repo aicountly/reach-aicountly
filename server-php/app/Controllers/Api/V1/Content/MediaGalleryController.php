@@ -47,7 +47,13 @@ class MediaGalleryController extends BaseApiController
         return $this->ok([
             'assets'                 => $rows,
             'signing_key_configured' => trim((string) env('MEDIA_SIGNING_KEY', '')) !== '',
-            'files_missing'          => count(array_filter($rows, static fn (array $r): bool => $r['file_missing'])),
+            // Active rows only. A retired asset with no file is settled
+            // business — reconcile already dealt with it, and counting it
+            // keeps telling the operator to run a command they just ran.
+            'files_missing'          => count(array_filter(
+                $rows,
+                static fn (array $r): bool => $r['file_missing'] && ($r['status'] ?? '') === 'active'
+            )),
             'storage_path'           => $store->storagePath(),
             'storage_writable'       => $store->storageWritable(),
             // Storing under the deploy tree is what let rsync --delete erase

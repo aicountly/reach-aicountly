@@ -169,7 +169,10 @@ export function MediaGalleryPage() {
 
   if (loading) return <Loader label="Loading cover gallery…" />;
 
-  const rotationReady = assets.filter(isRotationReady).length;
+  // Retired assets are out of play; counting them in the denominator reads as
+  // "you have 3 covers, none usable" when in truth you have none at all.
+  const activeAssets = assets.filter((a) => a.status === 'active');
+  const rotationReady = activeAssets.filter(isRotationReady).length;
   const tabs = [
     { id: 'deficit', label: `Deficit${deficit?.deficit ? ` (${deficit.deficit})` : ''}`, icon: AlertTriangle },
     { id: 'upload', label: 'Upload', icon: Upload },
@@ -183,7 +186,8 @@ export function MediaGalleryPage() {
           <h1>Cover Gallery</h1>
           <p className="text-sm text-muted">
             Covers shared across blog, knowledge base and community.
-            {' '}{rotationReady} of {assets.length} are rotation-ready.
+            {' '}{rotationReady} of {activeAssets.length} active covers are rotation-ready
+            {assets.length > activeAssets.length ? `, ${assets.length - activeAssets.length} retired` : ''}.
           </p>
         </div>
       </div>
@@ -251,23 +255,44 @@ export function MediaGalleryPage() {
                   Generate them with the prompts below and upload them on the Upload tab.
                 </Alert>
                 <ul className="text-sm" style={{ paddingLeft: '1.25rem' }}>
-                  {(deficit.upcoming || []).map((entry) => (
-                    <li key={entry.key} style={{ marginBottom: '0.5rem' }}>
-                      <strong>{entry.title}</strong> {entry.target_date ? `(target ${formatDate(entry.target_date)})` : ''}
-                      {entry.cover_prompt && (
-                        <div className="text-muted">
-                          Prompt: {entry.cover_prompt}{' '}
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => navigator.clipboard?.writeText(entry.cover_prompt)}
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
+                  {(deficit.upcoming || []).map((entry) => {
+                    const tags = (entry.suggested_tags || []).join(', ');
+                    return (
+                      <li key={entry.key} style={{ marginBottom: '1rem' }}>
+                        <strong>{entry.title}</strong> {entry.target_date ? `(target ${formatDate(entry.target_date)})` : ''}
+                        {entry.image_prompt && (
+                          <div className="text-muted" style={{ marginTop: '0.25rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => navigator.clipboard?.writeText(entry.image_prompt)}
+                            >
+                              Copy prompt
+                            </button>
+                            {' '}
+                            <span className="text-xs">paste into ChatGPT or Gemini as-is</span>
+                            <div className="text-xs" style={{ marginTop: '0.25rem', fontStyle: 'italic' }}>
+                              {entry.image_prompt}
+                            </div>
+                          </div>
+                        )}
+                        {tags && (
+                          <div className="text-muted" style={{ marginTop: '0.25rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => { navigator.clipboard?.writeText(tags); setTags(tags); setStream(entry.stream || ''); setTab('upload'); }}
+                            >
+                              Use these tags
+                            </button>
+                            {' '}
+                            <code className="text-xs">{tags}</code>
+                            {entry.stream ? <span className="text-xs"> · stream {entry.stream}</span> : null}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             ) : (
