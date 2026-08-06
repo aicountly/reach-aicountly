@@ -1773,6 +1773,14 @@ class WorkBlockService
         } catch (\Throwable) {
         }
 
+        // Derived publication data, created here because nothing guarantees an
+        // item reached this block through SEO_OPTIMIZE. Seven items sat in
+        // publish_queued with no SEO or publication profile at all, so every
+        // dispatch failed the readiness gate with "SEO profile is missing" and
+        // no amount of re-queuing could ever clear it. The call only fills
+        // fields that are absent — it never overwrites authored SEO.
+        $this->ensurePublicationProfilesForItem($contentItemId);
+
         $connectionKey = (new \App\Libraries\Publishing\PublicationConnectionService())
             ->resolveBlogConnectionKey();
 
@@ -2248,9 +2256,12 @@ class WorkBlockService
             0,
             320,
         );
-        if (mb_strlen($metaDescription) < 100) {
-            $metaDescription = str_pad($metaDescription, 100, '.');
-        }
+        // Deliberately not padded to a minimum length. This used to
+        // str_pad(..., 100, '.'), which silenced a *warning* — a short meta
+        // description has never been a blocking gate — by writing a run of
+        // dots into the description that ships to the public page and into
+        // search results. A short description is better than a padded one;
+        // SeoReadinessService still flags it for a human to improve.
 
         $seo = $this->db->table('reach_content_seo_profiles')
             ->where('content_item_id', $contentItemId)->get()->getRowArray();

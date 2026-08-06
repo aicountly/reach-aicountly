@@ -46,7 +46,26 @@ const TYPE_FILTERS = [
   { key: 'knowledge_base', label: 'Knowledge base' },
 ];
 
-const RETRYABLE = ['failed', 'blocked'];
+/**
+ * Whether a Retry will be accepted is decided server-side and returned as
+ * `retryable` — the client keeping its own copy of that list is what put a
+ * Retry button on rows the API always refused ("Error category
+ * 'authentication_error' is not retryable"). Only fall back to a status check
+ * for a payload from an older API that predates the flag.
+ */
+function canRetry(deployment) {
+  if (typeof deployment.retryable === 'boolean') return deployment.retryable;
+  return deployment.status === 'failed';
+}
+
+/** What to do instead, when retrying cannot help. */
+const NON_RETRYABLE_ADVICE = {
+  authentication_error: 'Fix the publisher credentials, then publish again.',
+  version_conflict: 'The public site already holds a version of this content. Publish again to send a fresh attempt.',
+  validation_error: 'The public site rejected the payload. Fix the content, then publish again.',
+  publication_blocked: 'The public site refused this content. Resolve it there, then publish again.',
+  not_found: 'The public record is gone. Publish again to recreate it.',
+};
 
 export default function DeploymentListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -205,7 +224,7 @@ export default function DeploymentListPage() {
                     <td>{formatDate(d.updated_at)}</td>
                     <td>
                       <div className="btn-group">
-                        {canPublish && RETRYABLE.includes(d.status) && (
+                        {canPublish && canRetry(d) && (
                           <button
                             type="button"
                             className="btn btn--sm btn--primary"
@@ -214,6 +233,17 @@ export default function DeploymentListPage() {
                           >
                             {retryingId === d.id ? 'Retrying…' : 'Retry'}
                           </button>
+                        )}
+                        {canPublish && !canRetry(d) && ['failed', 'blocked'].includes(d.status) && (
+                          // No Retry button here on purpose: this deployment is
+                          // dead and needs a new one, not another attempt.
+                          <Link
+                            to={`/content/${d.content_item_id}`}
+                            className="btn btn--sm btn--secondary"
+                            title={NON_RETRYABLE_ADVICE[d.error_category] ?? 'Retrying cannot clear this — publish again from the content item.'}
+                          >
+                            Publish again
+                          </Link>
                         )}
                         <Link to={`/publishing/deployments/${d.id}`} className="btn btn--sm btn--secondary">View</Link>
                       </div>
