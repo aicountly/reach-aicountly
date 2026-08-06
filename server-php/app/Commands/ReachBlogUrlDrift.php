@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Database\SchemaGuard;
-use App\Libraries\Publishing\Seo\CanonicalUrlPolicy;
+use App\Libraries\Intelligence\ContentIdentitySyncService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -26,6 +27,8 @@ use Throwable;
  */
 class ReachBlogUrlDrift extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-url-drift';
     protected $description = 'Report published blogs whose live URL differs from their current slug.';
@@ -41,9 +44,12 @@ class ReachBlogUrlDrift extends BaseCommand
 
     public function run(array $params): int
     {
-        $probe  = array_key_exists('probe', $params) || CLI::getOption('probe');
-        $record = array_key_exists('record-redirects', $params) || CLI::getOption('record-redirects');
-        $onlyId = (int) ($params['id'] ?? CLI::getOption('id') ?? 0);
+        // CLI::getOption() alone silently reads --record-redirects as absent
+        // when spark hands flags over in $params, which would turn a requested
+        // write into a no-op that still reports success.
+        $probe  = $this->sparkFlag('probe', $params);
+        $record = $this->sparkFlag('record-redirects', $params);
+        $onlyId = (int) ($this->sparkOption('id', $params, '0') ?? '0');
 
         try {
             $drifted = $this->drifted($onlyId);
@@ -104,7 +110,6 @@ class ReachBlogUrlDrift extends BaseCommand
             $builder->where('i.id', $onlyId);
         }
 
-        $policy  = new CanonicalUrlPolicy();
         $drifted = [];
 
         foreach ($builder->get()->getResultArray() as $item) {
@@ -124,7 +129,13 @@ class ReachBlogUrlDrift extends BaseCommand
                 continue;
             }
 
-            $slugUrl  = $policy->buildUrl('blog', $slug);
+            // Swap the final segment of the URL the site is actually serving,
+            // rather than rebuilding one from CanonicalUrlPolicy. The policy
+            // emits /blog/ while the site serves /blogs/, so a rebuilt URL
+            // tests the wrong path and reports 404 for a reason that has
+            // nothing to do with the slug. Substituting keeps host, scheme and
+            // prefix identical, so the only variable is the slug itself.
+            $slugUrl  = ContentIdentitySyncService::withLastSegment($liveUrl, $slug);
             $liveSlug = self::lastSegment($liveUrl);
 
             if ($liveSlug === strtolower($slug)) {
