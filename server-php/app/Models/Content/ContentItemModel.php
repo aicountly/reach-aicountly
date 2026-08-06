@@ -2,6 +2,7 @@
 
 namespace App\Models\Content;
 
+use App\Libraries\Content\SlugBuilder;
 use CodeIgniter\Model;
 
 class ContentItemModel extends Model
@@ -109,8 +110,7 @@ class ContentItemModel extends Model
     /** Generate a slug from the title, ensuring uniqueness. */
     public function buildUniqueSlug(string $title, ?int $excludeId = null): string
     {
-        $base = strtolower(preg_replace('/[^a-z0-9]+/', '-', $title));
-        $base = trim($base, '-');
+        $base = SlugBuilder::slug($title, 'untitled');
         $slug = $base;
         $i    = 1;
 
