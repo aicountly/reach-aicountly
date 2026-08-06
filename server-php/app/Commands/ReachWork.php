@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Services;
@@ -27,6 +28,8 @@ use Throwable;
  */
 class ReachWork extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:work';
     protected $description = 'Reserve and run Reach jobs from the reach_jobs queue.';
@@ -34,23 +37,28 @@ class ReachWork extends BaseCommand
 
     public function run(array $params): int
     {
-        $queueOption = (string) ($params['queue'] ?? CLI::getOption('queue') ?? 'default');
+        // CI4's argv parser stores "--queue=a,b" as an option *named*
+        // "queue=a,b" with a null value, so CLI::getOption('queue') returned
+        // null and this worker silently fell back to the `default` queue only —
+        // exactly the form the cron guide documents. --limit=20 was dropped the
+        // same way. sparkOption() reads argv directly as the durable fallback.
+        $queueOption = (string) ($this->sparkOption('queue', $params, 'default') ?? 'default');
         $queues      = array_values(array_filter(array_map('trim', explode(',', $queueOption))));
         if ($queues === []) {
             $queues = ['default'];
         }
         // --limit=N drains up to N jobs. --once alone means 1 job. If both are
         // passed, limit wins (operators often copy "--once --limit 20" expecting a batch).
-        $onceOpt  = CLI::getOption('once') !== null || array_key_exists('once', $params);
-        $limit    = (int) ($params['limit'] ?? CLI::getOption('limit') ?? 0);
+        $onceOpt  = $this->sparkFlag('once', $params);
+        $limit    = (int) ($this->sparkOption('limit', $params, '0') ?? 0);
         $once     = $onceOpt && $limit <= 0;
         if ($onceOpt && $limit > 0) {
             // Keep once=false so the loop can process up to $limit.
             $once = false;
         }
-        $workerId = (string) ($params['worker-id'] ?? CLI::getOption('worker-id') ?? gethostname() . '.' . getmypid());
-        $sleep    = max(0, (int) ($params['sleep'] ?? CLI::getOption('sleep') ?? 2));
-        $lease    = max(30, (int) ($params['lease'] ?? CLI::getOption('lease') ?? 300));
+        $workerId = (string) ($this->sparkOption('worker-id', $params) ?? gethostname() . '.' . getmypid());
+        $sleep    = max(0, (int) ($this->sparkOption('sleep', $params, '2') ?? 2));
+        $lease    = max(30, (int) ($this->sparkOption('lease', $params, '300') ?? 300));
         $stopFile = WRITEPATH . 'stop-reach-worker';
 
         $svc      = Services::jobService();

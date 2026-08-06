@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Enums\CommunityAnswerStatus;
 use App\Libraries\Community\CommunityAutoPublishService;
 use App\Libraries\Community\CommunityTriageService;
@@ -38,6 +39,8 @@ use Throwable;
  */
 class CommunityAdvance extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'community:advance';
     protected $description = 'Triage questions, retry stuck answer generation, and route generated drafts to review or publication.';
@@ -51,10 +54,10 @@ class CommunityAdvance extends BaseCommand
 
     public function run(array $params): int
     {
-        $limit    = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 10)));
-        $maxTries = max(1, (int) (CLI::getOption('max-generation-attempts') ?? ($params['max-generation-attempts'] ?? 3)));
-        $skipTriage = (bool) (CLI::getOption('skip-triage') ?? ($params['skip-triage'] ?? false));
-        $dryRun   = (bool) (CLI::getOption('dry-run') ?? ($params['dry-run'] ?? false));
+        $limit      = max(1, (int) ($this->sparkOption('limit', $params, '10') ?? 10));
+        $maxTries   = max(1, (int) ($this->sparkOption('max-generation-attempts', $params, '3') ?? 3));
+        $skipTriage = $this->sparkFlag('skip-triage', $params);
+        $dryRun     = $this->sparkFlag('dry-run', $params);
 
         $lockFile = WRITEPATH . 'community-advance.lock';
         $fp       = fopen($lockFile, 'c+');

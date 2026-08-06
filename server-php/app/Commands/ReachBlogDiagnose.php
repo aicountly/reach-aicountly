@@ -350,6 +350,26 @@ class ReachBlogDiagnose extends BaseCommand
                 'code'     => 'no_cron_log_files',
                 'message'  => 'No worker/schedule/dispatch/optimizer cron log files found under writable/logs. Crontab is almost certainly missing, using the wrong cd path, or not redirecting stdout.',
             ];
+        } else {
+            // A *partial* crontab was previously invisible here: worker.log and
+            // schedule.log existing was enough to pass, while the missing
+            // blog-dispatch/blog-optimizer lines are precisely what stops new
+            // blogs from being created.
+            $missing = [];
+            foreach ($cronLogs as $name => $meta) {
+                if (empty($meta['exists']) || (int) ($meta['bytes'] ?? 0) === 0) {
+                    $missing[] = $name;
+                }
+            }
+            if ($missing !== []) {
+                $issues[] = [
+                    'severity' => 'blocking',
+                    'code'     => 'partial_cron_install',
+                    'message'  => 'Some cron log files are missing or empty: ' . implode(', ', $missing)
+                                . '. The matching crontab lines are not installed (or redirect elsewhere). '
+                                . 'blog-dispatch.log/blog-optimizer.log missing means no new blog items are ever created.',
+                ];
+            }
         }
 
         $caps = $report['roadmap_caps'] ?? [];
@@ -430,11 +450,23 @@ class ReachBlogDiagnose extends BaseCommand
         }
 
         $eligible = (int) ($db['topic_candidates']['eligible_for_run'] ?? 0);
+        $dailyCap = (int) ($report['roadmap_caps']['daily_cap'] ?? 0);
         if ($eligible === 0) {
             $issues[] = [
                 'severity' => 'blocking',
                 'code'     => 'no_eligible_candidates',
                 'message'  => 'No eligible topic candidates (status candidate/scored, unlocked, not in cooldown). Optimiser will score 0 and create 0 blogs.',
+            ];
+        } elseif ($dailyCap > 0 && $eligible < $dailyCap) {
+            // The optimiser can only create as many items as it has candidates.
+            // A backlog of 1 against a daily cap of 10 caps output at one blog
+            // a day no matter how healthy every cron is.
+            $issues[] = [
+                'severity' => 'warning',
+                'code'     => 'candidate_backlog_below_daily_cap',
+                'message'  => "Only {$eligible} eligible topic candidate(s) against a daily cap of {$dailyCap}. "
+                            . 'Blog output is limited by the backlog, not by the caps. Approve more topic clusters in '
+                            . 'Knowledge or run reach:blog-discover-topics.',
             ];
         }
 
@@ -537,7 +569,14 @@ class ReachBlogDiagnose extends BaseCommand
         $actions = [];
         $codes = array_column($report['verdict'] ?? [], 'code');
 
-        if (in_array('no_cron_log_files', $codes, true) || in_array('optimizer_stale', $codes, true)) {
+        if (in_array('candidate_backlog_below_daily_cap', $codes, true)) {
+            $actions[] = 'Top up the backlog: php spark reach:blog-discover-topics --limit=10   (needs approved topic clusters in Knowledge)';
+        }
+
+        if (in_array('no_cron_log_files', $codes, true)
+            || in_array('partial_cron_install', $codes, true)
+            || in_array('optimizer_stale', $codes, true)
+        ) {
             $actions[] = 'Install/fix cPanel cron lines from docs/blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md (must include reach:blog-dispatch + reach:work --queue=default,blog,publishing + reach:blog-optimize-roadmap + reach:schedule).';
             $actions[] = 'Confirm cron cd path is the real server-php directory that contains this WRITEPATH.';
             $actions[] = 'Confirm PHP binary with: which php; ls -la $(which php)';

@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -19,6 +20,8 @@ use Config\Services;
  */
 class ReachSchedule extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:schedule';
     protected $description = 'Housekeeping for the reach_jobs queue: recover expired leases and prune old jobs.';
@@ -26,7 +29,7 @@ class ReachSchedule extends BaseCommand
 
     public function run(array $params): int
     {
-        $days = max(1, (int) ($params['prune-days'] ?? CLI::getOption('prune-days') ?? 14));
+        $days = max(1, (int) ($this->sparkOption('prune-days', $params, '14') ?? 14));
 
         $svc = Services::jobService();
         $recovered = $svc->recoverExpiredLeases();
