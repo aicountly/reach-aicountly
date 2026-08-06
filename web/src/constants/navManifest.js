@@ -4,14 +4,16 @@
 // WhatsApp live in Distribution), the stubbed Marketing Bot section, and the
 // superseded SEO Planner / Keyword Ideas entries were removed; Quality
 // Centre (cover gallery + content base) and the SEO Command Centre were
-// added. Section sub-navigation stays in each section's *Layout.jsx.
+// added; the Blog Command Centre's "SEO and Indexing" tab was promoted out
+// of that tab strip into the SEO block as "Blog SEO and Indexing".
+// Section sub-navigation stays in each section's *Layout.jsx.
 import {
   LayoutDashboard, FileText, CalendarDays, MonitorSmartphone,
   Paintbrush, BarChart3, Users, ArrowRightCircle, ScrollText,
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
   BookOpen, PenTool, Package, BrainCircuit,
   Globe, Send, MessagesSquare, Search, NotebookPen, ListOrdered,
-  Image, HelpCircle,
+  Image, HelpCircle, FileSearch,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 import { isBlogCommandCentreEnabled } from './blogFeatureFlags';
@@ -47,6 +49,18 @@ export function buildNavSections() {
       title: 'SEO',
       items: [
         { label: 'SEO Command Centre', path: '/seo-centre', icon: Search, requires: 'seo.view' },
+        // Was the Blog Command Centre's "SEO and Indexing" tab; renamed so it
+        // no longer reads as a rival of the SEO Command Centre above.
+        //
+        // Deliberately NOT behind isBlogCommandCentreEnabled(): that flag
+        // rolls out the blog *automation* pipeline (roadmap → drafts →
+        // verification → publishing), and none of this section's leaves touch
+        // it — they report Search Console, indexing and sitemap state for
+        // blogs that exist either way. Access is a permission question
+        // (blog.view), not a rollout question, and coupling an SEO
+        // destination to a blog-pipeline flag would reshape this block when
+        // someone toggles an unrelated subsystem.
+        { label: 'Blog SEO and Indexing', path: ROUTES.BLOG_SEO, icon: FileSearch, requires: 'blog.view' },
       ],
     },
     {

@@ -32,12 +32,7 @@ Treatment legend: `NEW` = purpose-built BCC page; `SHARED` = embeds/reuses a can
 | Publishing | Publishing Attempts | `/blog-command-centre/publishing/deployments` | SHARED (`publishing.view`) | `reach_publication_deployments` |
 | Publishing | Rollback | `/blog-command-centre/publishing/rollback` | SHARED (`publishing.view`) | `PublicationRollbackService::rollback()` (fixed this session, see F-09) |
 | Publishing | Emergency Unpublish | `/blog-command-centre/publishing/unpublish` | NEW | `PublicationRollbackService::unpublish()` (new method, this session) |
-| SEO and Indexing | Search Console | `/blog-command-centre/seo/search` | DEEP_LINK | → `/intelligence/search` (real GSC adapter) |
-| SEO and Indexing | Indexing Status | `/blog-command-centre/indexing` | DEEP_LINK | → `/intelligence/indexnow` |
-| SEO and Indexing | Internal Links | `/blog-command-centre/seo/internal-links` | SCAFFOLD | — |
-| SEO and Indexing | Cannibalisation | `/blog-command-centre/seo/cannibalisation` | SCAFFOLD | — |
-| SEO and Indexing | Sitemap | `/blog-command-centre/seo/sitemap` | DEEP_LINK | → `/intelligence/sitemaps` |
-| SEO and Indexing | Technical SEO | `/blog-command-centre/seo/technical` | SCAFFOLD | — |
+| ~~SEO and Indexing~~ | — | `/blog-command-centre/seo/*`, `/blog-command-centre/indexing` | MOVED + REDIRECT | Section left the tab strip in 2026-08 — see "SEO and Indexing relocation" below |
 | Analytics | Portfolio Performance | `/blog-command-centre/analytics/portfolio` | NEW | Portfolio 45/35/20 reporting |
 | Analytics | Blog Content | `/blog-command-centre/analytics/content` | DEEP_LINK | → `/intelligence/content` (now backed by real `GoogleAnalyticsContentConnector`) |
 | Analytics | Search Performance | `/blog-command-centre/analytics/search` | DEEP_LINK | → `/intelligence/search/queries` |
@@ -52,6 +47,28 @@ Treatment legend: `NEW` = purpose-built BCC page; `SHARED` = embeds/reuses a can
 | Operations | Audit Log | `/blog-command-centre/operations/audit` | SHARED (`audit.view`) | Real audit system embed |
 | Settings | Portfolio Mix, Automation Window, Publication Rules, Risk Rules, Verification Thresholds, Storage, SEO Configuration, Notifications | `/blog-command-centre/settings/*` | NEW | `BlogFeatureFlags`, portfolio config API |
 | Settings | Provider Routing | `/blog-command-centre/settings/provider-routing` | DEEP_LINK | → AI Control Centre routing |
+
+## SEO and Indexing relocation (2026-08)
+
+Every leaf of the Blog Command Centre's `SEO and Indexing` section was either a `DEEP_LINK` into `/intelligence/*` or a `SCAFFOLD`. In practice that meant clicking a BCC tab redirected the operator out of the Blog Command Centre and into Intelligence — a different surface with its own fifteen-tab strip and its own page title — with no way back except the browser's Back button. The section also read as a rival of the sidebar's `SEO Command Centre`.
+
+The section is now a first-class sidebar destination in the **SEO** block, renamed **Blog SEO and Indexing** (`/blog-seo`, `web/src/constants/blogSeoNav.js` + `web/src/pages/blog-seo/BlogSeoLayout.jsx`). The three former deep-links render their canonical Intelligence pages **in place** under the section's own sub-nav — the same reuse-not-reimplement rule as the `SHARED` treatment above, and the same pattern `/seo-centre` already uses for these components. No new backend, no parallel CRUD.
+
+| Old route | New route | Treatment | Canonical backend |
+|---|---|---|---|
+| `/blog-command-centre/seo` | `/blog-seo` | REDIRECT | — |
+| `/blog-command-centre/seo/search` | `/blog-seo/search-console` | SHARED | `SearchIntelligencePage` (real GSC adapter) |
+| `/blog-command-centre/indexing` | `/blog-seo/indexing` | SHARED | `IndexNowOperationsPage` |
+| `/blog-command-centre/seo/internal-links` | `/blog-seo/internal-links` | SCAFFOLD | — |
+| `/blog-command-centre/seo/cannibalisation` | `/blog-seo/cannibalisation` | SCAFFOLD | — |
+| `/blog-command-centre/seo/sitemap` | `/blog-seo/sitemap` | SHARED | `SitemapOverviewPage` |
+| `/blog-command-centre/seo/technical` | `/blog-seo/technical` | SCAFFOLD | — |
+
+`BlogSeoLayout` enforces RBAC at the layout level (`blog.view` or `seo.view`) so the direct URL cannot bypass the hidden menu entry — the same F-02 rule `BlogCommandCentreLayout` follows.
+
+**Not behind `isBlogCommandCentreEnabled()`.** That flag rolls out the blog *automation* pipeline (roadmap → drafts → verification → publishing); none of these six leaves touch it. They report Search Console, indexing and sitemap state for blogs that exist in either flag state, so access here is a permission question (`blog.view` / `seo.view`), not a rollout question — and coupling an SEO destination to a blog-pipeline flag would reshape the SEO sidebar block whenever an unrelated subsystem is toggled.
+
+That decision is what forces the redirects' placement: the seven legacy paths are registered **outside** the flag-gated `/blog-command-centre` route block and outside `BlogCommandCentreLayout` (alongside the existing `/blogs/manage` redirect). Nested inside it they would dead-end at the router catch-all whenever the flag is off, and would hit the layout's `blog.view` denial for a `seo.view`-only operator — even though `/blog-seo` itself is reachable in both cases.
 
 ## Legacy vs current
 

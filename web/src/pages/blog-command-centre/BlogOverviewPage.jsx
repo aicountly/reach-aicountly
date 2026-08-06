@@ -129,7 +129,7 @@ function buildCards(data) {
       key: 'search',
       title: 'Search',
       icon: Search,
-      link: ROUTES.BCC_SEO,
+      link: ROUTES.BLOG_SEO,
       status: searchConsole.status ?? 'DISABLED',
       detail: searchConsole.detail,
       metrics: [

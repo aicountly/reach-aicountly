@@ -45,6 +45,8 @@ import { ApprovalsPage } from './pages/ApprovalsPage';
 
 import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
 import SeoLayout from './pages/seo-centre/SeoLayout.jsx';
+import BlogSeoLayout from './pages/blog-seo/BlogSeoLayout.jsx';
+import { BlogSeoScaffoldPage } from './pages/blog-seo/BlogSeoScaffoldPage.jsx';
 import { SeoOverviewPage } from './pages/seo-centre/SeoOverviewPage.jsx';
 import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx';
 import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
@@ -247,6 +249,20 @@ export default function App() {
         <Route path="/blogs/manage" element={<Navigate to={ROUTES.BLOG_COMMAND_CENTRE} replace />} />
         <Route path="/marketing/blogs" element={<Navigate to={ROUTES.BLOG_COMMAND_CENTRE} replace />} />
 
+        {/* The "SEO and Indexing" section left the Blog Command Centre tab
+            strip for the SEO sidebar block. These live outside the feature
+            flag and outside BlogCommandCentreLayout on purpose: /blog-seo is
+            reachable in both flag states and under seo.view alone, so an old
+            bookmark must resolve there rather than dead-ending at the
+            catch-all or at the BCC layout's blog.view denial. */}
+        <Route path={ROUTES.BCC_SEO} element={<Navigate to={ROUTES.BLOG_SEO} replace />} />
+        <Route path={ROUTES.BCC_SEO_SEARCH} element={<Navigate to={ROUTES.BLOG_SEO_SEARCH} replace />} />
+        <Route path={ROUTES.BCC_SEO_INTERNAL_LINKS} element={<Navigate to={ROUTES.BLOG_SEO_INTERNAL_LINKS} replace />} />
+        <Route path={ROUTES.BCC_SEO_CANNIBALISATION} element={<Navigate to={ROUTES.BLOG_SEO_CANNIBALISATION} replace />} />
+        <Route path={ROUTES.BCC_SEO_SITEMAP} element={<Navigate to={ROUTES.BLOG_SEO_SITEMAP} replace />} />
+        <Route path={ROUTES.BCC_SEO_TECHNICAL} element={<Navigate to={ROUTES.BLOG_SEO_TECHNICAL} replace />} />
+        <Route path={ROUTES.BCC_INDEXING} element={<Navigate to={ROUTES.BLOG_SEO_INDEXING} replace />} />
+
         {/* Blog Command Centre */}
         {isBlogCommandCentreEnabled() && (
         <Route path={ROUTES.BLOG_COMMAND_CENTRE} element={<BlogCommandCentreLayout />}>
@@ -286,14 +302,6 @@ export default function App() {
           <Route path="publishing/rollback" element={<BlogSharedEmbed embed="rollback" />} />
           <Route path="publishing/emergency-unpublish" element={<EmergencyUnpublishPage />} />
           <Route path="published" element={<BlogPublishedManagePage />} />
-
-          <Route path="seo" element={<Navigate to="search" replace />} />
-          <Route path="seo/search" element={<BlogDeepLinkRedirect />} />
-          <Route path="seo/internal-links" element={<BlogScaffoldPage />} />
-          <Route path="seo/cannibalisation" element={<BlogScaffoldPage />} />
-          <Route path="seo/sitemap" element={<BlogDeepLinkRedirect />} />
-          <Route path="seo/technical" element={<BlogScaffoldPage />} />
-          <Route path="indexing" element={<BlogDeepLinkRedirect />} />
 
           <Route path="analytics" element={<Navigate to="portfolio" replace />} />
           <Route path="analytics/portfolio" element={<PortfolioPerformancePage />} />
@@ -516,6 +524,18 @@ export default function App() {
           <Route path="indexnow" element={<IndexNowOperationsPage />} />
           <Route path="sitemap" element={<SitemapOverviewPage />} />
           <Route path="connections" element={<ConnectorConfigPage />} />
+        </Route>
+
+        {/* Blog SEO and Indexing — promoted out of the Blog Command Centre
+            tab strip (its leaves used to redirect into /intelligence/*). */}
+        <Route path={ROUTES.BLOG_SEO} element={<BlogSeoLayout />}>
+          <Route index element={<Navigate to="search-console" replace />} />
+          <Route path="search-console" element={<SearchIntelligencePage />} />
+          <Route path="indexing" element={<IndexNowOperationsPage />} />
+          <Route path="internal-links" element={<BlogSeoScaffoldPage />} />
+          <Route path="cannibalisation" element={<BlogSeoScaffoldPage />} />
+          <Route path="sitemap" element={<SitemapOverviewPage />} />
+          <Route path="technical" element={<BlogSeoScaffoldPage />} />
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
