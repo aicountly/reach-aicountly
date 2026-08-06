@@ -703,20 +703,22 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
 
     /**
      * An active gallery cover tagged so CoverRelevanceScorer can match it to
-     * the fixture article. No binary is needed: assignment reads the row and
-     * hands back a signed URL.
+     * the fixture article. The binary has to exist on disk — assignment skips
+     * rows whose file is gone rather than handing out a URL that 404s.
      *
      * @param list<string> $tags
      */
     private function seedGalleryAsset(array $tags, ?string $stream = null): int
     {
-        $db  = Database::connect();
-        $key = bin2hex(random_bytes(8));
+        $db   = Database::connect();
+        $key  = bin2hex(random_bytes(8));
+        $path = sys_get_temp_dir() . '/e2e-cover-' . $key . '.webp';
+        file_put_contents($path, 'fake-webp-binary');
 
         $db->table('reach_media_gallery_assets')->insert([
             'asset_uuid'       => 'e2e-' . $key,
             'kind'             => 'gallery_upload',
-            'file_path'        => 'media/e2e/' . $key . '.webp',
+            'file_path'        => $path,
             'mime'             => 'image/webp',
             'bytes'            => 2048,
             'checksum_sha256'  => hash('sha256', $key),

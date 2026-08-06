@@ -68,6 +68,36 @@ safeguards keep that off the listing:
    bypass it — after the worker generates the new draft, approve it in Reach and
    publish as usual.
 
+### Where cover binaries live
+
+`MEDIA_STORAGE_PATH` must point at a directory **outside the document root** —
+the same convention as `blog_uploads`:
+
+```bash
+mkdir -p /home/<cpanel-user>/cover_images
+# then in public_html/api/.env:
+MEDIA_STORAGE_PATH=/home/<cpanel-user>/cover_images
+```
+
+Deploys rsync `public_html/api/` with `--delete`. Covers used to live under
+`writable/uploads/`, inside that tree, protected only by a filter rule that
+matched the directory entry and not its contents — so every binary was deleted
+on each release while its database row survived, and the gallery listed images
+that could not be served. A path outside the document root is not reachable by
+that command at all; the filter rules are now belt to that braces.
+
+Existing rows keep their stored absolute path, so changing this setting does
+not orphan anything that is still on disk. Rows whose file is already gone are
+cleared with:
+
+```bash
+php spark reach:media-reconcile          # report
+php spark reach:media-reconcile --fix    # retire them, then re-upload
+```
+
+A retired row leaves the rotation, which also stops the deficit report
+counting covers that do not exist.
+
 ### Cover images
 
 Gallery covers are assigned by topical relevance (`CoverRelevanceScorer`)

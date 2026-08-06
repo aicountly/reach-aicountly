@@ -70,15 +70,21 @@ final class BlogCoverRequirementTest extends ApiTestCase
         return $id;
     }
 
+    /**
+     * The binary must exist: assignment refuses a row whose file is gone,
+     * because a URL that 404s is not a cover.
+     */
     private function seedGalleryAsset(array $tags): int
     {
         $db  = Database::connect();
         $key = bin2hex(random_bytes(8));
+        $path = sys_get_temp_dir() . '/cover-' . $key . '.webp';
+        file_put_contents($path, 'fake-webp-binary');
 
         $db->table('reach_media_gallery_assets')->insert([
             'asset_uuid'      => 'cov-' . $key,
             'kind'            => 'gallery_upload',
-            'file_path'       => 'media/cov/' . $key . '.webp',
+            'file_path'       => $path,
             'mime'            => 'image/webp',
             'bytes'           => 1024,
             'checksum_sha256' => hash('sha256', $key),
