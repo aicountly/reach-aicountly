@@ -204,7 +204,59 @@ class BlogPublicationPayloadBuilder
             'scheduled_at'         => null,
         ];
 
+        $redirects = $this->pendingRedirects($contentItemId);
+        if ($redirects !== []) {
+            $payload['redirects'] = $redirects;
+        }
+
         return $payload;
+    }
+
+    /**
+     * Old URLs the public site should 301 to this post.
+     *
+     * Off by default. reach_publication_redirects has always been written (by
+     * reach:blog-repair-slugs) and never read, so a slug repair followed by a
+     * re-publish moves the post and leaves the previous URL 404ing. This is the
+     * missing half — but whether the receiving site understands a `redirects`
+     * key is a property of a different codebase, so sending it is opt-in:
+     * BLOG_PUBLISH_REDIRECTS_ENABLED must be true.
+     *
+     * Verify with one post before enabling for the rest. If the receiver
+     * ignores unknown fields the flag is harmless; if it validates strictly,
+     * enabling it blindly would fail every publish.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function pendingRedirects(int $contentItemId): array
+    {
+        if (! filter_var(env('BLOG_PUBLISH_REDIRECTS_ENABLED', false), FILTER_VALIDATE_BOOL)) {
+            return [];
+        }
+
+        try {
+            if (! \App\Libraries\Database\SchemaGuard::hasTable($this->db, 'reach_publication_redirects')) {
+                return [];
+            }
+
+            $rows = $this->db->table('reach_publication_redirects')
+                ->select('from_slug, to_slug, to_url, redirect_type')
+                ->where('content_item_id', $contentItemId)
+                ->whereIn('status', ['pending', 'active'])
+                ->orderBy('id', 'ASC')
+                ->get()->getResultArray();
+
+            return array_map(static fn (array $r): array => [
+                'from_path' => '/blogs/' . rawurlencode((string) $r['from_slug']),
+                'to_path'   => '/blogs/' . rawurlencode((string) ($r['to_slug'] ?? '')),
+                'to_url'    => $r['to_url'],
+                'type'      => (int) ($r['redirect_type'] ?? 301),
+            ], $rows);
+        } catch (\Throwable $e) {
+            log_message('warning', 'Redirect payload skipped: ' . $e->getMessage());
+
+            return [];
+        }
     }
 
     /**
