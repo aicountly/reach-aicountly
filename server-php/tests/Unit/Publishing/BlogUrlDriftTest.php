@@ -186,4 +186,44 @@ final class BlogUrlDriftTest extends CIUnitTestCase
         $this->assertStringContainsString("\$this->sparkFlag('record-redirects', \$params)", $source);
         $this->assertStringNotContainsString("CLI::getOption('record-redirects')", $source);
     }
+
+    /**
+     * BlogPublicationPayloadBuilder sends `$seo['slug'] ?? $item['slug']`, so
+     * reach_content_seo_profiles decides the published URL. Predicting a move
+     * from the content item's slug alone is wrong whenever the profile still
+     * holds the old value — the re-publish would then change nothing.
+     */
+    public function testDriftReportsTheSlugThePayloadWouldActuallySend(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString('reach_content_seo_profiles', $source);
+        $this->assertStringContainsString("'publish_slug'", $source);
+        $this->assertStringContainsString("'republish_moves_it'", $source);
+    }
+
+    /**
+     * "recorded 0" must distinguish "already on file" from "the flag was
+     * ignored" — the second is a silent no-op reporting success.
+     */
+    public function testZeroRecordedIsDisambiguated(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString("'redirects_already_on_file'", $source);
+        $this->assertStringContainsString("'matches_this_move'", $source);
+    }
+
+    /**
+     * The payload builder must keep preferring the SEO profile slug; the drift
+     * report's prediction is only correct while that precedence holds.
+     */
+    public function testPayloadSlugPrecedenceIsUnchanged(): void
+    {
+        $source = (string) file_get_contents(
+            APPPATH . 'Libraries/Publishing/Blog/BlogPublicationPayloadBuilder.php'
+        );
+
+        $this->assertStringContainsString("\$seo['slug'] ?? \$item['slug']", $source);
+    }
 }
