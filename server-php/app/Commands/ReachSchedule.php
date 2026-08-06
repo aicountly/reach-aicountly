@@ -123,6 +123,14 @@ class ReachSchedule extends BaseCommand
             ]);
         }
 
+        // 04:00 — pull Search Console facts. Must run before the SEO snapshot at
+        // 05:00, which aggregates exactly the rows this job writes.
+        if ($hour === 4) {
+            $svc->enqueue('reach.search_console_ingest', ['tenant_id' => 1], [
+                'idempotency_key' => "search-console-ingest-{$today}",
+            ]);
+        }
+
         // 05:00 — SEO rank + backlink snapshots (GSC data lags ~2 days)
         if ($hour === 5) {
             $svc->enqueue('reach.seo_snapshot', ['date' => null], [

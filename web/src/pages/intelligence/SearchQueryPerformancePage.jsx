@@ -4,6 +4,7 @@ import { listSearchMetrics } from '../../services/intelligenceService.js';
 
 export default function SearchQueryPerformancePage() {
   const [rows, setRows] = useState([]);
+  const [period, setPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -13,8 +14,9 @@ export default function SearchQueryPerformancePage() {
     listSearchMetrics({ dimension: 'query' })
       .then((data) => {
         if (cancelled) return;
-        const list = Array.isArray(data) ? data : (data?.metrics || data?.data || []);
+        const list = Array.isArray(data) ? data : (data?.rows || data?.metrics || data?.data || []);
         setRows(list);
+        setPeriod(data?.period ?? null);
       })
       .catch((e) => {
         if (!cancelled) setError(e.message || 'Failed to load query metrics');
@@ -33,6 +35,7 @@ export default function SearchQueryPerformancePage() {
           <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Query Performance</h1>
           <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
             Search queries driving traffic to your content
+            {period && <> · {period.from} → {period.to}</>}
           </p>
         </div>
       </div>

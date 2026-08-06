@@ -307,14 +307,82 @@ SEARCH_CONSOLE_DATA_LAG_DAYS=3
 SEARCH_CONSOLE_USE_MOCK=false
 ```
 
-5. Confirm the state on **Overview → Search**. The card distinguishes `DISABLED`,
-   `MISCONFIGURED` (with the precise reason), `MOCK`, and `CONNECTED`. It never shows
-   fabricated figures — if the property returns no rows, the batch is empty and the
-   warning explains why.
+5. Apply the migration that makes the fact table upsertable against live data
+   (widens `country` to alpha-3 and removes the NULLs that broke the unique key):
+
+```bash
+cd /home/<cpanel_user>/reach/server-php
+php spark migrate
+```
+
+6. Diagnose before doing anything else. This makes no writes and no ingest:
+
+```bash
+php spark reach:search-console doctor
+```
+
+   It reports each flag, the credential file state, the service-account
+   `client_email`, and a single `next_step` naming exactly what to fix.
+
+7. Confirm Google actually grants access to the property, then register the
+   connection and run the first health check:
+
+```bash
+php spark reach:search-console properties   # what the service account can read
+php spark reach:search-console register     # creates the stored connection from .env
+php spark reach:search-console health       # live authenticated check
+```
+
+   If `properties` comes back empty, step 3 has not taken effect — the service
+   account is authenticated but has no grant on the property.
+
+8. Map live blog URLs, then pull the first data:
+
+```bash
+php spark reach:search-console sync-identities
+php spark reach:search-console ingest
+php spark reach:search-console backfill --days=90   # optional history
+```
+
+   `sync-identities` is not optional. Search Console reports against URLs, and
+   facts are stored against a content identity; a post with no identity has its
+   rows recorded as *unmapped* and discarded. The ingest job runs this itself
+   before every pull, so newly published posts self-register from then on.
+
+9. Confirm the state on **Overview → Search**. The card distinguishes `DISABLED`,
+   `MISCONFIGURED` (with the precise reason), `MOCK`, and `CONNECTED`, and now also
+   reports how many facts have actually landed in the last 28 days and the freshest
+   day ingested. It never shows fabricated figures — if the property returns no rows,
+   the batch is empty and the warning explains why.
+
+   **A `CONNECTED` card with `facts (28d) 0` is a real state, not a bug**: credentials
+   are fine and nothing has been ingested yet. Run step 8, or wait for the nightly job.
 
 `SEARCH_CONSOLE_DATA_LAG_DAYS` matters: Search Console finalises data on a 2–3 day
 lag, and the connector clamps the requested end date so partial days are never
-ingested as complete.
+ingested as complete. The newest 2–3 days will always be absent by design.
+
+#### Ongoing operation
+
+`reach.search_console_ingest` is enqueued daily at 04:00 by `ReachSchedule`, one
+hour ahead of `reach.seo_snapshot` at 05:00, which aggregates exactly the rows it
+writes. Each run ingests the rolling incremental window for every enabled `gsc`
+connection and advances one 14-day slice of any active backfill.
+
+Verify it is flowing from the UI at **Intelligence → Search**, which shows the
+connector state, recent ingestion runs, and any unmapped URLs; the same actions
+(health check, ingest, backfill, sync identities) are available there as buttons.
+
+#### Which flag does what
+
+| Flag | Effect if false |
+| --- | --- |
+| `SEARCH_CONSOLE_ENABLED` | Connector refuses every call; the ingest job skips and no facts are ever written. |
+| `BLOG_SEARCH_CONSOLE_ENABLED` | Blog Command Centre Overview card reads `DISABLED` regardless of the connector's real state. |
+| `SEARCH_CONSOLE_USE_MOCK=true` | Simulated figures are served instead of real ones; the card reads `MOCK`. |
+
+Set the first two to `true` together. Setting only the blog flag makes the card
+claim `CONNECTED` while nothing ingests.
 
 ### GA4
 
