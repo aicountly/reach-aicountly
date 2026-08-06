@@ -235,6 +235,16 @@ class ReachBlogDiagnose extends BaseCommand
                     'block_type'         => $r['block_type'],
                     'count'              => (int) $r['cnt'],
                 ], $rows);
+
+                // 'processing' is not a state anything reopens, so a handler
+                // that died mid-execute strands the item silently.
+                $snap['stalled_processing_blocks'] = array_map(static fn ($r) => [
+                    'id'              => (int) $r['id'],
+                    'block_type'      => $r['block_type'],
+                    'content_item_id' => (int) ($r['content_item_id'] ?? 0),
+                    'attempt_count'   => (int) ($r['attempt_count'] ?? 0),
+                    'updated_at'      => $r['updated_at'] ?? null,
+                ], (new \App\Libraries\Blog\WorkBlockService())->stalledProcessingBlocks(30, 25));
             } else {
                 $snap['missing_table'][] = 'reach_work_blocks';
             }
@@ -449,6 +459,18 @@ class ReachBlogDiagnose extends BaseCommand
             ];
         }
 
+        $stalled = $db['stalled_processing_blocks'] ?? [];
+        if (is_array($stalled) && $stalled !== []) {
+            $types = array_values(array_unique(array_column($stalled, 'block_type')));
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'work_blocks_stalled_processing',
+                'message'  => count($stalled) . ' work block(s) wedged in "processing" for over 30 minutes ('
+                            . implode(', ', $types) . '). The handler died without marking them failed, and nothing '
+                            . 'reopens "processing" — their content items cannot move. reach:schedule now recovers these.',
+            ];
+        }
+
         $eligible = (int) ($db['topic_candidates']['eligible_for_run'] ?? 0);
         $dailyCap = (int) ($report['roadmap_caps']['daily_cap'] ?? 0);
         if ($eligible === 0) {
@@ -568,6 +590,11 @@ class ReachBlogDiagnose extends BaseCommand
     {
         $actions = [];
         $codes = array_column($report['verdict'] ?? [], 'code');
+
+        if (in_array('work_blocks_stalled_processing', $codes, true)) {
+            $actions[] = 'Recover wedged blocks: php spark reach:schedule   (then re-dispatch: php spark reach:blog-dispatch --force)';
+            $actions[] = 'See why they died: php spark reach:blog-failures';
+        }
 
         if (in_array('candidate_backlog_below_daily_cap', $codes, true)) {
             $actions[] = 'Top up the backlog: php spark reach:blog-discover-topics --limit=10   (needs approved topic clusters in Knowledge)';

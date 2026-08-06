@@ -188,8 +188,19 @@ class WorkBlockService
         // PUBLISH_BLOG applies its own hard high-risk-auto-publish ban internally and
         // does not depend on the general 'automation' flag (it depends on
         // 'public_publisher' + 'auto_publish' specifically).
+        //
+        // It used to return *outside* the try/catch below, so a throwing
+        // publish (most often PublishableContentGuard refusing a stub body)
+        // left the row wedged at 'processing' forever while the job retried to
+        // dead_letter. Nothing reopens 'processing', so the item stayed
+        // publish_queued with no path forward. Route it through the same
+        // failure handling as every other block type.
         if ($blockType === self::TYPE_PUBLISH_BLOG) {
-            return $this->executePublishBlog($id, $block);
+            try {
+                return $this->executePublishBlog($id, $block);
+            } catch (\Throwable $e) {
+                return $this->markFailed($id, $blockType, $e->getMessage());
+            }
         }
 
         if (! $this->flags->isEnabled('automation')) {
@@ -222,9 +233,76 @@ class WorkBlockService
                 self::TYPE_SYNC_ANALYTICS    => $this->executeSyncAnalytics($id, $block),
                 default => $this->blockOnFlag($id, $blockType, 'handler_not_implemented'),
             };
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
+            // Was RuntimeException only, so a TypeError or a database
+            // exception escaped and left the block at 'processing' — an
+            // unrecoverable state, since only 'failed' and 'blocked' are ever
+            // reopened. Any throwable is a failed block.
             return $this->markFailed($id, $blockType, $e->getMessage());
         }
+    }
+
+    /**
+     * Return work blocks wedged in 'processing' — the handler died without
+     * marking them failed, so no reopen path applies. Mirrors the job-queue
+     * lease recovery in `reach:schedule`.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function stalledProcessingBlocks(int $olderThanMinutes = 30, int $limit = 50): array
+    {
+        $cutoff = date('Y-m-d H:i:s', time() - max(1, $olderThanMinutes) * 60);
+
+        return $this->db->table('reach_work_blocks')
+            ->select('id, block_type, content_item_id, content_version_id, attempt_count, started_at, updated_at')
+            ->where('eligibility_status', 'processing')
+            ->where('updated_at <', $cutoff)
+            ->orderBy('id', 'ASC')
+            ->limit($limit)
+            ->get()
+            ->getResultArray();
+    }
+
+    /**
+     * Reopen stalled 'processing' blocks so the dispatcher can retry them,
+     * or fail them for good once they have burned through their attempts.
+     *
+     * @return array{recovered:int,dead_lettered:int,ids:list<int>}
+     */
+    public function recoverStalledProcessingBlocks(
+        int $olderThanMinutes = 30,
+        int $maxAttempts = 3,
+        int $limit = 50,
+    ): array {
+        $recovered = 0;
+        $dead      = 0;
+        $ids       = [];
+        $now       = date('Y-m-d H:i:s');
+
+        foreach ($this->stalledProcessingBlocks($olderThanMinutes, $limit) as $block) {
+            $id       = (int) $block['id'];
+            $attempts = (int) ($block['attempt_count'] ?? 0);
+            $ids[]    = $id;
+
+            if ($attempts >= max(1, $maxAttempts)) {
+                $this->markFailed(
+                    $id,
+                    (string) $block['block_type'],
+                    "stalled_in_processing_after_{$attempts}_attempts",
+                );
+                $dead++;
+                continue;
+            }
+
+            $this->db->table('reach_work_blocks')->where('id', $id)->update([
+                'eligibility_status'     => 'eligible',
+                'failure_classification' => null,
+                'updated_at'             => $now,
+            ]);
+            $recovered++;
+        }
+
+        return ['recovered' => $recovered, 'dead_lettered' => $dead, 'ids' => $ids];
     }
 
     // -------------------------------------------------------------------

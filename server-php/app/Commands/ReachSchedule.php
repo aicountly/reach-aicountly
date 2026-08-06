@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\ParsesSparkOptions;
+use App\Libraries\Blog\WorkBlockService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -34,6 +35,7 @@ class ReachSchedule extends BaseCommand
         $svc = Services::jobService();
         $recovered = $svc->recoverExpiredLeases();
         $pruned    = $svc->pruneOlderThanDays($days);
+        $blocks    = $this->recoverStalledWorkBlocks();
 
         // Dispatch scheduled Phase 2 jobs once per day (idempotent)
         $this->dispatchDailyJobs($svc);
@@ -46,10 +48,40 @@ class ReachSchedule extends BaseCommand
             'recovered' => $recovered,
             'pruned'    => $pruned,
             'prune_days'=> $days,
+            'work_blocks' => $blocks,
             'ai_catalog_seeded' => $aiSeeded,
         ], JSON_UNESCAPED_SLASHES);
         CLI::write($out);
         return 0;
+    }
+
+    /**
+     * Job leases recover here every minute; work blocks did not. A handler
+     * that died mid-execute left its row at 'processing', which nothing
+     * reopens, so the content item stalled permanently while its job
+     * dead-lettered out of sight.
+     *
+     * @return array<string,mixed>
+     */
+    private function recoverStalledWorkBlocks(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('reach_work_blocks')) {
+                return ['recovered' => 0, 'dead_lettered' => 0];
+            }
+
+            $minutes = max(5, (int) env('BLOG_WORK_BLOCK_STALL_MINUTES', 30));
+            $result  = (new WorkBlockService())->recoverStalledProcessingBlocks($minutes);
+
+            unset($result['ids']);
+
+            return $result;
+        } catch (\Throwable $e) {
+            log_message('error', 'reach:schedule work-block recovery failed: ' . $e->getMessage());
+
+            return ['recovered' => 0, 'dead_lettered' => 0, 'error' => mb_substr($e->getMessage(), 0, 120)];
+        }
     }
 
     /**
