@@ -8,6 +8,7 @@ use App\Libraries\Ai\Generation\AiGenerationOrchestrator;
 use App\Libraries\Ai\Generation\AiGenerationRequestService;
 use App\Libraries\Ai\Grounding\AiGroundingContextBuilder;
 use App\Libraries\Ai\Grounding\GroundingSnapshotService;
+use App\Libraries\Ai\ProviderRotationService;
 use App\Libraries\AuditLogger;
 
 /**
@@ -202,6 +203,9 @@ PROMPT;
      */
     private function invokeOrchestrator(string $contentType, string $prompt, array $groundingCtx, ?int $actorId): array
     {
+        $rotation  = new ProviderRotationService();
+        $preferred = $rotation->preferredNext(ProviderRotationService::SCOPE_COMMUNITY_ANSWER);
+
         $requests = new AiGenerationRequestService();
         $request  = $requests->create([
             // Routed via reach_ai_model_routes; reach:ai-seed-catalog seeds
@@ -213,6 +217,11 @@ PROMPT;
                 'answer_schema' => $contentType,
                 'product'       => (string) ($groundingCtx['product'] ?? ''),
                 'jurisdiction'  => (string) ($groundingCtx['jurisdiction'] ?? ''),
+                // Strict OpenAI ⇄ Gemini alternation. Soft hint only: the
+                // router boosts the preferred provider's route but still
+                // falls through to the other one, so a provider outage
+                // degrades to single-provider rather than failing outright.
+                'provider_preference' => $preferred,
             ],
         ], ['type' => 'system', 'user_id' => $actorId]);
 
@@ -221,6 +230,11 @@ PROMPT;
         if (($refreshed['status'] ?? '') !== 'completed') {
             throw new \RuntimeException('community_answer_generation_' . ($refreshed['status'] ?? 'unknown'));
         }
+
+        // Record who actually produced the output, not who we asked for —
+        // a mid-run failover to the other provider counts as that
+        // provider's turn, so the next answer swings back.
+        $this->recordRotationTurn($rotation, (int) $request['id']);
 
         $artifact = db_connect()->table('reach_ai_generation_artifacts')
             ->where('generation_request_id', $request['id'])
@@ -237,6 +251,37 @@ PROMPT;
         ];
 
         return [$aiOutput, $genRefs];
+    }
+
+    /**
+     * Attribute the completed generation to the provider that actually ran it.
+     *
+     * Rotation state must never block a generation that already succeeded, so
+     * a failure to read the run row or write the turn is swallowed — the worst
+     * case is one repeated provider on the next answer.
+     */
+    private function recordRotationTurn(ProviderRotationService $rotation, int $requestId): void
+    {
+        try {
+            $run = db_connect()->table('reach_ai_generation_runs r')
+                ->join('reach_ai_providers p', 'p.id = r.provider_id')
+                ->select('p.provider_key')
+                ->where('r.generation_request_id', $requestId)
+                ->orderBy('r.id', 'DESC')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
+
+            if (! empty($run['provider_key'])) {
+                $rotation->recordActual(
+                    ProviderRotationService::SCOPE_COMMUNITY_ANSWER,
+                    (string) $run['provider_key'],
+                    $requestId,
+                );
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'community answer rotation record failed: ' . $e->getMessage());
+        }
     }
 
     private function mockGenerationOutput(array $question, string $answerType): array

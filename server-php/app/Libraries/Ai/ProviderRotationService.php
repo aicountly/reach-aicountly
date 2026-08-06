@@ -7,19 +7,24 @@ namespace App\Libraries\Ai;
 use CodeIgniter\Database\BaseConnection;
 
 /**
- * Strict OpenAI ⇄ Gemini alternation for scheduled blog generation.
+ * Strict OpenAI ⇄ Gemini alternation for scheduled generation.
  *
  * The preference returned by preferredNext() is a soft routing hint; the
  * provider that actually produced the accepted output is recorded afterwards
  * via recordActual(), so mid-run failover (e.g. OpenAI quota → Gemini) counts
  * as Gemini's turn and the next run swings back to OpenAI.
+ *
+ * Each scope alternates independently — blog drafts and community answers
+ * keep separate turn state, so a busy blog schedule never starves the
+ * community side of one provider or the other.
  */
 class ProviderRotationService
 {
     public const PROVIDER_OPENAI = 'openai';
     public const PROVIDER_GEMINI = 'gemini';
 
-    public const SCOPE_BLOG_DRAFT = 'blog_draft';
+    public const SCOPE_BLOG_DRAFT      = 'blog_draft';
+    public const SCOPE_COMMUNITY_ANSWER = 'community_answer';
 
     private BaseConnection $db;
 
