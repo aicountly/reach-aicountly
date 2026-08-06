@@ -23,6 +23,24 @@ class AiErrorClassifier
             return new AiProviderError(AiProviderError::CATEGORY_AUTHENTICATION, $raw);
         }
 
+        // Must precede the 'invalid request' and 'not found' style branches:
+        // Google phrases a withdrawn model as "This model models/gemini-2.0-flash
+        // is no longer available", which previously fell all the way through to
+        // CATEGORY_UNKNOWN — a category the orchestrator does not fall back on,
+        // so a retired model killed the request instead of routing around it.
+        if (
+            str_contains($msg, 'no longer available')
+            || str_contains($msg, 'model not found')
+            || str_contains($msg, 'is not found')
+            || str_contains($msg, 'does not exist')
+            || str_contains($msg, 'has been deprecated')
+            || str_contains($msg, 'is deprecated')
+            || (str_contains($msg, 'model') && str_contains($msg, 'not supported'))
+            || (str_contains($msg, 'model') && str_contains($msg, 'retired'))
+        ) {
+            return new AiProviderError(AiProviderError::CATEGORY_MODEL_RETIRED, $raw);
+        }
+
         if (str_contains($msg, 'rate limit') || str_contains($msg, '429') || str_contains($msg, 'too many requests')) {
             return new AiProviderError(AiProviderError::CATEGORY_RATE_LIMITED, $raw);
         }
