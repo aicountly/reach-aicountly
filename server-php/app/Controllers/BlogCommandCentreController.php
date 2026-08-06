@@ -10,6 +10,7 @@ use App\Libraries\Blog\BlogPortfolioService;
 use App\Libraries\Blog\Roadmap\ScoringWeights;
 use App\Libraries\Intelligence\Connectors\ConnectorProviderFactory;
 use App\Libraries\Intelligence\Connectors\GoogleSearchConsoleConnector;
+use CodeIgniter\Database\RawSql;
 use Config\Database;
 
 class BlogCommandCentreController extends BaseApiController
@@ -273,7 +274,11 @@ class BlogCommandCentreController extends BaseApiController
             ->select('tc.*, ts.total_score, ts.scored_for_date, ts.trend_7d, ts.trend_28d')
             ->join(
                 'reach_topic_scores ts',
-                'ts.topic_candidate_id = tc.id AND ts.is_current = true',
+                // RawSql, not a plain string: the query builder escapes every
+                // token of a string ON clause as an identifier, so the boolean
+                // literal would compile to `"ts"."is_current" = "true"` and
+                // Postgres rejects it with `column "true" does not exist`.
+                new RawSql('ts.topic_candidate_id = tc.id AND ts.is_current = TRUE'),
                 'left',
             );
 
@@ -285,7 +290,9 @@ class BlogCommandCentreController extends BaseApiController
         }
 
         $total = $builder->countAllResults(false);
-        $rows  = $builder->orderBy('ts.total_score', 'DESC', false)
+        // NULLS LAST keeps not-yet-scored candidates below scored ones;
+        // Postgres sorts NULLs first on DESC by default.
+        $rows  = $builder->orderBy('ts.total_score DESC NULLS LAST', '', false)
             ->orderBy('tc.updated_at', 'DESC')
             ->limit($limit, $offset)
             ->get()
