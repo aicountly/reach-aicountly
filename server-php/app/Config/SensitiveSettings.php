@@ -54,10 +54,37 @@ class SensitiveSettings extends BaseConfig
         'authorization', 'private_key', 'service_account',
     ];
 
+    /**
+     * Keys that contain a sensitive-looking substring but carry no credential.
+     *
+     * 'token' matches token *counts* as readily as auth tokens, so usage
+     * metrics were being stored as "[REDACTED]" — the AI cost and usage
+     * reporting reads these columns, and a redacted count is not a safer
+     * number, it is a missing one. Checked before the substring rules.
+     */
+    public array $neverSensitive = [
+        'total_tokens',
+        'input_tokens',
+        'output_tokens',
+        'prompt_tokens',
+        'completion_tokens',
+        'max_output_tokens',
+        'max_tokens',
+        'max_completion_tokens',
+        'token_count',
+        'tokens',
+        'token_budget',
+        'tokens_used',
+        'tokens_remaining',
+    ];
+
     public function isSensitive(string $key): bool
     {
         $normalised = strtolower(trim($key));
         if ($normalised === '') {
+            return false;
+        }
+        if (in_array($normalised, array_map('strtolower', $this->neverSensitive), true)) {
             return false;
         }
         if (in_array($normalised, array_map('strtolower', $this->keys), true)) {

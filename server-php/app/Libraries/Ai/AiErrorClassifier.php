@@ -27,6 +27,31 @@ class AiErrorClassifier
             return new AiProviderError(AiProviderError::CATEGORY_RATE_LIMITED, $raw);
         }
 
+        // A model the provider has withdrawn. Permanent for *this* model, but
+        // the route's other models may be fine, so it must reach the fallback
+        // resolver rather than dead-ending as 'unknown' — which is what turned
+        // an OpenAI quota failure into eight failed community answers: the hop
+        // to Gemini landed on the retired gemini-2.5-pro and stopped there.
+        //
+        // Runs ahead of the invalid-request rules below, which would otherwise
+        // swallow the 404 Gemini reports this as. Distinct from
+        // provider_unavailable because that category is retryable, and retrying
+        // a withdrawn model spends an attempt on something that can never come
+        // back; this one falls back without retrying.
+        if (str_contains($msg, 'no longer available')
+            || str_contains($msg, 'model not found')
+            || str_contains($msg, 'model_not_found')
+            || str_contains($msg, 'is not found')
+            || str_contains($msg, 'does not exist')
+            || str_contains($msg, 'has been deprecated')
+            || str_contains($msg, 'is deprecated')
+            // Deliberately not "model … not supported": OpenAI phrases a
+            // request-shape rejection that way ("'max_tokens' is not supported
+            // with this model"), which is an adapter bug, not a dead model.
+            || (str_contains($msg, 'model') && str_contains($msg, 'retired'))) {
+            return new AiProviderError(AiProviderError::CATEGORY_MODEL_RETIRED, $raw);
+        }
+
         if (str_contains($msg, 'timeout') || str_contains($msg, 'timed out') || str_contains($msg, 'connection timed')) {
             return new AiProviderError(AiProviderError::CATEGORY_TIMEOUT, $raw);
         }
@@ -55,7 +80,14 @@ class AiErrorClassifier
 
         if (str_contains($msg, 'json_schema') || str_contains($msg, 'response_format')
             || str_contains($msg, 'invalid schema') || str_contains($msg, '400')
-            || str_contains($msg, 'invalid request') || str_contains($msg, 'bad request')) {
+            || str_contains($msg, 'invalid request') || str_contains($msg, 'bad request')
+            // Provider rejected the request shape, not its content — e.g.
+            // "Unsupported parameter: 'max_tokens' is not supported with this
+            // model." Classifying these as 'unknown' hid an adapter bug behind
+            // the vaguest label we have.
+            || str_contains($msg, 'unsupported parameter')
+            || str_contains($msg, 'unsupported value')
+            || str_contains($msg, 'unrecognized request argument')) {
             return new AiProviderError(AiProviderError::CATEGORY_INVALID_REQUEST, $raw);
         }
 

@@ -20,6 +20,7 @@ use App\Models\Refresh\RefreshOutcomeWindowModel;
 use App\Models\Refresh\RefreshPublicationLinkModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
+use App\Libraries\Database\SchemaGuard;
 
 class RefreshOutcomeController extends BaseApiController
 {
@@ -29,7 +30,7 @@ class RefreshOutcomeController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_refresh_outcome_windows')) {
+            if (! SchemaGuard::hasTable($db, 'reach_refresh_outcome_windows')) {
                 return $this->ok([]);
             }
 
@@ -57,7 +58,7 @@ class RefreshOutcomeController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_refresh_outcome_windows')) {
+            if (! SchemaGuard::hasTable($db, 'reach_refresh_outcome_windows')) {
                 return $this->fail('Outcome storage is not available. Run database migrations first.', 503);
             }
 
@@ -68,7 +69,7 @@ class RefreshOutcomeController extends BaseApiController
             }
 
             $metrics = [];
-            if ($db->tableExists('reach_refresh_outcome_metrics')) {
+            if (SchemaGuard::hasTable($db, 'reach_refresh_outcome_metrics')) {
                 $metrics = (new RefreshOutcomeMetricModel())->getForWindow($id);
             }
 
@@ -86,7 +87,7 @@ class RefreshOutcomeController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_refresh_outcome_windows')) {
+            if (! SchemaGuard::hasTable($db, 'reach_refresh_outcome_windows')) {
                 return $this->fail('Outcome storage is not available. Run database migrations first.', 503);
             }
 

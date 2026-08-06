@@ -6,6 +6,7 @@ use App\Controllers\BaseApiController;
 use App\Models\CommunityOfficialIdentityModel;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class OfficialIdentityController extends BaseApiController
 {
@@ -21,7 +22,7 @@ class OfficialIdentityController extends BaseApiController
     {
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_official_identities')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_official_identities')) {
                 return $this->response->setJSON(['data' => []]);
             }
 

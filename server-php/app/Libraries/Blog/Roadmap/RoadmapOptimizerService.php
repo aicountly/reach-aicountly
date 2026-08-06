@@ -7,6 +7,7 @@ use App\Libraries\Blog\BlogPortfolioService;
 use App\Libraries\Blog\WorkBlockService;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Orchestrates one daily roadmap optimisation run: score, decide, and enqueue brief work blocks.
@@ -313,7 +314,7 @@ class RoadmapOptimizerService
 
     private function loadWeights(): ScoringWeights
     {
-        if (! $this->db()->tableExists('reach_roadmap_scoring_weights')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_roadmap_scoring_weights')) {
             return ScoringWeights::defaults();
         }
 
@@ -353,7 +354,7 @@ class RoadmapOptimizerService
 
     private function currentScoreTotal(int $candidateId): ?float
     {
-        if (! $this->db()->tableExists('reach_topic_scores')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_topic_scores')) {
             return null;
         }
 

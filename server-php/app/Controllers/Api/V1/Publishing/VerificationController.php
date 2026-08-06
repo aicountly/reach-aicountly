@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Publishing;
 
 use App\Controllers\Api\V1\BaseApiController;
+use App\Libraries\Database\SchemaGuard;
 
 class VerificationController extends BaseApiController
 {
@@ -11,7 +12,7 @@ class VerificationController extends BaseApiController
         try {
             $db = \Config\Database::connect();
 
-            if (! $db->tableExists('reach_publication_verifications')) {
+            if (! SchemaGuard::hasTable($db, 'reach_publication_verifications')) {
                 return $this->ok([]);
             }
 

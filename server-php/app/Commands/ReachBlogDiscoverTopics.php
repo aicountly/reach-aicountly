@@ -8,6 +8,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:blog-discover-topics` — create topic candidates so the
@@ -116,7 +117,7 @@ class ReachBlogDiscoverTopics extends BaseCommand
     private function seedCandidate(string $title, bool $pin, string $stream): array
     {
         $db = Database::connect();
-        if (! $db->tableExists('reach_topic_candidates')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_candidates')) {
             throw new \RuntimeException('reach_topic_candidates table is missing — run migrations.');
         }
 

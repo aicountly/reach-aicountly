@@ -151,4 +151,85 @@ final class ReachBlogRepairSlugsCommandTest extends DatabaseTestCase
         $this->assertSame('blog-article-title', $this->slugOf($blogId));
         $this->assertSame('article-title', $this->slugOf($kbId), 'Out of scope for --type=blog');
     }
+
+    private function registryPathFor(int $contentItemId): ?string
+    {
+        $row = Database::connect()->table('reach_link_registry')
+            ->where('content_item_id', $contentItemId)
+            ->where('status', 'active')
+            ->get()->getRowArray();
+
+        return $row['url_path'] ?? null;
+    }
+
+    private function seedRegistry(int $contentItemId, string $urlPath): void
+    {
+        Database::connect()->table('reach_link_registry')->insert([
+            'url_path'        => $urlPath,
+            'title'           => 'Seeded',
+            'link_type'       => 'blog',
+            'content_item_id' => $contentItemId,
+        ]);
+    }
+
+    public function testRegistryPathFollowsTheRepairedSlug(): void
+    {
+        // The registry feeds the "Related reading" block of every article
+        // published next, so a stale path ships broken links into new posts.
+        $id = $this->seedItem('MCA annual filing calendar', 'annual-filing-calendar', 'published');
+        $this->seedRegistry($id, '/blogs/annual-filing-calendar');
+
+        command('reach:blog-repair-slugs --apply');
+
+        $this->assertSame('/blogs/mca-annual-filing-calendar', $this->registryPathFor($id));
+    }
+
+    public function testRegistryIsReconciledEvenWhenTheSlugsWereRepairedEarlier(): void
+    {
+        // The state the production database was left in: slugs already moved
+        // by a previous --apply, registry still on the old paths.
+        $id = $this->seedItem('MCA annual filing calendar', 'mca-annual-filing-calendar', 'published');
+        $this->seedRegistry($id, '/blogs/annual-filing-calendar');
+
+        command('reach:blog-repair-slugs --apply');
+
+        $this->assertSame('/blogs/mca-annual-filing-calendar', $this->registryPathFor($id));
+    }
+
+    public function testDryRunLeavesTheRegistryAlone(): void
+    {
+        $id = $this->seedItem('MCA annual filing calendar', 'mca-annual-filing-calendar', 'published');
+        $this->seedRegistry($id, '/blogs/annual-filing-calendar');
+
+        command('reach:blog-repair-slugs');
+
+        $this->assertSame('/blogs/annual-filing-calendar', $this->registryPathFor($id));
+    }
+
+    public function testAStaleDuplicateIsRetiredRatherThanCollidingOnTheUniquePath(): void
+    {
+        // A republish can insert the correct path before reconciliation runs;
+        // url_path is UNIQUE, so the stale row must step aside, not collide.
+        $id = $this->seedItem('MCA annual filing calendar', 'mca-annual-filing-calendar', 'published');
+        $this->seedRegistry($id, '/blogs/annual-filing-calendar');
+        $this->seedRegistry($id, '/blogs/mca-annual-filing-calendar');
+
+        command('reach:blog-repair-slugs --apply');
+
+        $rows = Database::connect()->table('reach_link_registry')
+            ->where('content_item_id', $id)->orderBy('id', 'ASC')->get()->getResultArray();
+
+        $this->assertSame('retired', $rows[0]['status'], 'The stale path is retired');
+        $this->assertSame('active', $rows[1]['status'], 'The correct path stays live');
+    }
+
+    public function testRegistryRowsForOtherContentAreUntouched(): void
+    {
+        $id = $this->seedItem('Plain lowercase title', 'plain-lowercase-title', 'published');
+        $this->seedRegistry($id, '/blogs/plain-lowercase-title');
+
+        command('reach:blog-repair-slugs --apply');
+
+        $this->assertSame('/blogs/plain-lowercase-title', $this->registryPathFor($id));
+    }
 }

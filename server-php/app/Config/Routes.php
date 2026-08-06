@@ -155,8 +155,11 @@ $routes->group('v1', static function ($routes) {
         $routes->get('blog-command-centre/roadmap/optimizer-runs',   'BlogCommandCentreController::optimizerRuns',     ['filter' => 'permission:blog.view']);
         $routes->get('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::scoringWeights',    ['filter' => 'permission:blog.view']);
         $routes->put('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::updateScoringWeights', ['filter' => 'permission:blog.edit']);
-        // Repo-versioned content base (read-only in the console; edited in git)
-        $routes->get('blog/content-base', 'Api\\V1\\Content\\ContentBaseController::index', ['filter' => 'permission:blog.view']);
+        // Repo-versioned content base (read-only in the console; edited in git).
+        // `content-base` is the shared view across blog, KB and community —
+        // `blog/content-base` stays for the Blog Command Centre roadmap tab.
+        $routes->get('content-base',      'Api\\V1\\Content\\ContentBaseController::overview', ['filter' => 'permission:content.view']);
+        $routes->get('blog/content-base', 'Api\\V1\\Content\\ContentBaseController::index',    ['filter' => 'permission:blog.view']);
 
         // Cover-image gallery (Quality Centre)
         $routes->get('media/gallery',            'Api\\V1\\Content\\MediaGalleryController::index',    ['filter' => 'permission:blog.view']);
@@ -827,7 +830,13 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/search/connections/(:num)/ingest',       'Api\\V1\\Intelligence\\SearchConsoleController::ingest/$1',           ['filter' => 'permission:search.ingest']);
         $routes->post('intelligence/search/connections/(:num)/backfill',     'Api\\V1\\Intelligence\\SearchConsoleController::backfill/$1',         ['filter' => 'permission:search.backfill']);
         $routes->get('intelligence/search/connections/(:num)/status',        'Api\\V1\\Intelligence\\SearchConsoleController::status/$1',           ['filter' => 'permission:search.read']);
+        $routes->post('intelligence/search/connections/(:num)/health-check',  'Api\\V1\\Intelligence\\SearchConsoleController::healthCheck/$1',      ['filter' => 'permission:search.read']);
         $routes->get('intelligence/search/metrics',                          'Api\\V1\\Intelligence\\SearchConsoleController::metrics',             ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/config',                           'Api\\V1\\Intelligence\\SearchConsoleController::config',              ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/properties',                       'Api\\V1\\Intelligence\\SearchConsoleController::properties',          ['filter' => 'permission:search.connect']);
+        $routes->get('intelligence/search/runs',                             'Api\\V1\\Intelligence\\SearchConsoleController::runs',                ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/unmapped',                         'Api\\V1\\Intelligence\\SearchConsoleController::unmapped',            ['filter' => 'permission:search.read']);
+        $routes->post('intelligence/search/sync-identities',                 'Api\\V1\\Intelligence\\SearchConsoleController::syncIdentities',      ['filter' => 'permission:search.reconcile']);
 
         // Phase 8: Content Analytics
         $routes->get('intelligence/content/connections',                     'Api\\V1\\Intelligence\\ContentAnalyticsController::connections',      ['filter' => 'permission:analytics.read']);

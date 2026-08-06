@@ -6,6 +6,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Config\Services;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:schedule` — housekeeping for the reach_jobs queue.
@@ -19,6 +20,8 @@ use Config\Services;
  */
 class ReachSchedule extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:schedule';
     protected $description = 'Housekeeping for the reach_jobs queue: recover expired leases and prune old jobs.';
@@ -26,7 +29,7 @@ class ReachSchedule extends BaseCommand
 
     public function run(array $params): int
     {
-        $days = max(1, (int) ($params['prune-days'] ?? CLI::getOption('prune-days') ?? 14));
+        $days = max(1, (int) ($this->sparkOption('prune-days', $params, '14') ?? '14'));
 
         $svc = Services::jobService();
         $recovered = $svc->recoverExpiredLeases();
@@ -57,7 +60,7 @@ class ReachSchedule extends BaseCommand
     {
         try {
             $db = Database::connect();
-            if (! $db->tableExists('reach_ai_model_routes')) {
+            if (! SchemaGuard::hasTable($db, 'reach_ai_model_routes')) {
                 return false;
             }
             $count = (int) $db->table('reach_ai_model_routes')
@@ -119,6 +122,14 @@ class ReachSchedule extends BaseCommand
             $svc->enqueue('reach.gallery_deficit_alert', ['date' => $today], [
                 'queue'           => 'notifications',
                 'idempotency_key' => "gallery-deficit-{$today}",
+            ]);
+        }
+
+        // 04:00 — pull Search Console facts. Must run before the SEO snapshot at
+        // 05:00, which aggregates exactly the rows this job writes.
+        if ($hour === 4) {
+            $svc->enqueue('reach.search_console_ingest', ['tenant_id' => 1], [
+                'idempotency_key' => "search-console-ingest-{$today}",
             ]);
         }
 

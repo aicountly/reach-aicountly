@@ -140,6 +140,8 @@ class PublicationRollbackService
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
 
+        $this->retireRegistryEntry((int) $deployment['content_item_id']);
+
         AuditLogger::record('publishing.unpublished', [
             'deployment_id'    => $deploymentId,
             'public_content_id'=> $publicContentId,
@@ -147,5 +149,43 @@ class PublicationRollbackService
         ], $authorisedBy);
 
         return true;
+    }
+
+    /**
+     * Take the article out of the internal-link registry when it goes down.
+     *
+     * PublicationDeploymentService records a `/blogs/<slug>` entry on publish,
+     * and nothing ever called LinkRegistryService::retire() — so a taken-down
+     * article stayed 'active' and remained eligible for the "Related reading"
+     * block that BlogPublicationPayloadBuilder writes into every article it
+     * publishes next. New posts would have carried links to a dead URL.
+     *
+     * Rollback deliberately does not do this: a rolled-back article is still
+     * live at the same URL, just showing a prior version.
+     */
+    private function retireRegistryEntry(int $contentItemId): void
+    {
+        if ($contentItemId <= 0) {
+            return;
+        }
+
+        try {
+            $item = $this->db->table('reach_content_items')
+                ->select('slug, content_type')
+                ->where('id', $contentItemId)
+                ->get()->getRowArray() ?? [];
+
+            $slug = (string) ($item['slug'] ?? '');
+            if ($slug === '') {
+                return;
+            }
+
+            $prefix = ($item['content_type'] ?? 'blog') === 'knowledge_base' ? '/help/' : '/blogs/';
+            (new \App\Libraries\Publishing\LinkRegistryService($this->db))
+                ->retire($prefix . rawurlencode($slug));
+        } catch (\Throwable $e) {
+            // Never fail a takedown because the registry could not be updated.
+            log_message('warning', 'Link registry retire skipped: ' . $e->getMessage());
+        }
     }
 }

@@ -44,6 +44,7 @@ import { BotReportDetailPage } from './pages/bot/BotReportDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 
 import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
+import { ContentBasePage as QualityContentBasePage } from './pages/quality/ContentBasePage.jsx';
 import SeoLayout from './pages/seo-centre/SeoLayout.jsx';
 import BlogSeoLayout from './pages/blog-seo/BlogSeoLayout.jsx';
 import { BlogSeoScaffoldPage } from './pages/blog-seo/BlogSeoScaffoldPage.jsx';
@@ -510,8 +511,9 @@ export default function App() {
           <Route path="operations" element={<VideoOperationsDashboardPage />} />
         </Route>
 
-        {/* Quality Centre — cover gallery + content base */}
+        {/* Quality Centre — assets shared across blog, KB and community */}
         <Route path="/quality/gallery" element={<MediaGalleryPage />} />
+        <Route path="/quality/content-base" element={<QualityContentBasePage />} />
 
         {/* SEO Command Centre */}
         <Route path="/seo-centre" element={<SeoLayout />}>

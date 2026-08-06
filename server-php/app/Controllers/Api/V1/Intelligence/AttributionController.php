@@ -11,6 +11,7 @@ use App\Models\Intelligence\AttributionTouchpointModel;
 use App\Models\Intelligence\AttributionConversionLinkModel;
 use App\Models\Intelligence\AttributionCalculationVersionModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class AttributionController extends BaseApiController
 {
@@ -30,7 +31,7 @@ class AttributionController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_attribution_conversion_links')) {
+            if (! SchemaGuard::hasTable($db, 'reach_attribution_conversion_links')) {
                 return $this->response->setJSON(['data' => $empty]);
             }
 
@@ -66,7 +67,7 @@ class AttributionController extends BaseApiController
             $rate = $total > 0 ? round(($attributed / $total) * 100, 1) : 0.0;
 
             $channelRows = [];
-            if ($db->tableExists('reach_attribution_touchpoints')) {
+            if (SchemaGuard::hasTable($db, 'reach_attribution_touchpoints')) {
                 $channelRows = $db->query(
                     "SELECT
                         COALESCE(NULLIF(TRIM(reach_attribution_touchpoints.channel), ''), NULLIF(TRIM(reach_attribution_touchpoints.utm_source), ''), 'Unknown') AS channel,
@@ -96,7 +97,7 @@ class AttributionController extends BaseApiController
             }, $channelRows);
 
             $latest = null;
-            if ($db->tableExists('reach_attribution_calculation_versions')) {
+            if (SchemaGuard::hasTable($db, 'reach_attribution_calculation_versions')) {
                 $calcModel = new AttributionCalculationVersionModel();
                 $latest    = $calcModel->where('tenant_id', $tenantId)->orderBy('calculated_at', 'DESC')->first();
             }
@@ -151,7 +152,7 @@ class AttributionController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_attribution_conversion_links')) {
+            if (! SchemaGuard::hasTable($db, 'reach_attribution_conversion_links')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -199,7 +200,7 @@ class AttributionController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_utm_templates')) {
+            if (! SchemaGuard::hasTable($db, 'reach_utm_templates')) {
                 return $this->response->setJSON(['data' => []]);
             }
 

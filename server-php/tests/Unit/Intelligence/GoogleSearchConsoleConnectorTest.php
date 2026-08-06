@@ -187,7 +187,11 @@ final class GoogleSearchConsoleConnectorTest extends CIUnitTestCase
         $this->assertSame(14, $row['clicks']);
         $this->assertSame(420, $row['impressions']);
         $this->assertSame(6.79, $row['avg_position']);
-        $this->assertNull($row['device']);
+        // An unrequested dimension is a sentinel, not NULL: device is part of
+        // uq_search_metric_fact, and a NULL there stops the unique index from
+        // matching so re-ingesting a day would duplicate rather than restate.
+        $this->assertSame('UNKNOWN', $row['device']);
+        $this->assertSame('ZZZ', $row['country']);
     }
 
     public function testRowNormalisationFallsBackToWindowDateWhenDateMissing(): void

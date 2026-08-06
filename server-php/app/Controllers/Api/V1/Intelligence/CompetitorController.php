@@ -10,6 +10,7 @@ use App\Models\Intelligence\CompetitorModel;
 use App\Models\Intelligence\CompetitorAliasModel;
 use App\Models\Intelligence\CompetitorObservationAggregateModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class CompetitorController extends BaseApiController
 {
@@ -19,7 +20,7 @@ class CompetitorController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_competitors')) {
+            if (! SchemaGuard::hasTable($db, 'reach_competitors')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -38,7 +39,7 @@ class CompetitorController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_competitors')) {
+            if (! SchemaGuard::hasTable($db, 'reach_competitors')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Competitor storage is not available yet. Run database migrations first.',
                 ]);

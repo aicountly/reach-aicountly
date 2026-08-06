@@ -10,6 +10,7 @@ use App\Libraries\Distribution\SuppressionService;
 use App\Enums\SuppressionReason;
 use App\Models\Distribution\ChannelSuppressionModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class SuppressionController extends BaseApiController
 {
@@ -36,7 +37,7 @@ class SuppressionController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_channel_suppressions')) {
+            if (! SchemaGuard::hasTable($db, 'reach_channel_suppressions')) {
                 return $this->ok([
                     'data'     => [],
                     'total'    => 0,

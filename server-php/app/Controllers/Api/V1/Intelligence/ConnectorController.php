@@ -6,9 +6,11 @@ namespace App\Controllers\Api\V1\Intelligence;
 
 use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
+use App\Libraries\Intelligence\Connectors\ConnectorProviderFactory;
 use App\Models\Intelligence\AnalyticsConnectionModel;
 use App\Models\Intelligence\ConnectorHealthModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class ConnectorController extends BaseApiController
 {
@@ -18,7 +20,7 @@ class ConnectorController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -53,7 +55,7 @@ class ConnectorController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Connector storage is not available yet. Run database migrations first.',
                 ]);
@@ -155,7 +157,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
@@ -176,7 +178,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
@@ -186,20 +188,35 @@ class ConnectorController extends BaseApiController
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
+            // Actually ask the provider. This used to record 'unknown' and log a
+            // "health check passed" audit event without contacting anything, so
+            // a broken connector looked indistinguishable from an unchecked one.
+            $probe = $this->probe($conn);
+
             $health = [
                 'connection_id' => $id,
-                'status'        => 'unknown',
+                'status'        => $probe['status'],
                 'checked_at'    => date('Y-m-d H:i:s'),
             ];
 
-            if ($db->tableExists('reach_connector_health')) {
-                $healthModel = new ConnectorHealthModel();
-                $healthId    = $healthModel->insert($health);
-                $health      = $healthModel->find($healthId) ?: $health;
+            if (SchemaGuard::hasTable($db, 'reach_connector_health')) {
+                try {
+                    $healthModel = new ConnectorHealthModel();
+                    $healthId    = $healthModel->insert($health);
+                    $health      = $healthModel->find($healthId) ?: $health;
+                } catch (\Throwable $e) {
+                    log_message('error', 'ConnectorController::healthCheck record: ' . $e->getMessage());
+                }
             }
 
+            $health['detail']     = $probe['detail'];
+            $health['latency_ms'] = $probe['latency_ms'];
+
             try {
-                $model->update($id, ['last_health_check_at' => date('Y-m-d H:i:s')]);
+                $model->update($id, [
+                    'health_status'        => $probe['status'],
+                    'last_health_check_at' => date('Y-m-d H:i:s'),
+                ]);
             } catch (\Throwable $e) {
                 log_message('error', 'ConnectorController::healthCheck update: ' . $e->getMessage());
             }
@@ -207,12 +224,14 @@ class ConnectorController extends BaseApiController
             try {
                 (new AuditLogger())->log(
                     null,
-                    AuditLogger::CONNECTOR_HEALTH_CHECK_PASSED,
+                    $probe['healthy']
+                        ? AuditLogger::CONNECTOR_HEALTH_CHECK_PASSED
+                        : AuditLogger::CONNECTOR_HEALTH_CHECK_FAILED,
                     'analytics_connection',
                     $id,
                     null,
-                    null,
-                    null,
+                    ['status' => $probe['status']],
+                    $probe['healthy'] ? null : ['detail' => $probe['detail']],
                     'system'
                 );
             } catch (\Throwable $e) {
@@ -226,11 +245,56 @@ class ConnectorController extends BaseApiController
         }
     }
 
+    /**
+     * Contact the provider behind a stored connection.
+     *
+     * Providers without a live client yet report 'unknown' with a reason rather
+     * than a green tick — an unimplemented check is not a passing check.
+     *
+     * @param array<string, mixed> $conn
+     * @return array{healthy: bool, status: string, detail: string, latency_ms: ?int}
+     */
+    private function probe(array $conn): array
+    {
+        $provider = strtolower((string) ($conn['provider'] ?? ''));
+
+        if ($provider !== 'gsc') {
+            return [
+                'healthy'    => false,
+                'status'     => 'unknown',
+                'detail'     => 'No live health probe is implemented for provider "' . $provider . '" yet.',
+                'latency_ms' => null,
+            ];
+        }
+
+        try {
+            $result = ConnectorProviderFactory::searchConsole((string) ($conn['site_property'] ?? ''))->healthCheck();
+
+            return [
+                'healthy'    => $result->healthy,
+                'status'     => $result->healthy ? 'healthy' : 'failing',
+                'detail'     => $result->healthy
+                    ? 'Authenticated and the property is readable.'
+                    : (string) $result->errorMessage,
+                'latency_ms' => $result->latencyMs,
+            ];
+        } catch (\Throwable $e) {
+            log_message('error', 'ConnectorController::probe: ' . $e->getMessage());
+
+            return [
+                'healthy'    => false,
+                'status'     => 'failing',
+                'detail'     => $e->getMessage(),
+                'latency_ms' => null,
+            ];
+        }
+    }
+
     public function disable(int $id): ResponseInterface
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
@@ -268,7 +332,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 

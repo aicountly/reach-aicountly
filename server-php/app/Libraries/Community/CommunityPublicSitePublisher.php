@@ -173,10 +173,18 @@ class CommunityPublicSitePublisher implements CommunityPublisherInterface
         $requestId   = ($body['request_id'] ?? '') ?: $this->generateRequestId();
         $idempotency = $body['idempotency_key'] ?? $requestId;
 
+        // The receiver derives the signed path from parse_url(REQUEST_URI,
+        // PHP_URL_PATH), which drops the query string. Every other endpoint
+        // here is query-less so the distinction never showed up, but
+        // getChanges() carries ?since=&limit= — signing the query too made
+        // its signature unverifiable and every change-feed pull failed auth.
+        // Sign the path only; the request still goes to the full URL.
+        $signedPath = parse_url($path, PHP_URL_PATH) ?: $path;
+
         $headers = $requireAuth
             ? $this->signer->buildAuthHeaders(
                 $method,
-                $path,
+                $signedPath,
                 $rawBody,
                 $idempotency,
                 $requestId,
@@ -234,15 +242,29 @@ class CommunityPublicSitePublisher implements CommunityPublisherInterface
         }
 
         $category = $this->classifier->classifyHttpStatus($httpStatus);
-        return $this->errorResult($category, $httpStatus);
+
+        // The receiver already returns a specific, already-safe reason —
+        // "Field 'body' is empty after sanitisation.", "Unknown community
+        // category." — and discarding it in favour of a status-derived
+        // generic ("Payload validation failed on the public site.") turns a
+        // one-line fix into a debugging session. Its messages are built for
+        // this purpose and never carry request content.
+        return $this->errorResult($category, $httpStatus, is_array($decoded) ? $decoded : null);
     }
 
-    private function errorResult(string $category, int $httpStatus = 0): array
+    private function errorResult(string $category, int $httpStatus = 0, ?array $response = null): array
     {
+        $remote = is_string($response['safe_error_message'] ?? null)
+            ? trim($response['safe_error_message'])
+            : '';
+
         return [
             'success'            => false,
             'error_category'     => $category,
-            'safe_error_message' => $this->classifier->safeMessage($category, $httpStatus),
+            'safe_error_message' => $remote !== ''
+                ? $remote
+                : $this->classifier->safeMessage($category, $httpStatus),
+            'remote_error_code'  => $response['error_code'] ?? null,
         ];
     }
 

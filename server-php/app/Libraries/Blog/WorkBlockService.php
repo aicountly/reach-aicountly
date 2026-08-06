@@ -26,6 +26,7 @@ use App\Libraries\Publishing\Seo\SeoReadinessService;
 use App\Models\Content\ContentBriefModel;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Work-block planning and execution layer for blog automation.
@@ -973,13 +974,25 @@ class WorkBlockService
     }
 
     /**
-     * Cover image for a fact-verified draft. Pipeline items generate one via
-     * the same provider family that wrote the text (openai → gpt-image-1,
-     * gemini → Nano Banana Pro); Claude-routine items are assigned a cover
-     * from the curated gallery instead of spending on AI images. The binary
-     * is persisted through MediaAssetStore and exposed as a signed public
-     * URL that aicountly.com's HeroImageFetcher can pull. Failures never
-     * stall the chain: SEO_OPTIMIZE is always chained afterwards.
+     * Cover image for a fact-verified draft.
+     *
+     * Source order is gallery-first, generation-second. Claude-routine items
+     * are assigned a topically matched cover from the curated gallery instead
+     * of spending on AI images; pipeline items generate one via the same
+     * provider family that wrote the text (openai → gpt-image-1, gemini →
+     * Nano Banana Pro), and fall back to the gallery when that leg is
+     * unavailable. The binary is persisted through MediaAssetStore and exposed
+     * as a signed public URL that aicountly.com's HeroImageFetcher can pull.
+     *
+     * BLOG_IMAGE_GENERATION_ENABLED gates the PAID leg only — it used to
+     * return before the gallery branch, so an operator who chose "gallery, not
+     * API" silently got no cover at all.
+     *
+     * Outcome handling (BLOG_REQUIRE_COVER_IMAGE, default on): a cover that
+     * cannot be sourced parks the item for a human instead of walking on to
+     * publication — recordCoverVerdict() writes the cover_image validation and
+     * moves the item into the review queue. With the flag off the old
+     * behaviour returns: warn, chain SEO, publish without a hero.
      *
      * @param array<string,mixed> $block
      * @return array<string,mixed>
@@ -989,16 +1002,6 @@ class WorkBlockService
         $contentItemId    = (int) ($block['content_item_id'] ?? 0);
         $contentVersionId = (int) ($block['content_version_id'] ?? 0);
 
-        if (! $this->flags->isEnabled('image_generation')) {
-            // Part of the main chain now: a disabled flag skips the image but
-            // must not dead-end the item (mirrors the FACT_VERIFY skip path).
-            $this->chainSeoOptimize($contentItemId, $contentVersionId);
-            $output = ['skipped' => true, 'reason' => 'image_generation_disabled'];
-            $this->markCompleted($id, $output);
-
-            return $output;
-        }
-
         $item    = $contentItemId > 0
             ? ($this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [])
             : [];
@@ -1006,6 +1009,7 @@ class WorkBlockService
             ? ($this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [])
             : [];
         $galleryMiss = null;
+        $aiEnabled   = $this->flags->isEnabled('image_generation');
 
         // Claude-routine drafts try the curated gallery first (rotation-managed),
         // not AI generation — 12+ blogs/day of AI covers is exactly the spend
@@ -1013,18 +1017,35 @@ class WorkBlockService
         // relevant we fall through to AI generation rather than fronting the
         // article with an unrelated stock photo; that costs one image on the
         // rare miss instead of every post.
-        if (($details['origin'] ?? 'pipeline') === 'claude_routine') {
+        //
+        // Pipeline items take the same route whenever the paid leg is switched
+        // off: a curated cover always beats no cover.
+        $galleryFirst = ($details['origin'] ?? 'pipeline') === 'claude_routine' || ! $aiEnabled;
+
+        if ($galleryFirst && $contentItemId > 0) {
             $output = $this->assignGalleryCover($contentItemId, $item, $details);
-            $aiFallback = filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL);
+            $aiFallback = $aiEnabled
+                && filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL);
 
-            if (empty($output['image_failed']) || ! $aiFallback) {
-                $this->chainSeoOptimize($contentItemId, $contentVersionId);
-                $this->markCompleted($id, $output);
+            if (empty($output['image_failed'])) {
+                return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
+            }
 
-                return $output;
+            if (! $aiFallback) {
+                return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
             }
 
             $galleryMiss = $output;
+        }
+
+        if (! $aiEnabled) {
+            // Nothing left to try: no gallery match (or no item to match) and
+            // the paid leg is off by configuration.
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
+                'image_failed' => true,
+                'reason'       => 'image_generation_disabled',
+                'gallery_miss' => $galleryMiss,
+            ]));
         }
 
         $input  = $this->decodeInput($block);
@@ -1046,21 +1067,31 @@ class WorkBlockService
             );
         }
         if ($prompt === '') {
-            $this->chainSeoOptimize($contentItemId, $contentVersionId);
-            $output = array_filter(['image_failed' => true, 'reason' => 'no_prompt_available', 'gallery_miss' => $galleryMiss]);
-            $this->markCompleted($id, $output);
-
-            return $output;
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
+                'image_failed' => true,
+                'reason'       => 'no_prompt_available',
+                'gallery_miss' => $galleryMiss,
+            ]));
         }
 
         $registry   = new ImageProviderRegistry();
         $configured = array_keys($registry->configuredProviders());
         if ($configured === []) {
-            $this->chainSeoOptimize($contentItemId, $contentVersionId);
-            $output = array_filter(['image_failed' => true, 'reason' => 'no_image_provider_configured', 'gallery_miss' => $galleryMiss]);
-            $this->markCompleted($id, $output);
+            // The paid leg is enabled but unusable. A curated cover is still
+            // better than none, so try the gallery before parking the item.
+            if ($galleryMiss === null && $contentItemId > 0) {
+                $fallback = $this->assignGalleryCover($contentItemId, $item, $details);
+                if (empty($fallback['image_failed'])) {
+                    return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $fallback);
+                }
+                $galleryMiss = $fallback;
+            }
 
-            return $output;
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
+                'image_failed' => true,
+                'reason'       => 'no_image_provider_configured',
+                'gallery_miss' => $galleryMiss,
+            ]));
         }
 
         // Same provider family as the text generator.
@@ -1126,19 +1157,150 @@ class WorkBlockService
                 'gallery_miss' => $galleryMiss,
             ], static fn ($v) => $v !== null);
         } catch (\Throwable $e) {
-            // Image trouble must never stall publication.
-            $output = array_filter([
-                'image_failed' => true,
-                'reason'       => mb_substr($e->getMessage(), 0, 200),
-                'provider_key' => $providerKey,
-                'gallery_miss' => $galleryMiss,
-            ], static fn ($v) => $v !== null);
+            // The provider failed. Fall back to the gallery before giving up —
+            // a curated cover beats parking the article over a transient 5xx.
+            $fallback = $galleryMiss === null && $contentItemId > 0
+                ? $this->assignGalleryCover($contentItemId, $item, $details)
+                : null;
+
+            if ($fallback !== null && empty($fallback['image_failed'])) {
+                $fallback['generation_error'] = mb_substr($e->getMessage(), 0, 200);
+                $output = $fallback;
+            } else {
+                $output = array_filter([
+                    'image_failed' => true,
+                    'reason'       => mb_substr($e->getMessage(), 0, 200),
+                    'provider_key' => $providerKey,
+                    'gallery_miss' => $galleryMiss ?? $fallback,
+                ], static fn ($v) => $v !== null);
+            }
         }
 
-        $this->chainSeoOptimize($contentItemId, $contentVersionId);
+        return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
+    }
+
+    /**
+     * Single exit for the cover block: record the verdict, then either let the
+     * chain continue or park the item for a human.
+     *
+     * A cover is "suitable" by construction — the gallery only assigns assets
+     * that clear MEDIA_GALLERY_MIN_RELEVANCE against the article's category,
+     * stream, tags and title, and a generated cover is drawn from the
+     * article's own title/summary. So "no cover" and "no suitable cover" are
+     * the same condition here, and both stop the walk to publication.
+     *
+     * @param array<string,mixed> $output
+     * @return array<string,mixed>
+     */
+    private function finishImageBlock(int $id, int $contentItemId, int $contentVersionId, array $output): array
+    {
+        $hasCover = empty($output['image_failed']);
+        $required = $this->flags->isEnabled('require_cover_image');
+
+        if ($contentItemId > 0) {
+            $this->recordCoverVerdict($contentItemId, $contentVersionId, $hasCover, $output);
+        }
+
+        if ($hasCover || ! $required || $contentItemId <= 0) {
+            // Historical behaviour: image trouble never stalls publication.
+            $this->chainSeoOptimize($contentItemId, $contentVersionId);
+            if (! $hasCover) {
+                $output['cover_required'] = false;
+            }
+            $this->markCompleted($id, $output);
+
+            return $output;
+        }
+
+        // Deliberately NOT chaining SEO_OPTIMIZE: that is the step that walks
+        // the item towards seo_review → cross review → publish. Parking here
+        // is what keeps a coverless article off aicountly.com.
+        $output['cover_required'] = true;
+        $output['parked']         = $this->parkForCoverReview($contentItemId, $output);
         $this->markCompleted($id, $output);
 
         return $output;
+    }
+
+    /**
+     * Record the cover outcome as a content validation.
+     *
+     * `failed` here is load-bearing: BlogReadinessService gate 6 blocks
+     * publication on any unwaived failed validation, so every publish path —
+     * automated dispatch, scheduled release, or a human hitting Publish —
+     * refuses the item until a cover exists. A superadmin who genuinely wants
+     * a coverless post waives it with a reason, which is audited.
+     *
+     * @param array<string,mixed> $output
+     */
+    private function recordCoverVerdict(int $contentItemId, int $contentVersionId, bool $hasCover, array $output): void
+    {
+        $required = $this->flags->isEnabled('require_cover_image');
+        $reason   = (string) ($output['reason'] ?? 'no_cover_assigned');
+
+        // Not required → a miss is advisory, so it must not block gate 6.
+        $status = $hasCover ? 'passed' : ($required ? 'failed' : 'warning');
+        $message = $hasCover
+            ? 'Cover image assigned' . (isset($output['relevance_score'])
+                ? ' from the gallery (relevance ' . $output['relevance_score'] . ')'
+                : ' by generation')
+            : 'No suitable cover image could be sourced: ' . $reason;
+
+        try {
+            (new \App\Libraries\ContentValidationService())->storeResult(
+                $contentItemId,
+                'cover_image',
+                $status,
+                [
+                    'version_id' => $contentVersionId > 0 ? $contentVersionId : null,
+                    'message'    => mb_substr($message, 0, 500),
+                    'details'    => $output,
+                ],
+            );
+        } catch (\Throwable) {
+            // Bookkeeping only — the parking transition below is what actually
+            // holds the item, and it must not depend on this write.
+        }
+    }
+
+    /**
+     * Move a coverless article into the human queue and say why.
+     *
+     * internal_review is the Blog Command Centre review queue and has no
+     * NEXT_WORK_BLOCK successor, so automation stops dead here until a person
+     * either supplies a cover (re-running the cover block clears the
+     * validation) or waives it.
+     *
+     * @param array<string,mixed> $output
+     */
+    private function parkForCoverReview(int $contentItemId, array $output): bool
+    {
+        $parked = false;
+
+        try {
+            (new BlogStateMachine($this))->transition(
+                $contentItemId,
+                BlogStateMachine::INTERNAL_REVIEW,
+                null,
+                ['reason' => 'cover_image_missing'],
+            );
+            $parked = true;
+        } catch (\Throwable) {
+            // Already past internal_review (or in a state that cannot reach
+            // it). The failed cover_image validation still blocks publication.
+        }
+
+        try {
+            \App\Libraries\AuditLogger::record('blog.cover_missing_parked', [
+                'content_item_id' => $contentItemId,
+                'reason'          => (string) ($output['reason'] ?? 'no_cover_assigned'),
+                'gallery_miss'    => $output['gallery_miss'] ?? null,
+                'parked'          => $parked,
+            ]);
+        } catch (\Throwable) {
+        }
+
+        return $parked;
     }
 
     /**
@@ -1610,6 +1772,14 @@ class WorkBlockService
             }
         } catch (\Throwable) {
         }
+
+        // Derived publication data, created here because nothing guarantees an
+        // item reached this block through SEO_OPTIMIZE. Seven items sat in
+        // publish_queued with no SEO or publication profile at all, so every
+        // dispatch failed the readiness gate with "SEO profile is missing" and
+        // no amount of re-queuing could ever clear it. The call only fills
+        // fields that are absent — it never overwrites authored SEO.
+        $this->ensurePublicationProfilesForItem($contentItemId);
 
         $connectionKey = (new \App\Libraries\Publishing\PublicationConnectionService())
             ->resolveBlogConnectionKey();
@@ -2086,9 +2256,12 @@ class WorkBlockService
             0,
             320,
         );
-        if (mb_strlen($metaDescription) < 100) {
-            $metaDescription = str_pad($metaDescription, 100, '.');
-        }
+        // Deliberately not padded to a minimum length. This used to
+        // str_pad(..., 100, '.'), which silenced a *warning* — a short meta
+        // description has never been a blocking gate — by writing a run of
+        // dots into the description that ships to the public page and into
+        // search results. A short description is better than a padded one;
+        // SeoReadinessService still flags it for a human to improve.
 
         $seo = $this->db->table('reach_content_seo_profiles')
             ->where('content_item_id', $contentItemId)->get()->getRowArray();
@@ -2235,7 +2408,7 @@ class WorkBlockService
         }
 
         // Prefer schema errors — provider runs often "completed" while request failed validation.
-        if ($this->db->tableExists('reach_ai_generation_artifacts')) {
+        if (SchemaGuard::hasTable($this->db, 'reach_ai_generation_artifacts')) {
             $artifact = $this->db->table('reach_ai_generation_artifacts')
                 ->select('schema_validation_status, schema_validation_errors')
                 ->where('generation_request_id', $generationRequestId)
@@ -2253,7 +2426,7 @@ class WorkBlockService
             }
         }
 
-        if (! $this->db->tableExists('reach_ai_generation_runs')) {
+        if (! SchemaGuard::hasTable($this->db, 'reach_ai_generation_runs')) {
             return '';
         }
 

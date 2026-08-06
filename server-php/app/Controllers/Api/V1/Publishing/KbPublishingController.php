@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Publishing;
 
 use App\Controllers\Api\V1\BaseApiController;
+use App\Libraries\Database\SchemaGuard;
 
 class KbPublishingController extends BaseApiController
 {
@@ -12,8 +13,8 @@ class KbPublishingController extends BaseApiController
             $db = \Config\Database::connect();
 
             if (
-                ! $db->tableExists('reach_publication_deployments')
-                || ! $db->tableExists('reach_content_items')
+                ! SchemaGuard::hasTable($db, 'reach_publication_deployments')
+                || ! SchemaGuard::hasTable($db, 'reach_content_items')
             ) {
                 return $this->ok([]);
             }
@@ -29,7 +30,7 @@ class KbPublishingController extends BaseApiController
                 )
                 ->where('reach_content_items.content_type', 'knowledge_base');
 
-            if ($db->tableExists('reach_kb_publication_profiles')) {
+            if (SchemaGuard::hasTable($db, 'reach_kb_publication_profiles')) {
                 $select .= ', reach_kb_publication_profiles.article_type AS article_type';
                 $builder->join(
                     'reach_kb_publication_profiles',

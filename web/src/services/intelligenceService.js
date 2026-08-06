@@ -87,6 +87,48 @@ export function listSearchMetrics(params = {}) {
   return api.get('v1/intelligence/search/metrics', params);
 }
 
+export function listSearchConnections(params = {}) {
+  return api.get('v1/intelligence/search/connections', params);
+}
+
+/** Credential/property diagnosis — why the connector is or is not usable. */
+export function getSearchConsoleConfig() {
+  return api.get('v1/intelligence/search/config');
+}
+
+/** Properties the service account can actually read, straight from Google. */
+export function listSearchConsoleProperties() {
+  return api.get('v1/intelligence/search/properties');
+}
+
+export function checkSearchConnection(id) {
+  return api.post(`v1/intelligence/search/connections/${id}/health-check`);
+}
+
+export function getSearchConnectionStatus(id) {
+  return api.get(`v1/intelligence/search/connections/${id}/status`);
+}
+
+export function ingestSearchConnection(id) {
+  return api.post(`v1/intelligence/search/connections/${id}/ingest`);
+}
+
+export function backfillSearchConnection(id, days = 90) {
+  return api.post(`v1/intelligence/search/connections/${id}/backfill`, { days });
+}
+
+export function listSearchIngestionRuns(params = {}) {
+  return api.get('v1/intelligence/search/runs', params);
+}
+
+export function listUnmappedSearchUrls(params = {}) {
+  return api.get('v1/intelligence/search/unmapped', params);
+}
+
+export function syncContentIdentities(body = {}) {
+  return api.post('v1/intelligence/search/sync-identities', body);
+}
+
 export function listContentMetrics(params = {}) {
   return api.get('v1/intelligence/content/metrics', params);
 }

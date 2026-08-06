@@ -9,6 +9,7 @@ use App\Libraries\Community\CommunityPublicationVerificationService;
 use App\Libraries\Community\CommunityPublicationReconciliationService;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class CommunityDeploymentController extends BaseApiController
 {
@@ -37,7 +38,7 @@ class CommunityDeploymentController extends BaseApiController
 
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_deployments')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_deployments')) {
                 return $this->response->setJSON($empty);
             }
 
@@ -50,7 +51,7 @@ class CommunityDeploymentController extends BaseApiController
                 ->orderBy('reach_community_deployments.created_at', 'DESC')
                 ->limit($perPage, $offset);
 
-            if ($db->tableExists('reach_community_official_answers')) {
+            if (SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
                 $builder->select(
                     'reach_community_deployments.*, '
                     . 'reach_community_official_answers.uuid AS answer_uuid'

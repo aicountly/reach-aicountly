@@ -23,6 +23,51 @@ final class CommunityRiskTierTest extends TestCase
         }
     }
 
+    /**
+     * fromQuestion() sets a floor the generation agent may raise but never
+     * lower. Generation used to assign the model's own risk_classification
+     * straight onto the answer, so a tier-2 question whose draft came back
+     * "low" was stored as tier 2 with classification low — the pair
+     * disagreeing, and the classification saying the answer needs no
+     * professional approval.
+     */
+    public function testRaisedToNeverLowersTheTier(): void
+    {
+        $regulatory = CommunityRiskTier::Regulatory;
+
+        // A model assessing lower must not move it.
+        $this->assertSame($regulatory, $regulatory->raisedTo(CommunityRiskTier::ProductUsage));
+        $this->assertSame($regulatory, $regulatory->raisedTo(CommunityRiskTier::GeneralEducation));
+        $this->assertSame($regulatory, $regulatory->raisedTo($regulatory));
+
+        // Assessing higher must move it — the model has read the draft.
+        $this->assertSame(
+            CommunityRiskTier::IndividualAdvice,
+            $regulatory->raisedTo(CommunityRiskTier::IndividualAdvice),
+        );
+        $this->assertSame(
+            CommunityRiskTier::Prohibited,
+            $regulatory->raisedTo(CommunityRiskTier::Prohibited),
+        );
+    }
+
+    /**
+     * The specific regression: a "low" assessment on a tier-2 answer must
+     * leave both halves of the pair saying professional approval is required.
+     */
+    public function testALowAssessmentCannotStripProfessionalApprovalFromARegulatoryAnswer(): void
+    {
+        $resolved = CommunityRiskTier::Regulatory
+            ->raisedTo(CommunityRiskTier::fromClassification('low'));
+
+        $this->assertTrue($resolved->requiresProfessionalApproval());
+        $this->assertSame(
+            CommunityRiskClassification::High,
+            $resolved->toClassification(),
+            'The stored classification must round-trip to the same tier, not to low.',
+        );
+    }
+
     public function testOnlyRegulatoryAndIndividualAdviceRequireProfessionalApproval(): void
     {
         $this->assertFalse(CommunityRiskTier::ProductUsage->requiresProfessionalApproval());

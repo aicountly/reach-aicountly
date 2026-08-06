@@ -12,6 +12,13 @@ interface SearchConsoleConnectorInterface
 {
     public function providerName(): string;
     public function isEnabled(): bool;
+
+    /** The property this connector instance currently reads. */
+    public function siteProperty(): string;
+
+    /** A connector bound to a stored connection's property rather than the env default. */
+    public function forSiteProperty(string $siteProperty): self;
+
     public function healthCheck(): ConnectorHealthResult;
     public function getCapabilities(): array;
     public function fetchSearchMetrics(IngestionRequest $request): MetricBatch;

@@ -5,6 +5,7 @@ namespace App\Controllers\Api\V1\Publishing;
 use App\Controllers\Api\V1\BaseApiController;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 use App\Libraries\AuditLogger;
+use App\Libraries\Database\SchemaGuard;
 
 class ConnectionController extends BaseApiController
 {
@@ -18,7 +19,7 @@ class ConnectionController extends BaseApiController
         try {
             $db = $this->db();
 
-            if (! $db->tableExists('reach_publication_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_publication_connections')) {
                 return $this->ok([]);
             }
 
@@ -50,7 +51,7 @@ class ConnectionController extends BaseApiController
         try {
             $db = $this->db();
 
-            if (! $db->tableExists('reach_publication_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_publication_connections')) {
                 return $this->notFound('Connection not found');
             }
 

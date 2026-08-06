@@ -32,6 +32,9 @@ class GoogleSearchConsoleConnector implements SearchConsoleConnectorInterface
     public const STATUS_ERROR         = 'error';
     public const STATUS_NO_DATA       = 'no_data';
 
+    /** Sentinel for rows Search Console returned without a country dimension. */
+    public const COUNTRY_UNKNOWN = 'ZZZ';
+
     private const SCOPE       = 'https://www.googleapis.com/auth/webmasters.readonly';
     private const API_BASE    = 'https://searchconsole.googleapis.com/webmasters/v3';
     private const MAX_ROWS    = 25000;
@@ -61,6 +64,35 @@ class GoogleSearchConsoleConnector implements SearchConsoleConnectorInterface
     public function providerName(): string
     {
         return 'google_search_console';
+    }
+
+    public function siteProperty(): string
+    {
+        return $this->siteProperty;
+    }
+
+    /**
+     * A copy of this connector bound to a specific property.
+     *
+     * Stored connections (reach_analytics_connections.site_property) are the
+     * source of truth once a property is registered; the env value is only the
+     * bootstrap default. Credentials stay env-only either way — a property name
+     * is not a secret, a service-account key is.
+     */
+    public function forSiteProperty(string $siteProperty): self
+    {
+        $siteProperty = trim($siteProperty);
+        if ($siteProperty === '' || $siteProperty === $this->siteProperty) {
+            return $this;
+        }
+
+        return new self(
+            enabled: $this->enabled,
+            keyPath: $this->keyPath,
+            siteProperty: $siteProperty,
+            dataLagDays: $this->dataLagDays,
+            timeout: $this->timeout,
+        );
     }
 
     public function isEnabled(): bool
@@ -359,12 +391,27 @@ class GoogleSearchConsoleConnector implements SearchConsoleConnectorInterface
             $byDimension[$dimension] = $keys[$index] ?? null;
         }
 
+        // Dimension keys double as the fact table's uniqueness key. NULLs are
+        // never equal to each other in a Postgres unique index, so an absent
+        // dimension must become an explicit sentinel or re-ingesting the same
+        // day would append duplicate rows instead of updating them.
+        $device = strtoupper(trim((string) ($byDimension['device'] ?? '')));
+        if (! in_array($device, ['DESKTOP', 'MOBILE', 'TABLET', 'SMARTTV'], true)) {
+            $device = 'UNKNOWN';
+        }
+
+        // Search Console reports countries as ISO-3166-1 alpha-3 ("ind", "usa").
+        $country = strtoupper(trim((string) ($byDimension['country'] ?? '')));
+        if (! preg_match('/^[A-Z]{3}$/', $country)) {
+            $country = self::COUNTRY_UNKNOWN;
+        }
+
         return [
             'metric_date'  => $byDimension['date'] ?? $fallbackDate,
             'page_url'     => $byDimension['page'] ?? null,
-            'query'        => $byDimension['query'] ?? null,
-            'device'       => $byDimension['device'] ?? null,
-            'country'      => $byDimension['country'] ?? null,
+            'query'        => (string) ($byDimension['query'] ?? ''),
+            'device'       => $device,
+            'country'      => $country,
             'clicks'       => (int) ($row['clicks'] ?? 0),
             'impressions'  => (int) ($row['impressions'] ?? 0),
             'ctr'          => round((float) ($row['ctr'] ?? 0), 6),

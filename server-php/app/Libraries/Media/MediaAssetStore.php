@@ -96,7 +96,12 @@ class MediaAssetStore
      */
     public function publicUrl(array $asset): string
     {
-        $base = rtrim((string) env('REACH_PUBLIC_BASE_URL', 'https://reach.aicountly.org'), '/');
+        // REACH_APP_URL is the portal's public identity and is already
+        // required; REACH_PUBLIC_BASE_URL stays as an override for the rare
+        // deployment that serves media from a different host.
+        $base = rtrim((string) (env('REACH_PUBLIC_BASE_URL')
+            ?: env('REACH_APP_URL')
+            ?: 'https://reach.aicountly.org'), '/');
         $ext  = $asset['mime'] === 'image/webp' ? 'webp' : 'img';
 
         return $base . '/api/v1/public/media/' . $asset['asset_uuid'] . '.' . $ext
@@ -138,9 +143,46 @@ class MediaAssetStore
         ]);
     }
 
+    /**
+     * Where cover binaries live.
+     *
+     * Defaults inside the application's writable/ directory, but production
+     * should point MEDIA_STORAGE_PATH at a directory OUTSIDE the document root
+     * (e.g. /home/<user>/cover_images, alongside the blog_uploads convention).
+     * Deploys rsync the API directory with --delete; anything under it is one
+     * filter-rule mistake away from being erased, which is exactly how every
+     * uploaded cover was deleted while its database row survived. A path
+     * outside the deploy tree cannot be reached by that command at all.
+     */
+    public function storagePath(): string
+    {
+        $configured = trim((string) env('MEDIA_STORAGE_PATH', ''));
+
+        return $configured !== ''
+            ? rtrim($configured, '/') . '/'
+            : rtrim(WRITEPATH, '/') . '/uploads/media/covers/';
+    }
+
+    /**
+     * Can this instance actually store an upload? A configured path that does
+     * not exist yet is fine as long as it can be created.
+     */
+    public function storageWritable(): bool
+    {
+        $path = rtrim($this->storagePath(), '/');
+
+        if (is_dir($path)) {
+            return is_writable($path);
+        }
+
+        $parent = dirname($path);
+
+        return is_dir($parent) && is_writable($parent);
+    }
+
     private function baseDir(): string
     {
-        return rtrim(WRITEPATH, '/') . '/uploads/media/covers/';
+        return $this->storagePath();
     }
 
     private function generateUuid(): string

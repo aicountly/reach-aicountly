@@ -30,10 +30,12 @@ class OfficialAnswerPublishingService
         private readonly OfficialAnswerApprovalService  $approval       = new OfficialAnswerApprovalService(),
         private readonly CommunityDeploymentModel       $deployModel    = new CommunityDeploymentModel(),
         private readonly CommunityAnswerApprovalModel    $approvalModel  = new CommunityAnswerApprovalModel(),
-        private CommunityPublisherInterface              $publisher      = new CommunityPublicSitePublisher()
+        private CommunityPublisherInterface              $publisher      = new CommunityPublicSitePublisher(),
+        private ?CommunityPublicRecordProvisioner        $provisioner    = null,
     ) {
         // Allow factory injection for test environments
-        $this->publisher = CommunityPublisherFactory::create();
+        $this->publisher   = CommunityPublisherFactory::create();
+        $this->provisioner ??= new CommunityPublicRecordProvisioner($this->publisher);
     }
 
     /**
@@ -175,6 +177,11 @@ class OfficialAnswerPublishingService
         ], $actorId);
 
         try {
+            // The receiver publishes an answer that already exists; it does not
+            // create one. Identity, question and answer must be upserted first
+            // or the publish call 404s.
+            $this->provisioner->ensureAnswerExists($answer, $version);
+
             $envelope = $this->buildPublishEnvelope($answer, $version, $idempotency);
             $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);
 
@@ -281,6 +288,29 @@ class OfficialAnswerPublishingService
             'attempt_count' => $attempts,
             'updated_at'    => date('Y-m-d H:i:s'),
         ]);
+
+        // Same ordering requirement as the first attempt — and if the original
+        // failure was the missing public records, this is what fixes it.
+        try {
+            $this->provisioner->ensureAnswerExists($answer, $version);
+        } catch (\RuntimeException $e) {
+            $exhausted = $attempts >= $maxAttempts;
+            $this->deployModel->update($deploymentId, [
+                'status'              => $exhausted ? 'dead_letter' : 'retrying',
+                'attempt_count'       => $attempts,
+                'last_error'          => substr($e->getMessage(), 0, 500),
+                'last_error_category' => 'provisioning_failed',
+                'next_retry_at'       => $exhausted ? null : date('Y-m-d H:i:s', time() + $this->backoffSeconds($attempts)),
+                'updated_at'          => date('Y-m-d H:i:s'),
+            ]);
+
+            return [
+                'success'  => false,
+                'outcome'  => $exhausted ? 'dead_letter' : 'retrying',
+                'attempts' => $attempts,
+                'safe_error_message' => $e->getMessage(),
+            ];
+        }
 
         $envelope = $this->buildPublishEnvelope($answer, $version, (string) $deployment['idempotency_key']);
         $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);
@@ -407,6 +437,12 @@ class OfficialAnswerPublishingService
             'response_checksum' => $result['payload_checksum'] ?? null,
             'deployed_at'      => date('Y-m-d H:i:s'),
             'updated_at'       => date('Y-m-d H:i:s'),
+            // Clear the failure from the attempt this retry just superseded.
+            // A succeeded row carrying last_error = "provisioning failed"
+            // reads as a half-broken publication to whoever looks next.
+            'last_error'          => null,
+            'last_error_category' => null,
+            'next_retry_at'       => null,
         ]);
 
         $this->answerRepo->save([

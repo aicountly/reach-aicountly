@@ -10,6 +10,7 @@ use App\Models\Intelligence\ContentIdentityModel;
 use App\Models\Intelligence\SitemapSnapshotModel;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class SitemapController extends BaseApiController
 {
@@ -34,7 +35,7 @@ class SitemapController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_sitemap_snapshots')) {
+            if (! SchemaGuard::hasTable($db, 'reach_sitemap_snapshots')) {
                 return $this->response->setJSON([
                     'data'    => null,
                     'message' => 'No snapshot found',
@@ -62,7 +63,7 @@ class SitemapController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_sitemap_snapshots')) {
+            if (! SchemaGuard::hasTable($db, 'reach_sitemap_snapshots')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Sitemap storage is not available yet. Run database migrations first.',
                 ]);

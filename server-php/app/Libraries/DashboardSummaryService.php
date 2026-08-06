@@ -4,6 +4,7 @@ namespace App\Libraries;
 
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Builds the marketing dashboard summary from the tables that actually hold
@@ -68,12 +69,6 @@ class DashboardSummaryService
     ];
 
     private BaseConnection $db;
-
-    /** @var array<string, bool> memoised tableExists() lookups */
-    private array $tables = [];
-
-    /** @var array<string, list<string>> memoised column lists */
-    private array $columns = [];
 
     public function __construct(?BaseConnection $db = null)
     {
@@ -504,26 +499,20 @@ class DashboardSummaryService
 
     private function hasTable(string $table): bool
     {
-        return $this->tables[$table] ??= $this->db->tableExists($table);
+        // Not memoised locally: `??=` would also cache a false, turning a
+        // table that appears later into a permanent "missing" for this
+        // instance. SchemaGuard memoises the positives and re-probes the rest.
+        return SchemaGuard::hasTable($this->db, $table);
     }
 
     /**
-     * getFieldNames() answers from the connection's cached column list, which
-     * can predate columns added by later migrations (reach_blog_posts gained
-     * content_item_id in 100063). Read the field data instead so a column the
-     * dedupe depends on is never wrongly reported as missing.
+     * This used to read getFieldData() directly to dodge the connection's
+     * cached column list, which can predate columns added by later migrations
+     * (reach_blog_posts gained content_item_id in 100063). SchemaGuard does
+     * that for every caller now.
      */
     private function columnExists(string $table, string $column): bool
     {
-        if (! $this->hasTable($table)) {
-            return false;
-        }
-
-        $names = $this->columns[$table] ??= array_map(
-            static fn ($field) => $field->name,
-            $this->db->getFieldData($table),
-        );
-
-        return in_array($column, $names, true);
+        return SchemaGuard::hasColumn($this->db, $table, $column);
     }
 }

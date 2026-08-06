@@ -6,6 +6,7 @@ namespace App\Controllers\Api\V1\Content;
 
 use App\Controllers\Api\V1\BaseApiController;
 use App\Libraries\Blog\ContentBaseService;
+use App\Libraries\Content\ContentBaseOverviewService;
 
 /**
  * Read-only console view of the repo-versioned content base. Edits happen in
@@ -13,6 +14,19 @@ use App\Libraries\Blog\ContentBaseService;
  */
 class ContentBaseController extends BaseApiController
 {
+    /**
+     * The whole base — blog, knowledge base and community Q&A — in one shape.
+     *
+     * The base has always fed all three surfaces; only the blog half was ever
+     * visible, and only from inside the Blog Command Centre. This is the
+     * surface-neutral view Quality Centre links to.
+     */
+    public function overview()
+    {
+        return $this->ok((new ContentBaseOverviewService())->overview());
+    }
+
+    /** Blog-only view, kept for the Blog Command Centre roadmap tab. */
     public function index()
     {
         $service = new ContentBaseService();
