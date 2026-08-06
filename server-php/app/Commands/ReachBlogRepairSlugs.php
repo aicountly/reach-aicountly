@@ -106,13 +106,14 @@ class ReachBlogRepairSlugs extends BaseCommand
 
             if ($repairs === []) {
                 CLI::write('No corrupted slugs found.', 'green');
-
-                return EXIT_SUCCESS;
+            } else {
+                $this->report($repairs, $apply);
             }
 
-            $this->report($repairs, $apply);
-
             if (! $apply) {
+                // The reconciliation pass reads current slugs, so it reports
+                // truthfully whether or not repairs happen in this run.
+                $this->reportLinkFallout($db, false);
                 CLI::newLine();
                 CLI::write('Dry run — nothing written. Re-run with --apply to commit.', 'yellow');
 
@@ -164,6 +165,11 @@ class ReachBlogRepairSlugs extends BaseCommand
             CLI::newLine();
             CLI::write(sprintf('Repaired %d slug(s); recorded %d redirect(s).', $written, $redirects), 'green');
 
+            // Must run even when this pass repaired nothing: an earlier --apply
+            // moved the slugs on, leaving the registry pointing at URLs that no
+            // longer belong to anything.
+            $this->reportLinkFallout($db, true);
+
             if ($redirects > 0) {
                 CLI::write(
                     'Redirect rows are recorded as "pending". Nothing in this repo serves '
@@ -179,6 +185,103 @@ class ReachBlogRepairSlugs extends BaseCommand
 
             return EXIT_ERROR;
         }
+    }
+
+    /**
+     * Reconcile everything else that stores a slug-derived URL.
+     *
+     * Repairing reach_content_items.slug is not the whole job. The internal
+     * link registry holds `/blogs/<slug>` per published item, and
+     * BlogPublicationPayloadBuilder feeds those paths straight into the
+     * "Related reading" block of every article it publishes next — so a stale
+     * registry means new posts ship with links to URLs that no longer belong
+     * to anything.
+     *
+     * Reconciliation is by content_item_id against the item's current slug, so
+     * this is re-runnable and also repairs a database where the slugs were
+     * moved by an earlier --apply.
+     */
+    private function reportLinkFallout($db, bool $apply): void
+    {
+        if (! SchemaGuard::hasTable($db, 'reach_link_registry')) {
+            return;
+        }
+
+        $rows = $db->table('reach_link_registry')
+            ->select(
+                'reach_link_registry.id, reach_link_registry.url_path, reach_link_registry.link_type, '
+                . 'reach_content_items.slug, reach_content_items.content_type'
+            )
+            ->join(
+                'reach_content_items',
+                'reach_content_items.id = reach_link_registry.content_item_id',
+                'inner',
+            )
+            ->whereIn('reach_link_registry.link_type', ['blog', 'knowledge_base'])
+            ->get()
+            ->getResultArray();
+
+        $stale = [];
+        foreach ($rows as $row) {
+            $slug = (string) ($row['slug'] ?? '');
+            if ($slug === '') {
+                continue;
+            }
+            $prefix   = ($row['content_type'] ?? 'blog') === 'knowledge_base' ? '/help/' : '/blogs/';
+            $expected = $prefix . rawurlencode($slug);
+
+            if ($expected !== ($row['url_path'] ?? '')) {
+                $stale[] = ['id' => (int) $row['id'], 'from' => (string) $row['url_path'], 'to' => $expected];
+            }
+        }
+
+        if ($stale === []) {
+            return;
+        }
+
+        CLI::newLine();
+        CLI::write(sprintf(
+            '%s %d internal-link registry path(s) left pointing at the old URLs:',
+            $apply ? 'Reconciling' : 'Found',
+            count($stale),
+        ), $apply ? 'green' : 'yellow');
+        CLI::table(
+            array_map(static fn ($s) => [$s['id'], $s['from'], $s['to']], $stale),
+            ['#', 'from', 'to'],
+        );
+
+        if (! $apply) {
+            return;
+        }
+
+        foreach ($stale as $row) {
+            // url_path is UNIQUE. If a republish already inserted the correct
+            // path, the stale row is a duplicate — retire it rather than
+            // collide, so the registry keeps exactly one live path per item.
+            $clash = $db->table('reach_link_registry')
+                ->where('url_path', $row['to'])
+                ->where('id !=', $row['id'])
+                ->countAllResults() > 0;
+
+            if ($clash) {
+                $db->table('reach_link_registry')
+                    ->where('id', $row['id'])
+                    ->update(['status' => 'retired', 'updated_at' => date('Y-m-d H:i:s')]);
+
+                continue;
+            }
+
+            $db->table('reach_link_registry')
+                ->where('id', $row['id'])
+                ->update(['url_path' => $row['to'], 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+
+        CLI::write('Registry reconciled — newly published posts will link to the repaired URLs.', 'green');
+        CLI::write(
+            'Bodies already published still contain the old links; those resolve only once '
+            . 'the redirects are live on the public site.',
+            'yellow',
+        );
     }
 
     /**
