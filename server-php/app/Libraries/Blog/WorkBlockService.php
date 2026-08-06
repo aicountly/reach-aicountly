@@ -1429,6 +1429,46 @@ class WorkBlockService
         ]);
     }
 
+    /**
+     * Queue cover-image generation for an item that never got one.
+     *
+     * GENERATE_IMAGE is normally the FACT_VERIFIED successor, so an item that
+     * reached publish_queued without passing through that transition has no
+     * cover and no queued work to produce one — it just fails the publication
+     * gate forever. Same idempotency key as the successor path, so this
+     * re-opens an existing block rather than stacking duplicates.
+     */
+    public function chainGenerateImage(int $contentItemId, int $contentVersionId = 0): ?int
+    {
+        if ($contentItemId <= 0) {
+            return null;
+        }
+
+        $key      = "blog-{$contentItemId}-fact_verified-" . self::TYPE_GENERATE_IMAGE;
+        $existing = $this->db->table('reach_work_blocks')->where('idempotency_key', $key)->get()->getRowArray();
+
+        if ($existing) {
+            $this->db->table('reach_work_blocks')->where('id', (int) $existing['id'])->update([
+                'eligibility_status' => 'eligible',
+                'content_version_id' => $contentVersionId > 0 ? $contentVersionId : ($existing['content_version_id'] ?? null),
+                'updated_at'         => date('Y-m-d H:i:s'),
+            ]);
+
+            return (int) $existing['id'];
+        }
+
+        $id = $this->create([
+            'block_type'         => self::TYPE_GENERATE_IMAGE,
+            'scope'              => 'blog',
+            'content_item_id'    => $contentItemId,
+            'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
+            'idempotency_key'    => $key,
+            'eligibility_status' => 'eligible',
+        ]);
+
+        return $id;
+    }
+
     /** Real rule-based SEO readiness scoring (no AI fabrication). */
     private function executeSeoOptimize(int $id, array $block): array
     {

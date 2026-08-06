@@ -449,12 +449,18 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         [$contentItemId] = $this->buildMinimalDraftFixture('high');
         $sm = new BlogStateMachine($this->workBlocks);
 
-        // Walk the legal adjacency path from draft; the approval gate fires only
-        // on the transition into published/live (assertPublishAllowed).
+        // This test isolates one gate: the approval check on the transition
+        // into published/live (assertPublishAllowed). Walking there through
+        // publish_queued no longer works, and correctly so — that transition
+        // now requires full publication readiness, which this deliberately
+        // minimal fixture does not have. Placing the item directly in
+        // publishing keeps the test on the gate it is named for instead of
+        // building a publication-ready fixture to exercise an unrelated one.
         $sm->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, []);
         $sm->transition($contentItemId, BlogStateMachine::APPROVED, null, []);
-        $sm->transition($contentItemId, BlogStateMachine::PUBLISH_QUEUED, null, []);
-        $sm->transition($contentItemId, BlogStateMachine::PUBLISHING, null, []);
+        Database::connect()->table('reach_content_items')
+            ->where('id', $contentItemId)
+            ->update(['workflow_status' => BlogStateMachine::PUBLISHING]);
 
         try {
             $sm->transition($contentItemId, BlogStateMachine::PUBLISHED, null, []);
