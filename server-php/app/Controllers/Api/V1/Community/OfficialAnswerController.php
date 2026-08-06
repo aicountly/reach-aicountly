@@ -9,6 +9,7 @@ use App\Libraries\Community\OfficialAnswerRepository;
 use CodeIgniter\HTTP\ResponseInterface;
 use InvalidArgumentException;
 use RuntimeException;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Official answer HTTP surface.
@@ -37,7 +38,7 @@ class OfficialAnswerController extends BaseApiController
 
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_official_answers')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
                 return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
             }
 

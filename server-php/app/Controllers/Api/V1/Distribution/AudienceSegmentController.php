@@ -10,6 +10,7 @@ use App\Libraries\Distribution\AudienceSegmentService;
 use App\Models\Distribution\AudienceSegmentModel;
 use App\Models\Distribution\AudienceSegmentRuleModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class AudienceSegmentController extends BaseApiController
 {
@@ -38,7 +39,7 @@ class AudienceSegmentController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_audience_segments')) {
+            if (! SchemaGuard::hasTable($db, 'reach_audience_segments')) {
                 return $this->ok(['data' => []]);
             }
 

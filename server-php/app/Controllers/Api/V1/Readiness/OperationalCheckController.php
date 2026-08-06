@@ -8,6 +8,7 @@ use App\Controllers\BaseApiController;
 use App\Libraries\Refresh\ReleaseAcceptanceService;
 use App\Models\Refresh\OperationalReadinessCheckModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class OperationalCheckController extends BaseApiController
 {
@@ -29,7 +30,7 @@ class OperationalCheckController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_operational_readiness_checks')) {
+            if (! SchemaGuard::hasTable($db, 'reach_operational_readiness_checks')) {
                 return $this->ok([]);
             }
 
@@ -52,7 +53,7 @@ class OperationalCheckController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_operational_readiness_checks')) {
+            if (! SchemaGuard::hasTable($db, 'reach_operational_readiness_checks')) {
                 return $this->fail('Operational check storage is not available. Run database migrations first.', 503);
             }
 
@@ -117,7 +118,7 @@ class OperationalCheckController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_operational_readiness_checks')) {
+            if (! SchemaGuard::hasTable($db, 'reach_operational_readiness_checks')) {
                 return $this->fail('Operational check storage is not available. Run database migrations first.', 503);
             }
 

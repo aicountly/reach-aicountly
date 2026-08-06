@@ -8,6 +8,7 @@ use App\Controllers\BaseApiController;
 use App\Libraries\Video\VideoIdeaRepository;
 use App\Libraries\Video\VideoIdeationService;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class VideoIdeaController extends BaseApiController
 {
@@ -60,7 +61,7 @@ class VideoIdeaController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_video_ideas')) {
+            if (! SchemaGuard::hasTable($db, 'reach_video_ideas')) {
                 return $this->ok($this->emptyList($page, $perPage));
             }
 

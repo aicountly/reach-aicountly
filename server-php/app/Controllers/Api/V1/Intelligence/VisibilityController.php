@@ -11,6 +11,7 @@ use App\Models\Intelligence\AiVisibilityPromptVersionModel;
 use App\Models\Intelligence\AiVisibilityRunModel;
 use App\Models\Intelligence\AiVisibilityObservationModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class VisibilityController extends BaseApiController
 {
@@ -113,7 +114,7 @@ class VisibilityController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_ai_visibility_runs')) {
+            if (! SchemaGuard::hasTable($db, 'reach_ai_visibility_runs')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -132,8 +133,8 @@ class VisibilityController extends BaseApiController
         try {
             $db = \Config\Database::connect();
             if (
-                ! $db->tableExists('reach_ai_visibility_observations')
-                || ! $db->tableExists('reach_ai_visibility_runs')
+                ! SchemaGuard::hasTable($db, 'reach_ai_visibility_observations')
+                || ! SchemaGuard::hasTable($db, 'reach_ai_visibility_runs')
             ) {
                 return $this->response->setJSON(['data' => []]);
             }

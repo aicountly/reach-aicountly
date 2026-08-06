@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Video;
 
 use App\Libraries\AuditLogger;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Phase 6 CP8 — YouTube connection service.
@@ -40,7 +41,7 @@ class VideoConnectionService
     public function listConnections(int $tenantId): array
     {
         $db = \Config\Database::connect();
-        if (! $db->tableExists('reach_publication_connections')) {
+        if (! SchemaGuard::hasTable($db, 'reach_publication_connections')) {
             return [];
         }
 
@@ -49,7 +50,7 @@ class VideoConnectionService
             ->where('enabled', true)
             ->orderBy('created_at', 'DESC');
 
-        if ($db->fieldExists('tenant_id', 'reach_publication_connections')) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'tenant_id')) {
             $builder->where('tenant_id', $tenantId);
         }
 
@@ -66,7 +67,7 @@ class VideoConnectionService
     public function create(int $tenantId, array $data, ?int $actorId = null): array
     {
         $db = \Config\Database::connect();
-        if (! $db->tableExists('reach_publication_connections')) {
+        if (! SchemaGuard::hasTable($db, 'reach_publication_connections')) {
             throw new \RuntimeException('Publication connections table is not available');
         }
 
@@ -86,20 +87,20 @@ class VideoConnectionService
             'supported_content_types' => json_encode(['video']),
         ];
 
-        if ($db->fieldExists('uuid', 'reach_publication_connections')) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'uuid')) {
             $row['uuid'] = $uuid;
         }
-        if ($db->fieldExists('tenant_id', 'reach_publication_connections')) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'tenant_id')) {
             $row['tenant_id'] = $tenantId;
         }
-        if ($db->fieldExists('credentials', 'reach_publication_connections')) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'credentials')) {
             $row['credentials'] = json_encode([
                 'channel_id'    => $data['channel_id'] ?? '',
                 'access_token'  => '[REDACTED]',
                 'refresh_token' => '[REDACTED]',
             ]);
         }
-        if ($db->fieldExists('created_by', 'reach_publication_connections') && $actorId !== null) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'created_by') && $actorId !== null) {
             $row['created_by'] = $actorId;
         }
 
@@ -154,14 +155,14 @@ class VideoConnectionService
     public function findByUuid(string $uuid, int $tenantId): ?array
     {
         $db = \Config\Database::connect();
-        if (! $db->tableExists('reach_publication_connections')) {
+        if (! SchemaGuard::hasTable($db, 'reach_publication_connections')) {
             return null;
         }
 
         $builder = $db->table('reach_publication_connections')
             ->where('connection_type', self::CONNECTION_TYPE);
 
-        if ($db->fieldExists('uuid', 'reach_publication_connections')) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'uuid')) {
             $builder->groupStart()
                 ->where('uuid', $uuid)
                 ->orWhere('connection_key', $uuid)
@@ -170,7 +171,7 @@ class VideoConnectionService
             $builder->where('connection_key', $uuid);
         }
 
-        if ($db->fieldExists('tenant_id', 'reach_publication_connections')) {
+        if (SchemaGuard::hasColumn($db, 'reach_publication_connections', 'tenant_id')) {
             $builder->where('tenant_id', $tenantId);
         }
 

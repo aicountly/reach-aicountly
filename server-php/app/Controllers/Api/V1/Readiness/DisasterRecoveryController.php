@@ -11,6 +11,7 @@ use App\Libraries\Refresh\ReleaseAcceptanceService;
 use App\Models\Refresh\DisasterRecoveryTestModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
+use App\Libraries\Database\SchemaGuard;
 
 class DisasterRecoveryController extends BaseApiController
 {
@@ -18,7 +19,7 @@ class DisasterRecoveryController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_disaster_recovery_tests')) {
+            if (! SchemaGuard::hasTable($db, 'reach_disaster_recovery_tests')) {
                 return $this->ok([
                     'tests'  => [],
                     'status' => $this->typeStatus([]),
@@ -65,7 +66,7 @@ class DisasterRecoveryController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_disaster_recovery_tests')) {
+            if (! SchemaGuard::hasTable($db, 'reach_disaster_recovery_tests')) {
                 return $this->fail('DR test storage is not available. Run database migrations first.', 503);
             }
 

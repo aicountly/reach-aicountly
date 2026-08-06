@@ -12,6 +12,7 @@ use App\Libraries\Intelligence\Connectors\ConnectorProviderFactory;
 use App\Libraries\Intelligence\Connectors\GoogleSearchConsoleConnector;
 use CodeIgniter\Database\RawSql;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 class BlogCommandCentreController extends BaseApiController
 {
@@ -106,13 +107,9 @@ class BlogCommandCentreController extends BaseApiController
             'recent_days'   => self::PUBLISHING_RECENT_DAYS,
         ];
 
-        // Uncached: tableExists() otherwise answers from a per-connection
-        // listTables() snapshot, so a long-lived worker that warmed the cache
-        // before a migration reports a live table as missing — and "missing"
-        // here renders as a dashboard full of zeroes.
         if (
-            ! $db->tableExists('reach_publication_deployments', false)
-            || ! $db->tableExists('reach_content_items', false)
+            ! SchemaGuard::hasTable($db, 'reach_publication_deployments')
+            || ! SchemaGuard::hasTable($db, 'reach_content_items')
         ) {
             return $empty;
         }
@@ -244,7 +241,7 @@ class BlogCommandCentreController extends BaseApiController
             'last_run' => null,
         ];
 
-        if (! $db->tableExists('reach_optimizer_runs')) {
+        if (! SchemaGuard::hasTable($db, 'reach_optimizer_runs')) {
             return $summary;
         }
 
@@ -337,7 +334,7 @@ class BlogCommandCentreController extends BaseApiController
         [$page, $limit, $offset] = $this->pagination();
         $db = Database::connect();
 
-        if (! $db->tableExists('reach_topic_candidates')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_candidates')) {
             return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
         }
 
@@ -380,7 +377,7 @@ class BlogCommandCentreController extends BaseApiController
         [$page, $limit, $offset] = $this->pagination();
         $db = Database::connect();
 
-        if (! $db->tableExists('reach_topic_scores')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_scores')) {
             return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
         }
 
@@ -403,7 +400,7 @@ class BlogCommandCentreController extends BaseApiController
         [$page, $limit, $offset] = $this->pagination();
         $db = Database::connect();
 
-        if (! $db->tableExists('reach_roadmap_decisions')) {
+        if (! SchemaGuard::hasTable($db, 'reach_roadmap_decisions')) {
             return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
         }
 
@@ -431,7 +428,7 @@ class BlogCommandCentreController extends BaseApiController
         [$page, $limit, $offset] = $this->pagination();
         $db = Database::connect();
 
-        if (! $db->tableExists('reach_optimizer_runs')) {
+        if (! SchemaGuard::hasTable($db, 'reach_optimizer_runs')) {
             return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
         }
 
@@ -449,7 +446,7 @@ class BlogCommandCentreController extends BaseApiController
     public function scoringWeights()
     {
         $db = Database::connect();
-        if (! $db->tableExists('reach_roadmap_scoring_weights')) {
+        if (! SchemaGuard::hasTable($db, 'reach_roadmap_scoring_weights')) {
             return $this->ok(ScoringWeights::defaults()->toArray());
         }
 
@@ -494,7 +491,7 @@ class BlogCommandCentreController extends BaseApiController
             'updated_at'           => date('Y-m-d H:i:s'),
         ];
 
-        if (! $db->tableExists('reach_roadmap_scoring_weights')) {
+        if (! SchemaGuard::hasTable($db, 'reach_roadmap_scoring_weights')) {
             return $this->fail('Scoring weights table is not available.', 503);
         }
 

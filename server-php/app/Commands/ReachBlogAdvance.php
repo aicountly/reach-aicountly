@@ -10,6 +10,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:blog-advance` — enqueue the next production work block for
@@ -268,7 +269,7 @@ class ReachBlogAdvance extends BaseCommand
 
     private function hasSuccessfulDeployment(\CodeIgniter\Database\BaseConnection $db, int $contentItemId): bool
     {
-        if ($contentItemId <= 0 || ! $db->tableExists('reach_publication_deployments')) {
+        if ($contentItemId <= 0 || ! SchemaGuard::hasTable($db, 'reach_publication_deployments')) {
             return false;
         }
 
