@@ -7,6 +7,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:blog-repair-slugs` — repair slugs mangled by the
@@ -49,7 +50,7 @@ class ReachBlogRepairSlugs extends BaseCommand
         $db = Database::connect();
 
         try {
-            if (! $db->tableExists('reach_content_items', false)) {
+            if (! SchemaGuard::hasTable($db, 'reach_content_items')) {
                 CLI::error('reach_content_items does not exist.');
 
                 return EXIT_ERROR;
@@ -130,16 +131,14 @@ class ReachBlogRepairSlugs extends BaseCommand
 
                 // The SEO profile carries its own slug and wins in the publish
                 // payload, so a repair that skips it changes nothing publicly.
-                // Uncached — the cached table list can be stale and would
-                // silently skip the SEO slug and the redirect record.
-                if ($db->tableExists('reach_content_seo_profiles', false)) {
+                if (SchemaGuard::hasTable($db, 'reach_content_seo_profiles')) {
                     $db->table('reach_content_seo_profiles')
                         ->where('content_item_id', $repair['id'])
                         ->where('slug', $repair['from'])
                         ->update(['slug' => $repair['to']]);
                 }
 
-                if ($repair['is_public'] && $db->tableExists('reach_publication_redirects', false)) {
+                if ($repair['is_public'] && SchemaGuard::hasTable($db, 'reach_publication_redirects')) {
                     $db->table('reach_publication_redirects')->insert([
                         'content_item_id' => $repair['id'],
                         'from_slug'       => $repair['from'],

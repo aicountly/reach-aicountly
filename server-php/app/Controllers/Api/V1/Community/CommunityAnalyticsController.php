@@ -4,6 +4,7 @@ namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class CommunityAnalyticsController extends BaseApiController
 {
@@ -20,7 +21,7 @@ class CommunityAnalyticsController extends BaseApiController
 
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_questions')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_questions')) {
                 return $this->response->setJSON(['data' => $empty]);
             }
 
@@ -33,7 +34,7 @@ class CommunityAnalyticsController extends BaseApiController
             $answerStats = [];
             $publishedCount = 0;
             $pendingApproval = 0;
-            if ($db->tableExists('reach_community_official_answers')) {
+            if (SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
                 $answerStats = $db->query("
                     SELECT status, COUNT(*) AS cnt
                     FROM reach_community_official_answers
@@ -50,7 +51,7 @@ class CommunityAnalyticsController extends BaseApiController
             }
 
             $openFindings = 0;
-            if ($db->tableExists('reach_community_moderation_findings')) {
+            if (SchemaGuard::hasTable($db, 'reach_community_moderation_findings')) {
                 $openFindings = (int) $db->table('reach_community_moderation_findings')
                     ->where('status', 'open')
                     ->countAllResults();
@@ -78,7 +79,7 @@ class CommunityAnalyticsController extends BaseApiController
 
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_engagement_events')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_engagement_events')) {
                 return $this->response->setJSON(['data' => [], 'days' => $days]);
             }
 
@@ -103,7 +104,7 @@ class CommunityAnalyticsController extends BaseApiController
     {
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_source_coverage')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_source_coverage')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -128,7 +129,7 @@ class CommunityAnalyticsController extends BaseApiController
     {
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_analytics_cache')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_analytics_cache')) {
                 return $this->response->setJSON(['data' => []]);
             }
 

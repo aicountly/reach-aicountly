@@ -6,6 +6,7 @@ use App\Libraries\Blog\BlogPortfolioService;
 use App\Libraries\Support\PgBoolean;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Gathers normalised scoring signals for topic candidates from analytics facts when available.
@@ -115,7 +116,7 @@ class RoadmapSignalProvider
      */
     private function searchConsoleSignals(int $identityId, string $forDate, array &$missingSignals): array
     {
-        if (! $this->db()->tableExists('reach_search_metric_facts')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_search_metric_facts')) {
             $missingSignals[] = 'search_console';
             return [];
         }
@@ -156,7 +157,7 @@ class RoadmapSignalProvider
      */
     private function analyticsSignals(int $identityId, string $forDate, array &$missingSignals): array
     {
-        if (! $this->db()->tableExists('reach_content_metric_facts')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_content_metric_facts')) {
             $missingSignals[] = 'ga4';
             return [];
         }
@@ -195,7 +196,7 @@ class RoadmapSignalProvider
 
     private function resolveContentIdentityId(int $contentItemId): ?int
     {
-        if (! $this->db()->tableExists('reach_content_identities')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_content_identities')) {
             return null;
         }
 
@@ -211,7 +212,7 @@ class RoadmapSignalProvider
 
     private function clusterCoverage(int $clusterId): ?float
     {
-        if (! $this->db()->tableExists('reach_content_items')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_content_items')) {
             return null;
         }
 
@@ -243,8 +244,8 @@ class RoadmapSignalProvider
             'problem_to_product'   => 0,
         ];
 
-        if (! $this->db()->tableExists('reach_content_blog_details')
-            || ! $this->db()->tableExists('reach_content_items')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_content_blog_details')
+            || ! SchemaGuard::hasTable($this->db(), 'reach_content_items')) {
             return $counts;
         }
 
@@ -290,7 +291,7 @@ class RoadmapSignalProvider
 
     private function productPrioritySignal(int $productId): ?float
     {
-        if (! $this->db()->tableExists('reach_products')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_products')) {
             return null;
         }
 
@@ -315,7 +316,7 @@ class RoadmapSignalProvider
 
     private function isProductProductionReady(int $productId): bool
     {
-        if (! $this->db()->tableExists('reach_products')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_products')) {
             return true;
         }
 
@@ -331,7 +332,7 @@ class RoadmapSignalProvider
 
     private function isContentStale(int $contentItemId, string $forDate): bool
     {
-        if (! $this->db()->tableExists('reach_content_items')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_content_items')) {
             return false;
         }
 
@@ -359,7 +360,7 @@ class RoadmapSignalProvider
 
     private function contentRiskLevel(int $contentItemId): string
     {
-        if ($contentItemId <= 0 || ! $this->db()->tableExists('reach_content_blog_details')) {
+        if ($contentItemId <= 0 || ! SchemaGuard::hasTable($this->db(), 'reach_content_blog_details')) {
             return 'LOW';
         }
 

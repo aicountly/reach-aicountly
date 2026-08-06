@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Blog;
 
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Durable cold-start for empty Knowledge / empty topic backlog.
@@ -70,7 +71,7 @@ class BlogColdStartService
     public function ensureApprovedClusters(): array
     {
         $db = Database::connect();
-        if (! $db->tableExists('reach_topic_clusters')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_clusters')) {
             throw new \RuntimeException('reach_topic_clusters table is missing — run migrations.');
         }
 
@@ -128,7 +129,7 @@ class BlogColdStartService
     public function ensurePilotCandidates(int $limit = 5): array
     {
         $db = Database::connect();
-        if (! $db->tableExists('reach_topic_candidates')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_candidates')) {
             throw new \RuntimeException('reach_topic_candidates table is missing — run migrations.');
         }
 
@@ -187,7 +188,7 @@ class BlogColdStartService
     public function countApprovedClusters(): int
     {
         $db = Database::connect();
-        if (! $db->tableExists('reach_topic_clusters')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_clusters')) {
             return 0;
         }
 
@@ -200,7 +201,7 @@ class BlogColdStartService
     public function countEligibleCandidates(): int
     {
         $db = Database::connect();
-        if (! $db->tableExists('reach_topic_candidates')) {
+        if (! SchemaGuard::hasTable($db, 'reach_topic_candidates')) {
             return 0;
         }
 

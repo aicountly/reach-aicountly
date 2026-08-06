@@ -8,6 +8,7 @@ use App\Controllers\BaseApiController;
 use App\Libraries\Video\VideoProjectRepository;
 use App\Libraries\Video\VideoProjectService;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class VideoProjectController extends BaseApiController
 {
@@ -47,8 +48,8 @@ class VideoProjectController extends BaseApiController
         try {
             $db = \Config\Database::connect();
             if (
-                ! $db->tableExists('reach_video_projects')
-                || ! $db->tableExists('reach_video_ideas')
+                ! SchemaGuard::hasTable($db, 'reach_video_projects')
+                || ! SchemaGuard::hasTable($db, 'reach_video_ideas')
             ) {
                 return $this->ok($empty);
             }

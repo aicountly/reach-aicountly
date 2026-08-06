@@ -14,6 +14,7 @@ use App\Models\Refresh\ReleaseAcceptanceRecordModel;
 use App\Models\Refresh\TechnicalDebtRecordModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
+use App\Libraries\Database\SchemaGuard;
 
 class ReleaseAcceptanceController extends BaseApiController
 {
@@ -81,7 +82,7 @@ class ReleaseAcceptanceController extends BaseApiController
     private function tableReady(string $table): bool
     {
         try {
-            return \Config\Database::connect()->tableExists($table);
+            return SchemaGuard::hasTable(\Config\Database::connect(), $table);
         } catch (\Throwable) {
             return false;
         }

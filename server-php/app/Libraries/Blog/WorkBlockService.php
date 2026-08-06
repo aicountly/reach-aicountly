@@ -26,6 +26,7 @@ use App\Libraries\Publishing\Seo\SeoReadinessService;
 use App\Models\Content\ContentBriefModel;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Work-block planning and execution layer for blog automation.
@@ -2235,7 +2236,7 @@ class WorkBlockService
         }
 
         // Prefer schema errors — provider runs often "completed" while request failed validation.
-        if ($this->db->tableExists('reach_ai_generation_artifacts')) {
+        if (SchemaGuard::hasTable($this->db, 'reach_ai_generation_artifacts')) {
             $artifact = $this->db->table('reach_ai_generation_artifacts')
                 ->select('schema_validation_status, schema_validation_errors')
                 ->where('generation_request_id', $generationRequestId)
@@ -2253,7 +2254,7 @@ class WorkBlockService
             }
         }
 
-        if (! $this->db->tableExists('reach_ai_generation_runs')) {
+        if (! SchemaGuard::hasTable($this->db, 'reach_ai_generation_runs')) {
             return '';
         }
 

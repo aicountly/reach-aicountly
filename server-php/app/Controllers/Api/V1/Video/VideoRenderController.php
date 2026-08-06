@@ -13,6 +13,7 @@ use App\Models\Video\VideoRenderJobModel;
 use App\Models\Video\VideoRenderAttemptModel;
 use App\Models\Video\VideoRenderProfileModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class VideoRenderController extends BaseApiController
 {
@@ -92,8 +93,8 @@ class VideoRenderController extends BaseApiController
         try {
             $db = \Config\Database::connect();
             if (
-                ! $db->tableExists('reach_video_render_jobs')
-                || ! $db->tableExists('reach_video_projects')
+                ! SchemaGuard::hasTable($db, 'reach_video_render_jobs')
+                || ! SchemaGuard::hasTable($db, 'reach_video_projects')
             ) {
                 return $this->ok($empty);
             }

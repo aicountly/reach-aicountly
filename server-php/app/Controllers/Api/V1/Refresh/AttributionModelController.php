@@ -9,6 +9,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Refresh\AttributionModelService;
 use App\Models\Refresh\AttributionModelModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class AttributionModelController extends BaseApiController
 {
@@ -20,7 +21,7 @@ class AttributionModelController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if ($db->tableExists('reach_attribution_models')) {
+            if (SchemaGuard::hasTable($db, 'reach_attribution_models')) {
                 $model = new AttributionModelModel();
                 $rows  = $model->where('tenant_id', $tenantId)->findAll();
                 if (is_array($rows)) {
@@ -58,7 +59,7 @@ class AttributionModelController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_attribution_models')) {
+            if (! SchemaGuard::hasTable($db, 'reach_attribution_models')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Attribution model storage is not available yet. Run database migrations first.',
                 ]);
@@ -129,7 +130,7 @@ class AttributionModelController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_attribution_models')) {
+            if (! SchemaGuard::hasTable($db, 'reach_attribution_models')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Attribution model storage is not available yet. Run database migrations first.',
                 ]);

@@ -10,6 +10,7 @@ use App\Libraries\Distribution\CampaignReconciliationService;
 use App\Libraries\JobService;
 use App\Models\Distribution\CampaignDispatchModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class DispatchController extends BaseApiController
 {
@@ -44,7 +45,7 @@ class DispatchController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_campaign_dispatches')) {
+            if (! SchemaGuard::hasTable($db, 'reach_campaign_dispatches')) {
                 return $this->ok([
                     'data'     => [],
                     'total'    => 0,

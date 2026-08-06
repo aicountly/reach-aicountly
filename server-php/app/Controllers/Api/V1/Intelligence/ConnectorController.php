@@ -9,6 +9,7 @@ use App\Libraries\AuditLogger;
 use App\Models\Intelligence\AnalyticsConnectionModel;
 use App\Models\Intelligence\ConnectorHealthModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class ConnectorController extends BaseApiController
 {
@@ -18,7 +19,7 @@ class ConnectorController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -53,7 +54,7 @@ class ConnectorController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Connector storage is not available yet. Run database migrations first.',
                 ]);
@@ -155,7 +156,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
@@ -176,7 +177,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
@@ -192,7 +193,7 @@ class ConnectorController extends BaseApiController
                 'checked_at'    => date('Y-m-d H:i:s'),
             ];
 
-            if ($db->tableExists('reach_connector_health')) {
+            if (SchemaGuard::hasTable($db, 'reach_connector_health')) {
                 $healthModel = new ConnectorHealthModel();
                 $healthId    = $healthModel->insert($health);
                 $health      = $healthModel->find($healthId) ?: $health;
@@ -230,7 +231,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 
@@ -268,7 +269,7 @@ class ConnectorController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
             }
 

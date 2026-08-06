@@ -7,6 +7,7 @@ namespace App\Controllers\Api\V1\Readiness;
 use App\Controllers\BaseApiController;
 use App\Models\Refresh\TechnicalDebtRecordModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class TechnicalDebtController extends BaseApiController
 {
@@ -14,7 +15,7 @@ class TechnicalDebtController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_technical_debt_records')) {
+            if (! SchemaGuard::hasTable($db, 'reach_technical_debt_records')) {
                 return $this->ok([]);
             }
 

@@ -7,6 +7,7 @@ namespace App\Controllers\Api\V1\Readiness;
 use App\Controllers\BaseApiController;
 use App\Models\Refresh\ReadinessFindingModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class FindingsController extends BaseApiController
 {
@@ -14,7 +15,7 @@ class FindingsController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_readiness_findings')) {
+            if (! SchemaGuard::hasTable($db, 'reach_readiness_findings')) {
                 return $this->ok([]);
             }
 
@@ -41,7 +42,7 @@ class FindingsController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_readiness_findings')) {
+            if (! SchemaGuard::hasTable($db, 'reach_readiness_findings')) {
                 return $this->ok([]);
             }
             return $this->ok((new ReadinessFindingModel())->getOpenBlockers());

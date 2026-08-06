@@ -10,6 +10,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:ai-seed-catalog`
@@ -350,7 +351,7 @@ class ReachAiSeedCatalog extends BaseCommand
         if ($routeId <= 0 || $sourceModelId <= 0 || $fallbackModelId <= 0 || $sourceModelId === $fallbackModelId) {
             return false;
         }
-        if (! $db->tableExists('reach_ai_model_fallbacks')) {
+        if (! SchemaGuard::hasTable($db, 'reach_ai_model_fallbacks')) {
             return false;
         }
 

@@ -8,6 +8,7 @@ use App\Controllers\BaseApiController;
 use App\Models\Intelligence\AnalyticsConnectionModel;
 use App\Models\Intelligence\ContentMetricFactModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class ContentAnalyticsController extends BaseApiController
 {
@@ -17,7 +18,7 @@ class ContentAnalyticsController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setJSON(['data' => []]);
             }
 
@@ -36,7 +37,7 @@ class ContentAnalyticsController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_analytics_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_analytics_connections')) {
                 return $this->response->setStatusCode(503)->setJSON([
                     'error' => 'Connector storage is not available yet. Run database migrations first.',
                 ]);
