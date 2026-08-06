@@ -186,4 +186,101 @@ final class BlogUrlDriftTest extends CIUnitTestCase
         $this->assertStringContainsString("\$this->sparkFlag('record-redirects', \$params)", $source);
         $this->assertStringNotContainsString("CLI::getOption('record-redirects')", $source);
     }
+
+    /**
+     * BlogPublicationPayloadBuilder sends `$seo['slug'] ?? $item['slug']`, so
+     * reach_content_seo_profiles decides the published URL. Predicting a move
+     * from the content item's slug alone is wrong whenever the profile still
+     * holds the old value — the re-publish would then change nothing.
+     */
+    public function testDriftReportsTheSlugThePayloadWouldActuallySend(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString('reach_content_seo_profiles', $source);
+        $this->assertStringContainsString("'publish_slug'", $source);
+        $this->assertStringContainsString("'republish_moves_it'", $source);
+    }
+
+    /**
+     * "recorded 0" must distinguish "already on file" from "the flag was
+     * ignored" — the second is a silent no-op reporting success.
+     */
+    public function testZeroRecordedIsDisambiguated(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString("'redirects_already_on_file'", $source);
+        $this->assertStringContainsString("'matches_this_move'", $source);
+    }
+
+    /**
+     * The payload builder must keep preferring the SEO profile slug; the drift
+     * report's prediction is only correct while that precedence holds.
+     */
+    public function testPayloadSlugPrecedenceIsUnchanged(): void
+    {
+        $source = (string) file_get_contents(
+            APPPATH . 'Libraries/Publishing/Blog/BlogPublicationPayloadBuilder.php'
+        );
+
+        $this->assertStringContainsString("\$seo['slug'] ?? \$item['slug']", $source);
+    }
+
+    // --- Republish command ------------------------------------------------
+
+    /**
+     * Moving a live URL cannot be undone by re-running the command, so the
+     * default must be a preview.
+     */
+    public function testRepublishIsDryRunWithoutApply(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogRepublish.php');
+
+        $this->assertStringContainsString("\$apply = \$this->sparkFlag('apply', \$params);", $source);
+        $this->assertStringContainsString('if (! $apply) {', $source);
+
+        // The only enqueue sits after the dry-run early return.
+        $earlyReturn = strpos($source, 'if (! $apply) {');
+        $enqueue     = strpos($source, '->enqueuePublication(');
+        $this->assertNotFalse($enqueue);
+        $this->assertLessThan($enqueue, $earlyReturn);
+    }
+
+    /**
+     * One item at a time: a bulk flag would let a single mistake move every
+     * live URL at once.
+     */
+    public function testRepublishRequiresAnExplicitId(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogRepublish.php');
+
+        $this->assertStringContainsString('--id is required', $source);
+        $this->assertStringNotContainsString('--all', $source);
+    }
+
+    /**
+     * The preview must name the specific way this can go wrong: a URL change
+     * with no recorded redirect, or one recorded but not being sent.
+     */
+    public function testRepublishPreviewWarnsAboutEachFailureMode(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogRepublish.php');
+
+        $this->assertStringContainsString('NO redirect is recorded', $source);
+        $this->assertStringContainsString('BLOG_PUBLISH_REDIRECTS_ENABLED is false', $source);
+        $this->assertStringContainsString('whether the', $source);
+    }
+
+    /**
+     * Approval is enforced by enqueuePublication; checking first turns a thrown
+     * exception into an explanation before anything is queued.
+     */
+    public function testRepublishChecksApprovalBeforeQueueing(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogRepublish.php');
+
+        $this->assertStringContainsString("!== 'approved'", $source);
+        $this->assertStringContainsString('publishing would be refused', $source);
+    }
 }

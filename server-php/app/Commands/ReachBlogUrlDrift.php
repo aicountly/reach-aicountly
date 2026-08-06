@@ -63,15 +63,29 @@ class ReachBlogUrlDrift extends BaseCommand
                 unset($row);
             }
 
-            $recorded = $record ? $this->recordRedirects($drifted) : 0;
+            $recorded    = $record ? $this->recordRedirects($drifted) : 0;
+            $alreadyHeld = count(array_filter(
+                $drifted,
+                static fn (array $i): bool => (bool) ($i['redirects_on_file']['matches_this_move'] ?? false),
+            ));
+            $wontMove = count(array_filter(
+                $drifted,
+                static fn (array $i): bool => ! ($i['republish_moves_it'] ?? true),
+            ));
 
             CLI::write(json_encode([
                 'action' => 'blog-url-drift',
                 'ts'     => gmdate('c'),
                 'result' => [
-                    'drifted'           => count($drifted),
-                    'items'             => $drifted,
-                    'redirects_recorded' => $recorded,
+                    'drifted'                  => count($drifted),
+                    'items'                    => $drifted,
+                    'redirects_recorded'       => $recorded,
+                    'redirects_already_on_file' => $alreadyHeld,
+                    'republish_would_not_move' => $wontMove,
+                    'seo_profile_warning' => $wontMove === 0 ? null
+                        : $wontMove . ' post(s) would not move at all: the publish payload takes the slug '
+                            . 'from reach_content_seo_profiles, which still holds the old value. Re-publishing '
+                            . 'them is harmless but pointless until that row is corrected.',
                     'note' => $drifted === []
                         ? 'Every published blog is live at the URL its current slug produces.'
                         : 'These posts are live at a URL their slug no longer matches. Re-publishing '
@@ -142,19 +156,85 @@ class ReachBlogUrlDrift extends BaseCommand
                 continue;
             }
 
+            // BlogPublicationPayloadBuilder sends `$seo['slug'] ?? $item['slug']`,
+            // so the SEO profile wins. If it still holds the old value a
+            // re-publish moves nothing, and predicting otherwise from the
+            // content item's slug alone would be wrong.
+            $publishSlug = $this->publishSlug((int) $item['id'], $slug);
+
             $drifted[] = [
-                'content_item_id' => (int) $item['id'],
-                'title'           => $item['title'],
-                'workflow_status' => $item['workflow_status'],
-                'live_url'        => $liveUrl,
-                'live_slug'       => $liveSlug,
-                'slug_url'        => $slugUrl,
-                'current_slug'    => $slug,
-                'published_at'    => $deployment['completed_at'] ?? null,
+                'content_item_id'  => (int) $item['id'],
+                'title'            => $item['title'],
+                'workflow_status'  => $item['workflow_status'],
+                'live_url'         => $liveUrl,
+                'live_slug'        => $liveSlug,
+                'slug_url'         => $slugUrl,
+                'current_slug'     => $slug,
+                'publish_slug'     => $publishSlug,
+                'republish_moves_it' => $publishSlug !== $liveSlug,
+                'redirects_on_file' => $this->existingRedirects((int) $item['id'], $liveSlug, $slug),
+                'published_at'     => $deployment['completed_at'] ?? null,
             ];
         }
 
         return $drifted;
+    }
+
+    /**
+     * The slug a re-publish would actually send.
+     *
+     * reach_content_seo_profiles.slug takes precedence over the content item's
+     * in the publication payload, and reach:blog-repair-slugs only updates the
+     * profile row when it still matches the pre-repair value — so the two can
+     * legitimately differ.
+     */
+    private function publishSlug(int $contentItemId, string $fallback): string
+    {
+        $db = Database::connect();
+        if (! SchemaGuard::hasTable($db, 'reach_content_seo_profiles')) {
+            return $fallback;
+        }
+
+        $seo = $db->table('reach_content_seo_profiles')
+            ->select('slug')
+            ->where('content_item_id', $contentItemId)
+            ->get()->getRowArray();
+
+        $slug = trim((string) ($seo['slug'] ?? ''));
+
+        return $slug !== '' ? $slug : $fallback;
+    }
+
+    /**
+     * Redirect rows already recorded for this move, so "recorded 0" reads as
+     * "already there" rather than "the flag was ignored".
+     *
+     * @return array<string, mixed>
+     */
+    private function existingRedirects(int $contentItemId, string $fromSlug, string $toSlug): array
+    {
+        $db = Database::connect();
+        if (! SchemaGuard::hasTable($db, 'reach_publication_redirects')) {
+            return ['pending' => 0, 'active' => 0, 'matches_this_move' => false];
+        }
+
+        $rows = $db->table('reach_publication_redirects')
+            ->select('from_slug, to_slug, status')
+            ->where('content_item_id', $contentItemId)
+            ->whereIn('status', ['pending', 'active'])
+            ->get()->getResultArray();
+
+        $matches = false;
+        $pending = 0;
+        $active  = 0;
+        foreach ($rows as $row) {
+            $row['status'] === 'active' ? $active++ : $pending++;
+            if ($row['from_slug'] === $fromSlug && $row['to_slug'] === $toSlug) {
+                $matches = true;
+            }
+        }
+
+        return ['pending' => $pending, 'active' => $active, 'matches_this_move' => $matches];
     }
 
     /**

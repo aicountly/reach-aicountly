@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Publishing;
 
 use App\Controllers\Api\V1\BaseApiController;
+use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
 use App\Libraries\Publishing\Jobs\PublicationRetryService;
 use App\Libraries\Publishing\Jobs\PublicationVerificationService;
 use App\Libraries\Publishing\Jobs\PublicationRollbackService;
@@ -83,12 +84,36 @@ class DeploymentController extends BaseApiController
             return $this->error('Could not load deployments.', 500);
         }
 
-        return $this->ok(is_array($rows) ? $rows : [], [
+        return $this->ok($this->withRetryability(is_array($rows) ? $rows : []), [
             'total'     => $total,
             'page'      => $page,
             'per_page'  => $limit,
             'last_page' => max(1, (int) ceil($total / $limit)),
         ]);
+    }
+
+    /**
+     * Say whether each deployment can actually be retried.
+     *
+     * Only a transient fault is retryable — PublicationRetryService rejects
+     * anything else outright. Without this the client had to keep its own copy
+     * of that list, so the UI offered a Retry button on rows the API would
+     * always refuse: an authentication failure or a version conflict needs
+     * credentials fixed or a fresh publish, not another attempt.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function withRetryability(array $rows): array
+    {
+        $classifier = new PublishingErrorClassifier();
+
+        foreach ($rows as $i => $row) {
+            $rows[$i]['retryable'] = ($row['status'] ?? '') === 'failed'
+                && $classifier->isRetryable((string) ($row['error_category'] ?? ''));
+        }
+
+        return $rows;
     }
 
     public function show(int $id): \CodeIgniter\HTTP\ResponseInterface
@@ -128,7 +153,7 @@ class DeploymentController extends BaseApiController
             return $this->notFound('Deployment not found');
         }
 
-        return $this->ok($row);
+        return $this->ok($this->withRetryability([$row])[0]);
     }
 
     public function verifications(int $id): \CodeIgniter\HTTP\ResponseInterface
