@@ -5,7 +5,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DailyPackSlot } from '../../components/content/DailyPackSlot';
 import { usePermission } from '../../hooks/usePermission';
-import { formatDate } from '../../utils/formatDate';
+import { formatDate, todayInputValue } from '../../utils/formatDate';
 
 /** Pack config editor — reads/writes reach_settings.daily_pack_config */
 function PackConfigPanel({ onClose }) {
@@ -80,7 +80,7 @@ export function DailyPackPage() {
   const [loading, setLoading]       = useState(true);
   const [genLoading, setGen]        = useState(false);
   const [error, setError]           = useState(null);
-  const [date, setDate]             = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate]             = useState(todayInputValue());
   const [showConfig, setShowConfig] = useState(false);
 
   const load = useCallback(async () => {

@@ -26,6 +26,24 @@ describe('formatDate', () => {
     expect(formatDate(new Date(2026, 7, 3))).toBe('03-08-2026');
   });
 
+  // Postgres writes TIMESTAMPTZ with a space separator and an hour-only
+  // offset. Neither is valid ISO 8601, and naive normalisation to
+  // "2026-08-03T10:00:00+00" yields Invalid Date — which would have blanked
+  // every Created/Updated/Published column in the app.
+  it('parses the exact wire format Postgres emits for TIMESTAMPTZ', () => {
+    expect(formatDate('2026-08-03 10:00:00+00')).not.toBe('—');
+    expect(formatDate('2026-08-03 10:00:00.123456+00')).not.toBe('—');
+    expect(formatDate('2026-08-03 10:00:00+05:30')).not.toBe('—');
+    expect(formatDate('2026-08-03T10:00:00Z')).not.toBe('—');
+  });
+
+  it('maps a full-width year literally, not through the 1900s window', () => {
+    // `new Date(26, 7, 3)` is 1926 — the Date constructor's two-digit-year
+    // legacy rule. A four-digit "0026" must stay year 26.
+    expect(formatDate('0026-08-03')).toBe('03-08-0026');
+    expect(formatDate('0099-01-01')).toBe('01-01-0099');
+  });
+
   it('falls back rather than printing "Invalid Date"', () => {
     expect(formatDate(null)).toBe('—');
     expect(formatDate(undefined)).toBe('—');

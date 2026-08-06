@@ -6,13 +6,14 @@ import { Card } from '../components/common/Card';
 import { Loader } from '../components/common/Loader';
 import { Alert } from '../components/common/Alert';
 import { Modal } from '../components/common/Modal';
+import { toDateInputValue, todayInputValue } from '../utils/formatDate';
 
 const KINDS = ['blog', 'social', 'email', 'whatsapp', 'campaign', 'webinar', 'other'];
 
 const EMPTY_ITEM = {
   title: '',
   item_kind: 'blog',
-  date: new Date().toISOString().slice(0, 10),
+  date: todayInputValue(),
   notes: '',
 };
 
@@ -69,7 +70,7 @@ export function ContentCalendarPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ ...EMPTY_ITEM, date: new Date().toISOString().slice(0, 10) });
+    setForm({ ...EMPTY_ITEM, date: todayInputValue() });
     setFormErrors({});
     setModalOpen(true);
   };
@@ -79,7 +80,7 @@ export function ContentCalendarPage() {
     setForm({
       title: item.title || '',
       item_kind: item.item_kind || 'blog',
-      date: String(item.date || '').slice(0, 10),
+      date: toDateInputValue(item.date),
       notes: item.notes || '',
     });
     setFormErrors({});
