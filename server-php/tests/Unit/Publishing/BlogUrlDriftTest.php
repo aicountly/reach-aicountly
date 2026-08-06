@@ -1,0 +1,141 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\Publishing;
+
+use CodeIgniter\Test\CIUnitTestCase;
+
+/**
+ * Guards the slug-drift tooling.
+ *
+ * The underlying defect is a gap between two facts that are individually true:
+ * reach:blog-repair-slugs fixes reach_content_items.slug immediately, and a
+ * post only moves URL when it is re-published. Between them, "Repaired 0
+ * slug(s)" reads as "nothing to do" while every live URL is still wrong.
+ */
+final class BlogUrlDriftTest extends CIUnitTestCase
+{
+    public function testDriftCommandIsRegistered(): void
+    {
+        $this->assertFileExists(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+    }
+
+    /**
+     * --record-redirects writes; nothing else may. An operator running the
+     * report to understand the situation must not change it.
+     */
+    public function testReportingIsReadOnlyUnlessRecordRedirectsIsPassed(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $recordCall = strpos($source, '$record ? $this->recordRedirects($drifted) : 0');
+        $this->assertNotFalse($recordCall, 'Writes must be gated on the --record-redirects flag.');
+
+        // The only insert in the file belongs to recordRedirects().
+        $this->assertSame(1, substr_count($source, '->insert('));
+    }
+
+    /**
+     * Re-running must not stack duplicate rows for the same move.
+     */
+    public function testRedirectRecordingChecksForAnExistingRow(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString("whereIn('status', ['pending', 'active'])", $source);
+        $this->assertStringContainsString('if ($exists > 0) {', $source);
+    }
+
+    /**
+     * The whole point of --probe: only the public site can say which URL is
+     * real. A live old URL plus a 404 new one is the dangerous case, because
+     * re-publishing then breaks a working page.
+     */
+    public function testProbeDistinguishesTheDangerousCase(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString('the old URL will 404 without a redirect', $source);
+        $this->assertStringContainsString('already moved — the deployment record is stale', $source);
+        $this->assertStringContainsString('neither URL resolves', $source);
+    }
+
+    // --- Redirect emission ------------------------------------------------
+
+    /**
+     * reach_publication_redirects was written by the repair command and read by
+     * nothing, so repaired slugs could never produce a 301. The payload builder
+     * is the missing reader.
+     */
+    public function testPayloadBuilderReadsTheRedirectTable(): void
+    {
+        $source = (string) file_get_contents(
+            APPPATH . 'Libraries/Publishing/Blog/BlogPublicationPayloadBuilder.php'
+        );
+
+        $this->assertStringContainsString('reach_publication_redirects', $source);
+        $this->assertStringContainsString("\$payload['redirects']", $source);
+    }
+
+    /**
+     * Whether the receiving site understands a `redirects` key is a property of
+     * a different codebase. Sending it must therefore be opt-in — a strict
+     * receiver would otherwise reject every publish the moment this shipped.
+     */
+    public function testRedirectEmissionIsOffByDefault(): void
+    {
+        $source = (string) file_get_contents(
+            APPPATH . 'Libraries/Publishing/Blog/BlogPublicationPayloadBuilder.php'
+        );
+
+        $this->assertStringContainsString(
+            "env('BLOG_PUBLISH_REDIRECTS_ENABLED', false)",
+            $source,
+            'The default must be false, not true.',
+        );
+
+        $this->assertFalse(
+            filter_var(env('BLOG_PUBLISH_REDIRECTS_ENABLED', false), FILTER_VALIDATE_BOOL),
+            'Nothing in the test environment may switch redirect emission on implicitly.',
+        );
+    }
+
+    /**
+     * A redirect is only "active" once a publish carrying it succeeded. With
+     * emission off the rows must stay pending — claiming otherwise would assert
+     * the public site is serving something it has never been told about.
+     */
+    public function testRedirectsActivateOnlyWhenEmissionIsEnabled(): void
+    {
+        $source = (string) file_get_contents(
+            APPPATH . 'Libraries/Publishing/Jobs/PublicationDeploymentService.php'
+        );
+
+        $activate = strpos($source, 'private function activateRedirects');
+        $this->assertNotFalse($activate);
+
+        $body  = substr($source, $activate);
+        $guard = strpos($body, "env('BLOG_PUBLISH_REDIRECTS_ENABLED', false)");
+        $write = strpos($body, "'status'        => 'active'");
+
+        $this->assertNotFalse($guard, 'Activation must be gated on the same flag as emission.');
+        $this->assertNotFalse($write);
+        $this->assertLessThan($write, $guard, 'The flag check must precede the write.');
+    }
+
+    /**
+     * Publishing already succeeded on the public site by this point; a
+     * bookkeeping failure must not turn that into a reported failure.
+     */
+    public function testActivationFailureCannotFailThePublish(): void
+    {
+        $source = (string) file_get_contents(
+            APPPATH . 'Libraries/Publishing/Jobs/PublicationDeploymentService.php'
+        );
+
+        $activate = substr($source, (int) strpos($source, 'private function activateRedirects'));
+        $this->assertStringContainsString('catch (\Throwable $e)', $activate);
+        $this->assertStringContainsString('Redirect activation skipped', $activate);
+    }
+}

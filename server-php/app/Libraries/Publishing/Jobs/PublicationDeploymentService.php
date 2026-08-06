@@ -324,6 +324,8 @@ class PublicationDeploymentService
             } catch (\Throwable $e) {
                 log_message('warning', 'Link registry record skipped: ' . $e->getMessage());
             }
+
+            $this->activateRedirects((int) $deployment['content_item_id'], $deploymentId, $now);
         }
 
         AuditLogger::record('publishing.accepted', [
@@ -335,6 +337,41 @@ class PublicationDeploymentService
 
         if ($status === 'published' && ($deployment['content_item_id'] ?? null)) {
             $this->tryTrackBlogStateTransition((int) $deployment['content_item_id']);
+        }
+    }
+
+    /**
+     * Mark this item's redirects live once the publish that carries them has
+     * been accepted.
+     *
+     * Only meaningful when BLOG_PUBLISH_REDIRECTS_ENABLED sent them in the
+     * payload — with the flag off the rows stay 'pending', which is the honest
+     * state: recorded in Reach, not yet served by the public site. Failures are
+     * swallowed; a publish that already succeeded must never be reported as
+     * failed over bookkeeping.
+     */
+    private function activateRedirects(int $contentItemId, int $deploymentId, string $now): void
+    {
+        if (! filter_var(env('BLOG_PUBLISH_REDIRECTS_ENABLED', false), FILTER_VALIDATE_BOOL)) {
+            return;
+        }
+
+        try {
+            if (! \App\Libraries\Database\SchemaGuard::hasTable($this->db, 'reach_publication_redirects')) {
+                return;
+            }
+
+            $this->db->table('reach_publication_redirects')
+                ->where('content_item_id', $contentItemId)
+                ->where('status', 'pending')
+                ->update([
+                    'status'        => 'active',
+                    'deployment_id' => $deploymentId,
+                    'applied_at'    => $now,
+                    'updated_at'    => $now,
+                ]);
+        } catch (\Throwable $e) {
+            log_message('warning', 'Redirect activation skipped: ' . $e->getMessage());
         }
     }
 

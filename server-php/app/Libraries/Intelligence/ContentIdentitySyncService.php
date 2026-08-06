@@ -84,6 +84,23 @@ class ContentIdentitySyncService
      * bulk. Building the map once per ingestion run replaces a per-row query;
      * a single GSC page can otherwise mean tens of thousands of lookups.
      *
+     * A post can legitimately be reachable at more than one URL, so every URL
+     * that provably belongs to a specific content item is indexed against it:
+     *
+     *  - the identity's own canonical_url;
+     *  - every canonical_url any deployment ever published it at;
+     *  - the URL its *current* slug would produce.
+     *
+     * That last pair matters after a slug repair: the slug column is corrected
+     * immediately but the post is only re-published later, so the live URL and
+     * the current slug disagree for a while and Google reports whichever it
+     * last crawled. Both are the same post, and both come from that item's own
+     * records — this is not a wildcard match on a shared path segment, which is
+     * why it cannot credit a marketing page's clicks to a blog.
+     *
+     * A URL claimed by two different identities is dropped rather than assigned
+     * to whichever sorted first.
+     *
      * @return array<string, int>
      */
     public function urlIndex(int $tenantId): array
@@ -92,21 +109,114 @@ class ContentIdentitySyncService
             return [];
         }
 
-        $rows = $this->db->table('reach_content_identities')
-            ->select('id, canonical_url')
+        $identities = $this->db->table('reach_content_identities')
+            ->select('id, source_id, content_type, canonical_url')
             ->where('tenant_id', $tenantId)
-            ->where('canonical_url IS NOT NULL', null, false)
             ->get()->getResultArray();
 
+        /** @var array<string, array<int, true>> $claims url => set of identity ids */
+        $claims       = [];
+        $blogBySource = [];
+
+        foreach ($identities as $identity) {
+            $id = (int) $identity['id'];
+
+            $this->claim($claims, (string) ($identity['canonical_url'] ?? ''), $id);
+
+            if (($identity['content_type'] ?? '') === 'blog') {
+                $blogBySource[(int) $identity['source_id']] = $id;
+            }
+        }
+
+        if ($blogBySource !== []) {
+            foreach ($this->publishedUrlsBySource(array_keys($blogBySource)) as $sourceId => $urls) {
+                foreach ($urls as $url) {
+                    $this->claim($claims, $url, $blogBySource[$sourceId]);
+                }
+            }
+
+            foreach ($this->slugUrlsBySource(array_keys($blogBySource)) as $sourceId => $url) {
+                $this->claim($claims, $url, $blogBySource[$sourceId]);
+            }
+        }
+
         $index = [];
-        foreach ($rows as $row) {
-            $key = self::normaliseUrl((string) $row['canonical_url']);
-            if ($key !== '' && ! isset($index[$key])) {
-                $index[$key] = (int) $row['id'];
+        foreach ($claims as $url => $owners) {
+            if (count($owners) === 1) {
+                $index[$url] = (int) array_key_first($owners);
             }
         }
 
         return $index;
+    }
+
+    /**
+     * @param array<string, array<int, true>> $claims
+     */
+    private function claim(array &$claims, string $url, int $identityId): void
+    {
+        $key = self::normaliseUrl($url);
+        if ($key !== '') {
+            $claims[$key][$identityId] = true;
+        }
+    }
+
+    /**
+     * Every URL each content item has been published at, newest deployments
+     * included — a post keeps drawing traffic on its previous URL while the
+     * redirect is still being crawled.
+     *
+     * @param list<int> $sourceIds
+     * @return array<int, list<string>>
+     */
+    private function publishedUrlsBySource(array $sourceIds): array
+    {
+        if ($sourceIds === [] || ! SchemaGuard::hasTable($this->db, 'reach_publication_deployments')) {
+            return [];
+        }
+
+        $rows = $this->db->table('reach_publication_deployments')
+            ->select('content_item_id, canonical_url')
+            ->whereIn('content_item_id', $sourceIds)
+            ->whereIn('status', self::LIVE_DEPLOYMENT_STATES)
+            ->where('canonical_url IS NOT NULL', null, false)
+            ->get()->getResultArray();
+
+        $bySource = [];
+        foreach ($rows as $row) {
+            $bySource[(int) $row['content_item_id']][] = (string) $row['canonical_url'];
+        }
+
+        return $bySource;
+    }
+
+    /**
+     * The URL each item's current slug would produce.
+     *
+     * @param list<int> $sourceIds
+     * @return array<int, string>
+     */
+    private function slugUrlsBySource(array $sourceIds): array
+    {
+        if ($sourceIds === [] || ! SchemaGuard::hasTable($this->db, 'reach_content_items')) {
+            return [];
+        }
+
+        $rows = $this->db->table('reach_content_items')
+            ->select('id, slug')
+            ->whereIn('id', $sourceIds)
+            ->where('deleted_at IS NULL', null, false)
+            ->get()->getResultArray();
+
+        $urls = [];
+        foreach ($rows as $row) {
+            $slug = trim((string) ($row['slug'] ?? ''));
+            if ($slug !== '') {
+                $urls[(int) $row['id']] = $this->urlPolicy->buildUrl('blog', $slug);
+            }
+        }
+
+        return $urls;
     }
 
     /**
