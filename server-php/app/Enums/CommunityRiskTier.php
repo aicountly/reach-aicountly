@@ -101,6 +101,20 @@ enum CommunityRiskTier: int
     }
 
     /**
+     * The higher of this tier and a later assessment.
+     *
+     * fromQuestion() establishes a floor and the generation agent may raise it
+     * — it has read the drafted content, which the question-time
+     * classification had not — but never lower it, or a draft could talk its
+     * own publication gate away. Callers that accept a model-supplied risk
+     * level must route it through here rather than assigning it.
+     */
+    public function raisedTo(self $assessed): self
+    {
+        return $assessed->value > $this->value ? $assessed : $this;
+    }
+
+    /**
      * Derive an initial tier from question metadata. This is the floor: the
      * generation agent may raise it but never lower it.
      */

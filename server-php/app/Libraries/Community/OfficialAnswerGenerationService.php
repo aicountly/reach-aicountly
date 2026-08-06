@@ -4,6 +4,7 @@ namespace App\Libraries\Community;
 
 use App\Enums\CommunityAnswerStatus;
 use App\Enums\CommunityRiskClassification;
+use App\Enums\CommunityRiskTier;
 use App\Libraries\Ai\Generation\AiGenerationOrchestrator;
 use App\Libraries\Ai\Generation\AiGenerationRequestService;
 use App\Libraries\Ai\Grounding\AiGroundingContextBuilder;
@@ -139,20 +140,61 @@ class OfficialAnswerGenerationService
             $actorId
         );
 
-        // Update answer record with risk classification and ai_assisted flag
+        // risk_tier and risk_classification are two views of one fact — the enum
+        // keeps them in step via toClassification()/fromClassification() — but
+        // this method used to write only the classification, from the model's
+        // own assessment. A tier-2 answer whose draft came back "low" ended up
+        // stored as tier 2 / low, and the pair disagreeing is how a publication
+        // gate quietly stops gating: riskTierOf() prefers the tier column
+        // today, so anything that later derives the tier from the
+        // classification instead would wave that answer past professional
+        // review.
+        //
+        // Resolve to the higher of the two. The model may raise the tier — it
+        // has read the drafted content, which the question-time classification
+        // had not — but it must never lower one, or a draft could talk its own
+        // gate away.
+        $currentTier  = $this->currentRiskTier($answer);
+        $resolvedTier = $currentTier->raisedTo(CommunityRiskTier::fromClassification($riskClass));
+
         $this->answerRepo->save([
-            'id'              => $answer['id'],
-            'risk_classification' => $riskClass,
-            'ai_assisted'     => true,
-            'status'          => CommunityAnswerStatus::DraftGenerated->value,
+            'id'                  => $answer['id'],
+            'risk_tier'           => $resolvedTier->value,
+            'risk_classification' => $resolvedTier->toClassification()->value,
+            'ai_assisted'         => true,
+            'status'              => CommunityAnswerStatus::DraftGenerated->value,
         ]);
+
+        if ($resolvedTier->value !== $currentTier->value) {
+            AuditLogger::record(AuditLogger::COMMUNITY_ANSWER_RISK_CHANGED, [
+                'answer_id'  => (int) $answer['id'],
+                'from_tier'  => $currentTier->value,
+                'to_tier'    => $resolvedTier->value,
+                'reason'     => 'raised by generation-time model assessment',
+            ], $actorId);
+        }
 
         return [
             'version'          => $version,
             'ai_output'        => $aiOutput,
-            'risk_classification' => $riskClass,
+            'risk_classification' => $resolvedTier->toClassification()->value,
+            'risk_tier'        => $resolvedTier->value,
             'requires_professional_review' => $aiOutput['requires_professional_review'] ?? false,
         ];
+    }
+
+    /**
+     * The tier the answer already carries, preferring the explicit column and
+     * falling back to the classification — the same precedence the publish
+     * gate uses, so the two cannot disagree about what is being compared.
+     */
+    private function currentRiskTier(array $answer): CommunityRiskTier
+    {
+        if (isset($answer['risk_tier']) && $answer['risk_tier'] !== null && $answer['risk_tier'] !== '') {
+            return CommunityRiskTier::from((int) $answer['risk_tier']);
+        }
+
+        return CommunityRiskTier::fromClassification($answer['risk_classification'] ?? 'low');
     }
 
     private function buildGroundingContext(array $question, array $answer): array
@@ -161,9 +203,35 @@ class OfficialAnswerGenerationService
             'question_title'   => $question['title'],
             'question_body'    => $question['body'] ?? '',
             'product'          => $answer['product'] ?? $question['product'] ?? '',
-            'jurisdiction'     => $answer['jurisdiction'] ?? $question['jurisdiction'] ?? '',
+            'jurisdiction'     => $this->resolveJurisdiction($question, $answer),
             'risk'             => $answer['risk_classification'] ?? 'low',
         ];
+    }
+
+    /**
+     * Jurisdiction for the prompt, falling back to a configured default.
+     *
+     * Nothing sets a jurisdiction on agent-curated questions — intake only
+     * carries one when the caller supplies it, and community:agents-run does
+     * not — so the prompt rendered a bare "Jurisdiction:" and the model,
+     * correctly, refused to commit: the first published answer opened with "I
+     * can't provide a definitive turnover limit ... thresholds can differ by
+     * jurisdiction". That reads as an evasive answer but is really a missing
+     * input.
+     *
+     * COMMUNITY_DEFAULT_JURISDICTION supplies the fallback. It is deliberately
+     * empty by default: naming the jurisdiction changes what the model is
+     * willing to assert about tax and company law, so it is an explicit
+     * operator decision rather than something inferred from the question text.
+     */
+    private function resolveJurisdiction(array $question, array $answer): string
+    {
+        $explicit = trim((string) ($answer['jurisdiction'] ?? $question['jurisdiction'] ?? ''));
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        return trim((string) ($_ENV['COMMUNITY_DEFAULT_JURISDICTION'] ?? getenv('COMMUNITY_DEFAULT_JURISDICTION') ?: ''));
     }
 
     private function buildPrompt(array $question, array $answer, string $answerType, array $groundingCtx): string
