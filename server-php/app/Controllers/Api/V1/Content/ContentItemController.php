@@ -7,6 +7,7 @@ use App\Libraries\Blog\BlogRedraftService;
 use App\Libraries\Blog\BlogStateMachine;
 use App\Libraries\ContentItemService;
 use App\Libraries\ContentMappingService;
+use App\Libraries\ContentPurgeService;
 use App\Libraries\AuditLogger;
 
 /**
@@ -18,6 +19,7 @@ use App\Libraries\AuditLogger;
  *   GET    /v1/content/items/:id
  *   PUT    /v1/content/items/:id
  *   DELETE /v1/content/items/:id
+ *   DELETE /v1/content/items/:id/purge
  *   POST   /v1/content/items/:id/submit
  *   POST   /v1/content/items/:id/approve
  *   POST   /v1/content/items/:id/reject
@@ -163,6 +165,38 @@ class ContentItemController extends BaseContentController
             return $this->ok(['deleted' => true]);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * DELETE /v1/content/items/:id/purge
+     *
+     * Permanent removal, unlike delete() above which archives. Takes the item
+     * down from the public site first; pass {"force": true} to delete from
+     * Reach even when that takedown fails.
+     */
+    public function purge($id)
+    {
+        $item = $this->findItem($id);
+        if ($item instanceof \CodeIgniter\HTTP\ResponseInterface) {
+            return $item;
+        }
+
+        $body   = $this->input();
+        $reason = trim($body['reason'] ?? '');
+        $force  = filter_var($body['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        try {
+            $result = (new ContentPurgeService())->purge(
+                (int) $item['id'],
+                $reason ?: 'Permanently deleted from the Reach panel',
+                $this->actor(),
+                $force
+            );
+            return $this->ok($result);
+        } catch (\RuntimeException $e) {
+            // 409: the caller can retry with force once the public copy is handled.
+            return $this->fail($e->getMessage(), 409);
         }
     }
 

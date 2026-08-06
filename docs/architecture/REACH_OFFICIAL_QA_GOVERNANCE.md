@@ -214,6 +214,27 @@ Overrides require the `community.answer.override_validation` permission and a ma
 5. All audit history is preserved.
 6. Content can be restored if the withdrawal reason is resolved.
 
+### Permanent Deletion
+
+Withdrawal is the default and preserves everything. Deletion is the exception,
+for records that should never have existed — spam intake, mis-generated drafts,
+duplicate questions.
+
+1. `DELETE /v1/community/answers/:uuid` removes an answer with its versions,
+   approvals, deployments and verifications.
+   `DELETE /v1/community/questions/:uuid` removes a question with every answer
+   written for it.
+2. Both require `community_answer.delete` / `community_question.delete`. Those
+   slugs are held by `super_admin` and `reach_admin` only — the operational
+   `community_*` roles withdraw and archive, they never purge.
+3. A published answer is unpublished from the public site first. If that
+   takedown fails the delete is refused, so Reach can never drop the only
+   record of something still live. `{"force": true}` overrides that for an
+   operator who will remove the public copy by hand.
+4. `community.answer.deleted` / `community.question.deleted` audit events are
+   recorded with the actor, reason and what was removed. The audit trail
+   outlives the content.
+
 ### Prohibition on Silent Rewrites
 
 A published answer must never be silently overwritten. Every change creates a new version. Every material edit invalidates approval.

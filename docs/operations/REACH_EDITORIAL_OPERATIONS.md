@@ -93,6 +93,30 @@ If content is overdue:
 
 ---
 
+## Deleting content
+
+Two different actions, deliberately kept apart:
+
+| Action | Endpoint | Permission | Effect |
+|--------|----------|------------|--------|
+| Archive | `DELETE /v1/content/items/:id` | `content.edit` | Sets `workflow_status = archived`. Reversible; the row stays. |
+| Delete | `DELETE /v1/content/items/:id/purge` | `content.delete` | Removes the item, its versions, briefs, comments, validations and deployment records. Not reversible. |
+
+The **Delete** button on Content Studio, the Blog Command Centre lists and the
+content detail page calls the purge route. It is shown only to users holding
+`content.delete` — seeded to `super_admin` and `reach_admin`.
+
+A published item is taken down from AICOUNTLY.com before anything is deleted.
+If the takedown fails, the delete is refused with a 409 and the panel offers to
+remove it from Reach anyway (`{"force": true}`) — use that only when you will
+remove the public copy by hand, otherwise the article stays live with nothing
+in Reach to unpublish it with.
+
+Every purge writes a `content.deleted` audit record with the actor, the reason
+and a snapshot of the title, slug, type and status.
+
+---
+
 ## Audit trail
 
 Every material action is logged to `reach_audit_logs`. To view audit history for a content item, use the admin panel audit viewer filtered by `subject_type = 'content_item'` and `subject_id = <item_id>`.

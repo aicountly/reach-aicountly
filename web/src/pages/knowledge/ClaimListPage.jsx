@@ -8,6 +8,8 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { ClaimRiskBadge } from '../../components/knowledge/ClaimRiskBadge';
+import { usePermission } from '../../hooks/usePermission';
+import { knowledgeDeleteColumn } from './knowledgeDeleteColumn';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const RISK_OPTIONS   = ['', 'low', 'medium', 'high', 'critical'];
@@ -22,6 +24,7 @@ export function ClaimListPage() {
   const [search, setSearch]     = useState('');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
+  const { has } = usePermission();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -47,6 +50,14 @@ export function ClaimListPage() {
     { key: 'valid_from', label: 'Valid from', render: (r) => r.valid_from ? new Date(r.valid_from).toLocaleDateString() : '—' },
     { key: 'valid_until', label: 'Valid until', render: (r) => r.valid_until ? new Date(r.valid_until).toLocaleDateString() : '—' },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
+    ...knowledgeDeleteColumn({
+      can: has('claim.manage'),
+      entityLabel: 'claim',
+      nameOf: (r) => r.claim_text,
+      onDelete: (r) => knowledgeService.deleteClaim(r.id),
+      onDeleted: load,
+      onError: setError,
+    }),
   ];
 
   return (

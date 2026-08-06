@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Edit2, FileText, MessageSquare, CheckSquare, Clock, GitBranch, Send } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
+import { DeleteButton } from '../../components/common/DeleteButton';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
@@ -21,6 +22,7 @@ const PUBLISHABLE = new Set(['approved', 'scheduled']);
 export function ContentDetailPage() {
   const { id } = useParams();
   const { has } = usePermission();
+  const nav = useNavigate();
   const [item, setItem]             = useState(null);
   const [transitions, setTrans]     = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -32,6 +34,7 @@ export function ContentDetailPage() {
   const canApprove  = has('content.approve');
   const canReview   = has('content.review');
   const canPublish  = has('publishing.publish');
+  const canDelete   = has('content.delete');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,6 +161,19 @@ export function ContentDetailPage() {
             <button className="btn btn-primary" onClick={handlePublish} disabled={actioning === 'publish'}>
               <Send size={13} /> Publish now
             </button>
+          )}
+          {canDelete && (
+            <DeleteButton
+              className="btn btn-danger"
+              confirmMessage={
+                `Permanently delete “${item.title}”?\n\n`
+                + 'Its versions, comments and validations go with it, and a published '
+                + 'article is removed from AICOUNTLY.com. This cannot be undone.'
+              }
+              onDelete={(force) => contentService.purgeItem(id, 'Deleted from the content detail page', force)}
+              onDeleted={() => nav(ROUTES.CONTENT)}
+              onError={setError}
+            />
           )}
         </div>
       </div>

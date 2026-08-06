@@ -146,6 +146,12 @@ final class Permissions
     public const CONTENT_REJECT         = 'content.reject';
     public const CONTENT_SCHEDULE_PERM  = 'content.schedule';
     public const CONTENT_ARCHIVE        = 'content.archive';
+    /**
+     * Permanent removal of a content item (blog, knowledge base, community
+     * body) with its versions and public deployment. Distinct from
+     * content.archive, which only hides the item and keeps the row.
+     */
+    public const CONTENT_DELETE         = 'content.delete';
 
     /** Content versions */
     public const CONTENT_VERSION_VIEW   = 'content_version.view';
@@ -297,6 +303,8 @@ final class Permissions
     public const COMMUNITY_QUESTION_EDIT     = 'community_question.edit';
     public const COMMUNITY_QUESTION_CLASSIFY = 'community_question.classify';
     public const COMMUNITY_QUESTION_MODERATE = 'community_question.moderate';
+    /** Permanent removal of a question and every answer under it. Admin-only. */
+    public const COMMUNITY_QUESTION_DELETE   = 'community_question.delete';
 
     /** Community — official answer lifecycle */
     public const COMMUNITY_ANSWER_GENERATE             = 'community_answer.generate';
@@ -310,6 +318,8 @@ final class Permissions
     public const COMMUNITY_ANSWER_RESTORE              = 'community_answer.restore';
     public const COMMUNITY_ANSWER_WITHDRAW             = 'community_answer.withdraw';
     public const COMMUNITY_ANSWER_OVERRIDE_VALIDATION  = 'community_answer.override_validation';
+    /** Permanent removal of an answer with its versions and approvals. Admin-only. */
+    public const COMMUNITY_ANSWER_DELETE               = 'community_answer.delete';
 
     /** Community — identity and settings management */
     public const COMMUNITY_IDENTITY_MANAGE  = 'community_identity.manage';
@@ -528,6 +538,7 @@ final class Permissions
                 self::CONTENT_VIEW, self::CONTENT_CREATE, self::CONTENT_EDIT,
                 self::CONTENT_SUBMIT, self::CONTENT_REVIEW, self::CONTENT_APPROVE,
                 self::CONTENT_REJECT, self::CONTENT_SCHEDULE_PERM, self::CONTENT_ARCHIVE,
+                self::CONTENT_DELETE,
             ],
             'content_version'    => [self::CONTENT_VERSION_VIEW, self::CONTENT_VERSION_CREATE],
             'content_comment'    => [
@@ -569,6 +580,7 @@ final class Permissions
             'community_intake'     => [self::COMMUNITY_INTAKE_CREATE, self::COMMUNITY_INTAKE_IMPORT],
             'community_question'   => [
                 self::COMMUNITY_QUESTION_EDIT, self::COMMUNITY_QUESTION_CLASSIFY, self::COMMUNITY_QUESTION_MODERATE,
+                self::COMMUNITY_QUESTION_DELETE,
             ],
             'community_answer'     => [
                 self::COMMUNITY_ANSWER_GENERATE, self::COMMUNITY_ANSWER_EDIT,
@@ -576,7 +588,7 @@ final class Permissions
                 self::COMMUNITY_ANSWER_APPROVE, self::COMMUNITY_ANSWER_SCHEDULE,
                 self::COMMUNITY_ANSWER_PUBLISH, self::COMMUNITY_ANSWER_UNPUBLISH,
                 self::COMMUNITY_ANSWER_RESTORE, self::COMMUNITY_ANSWER_WITHDRAW,
-                self::COMMUNITY_ANSWER_OVERRIDE_VALIDATION,
+                self::COMMUNITY_ANSWER_OVERRIDE_VALIDATION, self::COMMUNITY_ANSWER_DELETE,
             ],
             'community_identity'   => [self::COMMUNITY_IDENTITY_MANAGE],
             'community_settings'   => [self::COMMUNITY_SETTINGS_MANAGE],

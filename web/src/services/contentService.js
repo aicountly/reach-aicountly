@@ -41,6 +41,10 @@ export const contentService = {
   createItem: (data) => request('POST', '/content/items', data),
   updateItem: (id, data) => request('PUT', `/content/items/${id}`, data),
   deleteItem: (id, reason) => request('DELETE', `/content/items/${id}`, { reason }),
+  // Permanent: removes the item, its versions and its public deployment.
+  // `force` deletes from Reach even when the public takedown failed.
+  purgeItem: (id, reason, force = false) =>
+    request('DELETE', `/content/items/${id}/purge`, { reason, force }),
   getTransitions: (id) => request('GET', `/content/items/${id}/transitions`),
 
   // Workflow

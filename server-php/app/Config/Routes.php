@@ -461,6 +461,8 @@ $routes->group('v1', static function ($routes) {
         $routes->get('content/items/(:num)',                       'Api\\V1\\Content\\ContentItemController::show/$1',        ['filter' => 'permission:content.view']);
         $routes->put('content/items/(:num)',                       'Api\\V1\\Content\\ContentItemController::update/$1',      ['filter' => 'permission:content.edit']);
         $routes->delete('content/items/(:num)',                    'Api\\V1\\Content\\ContentItemController::delete/$1',      ['filter' => 'permission:content.edit']);
+        // Permanent delete — archives are reversible, this is not.
+        $routes->delete('content/items/(:num)/purge',              'Api\\V1\\Content\\ContentItemController::purge/$1',       ['filter' => 'permission:content.delete']);
         $routes->post('content/items/(:num)/submit',               'Api\\V1\\Content\\ContentItemController::submit/$1',      ['filter' => 'permission:content.submit']);
         $routes->post('content/items/(:num)/approve',              'Api\\V1\\Content\\ContentItemController::approve/$1',     ['filter' => ['permission:content.approve', 'throttle:approval']]);
         $routes->post('content/items/(:num)/reject',               'Api\\V1\\Content\\ContentItemController::reject/$1',      ['filter' => ['permission:content.approve', 'throttle:approval']]);
@@ -605,6 +607,7 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community/questions/stats',                            'Api\\V1\\Community\\QuestionController::stats',                           ['filter' => 'permission:community.view']);
         $routes->get('community/questions/(:segment)',                       'Api\\V1\\Community\\QuestionController::show/$1',                         ['filter' => 'permission:community.view']);
         $routes->put('community/questions/(:segment)/status',                'Api\\V1\\Community\\QuestionController::updateStatus/$1',                 ['filter' => 'permission:community_question.edit']);
+        $routes->delete('community/questions/(:segment)',                    'Api\\V1\\Community\\QuestionController::destroy/$1',                      ['filter' => 'permission:community_question.delete']);
 
         // Official Identities
         $routes->get('community/identities',                                 'Api\\V1\\Community\\OfficialIdentityController::index',                   ['filter' => 'permission:community.view']);
@@ -618,6 +621,7 @@ $routes->group('v1', static function ($routes) {
         $routes->post('community/answers',                                   'Api\\V1\\Community\\OfficialAnswerController::create',                    ['filter' => 'permission:community_answer.generate']);
         $routes->get('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::show/$1',                   ['filter' => 'permission:community.view']);
         $routes->put('community/answers/(:segment)',                         'Api\\V1\\Community\\OfficialAnswerController::update/$1',                 ['filter' => 'permission:community_answer.edit']);
+        $routes->delete('community/answers/(:segment)',                      'Api\\V1\\Community\\OfficialAnswerController::destroy/$1',                ['filter' => 'permission:community_answer.delete']);
         $routes->get('community/answers/(:segment)/versions',                'Api\\V1\\Community\\OfficialAnswerController::versions/$1',               ['filter' => 'permission:community.view']);
         $routes->post('community/answers/(:segment)/generate',               'Api\\V1\\Community\\OfficialAnswerController::generate/$1',               ['filter' => 'permission:community_answer.generate']);
         $routes->post('community/answers/(:segment)/validate',               'Api\\V1\\Community\\OfficialAnswerController::validateAnswer/$1',         ['filter' => 'permission:community_answer.review']);

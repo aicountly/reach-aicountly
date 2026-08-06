@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 
 // Keys mirror App\Enums\CommunityAnswerStatus — the old map used invented
@@ -34,6 +36,9 @@ const STATUS_HINT = {
 
 export default function OfficialAnswerEditorPage() {
   const { uuid } = useParams();
+  const navigate = useNavigate();
+  const { has } = usePermission();
+  const canDelete = has('community_answer.delete');
   const [answer, setAnswer]   = useState(null);
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,6 +146,22 @@ export default function OfficialAnswerEditorPage() {
           <span className={`badge ${answer.risk_classification === 'high' || answer.risk_classification === 'critical' ? 'badge--error' : 'badge--warning'}`}>
             Risk: {answer.risk_classification}
           </span>
+        )}
+        {canDelete && (
+          <DeleteButton
+            className="btn btn--sm btn--danger ml-2"
+            confirmMessage={
+              'Permanently delete this official answer?\n\n'
+              + 'Its versions, approvals and deployment records go with it, and a '
+              + 'published answer is removed from the public site. This cannot be undone.'
+            }
+            onDelete={(force) => api.delete(
+              `v1/community/answers/${answerUuid}`,
+              { reason: 'Deleted from the answer editor', force },
+            )}
+            onDeleted={() => navigate('/community/answers')}
+            onError={(msg) => msg && setActionMsg(msg)}
+          />
         )}
       </div>
 

@@ -246,6 +246,10 @@ class RolesAndPermissionsSeeder extends Seeder
                         Permissions::COMMUNITY_ANSWER_OVERRIDE_VALIDATION,
                         Permissions::COMMUNITY_AUDIT_VIEW,
                         Permissions::COMMUNITY_ENGAGEMENT_INGEST,
+                        // Permanent Q&A removal stays with admins: the operational
+                        // community_* roles withdraw and archive, they never purge.
+                        Permissions::COMMUNITY_QUESTION_DELETE,
+                        Permissions::COMMUNITY_ANSWER_DELETE,
                     ],
                 ))),
             ],

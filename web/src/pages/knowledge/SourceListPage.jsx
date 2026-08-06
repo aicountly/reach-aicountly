@@ -8,6 +8,8 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { SourceAuthorityBadge } from '../../components/knowledge/SourceAuthorityBadge';
+import { usePermission } from '../../hooks/usePermission';
+import { knowledgeDeleteColumn } from './knowledgeDeleteColumn';
 
 const STATUS_OPTIONS  = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const SOURCE_TYPES    = ['', 'official_docs', 'press_release', 'third_party', 'community', 'internal'];
@@ -22,6 +24,7 @@ export function SourceListPage() {
   const [search, setSearch]       = useState('');
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
+  const { has } = usePermission();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -49,6 +52,14 @@ export function SourceListPage() {
     { key: 'authority_score', label: 'Authority', render: (r) => <SourceAuthorityBadge score={r.authority_score} sourceType={r.source_type} /> },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    ...knowledgeDeleteColumn({
+      can: has('source.manage'),
+      entityLabel: 'source',
+      nameOf: (r) => r.name,
+      onDelete: (r) => knowledgeService.deleteSource(r.id),
+      onDeleted: load,
+      onError: setError,
+    }),
   ];
 
   return (

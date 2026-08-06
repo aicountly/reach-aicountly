@@ -71,6 +71,7 @@ class AuditLogger
     public const CONTENT_CREATED              = 'content.created';
     public const CONTENT_UPDATED              = 'content.updated';
     public const CONTENT_ARCHIVED             = 'content.archived';
+    public const CONTENT_DELETED              = 'content.deleted';
     public const CONTENT_STATUS_CHANGED       = 'content.status_changed';
     public const CONTENT_SUBMITTED            = 'content.submitted';
     public const CONTENT_APPROVED             = 'content.approved';
@@ -177,6 +178,7 @@ class AuditLogger
     public const COMMUNITY_QUESTION_DUPLICATE_MERGED    = 'community.question.duplicate_merged';
     public const COMMUNITY_QUESTION_MODERATED           = 'community.question.moderated';
     public const COMMUNITY_QUESTION_ARCHIVED            = 'community.question.archived';
+    public const COMMUNITY_QUESTION_DELETED             = 'community.question.deleted';
 
     public const COMMUNITY_ANSWER_GENERATION_REQUESTED  = 'community.answer.generation_requested';
     public const COMMUNITY_ANSWER_GENERATION_STARTED    = 'community.answer.generation_started';
@@ -209,6 +211,7 @@ class AuditLogger
     public const COMMUNITY_ANSWER_UNPUBLISHED           = 'community.answer.unpublished';
     public const COMMUNITY_ANSWER_WITHDRAWN             = 'community.answer.withdrawn';
     public const COMMUNITY_ANSWER_RESTORED              = 'community.answer.restored';
+    public const COMMUNITY_ANSWER_DELETED               = 'community.answer.deleted';
 
     public const COMMUNITY_IDENTITY_CREATED             = 'community.identity.created';
     public const COMMUNITY_IDENTITY_UPDATED             = 'community.identity.updated';

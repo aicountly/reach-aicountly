@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Community\CommunityPurgeService;
 use App\Libraries\Community\CommunityQuestionIntakeService;
 use App\Libraries\Community\CommunityQuestionRepository;
 use App\Libraries\AuditLogger;
@@ -116,6 +117,38 @@ class QuestionController extends BaseApiController
 
         AuditLogger::record(AuditLogger::COMMUNITY_QUESTION_STATUS_CHANGED, compact('uuid', 'newStatus'));
         return $this->response->setJSON(['success' => true]);
+    }
+
+    /**
+     * DELETE /community/questions/(:segment)
+     *
+     * Permanent removal of the question and every official answer under it.
+     * Published answers are taken down first; pass {"force": true} to delete
+     * from Reach even if that fails.
+     */
+    public function destroy(string $uuid): ResponseInterface
+    {
+        $question = $this->repo->findByUuid($uuid);
+        if (!$question) {
+            return $this->response->setStatusCode(404)->setJSON(['ok' => false, 'error' => 'Question not found.']);
+        }
+
+        $body   = $this->request->getJSON(true) ?? [];
+        $reason = trim((string) ($body['reason'] ?? ''));
+        $force  = filter_var($body['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        try {
+            $result = (new CommunityPurgeService())->purgeQuestion(
+                (int) $question['id'],
+                $reason !== '' ? $reason : 'Deleted from the Reach panel',
+                $this->userId(),
+                $force
+            );
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(409)->setJSON(['ok' => false, 'error' => $e->getMessage()]);
+        }
+
+        return $this->response->setJSON(['data' => $result]);
     }
 
     /** GET /community/questions/stats */

@@ -65,12 +65,19 @@ A product is **AI-ready** only when:
 
 ---
 
-## Soft deletes
+## Deleting records
+
+Every knowledge list page (products, personas, industries, markets, business
+problems, search intents, topic clusters, claims, sources, citations, brand
+rules, content policies) has a **Delete** action in its Actions column. It is
+shown only to users holding that entity's manage permission — `product.manage`,
+`persona.manage`, `claim.manage` and so on — which is the same permission the
+`DELETE /v1/knowledge/<entity>/:id` route enforces.
 
 Knowledge records are soft-deleted (`deleted_at IS NOT NULL`). Deleted records
-do not appear in any UI or API response by default. To permanently purge records,
-contact a `super_admin` who can do so via raw DB access or a future purge
-command.
+do not appear in any UI or API response by default. To permanently purge rows
+from the database, contact a `super_admin` who can do so via raw DB access or a
+future purge command.
 
 ---
 

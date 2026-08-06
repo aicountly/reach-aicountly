@@ -6,6 +6,7 @@ import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
+import { DeleteButton } from '../../components/common/DeleteButton';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
@@ -34,6 +35,7 @@ export function ContentListPage() {
   const nav = useNavigate();
 
   const canCreate = has('content.create');
+  const canDelete = has('content.delete');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -57,6 +59,20 @@ export function ContentListPage() {
     { key: 'risk', label: 'Risk', render: (r) => <ContentRiskBadge level={r.risk_level} /> },
     { key: 'due', label: 'Due', render: (r) => r.review_due_at ? new Date(r.review_due_at).toLocaleDateString() : '—' },
     { key: 'created', label: 'Created', render: (r) => new Date(r.created_at).toLocaleDateString() },
+    ...(canDelete ? [{
+      key: 'actions', label: 'Actions', width: 110, render: (r) => (
+        <DeleteButton
+          confirmMessage={
+            `Permanently delete “${r.title || 'untitled'}”?\n\n`
+            + 'Its versions, comments and validations go with it, and a published '
+            + 'article is removed from AICOUNTLY.com. This cannot be undone.'
+          }
+          onDelete={(force) => contentService.purgeItem(r.id, 'Deleted from Content Studio', force)}
+          onDeleted={load}
+          onError={setError}
+        />
+      ),
+    }] : []),
   ];
 
   return (

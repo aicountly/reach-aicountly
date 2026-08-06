@@ -74,7 +74,8 @@ export const api = {
   post:   (path, body)   => request(path, { method: 'POST', body: body ? JSON.stringify(body) : null }),
   put:    (path, body)   => request(path, { method: 'PUT',  body: body ? JSON.stringify(body) : null }),
   patch:  (path, body)   => request(path, { method: 'PATCH', body: body ? JSON.stringify(body) : null }),
-  delete: (path)         => request(path, { method: 'DELETE' }),
+  // A DELETE may carry a body — deletions that need a reason or a force flag.
+  delete: (path, body)   => request(path, { method: 'DELETE', body: body ? JSON.stringify(body) : null }),
   // Multipart upload — pass a FormData instance.
   upload: (path, formData) => request(path, { method: 'POST', body: formData }),
 };

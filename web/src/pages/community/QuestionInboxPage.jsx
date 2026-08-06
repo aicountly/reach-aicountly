@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
 const STATUS_OPTS = [
@@ -35,6 +37,8 @@ export default function QuestionInboxPage() {
   const [sort, setSort]           = useState('triage_score_desc');
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const { has } = usePermission();
+  const canDelete = has('community_question.delete');
 
   function load() {
     setLoading(true);
@@ -101,6 +105,22 @@ export default function QuestionInboxPage() {
                 <td>{q.source_received_at ? new Date(q.source_received_at).toLocaleDateString() : '—'}</td>
                 <td>
                   <Link to={`/community/questions/${q.external_id}`} className="btn btn--sm">Open</Link>
+                  {canDelete && (
+                    <DeleteButton
+                      className="btn btn--sm btn--danger ml-2"
+                      confirmMessage={
+                        `Permanently delete “${q.title || 'this question'}”?\n\n`
+                        + 'Every official answer written for it is deleted too, and a '
+                        + 'published answer is removed from the public site. This cannot be undone.'
+                      }
+                      onDelete={(force) => api.delete(
+                        `v1/community/questions/${q.external_id}`,
+                        { reason: 'Deleted from the question inbox', force },
+                      )}
+                      onDeleted={load}
+                      onError={(msg) => msg && alert(msg)}
+                    />
+                  )}
                 </td>
               </tr>
             ))}

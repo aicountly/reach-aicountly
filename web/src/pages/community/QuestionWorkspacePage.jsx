@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 
 const TRANSITION_STATUSES = ['triaged', 'in_progress', 'closed', 'spam'];
@@ -16,6 +18,8 @@ export default function QuestionWorkspacePage() {
   const [generating, setGenerating]       = useState(false);
   const [statusNote, setStatusNote]       = useState('');
   const [newStatus, setNewStatus]         = useState('');
+  const { has } = usePermission();
+  const canDelete = has('community_question.delete');
 
   function load() {
     setLoading(true);
@@ -65,6 +69,22 @@ export default function QuestionWorkspacePage() {
         <Link to="/community/questions" className="btn btn--sm btn--ghost mb-2">← Back to inbox</Link>
         <h1>{question.title}</h1>
         <span className="badge badge--neutral">{question.status}</span>
+        {canDelete && (
+          <DeleteButton
+            className="btn btn--sm btn--danger ml-2"
+            confirmMessage={
+              `Permanently delete “${question.title}”?\n\n`
+              + 'Every official answer written for it is deleted too, and a published '
+              + 'answer is removed from the public site. This cannot be undone.'
+            }
+            onDelete={(force) => api.delete(
+              `v1/community/questions/${uuid}`,
+              { reason: 'Deleted from the question workspace', force },
+            )}
+            onDeleted={() => navigate('/community/questions')}
+            onError={(msg) => msg && alert(msg)}
+          />
+        )}
       </div>
 
       <div className="two-col-grid">

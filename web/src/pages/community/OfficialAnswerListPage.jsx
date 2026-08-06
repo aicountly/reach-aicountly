@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { DeleteButton } from '../../components/common/DeleteButton';
+import { usePermission } from '../../hooks/usePermission';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 
 // Values mirror App\Enums\CommunityAnswerStatus — the old list used
@@ -43,6 +45,9 @@ export default function OfficialAnswerListPage() {
   const [status, setStatus]       = useState('');
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { has } = usePermission();
+  const canDelete = has('community_answer.delete');
 
   useEffect(() => {
     setLoading(true);
@@ -53,7 +58,7 @@ export default function OfficialAnswerListPage() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [status, page]);
+  }, [status, page, reloadKey]);
 
   return (
     <div>
@@ -101,6 +106,22 @@ export default function OfficialAnswerListPage() {
                 <td>{a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}</td>
                 <td>
                   <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="btn btn--sm">Edit</Link>
+                  {canDelete && (
+                    <DeleteButton
+                      className="btn btn--sm btn--danger ml-2"
+                      confirmMessage={
+                        'Permanently delete this official answer?\n\n'
+                        + 'Its versions, approvals and deployment records go with it, and a '
+                        + 'published answer is removed from the public site. This cannot be undone.'
+                      }
+                      onDelete={(force) => api.delete(
+                        `v1/community/answers/${a.uuid ?? a.external_id}`,
+                        { reason: 'Deleted from the official answers list', force },
+                      )}
+                      onDeleted={() => setReloadKey((k) => k + 1)}
+                      onError={(msg) => msg && alert(msg)}
+                    />
+                  )}
                 </td>
               </tr>
             ))}

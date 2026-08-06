@@ -23,6 +23,7 @@ enum CommunityPermission: string
     case QuestionEdit             = 'community_question.edit';
     case QuestionClassify         = 'community_question.classify';
     case QuestionModerate         = 'community_question.moderate';
+    case QuestionDelete           = 'community_question.delete';
 
     // Answer sub-domain
     case AnswerGenerate           = 'community_answer.generate';
@@ -36,6 +37,7 @@ enum CommunityPermission: string
     case AnswerRestore            = 'community_answer.restore';
     case AnswerWithdraw           = 'community_answer.withdraw';
     case AnswerOverrideValidation = 'community_answer.override_validation';
+    case AnswerDelete             = 'community_answer.delete';
 
     // Identity, settings, analytics, audit, engagement
     case IdentityManage           = 'community_identity.manage';

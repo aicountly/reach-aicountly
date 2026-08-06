@@ -392,6 +392,22 @@ class OfficialAnswerLifecycleService
         return $this->publishing->restore($answerId, $actorId);
     }
 
+    /**
+     * Permanent deletion. Archiving keeps the record; this removes it, and the
+     * public copy with it.
+     *
+     * @return array{deleted: bool, unpublished: bool}
+     */
+    public function purge(string $answerUuid, string $reason, ?int $actorId = null, bool $force = false): array
+    {
+        return (new CommunityPurgeService())->purgeAnswer(
+            $this->resolveAnswerId($answerUuid),
+            $reason,
+            $actorId,
+            $force
+        );
+    }
+
     public function archive(string $answerUuid, ?int $actorId = null): void
     {
         $answerId = $this->resolveAnswerId($answerUuid);

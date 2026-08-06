@@ -7,6 +7,8 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
+import { usePermission } from '../../hooks/usePermission';
+import { knowledgeDeleteColumn } from './knowledgeDeleteColumn';
 
 const STATUS_OPTIONS    = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const RULE_TYPE_OPTIONS = ['', 'preferred_name', 'avoid_term', 'tone', 'trademark', 'competitor_mention'];
@@ -21,6 +23,7 @@ export function BrandRulesPage() {
   const [search, setSearch]     = useState('');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
+  const { has } = usePermission();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -44,6 +47,14 @@ export function BrandRulesPage() {
     { key: 'product_id', label: 'Product', render: (r) => r.product_id ? `#${r.product_id}` : 'Global' },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    ...knowledgeDeleteColumn({
+      can: has('brand_rules.manage'),
+      entityLabel: 'brand rule',
+      nameOf: (r) => r.rule_text,
+      onDelete: (r) => knowledgeService.deleteBrandRule(r.id),
+      onDeleted: load,
+      onError: setError,
+    }),
   ];
 
   return (

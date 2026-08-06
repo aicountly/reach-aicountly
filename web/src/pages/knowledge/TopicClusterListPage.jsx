@@ -7,6 +7,8 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
+import { usePermission } from '../../hooks/usePermission';
+import { knowledgeDeleteColumn } from './knowledgeDeleteColumn';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 
@@ -19,6 +21,7 @@ export function TopicClusterListPage() {
   const [search, setSearch]   = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  const { has } = usePermission();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -39,6 +42,14 @@ export function TopicClusterListPage() {
     )},
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    ...knowledgeDeleteColumn({
+      can: has('knowledge.edit'),
+      entityLabel: 'topic cluster',
+      nameOf: (r) => r.name,
+      onDelete: (r) => knowledgeService.deleteCluster(r.id),
+      onDeleted: load,
+      onError: setError,
+    }),
   ];
 
   return (

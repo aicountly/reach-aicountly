@@ -268,6 +268,33 @@ class OfficialAnswerController extends BaseApiController
         ]));
     }
 
+    /**
+     * DELETE /community/answers/(:segment)
+     *
+     * Permanent removal, not a withdrawal: the answer, its versions, approvals
+     * and deployment records all go. A published answer is taken down first;
+     * pass {"force": true} to delete from Reach even if that fails.
+     */
+    public function destroy(string $uuid): ResponseInterface
+    {
+        $body   = $this->request->getJSON(true) ?? [];
+        $reason = trim((string) ($body['reason'] ?? ''));
+        $force  = filter_var($body['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($this->repo->findByUuid($uuid) === null) {
+            return $this->notFound();
+        }
+
+        return $this->guard(fn () => $this->response->setJSON([
+            'data' => $this->lifecycle->purge(
+                $uuid,
+                $reason !== '' ? $reason : 'Deleted from the Reach panel',
+                $this->userId(),
+                $force
+            ),
+        ]));
+    }
+
     /** GET /community/answers/(:segment)/versions */
     public function versions(string $uuid): ResponseInterface
     {

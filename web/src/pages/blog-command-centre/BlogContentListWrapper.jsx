@@ -4,10 +4,12 @@ import { contentService } from '../../services/contentService';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
+import { DeleteButton } from '../../components/common/DeleteButton';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { ROUTES } from '../../constants/routes';
+import { usePermission } from '../../hooks/usePermission';
 
 const WORKFLOW_STATUSES = [
   '', 'idea', 'brief', 'brief_ready', 'outline_ready', 'draft', 'draft_generating',
@@ -26,6 +28,8 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
   const [error, setError] = useState(null);
   const [workflowStatus, setWorkflowStatus] = useState(defaultWorkflowStatus || '');
   const nav = useNavigate();
+  const { has } = usePermission();
+  const canDelete = has('content.delete');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -50,6 +54,20 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
     { key: 'status', label: 'Status', render: (r) => <ContentStatusBadge status={r.workflow_status} /> },
     { key: 'risk', label: 'Risk', render: (r) => <ContentRiskBadge level={r.risk_level} /> },
     { key: 'created', label: 'Created', render: (r) => new Date(r.created_at).toLocaleDateString() },
+    ...(canDelete ? [{
+      key: 'actions', label: 'Actions', width: 110, render: (r) => (
+        <DeleteButton
+          confirmMessage={
+            `Permanently delete the blog “${r.title || 'untitled'}”?\n\n`
+            + 'Its versions and briefs go with it, and a published article is '
+            + 'removed from AICOUNTLY.com. This cannot be undone.'
+          }
+          onDelete={(force) => contentService.purgeItem(r.id, 'Deleted from Blog Command Centre', force)}
+          onDeleted={load}
+          onError={setError}
+        />
+      ),
+    }] : []),
   ];
 
   return (

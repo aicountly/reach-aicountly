@@ -10,6 +10,7 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { usePermission } from '../../hooks/usePermission';
+import { knowledgeDeleteColumn } from './knowledgeDeleteColumn';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 
@@ -52,6 +53,14 @@ export function ProductListPage() {
       <a href={r.public_url} target="_blank" rel="noreferrer" className="text-sm">↗</a>
     ) : '—' },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    ...knowledgeDeleteColumn({
+      can: has('product.manage'),
+      entityLabel: 'product',
+      nameOf: (r) => r.name,
+      onDelete: (r) => knowledgeService.deleteProduct(r.id),
+      onDeleted: load,
+      onError: setError,
+    }),
   ];
 
   return (
