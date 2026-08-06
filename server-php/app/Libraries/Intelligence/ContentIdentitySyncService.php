@@ -208,12 +208,25 @@ class ContentIdentitySyncService
             ->where('deleted_at IS NULL', null, false)
             ->get()->getResultArray();
 
+        // Anchor the slug URL to the path the site is actually serving. Rebuilt
+        // URLs would use CanonicalUrlPolicy's /blog/ prefix while live posts sit
+        // under /blogs/, so the index would carry an entry Google can never
+        // report and miss the one it does.
+        $liveUrls = $this->publishedUrlsBySource($sourceIds);
+
         $urls = [];
         foreach ($rows as $row) {
             $slug = trim((string) ($row['slug'] ?? ''));
-            if ($slug !== '') {
-                $urls[(int) $row['id']] = $this->urlPolicy->buildUrl('blog', $slug);
+            if ($slug === '') {
+                continue;
             }
+
+            $id       = (int) $row['id'];
+            $template = $liveUrls[$id][0] ?? null;
+
+            $urls[$id] = $template !== null
+                ? self::withLastSegment($template, $slug)
+                : $this->urlPolicy->buildUrl('blog', $slug);
         }
 
         return $urls;
@@ -264,6 +277,23 @@ class ContentIdentitySyncService
         }
 
         return $index;
+    }
+
+    /**
+     * The same URL with its final path segment replaced.
+     *
+     * Used to derive "where would this post be if its current slug were live"
+     * from the URL the site is genuinely serving, so host, scheme and path
+     * prefix stay identical and the slug is the only variable.
+     */
+    public static function withLastSegment(string $url, string $segment): string
+    {
+        $trimmed  = rtrim(trim($url), '/');
+        $position = strrpos($trimmed, '/');
+
+        return $position === false
+            ? $trimmed . '/' . rawurlencode($segment)
+            : substr($trimmed, 0, $position + 1) . rawurlencode($segment);
     }
 
     /**

@@ -138,4 +138,52 @@ final class BlogUrlDriftTest extends CIUnitTestCase
         $this->assertStringContainsString('catch (\Throwable $e)', $activate);
         $this->assertStringContainsString('Redirect activation skipped', $activate);
     }
+
+    // --- URL construction -------------------------------------------------
+
+    /**
+     * CanonicalUrlPolicy emits /blog/ while the site serves /blogs/. Rebuilding
+     * the comparison URL from the policy therefore probes a path that does not
+     * exist and reports 404 for a reason unrelated to the slug — which is what
+     * the first production run of this command did. Substituting the final
+     * segment of the URL the site is actually serving keeps every other part
+     * identical.
+     */
+    public function testComparisonUrlKeepsThePathPrefixTheSiteActuallyServes(): void
+    {
+        $live = 'https://www.aicountly.com/blogs/ookkeeping-hecklist-for-ndian-s';
+
+        $this->assertSame(
+            'https://www.aicountly.com/blogs/bookkeeping-checklist-for-indian-smes',
+            \App\Libraries\Intelligence\ContentIdentitySyncService::withLastSegment(
+                $live,
+                'bookkeeping-checklist-for-indian-smes',
+            ),
+        );
+    }
+
+    public function testSegmentSwapToleratesATrailingSlash(): void
+    {
+        $this->assertSame(
+            'https://aicountly.com/blogs/new-slug',
+            \App\Libraries\Intelligence\ContentIdentitySyncService::withLastSegment(
+                'https://aicountly.com/blogs/old-slug/',
+                'new-slug',
+            ),
+        );
+    }
+
+    /**
+     * --record-redirects must be honoured however spark hands the flag over;
+     * reading it as absent turns a requested write into a silent no-op that
+     * still reports success.
+     */
+    public function testFlagsAreParsedThroughTheSharedSparkOptionHelper(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Commands/ReachBlogUrlDrift.php');
+
+        $this->assertStringContainsString('use ParsesSparkOptions;', $source);
+        $this->assertStringContainsString("\$this->sparkFlag('record-redirects', \$params)", $source);
+        $this->assertStringNotContainsString("CLI::getOption('record-redirects')", $source);
+    }
 }
