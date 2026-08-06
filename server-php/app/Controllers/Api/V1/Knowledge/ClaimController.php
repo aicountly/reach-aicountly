@@ -26,7 +26,7 @@ class ClaimController extends BaseKnowledgeController
             'product_id' => $this->request->getGet('product_id'),
             'status'     => $this->request->getGet('status'),
             'risk_level' => $this->request->getGet('risk_level'),
-            'q'          => $this->request->getGet('q'),
+            'q'          => $this->searchTerm(),
         ]));
     }
 

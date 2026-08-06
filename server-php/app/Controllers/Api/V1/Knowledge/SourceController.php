@@ -23,7 +23,7 @@ class SourceController extends BaseKnowledgeController
         return $this->listPaged(array_filter([
             'status'      => $this->request->getGet('status'),
             'source_type' => $this->request->getGet('source_type'),
-            'q'           => $this->request->getGet('q'),
+            'q'           => $this->searchTerm(),
         ]));
     }
 

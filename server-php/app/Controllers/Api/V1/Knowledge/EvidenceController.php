@@ -23,7 +23,7 @@ class EvidenceController extends BaseKnowledgeController
         return $this->listPaged(array_filter([
             'status'        => $this->request->getGet('status'),
             'evidence_type' => $this->request->getGet('evidence_type'),
-            'q'             => $this->request->getGet('q'),
+            'q'             => $this->searchTerm(),
         ]));
     }
 

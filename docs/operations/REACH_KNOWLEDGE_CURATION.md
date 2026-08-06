@@ -50,6 +50,15 @@ This command is **safe to run multiple times**. It will:
 - Skip products that have been `approved` (preserves administrator changes)
 - Create product aliases for legacy code names
 
+The same import is available without shell access from **Knowledge → Products →
+Import taxonomy** (`POST /v1/knowledge/products/import-taxonomy`, requires
+`product.manage`). Deployments do not run the import automatically, so a fresh
+environment shows an empty Products list until the command or the button is run.
+
+The taxonomy carries one dangling alias — `manage` → `manage_account`, a slug
+that is not in `SaasProductTaxonomy::products()`. The import reports it as an
+error and continues; the other aliases and every product still import.
+
 ---
 
 ## Monitoring completeness

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ArrowLeft, Check, X, Send } from 'lucide-react';
 import { knowledgeService } from '../../services/knowledgeService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
@@ -30,6 +30,13 @@ export function ProductDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const submit = async () => {
+    setBusy(true);
+    try { await knowledgeService.submitProduct(id); load(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
   const approve = async () => {
     setBusy(true);
     try { await knowledgeService.approveProduct(id); load(); }
@@ -40,13 +47,16 @@ export function ProductDetailPage() {
   const reject = async () => {
     const note = window.prompt('Rejection reason (optional):') || '';
     setBusy(true);
-    try { await knowledgeService.rejectProduct(id, note); load(); }
+    try { await knowledgeService.rejectProduct(id, { reason: note }); load(); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   };
 
   if (error) return <Alert variant="danger">{error}</Alert>;
   if (!product) return <Loader />;
+
+  // The API exposes the workflow state as `status`; older payloads used `knowledge_status`.
+  const workflowStatus = product.knowledge_status || product.status;
 
   return (
     <div>
@@ -59,13 +69,18 @@ export function ProductDetailPage() {
           <div className="text-xs text-muted">{product.slug}</div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <KnowledgeStatusBadge status={product.knowledge_status || product.status} />
-          {has('product.approve') && product.knowledge_status !== 'approved' && (
+          <KnowledgeStatusBadge status={workflowStatus} />
+          {has('knowledge.submit') && workflowStatus === 'draft' && (
+            <button className="btn btn-secondary btn-sm" disabled={busy} onClick={submit}>
+              <Send size={13} /> Submit for review
+            </button>
+          )}
+          {has('knowledge.approve') && workflowStatus === 'needs_review' && (
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={approve}>
               <Check size={13} /> Approve
             </button>
           )}
-          {has('product.approve') && product.knowledge_status !== 'rejected' && (
+          {has('knowledge.approve') && workflowStatus !== 'rejected' && workflowStatus !== 'draft' && (
             <button className="btn btn-danger btn-sm" disabled={busy} onClick={reject}>
               <X size={13} /> Reject
             </button>
@@ -87,7 +102,7 @@ export function ProductDetailPage() {
               </div>
               <div>
                 <div className="text-xs text-muted">Knowledge Status</div>
-                <KnowledgeStatusBadge status={product.knowledge_status || product.status} />
+                <KnowledgeStatusBadge status={workflowStatus} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <div className="text-xs text-muted">Short Description</div>
@@ -114,7 +129,7 @@ export function ProductDetailPage() {
         <div className="flex flex-col gap-3">
           {completeness && (
             <Card title="Completeness">
-              <CompletenessGauge percent={completeness.percent} size={80} />
+              <CompletenessGauge score={completeness.score} percent={completeness.percent} size={80} />
               {completeness.missing?.length > 0 && (
                 <ul style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
                   {completeness.missing.map((m) => <li key={m}>• {m}</li>)}

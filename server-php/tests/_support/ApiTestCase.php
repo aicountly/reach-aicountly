@@ -73,6 +73,8 @@ abstract class ApiTestCase extends DatabaseTestCase
                               'content_validation.view', 'content_assignment.view', 'content_schedule.view'],
             // blog_author: blog operations only; no community or approval access
             'blog_author'  => ['blog.view', 'blog.create', 'blog.edit', 'blog.submit'],
+            // knowledge_viewer: reads the knowledge foundation, cannot manage it
+            'knowledge_viewer' => ['knowledge.view', 'product.view'],
         ];
         $permissions = $permissionMap[$slug] ?? [];
 
