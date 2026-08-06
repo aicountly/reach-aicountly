@@ -19,6 +19,56 @@ class BlogHumanApprovalService
         $this->db = Database::connect();
     }
 
+    /** Blog states a human may push into internal_review from. */
+    private const SUBMITTABLE = [
+        BlogStateMachine::DRAFT,
+        BlogStateMachine::FACT_VERIFIED,
+        BlogStateMachine::CHANGES_REQUESTED,
+    ];
+
+    /**
+     * Hand a blog item to human review (internal_review).
+     *
+     * Blog items must not go through ContentWorkflowService's review_pending —
+     * that state is absent from BlogStateMachine, so an item parked there is
+     * invisible to isBlogAwaitingHuman() and to the HUMAN_REVIEW_GATE work
+     * block, leaving it unapprovable.
+     *
+     * @return array<string,mixed> Updated content item row
+     */
+    public function submitForReview(int $contentItemId, int $actorId, string $reason = ''): array
+    {
+        $item   = $this->requireBlogItem($contentItemId);
+        $status = strtolower((string) ($item['workflow_status'] ?? ''));
+
+        if (! in_array($status, self::SUBMITTABLE, true)) {
+            throw new \RuntimeException(
+                "Blog item must be in draft, fact_verified or changes_requested to submit for review (current: {$status})."
+            );
+        }
+
+        (new BlogStateMachine())->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, $actorId, [
+            'reason' => $reason !== '' ? $reason : 'submitted_for_human_review',
+        ]);
+
+        return $this->requireBlogItem($contentItemId);
+    }
+
+    /**
+     * True when the blog submit path applies — used to route the generic
+     * submit endpoint away from ContentWorkflowService.
+     *
+     * @param array<string,mixed> $item
+     */
+    public function isBlogSubmittable(array $item): bool
+    {
+        if (($item['content_type'] ?? '') !== 'blog') {
+            return false;
+        }
+
+        return in_array(strtolower((string) ($item['workflow_status'] ?? '')), self::SUBMITTABLE, true);
+    }
+
     /**
      * @return array<string,mixed> Updated content item row
      */

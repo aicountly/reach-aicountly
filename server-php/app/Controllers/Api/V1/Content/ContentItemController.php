@@ -173,8 +173,19 @@ class ContentItemController extends BaseContentController
             return $item;
         }
 
+        $actor = $this->actor();
+        $blog  = new BlogHumanApprovalService();
+
         try {
-            $updated = $this->workflow->submit($item['id'], $this->actor());
+            // Blogs run on BlogStateMachine, whose human-review state is
+            // internal_review; the generic review_pending is not a blog state.
+            if ($blog->isBlogSubmittable($item)) {
+                $updated = $blog->submitForReview((int) $item['id'], (int) ($actor['id'] ?? 0));
+
+                return $this->ok($updated);
+            }
+
+            $updated = $this->workflow->submit($item['id'], $actor);
             return $this->ok($updated);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);

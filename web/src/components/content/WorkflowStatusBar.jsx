@@ -36,7 +36,10 @@ export function WorkflowStatusBar({ currentStatus, nextStatuses = [] }) {
             </div>
           );
         })}
-        {['changes_requested', 'archived', 'rejected'].includes(currentStatus) && (
+        {/* Off-track states (changes_requested/rejected) and blog-only automation
+            states are absent from ORDERED_STATES — badge them so the bar never
+            renders with nothing marked current. */}
+        {currentIndex === -1 && currentStatus && (
           <div style={{ marginLeft: 16 }}>
             <ContentStatusBadge status={currentStatus} />
           </div>

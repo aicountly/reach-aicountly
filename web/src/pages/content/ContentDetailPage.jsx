@@ -13,8 +13,9 @@ import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
 const AWAITING_HUMAN = new Set(['review_pending', 'internal_review', 'seo_review']);
-// Mirrors the sources ContentWorkflowService::submit() accepts.
-const SUBMITTABLE = new Set(['draft', 'validation_pending', 'changes_requested']);
+// Mirrors the sources the submit endpoint accepts: ContentWorkflowService::submit()
+// for generic items, BlogHumanApprovalService::submitForReview() for blogs.
+const SUBMITTABLE = new Set(['draft', 'validation_pending', 'changes_requested', 'fact_verified']);
 const PUBLISHABLE = new Set(['approved', 'scheduled']);
 
 export function ContentDetailPage() {
