@@ -26,7 +26,15 @@ const asset = (over = {}) => ({
 
 const deficit = {
   deficit: 2, needed: 3, available: 1, untagged: 0, lookahead_days: 14,
-  upcoming: [{ key: 'gst-itc', title: 'GSTR-2B mismatch', target_date: '2026-08-06', cover_prompt: 'Two document stacks' }],
+  upcoming: [{
+    key: 'gst-itc',
+    title: 'GSTR-2B mismatch',
+    target_date: '2026-08-06',
+    stream: 'marketing',
+    cover_prompt: 'Two document stacks',
+    image_prompt: 'Generate one landscape image, 3:2 aspect ratio (1536x1024), for use as a blog cover. Flat editorial illustration…',
+    suggested_tags: ['gstr', 'mismatch', 'reconciliation'],
+  }],
 };
 
 beforeEach(() => {
@@ -103,7 +111,30 @@ describe('Cover gallery', () => {
     renderWithAuth(<MediaGalleryPage />);
 
     // 3 assets, but only the tagged gallery_upload can be matched to an article.
-    await waitFor(() => expect(screen.getByText(/1 of 3 are rotation-ready/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/1 of 3 active covers are rotation-ready/)).toBeInTheDocument());
+  });
+
+  it('offers a paste-ready prompt rather than the bare scene note', async () => {
+    renderWithAuth(<MediaGalleryPage />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Copy prompt/ })).toBeInTheDocument());
+    expect(screen.getByText(/paste into ChatGPT or Gemini as-is/)).toBeInTheDocument();
+    expect(screen.getByText(/Generate one landscape image, 3:2 aspect ratio/)).toBeInTheDocument();
+  });
+
+  it('carries the suggested tags straight into the upload form', async () => {
+    const user = userEvent.setup();
+    renderWithAuth(<MediaGalleryPage />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Use these tags/ })).toBeInTheDocument());
+    expect(screen.getByText('gstr, mismatch, reconciliation')).toBeInTheDocument();
+
+    // Tagging is what makes an upload matchable, so the console should not
+    // make the operator retype what it just worked out.
+    await user.click(screen.getByRole('button', { name: /Use these tags/ }));
+
+    expect(await screen.findByText('Upload cover image')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('gst, accounting')).toHaveValue('gstr, mismatch, reconciliation');
   });
 
   it('warns when the cover directory is unwritable, because uploads will fail', async () => {
