@@ -64,7 +64,11 @@ The section is now a first-class sidebar destination in the **SEO** block, renam
 | `/blog-command-centre/seo/sitemap` | `/blog-seo/sitemap` | SHARED | `SitemapOverviewPage` |
 | `/blog-command-centre/seo/technical` | `/blog-seo/technical` | SCAFFOLD | — |
 
-Old paths stay registered as redirects (bookmarks preserved), and `BlogSeoLayout` enforces RBAC at the layout level (`blog.view` or `seo.view`) so the direct URL cannot bypass the hidden menu entry — the same F-02 rule `BlogCommandCentreLayout` follows.
+`BlogSeoLayout` enforces RBAC at the layout level (`blog.view` or `seo.view`) so the direct URL cannot bypass the hidden menu entry — the same F-02 rule `BlogCommandCentreLayout` follows.
+
+**Not behind `isBlogCommandCentreEnabled()`.** That flag rolls out the blog *automation* pipeline (roadmap → drafts → verification → publishing); none of these six leaves touch it. They report Search Console, indexing and sitemap state for blogs that exist in either flag state, so access here is a permission question (`blog.view` / `seo.view`), not a rollout question — and coupling an SEO destination to a blog-pipeline flag would reshape the SEO sidebar block whenever an unrelated subsystem is toggled.
+
+That decision is what forces the redirects' placement: the seven legacy paths are registered **outside** the flag-gated `/blog-command-centre` route block and outside `BlogCommandCentreLayout` (alongside the existing `/blogs/manage` redirect). Nested inside it they would dead-end at the router catch-all whenever the flag is off, and would hit the layout's `blog.view` denial for a `seo.view`-only operator — even though `/blog-seo` itself is reachable in both cases.
 
 ## Legacy vs current
 

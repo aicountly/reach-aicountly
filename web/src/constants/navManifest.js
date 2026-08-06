@@ -51,6 +51,15 @@ export function buildNavSections() {
         { label: 'SEO Command Centre', path: '/seo-centre', icon: Search, requires: 'seo.view' },
         // Was the Blog Command Centre's "SEO and Indexing" tab; renamed so it
         // no longer reads as a rival of the SEO Command Centre above.
+        //
+        // Deliberately NOT behind isBlogCommandCentreEnabled(): that flag
+        // rolls out the blog *automation* pipeline (roadmap → drafts →
+        // verification → publishing), and none of this section's leaves touch
+        // it — they report Search Console, indexing and sitemap state for
+        // blogs that exist either way. Access is a permission question
+        // (blog.view), not a rollout question, and coupling an SEO
+        // destination to a blog-pipeline flag would reshape this block when
+        // someone toggles an unrelated subsystem.
         { label: 'Blog SEO and Indexing', path: ROUTES.BLOG_SEO, icon: FileSearch, requires: 'blog.view' },
       ],
     },
