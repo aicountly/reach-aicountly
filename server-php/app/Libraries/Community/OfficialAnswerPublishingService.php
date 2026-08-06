@@ -350,7 +350,16 @@ class OfficialAnswerPublishingService
     }
 
     /** Exponential backoff capped at one hour. */
-    private function backoffSeconds(int $attempt): int
+    /**
+     * Delay before the next retry of a failed deployment.
+     *
+     * Public and static so the schedule is verifiable without a database: it
+     * decides how long a stuck publication waits, and the sweep only picks a
+     * deployment back up once next_retry_at has passed. Doubling from 30s and
+     * capped at an hour, so five attempts span roughly eight minutes rather
+     * than hammering a public site that is already failing.
+     */
+    public static function backoffSeconds(int $attempt): int
     {
         return (int) min(3600, 30 * (2 ** max(0, $attempt - 1)));
     }
