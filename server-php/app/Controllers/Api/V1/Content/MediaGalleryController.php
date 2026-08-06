@@ -30,13 +30,25 @@ class MediaGalleryController extends BaseApiController
 
         $store = new MediaAssetStore($db);
         $rows  = array_map(static function (array $row) use ($store): array {
+            // Computed before file_path is stripped: a row whose binary is gone
+            // renders as a broken <img> with no clue why, which is how a
+            // missing upload directory hides for weeks.
+            $row['file_missing'] = ! is_file((string) ($row['file_path'] ?? ''));
             unset($row['file_path']);
             $row['public_url'] = $store->publicUrl($row);
 
             return $row;
         }, $builder->get()->getResultArray());
 
-        return $this->ok(['assets' => $rows]);
+        // Serving is HMAC-signed and fails closed: with no MEDIA_SIGNING_KEY,
+        // publicUrl() still mints a URL but verifySignature() rejects every
+        // request, so all covers 404 — in this gallery AND on aicountly.com.
+        // Report it rather than leaving an operator to guess from broken tiles.
+        return $this->ok([
+            'assets'                 => $rows,
+            'signing_key_configured' => trim((string) env('MEDIA_SIGNING_KEY', '')) !== '',
+            'files_missing'          => count(array_filter($rows, static fn (array $r): bool => $r['file_missing'])),
+        ]);
     }
 
     public function upload()
