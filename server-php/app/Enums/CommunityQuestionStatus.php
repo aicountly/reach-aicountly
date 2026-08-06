@@ -35,12 +35,16 @@ enum CommunityQuestionStatus: string
             self::Triaged            => [self::DraftRequested, self::Archived, self::DuplicateMerged],
             self::DraftRequested     => [self::Generating, self::Archived],
             self::Generating         => [self::DraftGenerated, self::ValidationFailed],
-            self::DraftGenerated     => [self::ValidationFailed, self::ModerationRequired, self::EditorialReview],
-            self::ValidationFailed   => [self::DraftGenerated, self::Archived],
-            self::ModerationRequired => [self::DraftGenerated, self::Archived],
+            // Regeneration is re-enterable from every pre-approval state, so a
+            // question can follow its answer back into `generating` when an
+            // operator retries a failed or rejected draft. Without these the
+            // question would strand one state behind its own answer.
+            self::DraftGenerated     => [self::ValidationFailed, self::ModerationRequired, self::EditorialReview, self::Generating],
+            self::ValidationFailed   => [self::DraftGenerated, self::Generating, self::Archived],
+            self::ModerationRequired => [self::DraftGenerated, self::Generating, self::Archived],
             self::EditorialReview    => [self::ProfessionalReview, self::ChangesRequested, self::Approved],
             self::ProfessionalReview => [self::ChangesRequested, self::Approved],
-            self::ChangesRequested   => [self::DraftGenerated],
+            self::ChangesRequested   => [self::DraftGenerated, self::Generating],
             self::Approved           => [self::Scheduled, self::Publishing],
             self::Scheduled          => [self::Publishing, self::Approved],
             self::Publishing         => [self::Published, self::VerificationFailed],

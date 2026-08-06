@@ -202,6 +202,55 @@ draft_generated
                     └── withdrawn ──► archived
 ```
 
+### Question status is mirrored from its official answer
+
+A question and its official answer share this state machine and the same case
+names on purpose: the answer is where work happens, and the question's status
+is a projection of it used by the Question Inbox.
+
+`CommunityQuestionStatusMirror` performs that projection. Every answer status
+write — `OfficialAnswerRepository::transitionStatus()` and any
+`save()` carrying a `status` — walks the owning question to the matching
+status, one legal transition at a time (the shortest route is computed by
+breadth-first search over `CommunityQuestionStatus::validTransitions`).
+
+Mirroring is best-effort: a failure is logged and swallowed, because a
+reporting projection must never abort the lifecycle that produced it. Manual
+`PUT /community/questions/{uuid}/status` calls remain available for the moves
+an operator makes on the question itself (triage, archive, duplicate merge).
+
+Before the mirror existed, the only question transition in the system was the
+one-way hop to `draft_requested` performed when a draft answer was reserved, so
+every question with an answer showed `draft_requested` in the inbox forever —
+including questions whose answer was already live on aicountly.com.
+
+---
+
+## Publication Sequence
+
+Publishing to aicountly.com is a three-call conversation, mirroring the Phase 4
+blog path (`create_draft` → `publish`). The public site holds its own records,
+so both the question and the answer must exist there before either can go live:
+
+```
+POST /reach/v1/community/questions              (create_question)  — once per question
+POST /reach/v1/community/answers                (create_answer)    — once per answer
+   or PUT /reach/v1/community/answers/{uuid}    (update_answer)    — on re-publication
+POST /reach/v1/community/answers/{uuid}/publish (publish)
+```
+
+`OfficialAnswerPublishingService::publish()` runs all three. The create steps
+are guarded by stored identifiers — `reach_community_questions.public_question_id`
+and `reach_community_official_answers.public_external_id` — so repeat
+publications and deployment retries update the existing public records rather
+than creating duplicates. A failure in either create step is recorded on the
+deployment (`last_error_category = public_record_creation`) and retried by the
+usual backoff sweep.
+
+On success the question row records where readers can find it:
+`public_url` (the answer's canonical URL minus the `#official-answer`
+fragment) and `published_at`. The Question Inbox links out to that URL.
+
 ---
 
 ## Answer Version Immutability

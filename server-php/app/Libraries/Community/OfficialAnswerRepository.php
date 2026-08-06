@@ -10,12 +10,19 @@ use RuntimeException;
 /**
  * Repository for official answer aggregates.
  * Encapsulates multi-table queries and state-machine transition enforcement.
+ *
+ * Every write that moves an answer's status also mirrors that status onto the
+ * owning question (see CommunityQuestionStatusMirror). Mirroring lives here
+ * rather than in the individual lifecycle services because status is written
+ * from two places — transitionStatus() and save() with a 'status' key — and a
+ * mirror that any caller can forget is a mirror that drifts.
  */
 class OfficialAnswerRepository
 {
     public function __construct(
         private readonly CommunityOfficialAnswerModel $answerModel = new CommunityOfficialAnswerModel(),
-        private readonly CommunityAnswerVersionModel  $versionModel = new CommunityAnswerVersionModel()
+        private readonly CommunityAnswerVersionModel  $versionModel = new CommunityAnswerVersionModel(),
+        private readonly CommunityQuestionStatusMirror $questionMirror = new CommunityQuestionStatusMirror()
     ) {}
 
     public function findById(int $id): ?array
@@ -48,6 +55,14 @@ class OfficialAnswerRepository
             return (int) $this->answerModel->getInsertID();
         }
         $this->answerModel->update($data['id'], $data);
+
+        // Generation success and publication success both set the status
+        // through save() rather than transitionStatus(); mirror those too.
+        $status = isset($data['status']) ? CommunityAnswerStatus::tryFrom((string) $data['status']) : null;
+        if ($status !== null) {
+            $this->questionMirror->syncFromAnswerId((int) $data['id'], $status);
+        }
+
         return (int) $data['id'];
     }
 
@@ -69,6 +84,8 @@ class OfficialAnswerRepository
         if (!$affected) {
             throw new RuntimeException("Status transition failed (concurrent modification?) for answer #{$id}");
         }
+
+        $this->questionMirror->syncFromAnswerId($id, $to);
     }
 
     public function saveVersion(array $versionData): int
@@ -148,5 +165,19 @@ class OfficialAnswerRepository
     public function countByStatus(): array
     {
         return $this->answerModel->countByStatus();
+    }
+
+    /**
+     * Answers belonging to one question, addressed the way the HTTP surface
+     * addresses questions — by UUID.
+     */
+    public function listForQuestionUuid(string $questionUuid): array
+    {
+        $question = (new CommunityQuestionRepository())->findByUuid($questionUuid);
+        if ($question === null) {
+            return [];
+        }
+
+        return $this->answerModel->listForQuestion((int) $question['id']);
     }
 }

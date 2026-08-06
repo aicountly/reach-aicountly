@@ -3,7 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 
-const TRANSITION_STATUSES = ['triaged', 'in_progress', 'closed', 'spam'];
+// Manual overrides only. The normal lifecycle statuses are mirrored from the
+// official answer as it is generated, reviewed and published, so this list is
+// limited to the moves an operator makes on the question itself.
+const TRANSITION_STATUSES = ['triaged', 'draft_requested', 'archived', 'duplicate_merged'];
 
 export default function QuestionWorkspacePage() {
   const { uuid } = useParams();
@@ -48,7 +51,8 @@ export default function QuestionWorkspacePage() {
     setGenerating(true);
     api.post('v1/community/answers', { question_uuid: uuid })
       .then(r => {
-        const answerUuid = r?.external_id ?? r?.data?.external_id;
+        const created = r?.data ?? r;
+        const answerUuid = created?.uuid ?? created?.external_id;
         if (answerUuid) navigate(`/community/answers/${answerUuid}`);
       })
       .catch(e => alert(e.message))
@@ -71,12 +75,18 @@ export default function QuestionWorkspacePage() {
         <section className="card">
           <h2 className="card__title">Question details</h2>
           <dl className="meta-list">
-            <dt>UUID</dt><dd><code>{question.external_id}</code></dd>
+            <dt>UUID</dt><dd><code>{question.uuid ?? question.external_id}</code></dd>
             <dt>Space</dt><dd>{question.space_slug ?? '—'}</dd>
-            <dt>Source</dt><dd>{question.source_platform ?? '—'}</dd>
+            <dt>Source</dt><dd>{question.source_type ?? question.source_platform ?? '—'}</dd>
             <dt>Risk</dt><dd>{question.risk_classification ?? '—'}</dd>
             <dt>Triage score</dt><dd>{question.triage_score ?? '—'}</dd>
-            <dt>Received</dt><dd>{question.source_received_at ?? '—'}</dd>
+            <dt>Received</dt><dd>{question.intake_timestamp ?? question.question_timestamp ?? '—'}</dd>
+            <dt>Public page</dt>
+            <dd>
+              {question.public_url
+                ? <a href={question.public_url} target="_blank" rel="noreferrer">{question.public_url}</a>
+                : 'Not published yet'}
+            </dd>
           </dl>
           <div className="mt-3">
             <p className="label">Body</p>
@@ -112,12 +122,19 @@ export default function QuestionWorkspacePage() {
             ) : answers.map(a => (
               <div key={a.id} className="list-item">
                 <span className="badge badge--neutral">{a.status}</span>
-                <Link to={`/community/answers/${a.external_id}`} className="ml-2">{a.external_id}</Link>
+                <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="ml-2">
+                  {a.uuid ?? a.external_id}
+                </Link>
               </div>
             ))}
-            <button className="btn btn--sm mt-2" onClick={handleGenerateAnswer} disabled={generating}>
-              {generating ? 'Creating…' : '+ Create official answer'}
-            </button>
+            {/* A question carries at most one official answer; offering the
+                action again would only produce a "already has official
+                answer" error. */}
+            {answers.length === 0 && (
+              <button className="btn btn--sm mt-2" onClick={handleGenerateAnswer} disabled={generating}>
+                {generating ? 'Creating…' : '+ Create official answer'}
+              </button>
+            )}
           </div>
         </section>
       </div>

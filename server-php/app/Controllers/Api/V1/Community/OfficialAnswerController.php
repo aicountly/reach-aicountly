@@ -32,8 +32,9 @@ class OfficialAnswerController extends BaseApiController
     /** GET /community/answers */
     public function index(): ResponseInterface
     {
-        $status  = (string) ($this->request->getGet('status') ?? '');
-        $perPage = min((int) ($this->request->getGet('per_page') ?? 100), 100);
+        $status       = (string) ($this->request->getGet('status') ?? '');
+        $questionUuid = (string) ($this->request->getGet('question_uuid') ?? '');
+        $perPage      = min((int) ($this->request->getGet('per_page') ?? 100), 100);
 
         try {
             $db = db_connect();
@@ -44,7 +45,9 @@ class OfficialAnswerController extends BaseApiController
             // Empty status = "All" in the UI — list everything. The old
             // 'draft_requested' default made the All view silently show a
             // single status and hide failed/generated drafts entirely.
-            $items = $this->repo->listByStatus($status !== '' ? $status : null, $perPage);
+            $items = $questionUuid !== ''
+                ? $this->repo->listForQuestionUuid($questionUuid)
+                : $this->repo->listByStatus($status !== '' ? $status : null, $perPage);
 
             return $this->response->setJSON([
                 'data' => is_array($items) ? $items : [],

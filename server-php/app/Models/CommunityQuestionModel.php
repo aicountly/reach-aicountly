@@ -22,6 +22,7 @@ class CommunityQuestionModel extends Model
         'sensitivity_flags', 'personal_data_detected', 'spam_score',
         'moderation_state', 'duplicate_cluster_id', 'triage_score',
         'assigned_to', 'status',
+        'public_question_id', 'public_question_slug', 'public_url', 'published_at',
     ];
 
     // tags / sensitivity_flags are native Postgres TEXT[] columns. The old
@@ -39,11 +40,28 @@ class CommunityQuestionModel extends Model
         return $this->where('uuid', $uuid)->first();
     }
 
+    /** Column expressions the inbox sorts by, keyed by the API's sort tokens. */
+    private const SORTS = [
+        'triage_score_desc' => ['q.triage_score', 'DESC'],
+        'triage_score_asc'  => ['q.triage_score', 'ASC'],
+        'newest'            => ['q.intake_timestamp', 'DESC'],
+        'oldest'            => ['q.intake_timestamp', 'ASC'],
+    ];
+
     public function listForInbox(array $filters = [], int $page = 1, int $perPage = 25): array
     {
+        // The official answer carries the risk tier and the live public URL;
+        // the inbox shows both, so they are joined here rather than fetched
+        // per row by the client.
         $builder = $this->db->table($this->table . ' q')
-            ->select('q.*, s.title AS space_title, s.slug AS space_slug')
-            ->join('reach_community_spaces s', 's.id = q.space_id', 'left');
+            ->select(
+                'q.*, s.title AS space_title, s.slug AS space_slug, '
+                . 'a.uuid AS answer_uuid, a.status AS answer_status, '
+                . 'a.risk_classification, a.risk_tier, '
+                . 'a.public_url AS answer_public_url'
+            )
+            ->join('reach_community_spaces s', 's.id = q.space_id', 'left')
+            ->join('reach_community_official_answers a', 'a.question_id = q.id', 'left');
 
         if (!empty($filters['status'])) {
             $builder->where('q.status', $filters['status']);
@@ -70,7 +88,9 @@ class CommunityQuestionModel extends Model
         $total = $builder->countAllResults(false);
         $offset = ($page - 1) * $perPage;
 
-        $rows = $builder->orderBy('q.triage_score', 'DESC')
+        [$sortColumn, $sortDir] = self::SORTS[$filters['sort'] ?? ''] ?? self::SORTS['triage_score_desc'];
+
+        $rows = $builder->orderBy($sortColumn, $sortDir)
             ->orderBy('q.intake_timestamp', 'DESC')
             ->limit($perPage, $offset)
             ->get()
