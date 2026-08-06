@@ -77,7 +77,13 @@ function Thumb({ asset, servable }) {
 
 export function MediaGalleryPage() {
   const [assets, setAssets] = useState([]);
-  const [meta, setMeta] = useState({ signing_key_configured: true, files_missing: 0 });
+  const [meta, setMeta] = useState({
+    signing_key_configured: true,
+    files_missing: 0,
+    storage_path: '',
+    storage_writable: true,
+    storage_outside_deploy: true,
+  });
   const [deficit, setDeficit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -96,6 +102,9 @@ export function MediaGalleryPage() {
         setMeta({
           signing_key_configured: listRes?.signing_key_configured !== false,
           files_missing: listRes?.files_missing ?? 0,
+          storage_path: listRes?.storage_path ?? '',
+          storage_writable: listRes?.storage_writable,
+          storage_outside_deploy: listRes?.storage_outside_deploy,
         });
         setDeficit(deficitRes);
         setError('');
@@ -194,8 +203,25 @@ export function MediaGalleryPage() {
 
       {meta.files_missing > 0 && (
         <Alert variant="warning">
-          {meta.files_missing} asset(s) have a database row but no file on disk. Check that
-          {' '}<code>writable/uploads/</code> survived the last deploy.
+          {meta.files_missing} asset(s) have a database row but no file on disk.
+          {' '}Run <code>php spark reach:media-reconcile --fix</code> to retire them, then re-upload.
+        </Alert>
+      )}
+
+      {meta.storage_writable === false && (
+        <Alert variant="danger">
+          <strong>Uploads will fail.</strong> The cover directory
+          {' '}<code>{meta.storage_path}</code> does not exist or is not writable by the web user.
+          {' '}Create it and give it to the account that runs PHP.
+        </Alert>
+      )}
+
+      {meta.storage_writable !== false && meta.storage_outside_deploy === false && (
+        <Alert variant="warning">
+          Covers are stored at <code>{meta.storage_path}</code>, inside the deployed API directory.
+          {' '}Deploys rsync that directory with <code>--delete</code>, so uploads there are one
+          filter-rule mistake away from being erased — which is how every cover was lost before.
+          {' '}Point <code>MEDIA_STORAGE_PATH</code> at a directory outside the document root.
         </Alert>
       )}
 

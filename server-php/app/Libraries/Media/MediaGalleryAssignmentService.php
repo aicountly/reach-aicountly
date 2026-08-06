@@ -82,6 +82,20 @@ class MediaGalleryAssignmentService
                 continue; // Another worker took it — try the next best.
             }
 
+            // A row whose binary is gone is not a cover. Assigning it would
+            // set featured_image_reference to a URL that 404s, pass the
+            // cover gate, and publish an article with a broken hero on
+            // aicountly.com — the exact outcome the gate exists to prevent.
+            if (! is_file((string) ($locked['file_path'] ?? ''))) {
+                log_message('error', sprintf(
+                    'Gallery asset %d has no file at %s; skipping assignment. Run `php spark reach:media-reconcile`.',
+                    (int) $locked['id'],
+                    (string) ($locked['file_path'] ?? '')
+                ));
+
+                continue;
+            }
+
             $assetId = (int) $locked['id'];
             $this->store->markUsed($assetId, $contentItemId);
 
@@ -129,7 +143,7 @@ class MediaGalleryAssignmentService
     private function lock(int $assetId): ?array
     {
         return $this->db->query(
-            "SELECT id, asset_uuid, mime FROM reach_media_gallery_assets
+            "SELECT id, asset_uuid, mime, file_path FROM reach_media_gallery_assets
              WHERE id = ? AND status = 'active'
              FOR UPDATE SKIP LOCKED",
             [$assetId]

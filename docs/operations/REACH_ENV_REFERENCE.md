@@ -28,6 +28,7 @@ See `server-php/.env.example`. In short:
 | Engage / Worker | `ENGAGE_*`, `WORKER_*` |
 | Publishing | `AICOUNTLY_PUBLIC_SITE_BASE_URL`, `_SERVICE_TOKEN`, `_SIGNING_KEY` |
 | Reach tokens | `MEDIA_SIGNING_KEY`, `PUBLIC_LEAD_CAPTURE_TOKEN`, `REACH_AUTOMATION_TOKEN` |
+| Media storage | `MEDIA_STORAGE_PATH` — absolute path outside the document root |
 | AI keys | `AI_OPENAI_API_KEY`, `AI_GEMINI_API_KEY`, `AI_PERPLEXITY_API_KEY` |
 | Channels | social tokens, `EMAIL_API_KEY`, `SMS_*`, `WHATSAPP_*` |
 | Analytics | `GA4_*`, `SEARCH_CONSOLE_*`, `CONTENT_ANALYTICS_*`, `INDEXNOW_*` |

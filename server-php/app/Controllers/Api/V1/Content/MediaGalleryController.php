@@ -48,6 +48,11 @@ class MediaGalleryController extends BaseApiController
             'assets'                 => $rows,
             'signing_key_configured' => trim((string) env('MEDIA_SIGNING_KEY', '')) !== '',
             'files_missing'          => count(array_filter($rows, static fn (array $r): bool => $r['file_missing'])),
+            'storage_path'           => $store->storagePath(),
+            'storage_writable'       => $store->storageWritable(),
+            // Storing under the deploy tree is what let rsync --delete erase
+            // every cover; say so while it is still the case.
+            'storage_outside_deploy' => ! str_starts_with($store->storagePath(), rtrim(ROOTPATH, '/')),
         ]);
     }
 

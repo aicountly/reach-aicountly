@@ -32,7 +32,12 @@ const deficit = {
 beforeEach(() => {
   vi.clearAllMocks();
   mediaGalleryService.list.mockResolvedValue({
-    assets: [asset()], signing_key_configured: true, files_missing: 0,
+    assets: [asset()],
+    signing_key_configured: true,
+    files_missing: 0,
+    storage_path: '/home/reachaicountly/cover_images/',
+    storage_writable: true,
+    storage_outside_deploy: true,
   });
   mediaGalleryService.deficit.mockResolvedValue(deficit);
 });
@@ -99,6 +104,38 @@ describe('Cover gallery', () => {
 
     // 3 assets, but only the tagged gallery_upload can be matched to an article.
     await waitFor(() => expect(screen.getByText(/1 of 3 are rotation-ready/)).toBeInTheDocument());
+  });
+
+  it('warns when the cover directory is unwritable, because uploads will fail', async () => {
+    mediaGalleryService.list.mockResolvedValue({
+      assets: [], signing_key_configured: true, files_missing: 0,
+      storage_path: '/home/reachaicountly/cover_images/',
+      storage_writable: false, storage_outside_deploy: true,
+    });
+    renderWithAuth(<MediaGalleryPage />);
+
+    await waitFor(() => expect(screen.getByText(/Uploads will fail/)).toBeInTheDocument());
+    expect(screen.getByText('/home/reachaicountly/cover_images/')).toBeInTheDocument();
+  });
+
+  it('warns while covers still sit inside the rsynced deploy tree', async () => {
+    mediaGalleryService.list.mockResolvedValue({
+      assets: [], signing_key_configured: true, files_missing: 0,
+      storage_path: '/home/app/public_html/api/writable/uploads/media/covers/',
+      storage_writable: true, storage_outside_deploy: false,
+    });
+    renderWithAuth(<MediaGalleryPage />);
+
+    await waitFor(() => expect(screen.getByText(/inside the deployed API directory/)).toBeInTheDocument());
+    expect(screen.getByText('MEDIA_STORAGE_PATH')).toBeInTheDocument();
+  });
+
+  it('stays quiet when storage is outside the deploy tree and writable', async () => {
+    renderWithAuth(<MediaGalleryPage />);
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Deficit/ })).toBeInTheDocument());
+    expect(screen.queryByText(/Uploads will fail/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/inside the deployed API directory/)).not.toBeInTheDocument();
   });
 
   it('uses descriptive alt text rather than the stored generation prompt', async () => {
