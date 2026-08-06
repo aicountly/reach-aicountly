@@ -41,8 +41,12 @@ export function buildNavSections() {
     {
       title: 'Quality Centre',
       items: [
+        // Both are shared across blog, KB and community — hence Quality Centre
+        // rather than a surface-specific menu. Content Base used to point into
+        // the Blog Command Centre roadmap, which hid the KB and community
+        // halves of the same file tree.
         { label: 'Cover Gallery', path: '/quality/gallery', icon: Image, requires: 'blog.view' },
-        { label: 'Content Base',  path: '/blog-command-centre/roadmap/content-base', icon: BookOpen, requires: 'blog.view' },
+        { label: 'Content Base',  path: '/quality/content-base', icon: BookOpen, requires: 'content.view' },
       ],
     },
     {

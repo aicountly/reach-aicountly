@@ -155,8 +155,11 @@ $routes->group('v1', static function ($routes) {
         $routes->get('blog-command-centre/roadmap/optimizer-runs',   'BlogCommandCentreController::optimizerRuns',     ['filter' => 'permission:blog.view']);
         $routes->get('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::scoringWeights',    ['filter' => 'permission:blog.view']);
         $routes->put('blog-command-centre/roadmap/scoring-weights',  'BlogCommandCentreController::updateScoringWeights', ['filter' => 'permission:blog.edit']);
-        // Repo-versioned content base (read-only in the console; edited in git)
-        $routes->get('blog/content-base', 'Api\\V1\\Content\\ContentBaseController::index', ['filter' => 'permission:blog.view']);
+        // Repo-versioned content base (read-only in the console; edited in git).
+        // `content-base` is the shared view across blog, KB and community —
+        // `blog/content-base` stays for the Blog Command Centre roadmap tab.
+        $routes->get('content-base',      'Api\\V1\\Content\\ContentBaseController::overview', ['filter' => 'permission:content.view']);
+        $routes->get('blog/content-base', 'Api\\V1\\Content\\ContentBaseController::index',    ['filter' => 'permission:blog.view']);
 
         // Cover-image gallery (Quality Centre)
         $routes->get('media/gallery',            'Api\\V1\\Content\\MediaGalleryController::index',    ['filter' => 'permission:blog.view']);
