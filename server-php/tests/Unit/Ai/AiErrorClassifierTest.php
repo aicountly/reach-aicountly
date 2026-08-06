@@ -59,6 +59,30 @@ class AiErrorClassifierTest extends CIUnitTestCase
         }
     }
 
+    /**
+     * gpt-5-mini rejecting the legacy 'max_tokens' classified as 'unknown',
+     * which is both uninformative and the one category that permits neither a
+     * retry nor a fallback hop — so an adapter bug looked like an unexplained
+     * provider failure.
+     */
+    public function testClassifiesRejectedRequestShapeAsInvalidRequest(): void
+    {
+        $messages = [
+            "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+            "Unsupported value: 'temperature' does not support 0.2 with this model.",
+            'Unrecognized request argument supplied: max_completion_tokens',
+        ];
+
+        foreach ($messages as $message) {
+            $error = $this->classifier->classify(new \RuntimeException($message));
+            $this->assertSame(
+                AiProviderError::CATEGORY_INVALID_REQUEST,
+                $error->category,
+                "Request-shape rejection should not fall through to 'unknown': {$message}",
+            );
+        }
+    }
+
     public function testClassifiesTimeout(): void
     {
         $error = $this->classifier->classify(new \RuntimeException('Connection timed out'));

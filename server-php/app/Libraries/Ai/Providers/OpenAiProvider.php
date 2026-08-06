@@ -81,13 +81,14 @@ class OpenAiProvider implements AiProviderInterface
 
         $start = hrtime(true);
 
+        $tokenParam = $this->tokenLimitParam($input->modelKey);
         $body = [
             'model'       => $input->modelKey,
             'messages'    => [
                 ['role' => 'system', 'content' => $input->systemPrompt],
                 ['role' => 'user',   'content' => $input->userPrompt],
             ],
-            'max_tokens'  => $input->maxOutputTokens,
+            $tokenParam   => $input->maxOutputTokens,
         ];
 
         if (! empty($input->outputSchema)) {
@@ -112,7 +113,26 @@ class OpenAiProvider implements AiProviderInterface
                 $input->timeoutSeconds,
             );
         } catch (\Throwable $e) {
-            if (! empty($input->outputSchema) && $this->isSchemaRejection($e)) {
+            // Self-heal a token-limit parameter mismatch: swap to the other
+            // spelling and retry once. tokenLimitParam() gets this right for
+            // known families, but OpenAI has renamed it once already and a
+            // guessed-wrong prefix would otherwise kill generation outright.
+            if ($this->isTokenParamRejection($e)) {
+                $swapped = $tokenParam === 'max_tokens' ? 'max_completion_tokens' : 'max_tokens';
+                unset($body[$tokenParam]);
+                $body[$swapped] = $input->maxOutputTokens;
+                try {
+                    $response = $this->curlRequest(
+                        'POST',
+                        $this->baseUrl . self::CHAT_URL,
+                        $body,
+                        $input->timeoutSeconds,
+                    );
+                } catch (\Throwable $retryError) {
+                    $error = $this->classifyError($retryError);
+                    throw new AiProviderException($error->message, $error, $retryError);
+                }
+            } elseif (! empty($input->outputSchema) && $this->isSchemaRejection($e)) {
                 try {
                     $body['response_format'] = ['type' => 'json_object'];
                     $response = $this->curlRequest(
@@ -241,6 +261,35 @@ class OpenAiProvider implements AiProviderInterface
         }
 
         return is_string($v) ? trim($v) : '';
+    }
+
+    /**
+     * Which token-limit parameter the Chat Completions API expects.
+     *
+     * The reasoning families (gpt-5*, o1/o3/o4*) reject the legacy 'max_tokens'
+     * outright — "Unsupported parameter: 'max_tokens' is not supported with this
+     * model. Use 'max_completion_tokens' instead." — while older chat models
+     * still take it. A wrong guess is recoverable: isTokenParamRejection()
+     * swaps and retries.
+     */
+    private function tokenLimitParam(string $modelKey): string
+    {
+        $key = strtolower(trim($modelKey));
+
+        return preg_match('/^(gpt-5|o[1-9])/', $key) === 1
+            ? 'max_completion_tokens'
+            : 'max_tokens';
+    }
+
+    private function isTokenParamRejection(\Throwable $e): bool
+    {
+        $msg = strtolower($e->getMessage());
+
+        return (str_contains($msg, 'max_tokens') || str_contains($msg, 'max_completion_tokens'))
+            && (str_contains($msg, 'unsupported parameter')
+                || str_contains($msg, 'unrecognized request argument')
+                || str_contains($msg, 'is not supported with this model')
+                || str_contains($msg, 'use \'max_completion_tokens\' instead'));
     }
 
     private function isSchemaRejection(\Throwable $e): bool

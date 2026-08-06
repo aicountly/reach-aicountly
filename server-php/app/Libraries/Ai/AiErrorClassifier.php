@@ -70,7 +70,14 @@ class AiErrorClassifier
 
         if (str_contains($msg, 'json_schema') || str_contains($msg, 'response_format')
             || str_contains($msg, 'invalid schema') || str_contains($msg, '400')
-            || str_contains($msg, 'invalid request') || str_contains($msg, 'bad request')) {
+            || str_contains($msg, 'invalid request') || str_contains($msg, 'bad request')
+            // Provider rejected the request shape, not its content — e.g.
+            // "Unsupported parameter: 'max_tokens' is not supported with this
+            // model." Classifying these as 'unknown' hid an adapter bug behind
+            // the vaguest label we have.
+            || str_contains($msg, 'unsupported parameter')
+            || str_contains($msg, 'unsupported value')
+            || str_contains($msg, 'unrecognized request argument')) {
             return new AiProviderError(AiProviderError::CATEGORY_INVALID_REQUEST, $raw);
         }
 
