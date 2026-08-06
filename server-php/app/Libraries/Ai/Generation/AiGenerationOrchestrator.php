@@ -183,6 +183,9 @@ class AiGenerationOrchestrator
         $attemptedModelIds = [];
         $attemptNumber     = $this->runs->countAttemptsForRequest($requestId) + 1;
         $currentDecision   = $decision;
+        // Sticks once we hop off the route's primary model, so every
+        // subsequent run row is recorded as a fallback attempt.
+        $usingFallback     = false;
 
         while ($attemptNumber <= self::MAX_ATTEMPTS) {
             $providerKey = $currentDecision->provider->getProviderKey();
@@ -198,6 +201,7 @@ class AiGenerationOrchestrator
                     return;
                 }
                 $currentDecision = $nextDecision;
+                $usingFallback   = true;
                 $attemptNumber++;
                 continue;
             }
@@ -216,7 +220,14 @@ class AiGenerationOrchestrator
                 return;
             }
 
-            $run = $this->runs->create($requestId, $providerId, $modelId, $attemptNumber, $promptVersion ? (int) $promptVersion['id'] : null);
+            $run = $this->runs->create(
+                $requestId,
+                $providerId,
+                $modelId,
+                $attemptNumber,
+                $promptVersion ? (int) $promptVersion['id'] : null,
+                $usingFallback,
+            );
             // Postgres drivers often return numeric ids as strings.
             $runId = (int) $run['id'];
             $this->runs->linkGroundingSnapshot($runId, (int) $snapshot['id']);
@@ -313,6 +324,7 @@ class AiGenerationOrchestrator
                 }
 
                 $currentDecision = $nextDecision;
+                $usingFallback   = true;
                 $attemptNumber++;
             }
         }

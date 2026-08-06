@@ -27,6 +27,21 @@ class AiErrorClassifier
             return new AiProviderError(AiProviderError::CATEGORY_RATE_LIMITED, $raw);
         }
 
+        // A retired or unavailable model is permanent for *this* model but the
+        // route's other models may be fine, so it must reach the fallback
+        // resolver rather than dead-ending as 'unknown'. Checked before the
+        // invalid-request rules below, which would otherwise swallow the 404
+        // these arrive as (e.g. Gemini: "models/gemini-2.5-pro is no longer
+        // available to new users").
+        if (str_contains($msg, 'no longer available')
+            || str_contains($msg, 'model not found')
+            || str_contains($msg, 'is not found for api version')
+            || str_contains($msg, 'model_not_found')
+            || str_contains($msg, 'has been deprecated')
+            || str_contains($msg, 'does not exist or you do not have access')) {
+            return new AiProviderError(AiProviderError::CATEGORY_PROVIDER_UNAVAIL, $raw);
+        }
+
         if (str_contains($msg, 'timeout') || str_contains($msg, 'timed out') || str_contains($msg, 'connection timed')) {
             return new AiProviderError(AiProviderError::CATEGORY_TIMEOUT, $raw);
         }
