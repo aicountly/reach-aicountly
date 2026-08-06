@@ -98,6 +98,12 @@ class ReachSchedule extends BaseCommand
             ]);
         }
 
+        // Every hour: release articles parked for want of a cover. Covers
+        // arrive when an operator uploads them, not on a schedule, so an
+        // article parked at 09:10 should not wait a day because its cover
+        // landed at 09:15. Idempotent per article per day.
+        $svc->enqueue('reach.blog_cover_sweep', ['limit' => 25], ['queue' => 'blog']);
+
         // Every hour: due-date reminders, overdue escalation, schedule readiness
         $svc->enqueue('reach.content_due_date_reminder',  [], ['queue' => 'notifications']);
         $svc->enqueue('reach.content_overdue_escalation', [], ['queue' => 'notifications']);
