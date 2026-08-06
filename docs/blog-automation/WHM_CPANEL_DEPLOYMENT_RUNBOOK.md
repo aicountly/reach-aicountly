@@ -389,13 +389,28 @@ php -r 'var_dump(array_keys(json_decode(file_get_contents(getenv("HOME")."/secur
 # expect: type, project_id, private_key_id, private_key, client_email, ...
 ```
 
-Then confirm it is genuinely not web-reachable:
+Then confirm it is genuinely not web-reachable. **Check the response body, not
+the status code.** Reach's front end is a single-page app whose rewrite serves
+`index.html` for any unmatched path, so *every* URL returns `200` — a bare
+status-code check reports a false compromise on this host:
 
 ```bash
 realpath ~/secure/gsc.json | grep public_html && echo "STOP — inside the docroot"
-curl -sS -o /dev/null -w '%{http_code}\n' https://reach.aicountly.org/secure/gsc.json
-# expect 404 (or 403) — anything else means it is exposed
+
+# What the key's URL actually returns
+curl -sS https://reach.aicountly.org/secure/gsc.json | head -c 120; echo
+
+# Control: a path that certainly does not exist
+curl -sS -o /dev/null -w 'control: %{http_code}\n' \
+  https://reach.aicountly.org/secure/no-such-file-xyz123.json
 ```
+
+- Body starts `<!doctype html` / `<html`, and the control also returns `200`
+  → the SPA rewrite is answering everything. **Not exposed.**
+- Body starts `{` or contains `"private_key"` → **exposed.** Delete the file,
+  revoke that key in Google Cloud (Service Accounts → Keys), issue a new one and
+  place it outside the document root. The Search Console grant is attached to
+  the service account rather than the key, so step 1b does not need redoing.
 
 Two host-specific things to check:
 
