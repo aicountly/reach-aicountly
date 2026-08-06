@@ -106,6 +106,14 @@ final class MigrationLifecycleTest extends DatabaseTestCase
             ");
         }
 
+        // The DROP loop above removes the `migrations` history table too, but the
+        // connection still caches the old table list. Without this flush,
+        // MigrationRunner::ensureTable() sees a stale "migrations exists" and skips
+        // recreating it, so latest() dies on `relation "migrations" does not exist`
+        // — which is what happens whenever a DB-heavy test class runs before this
+        // one and pushes regress(0) down the nuclear-reset path.
+        $db->resetDataCache();
+
         // ALWAYS recreate the runner after regress (success or failure) to flush
         // any stale batch/history cache that would cause latest() to be a no-op.
         $runner = \Config\Services::migrations($config, $db, false);

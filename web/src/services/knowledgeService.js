@@ -15,6 +15,8 @@ export const knowledgeService = {
   archiveProduct:  (id)   => api.post(`${K}/products/${id}/archive`),
   productAliases:  (id)   => api.get(`${K}/products/${id}/aliases`),
   addAlias:        (id,b) => api.post(`${K}/products/${id}/aliases`, b),
+  // Idempotent seed of reach_products from the legacy SaaS taxonomy.
+  importProductTaxonomy: () => api.post(`${K}/products/import-taxonomy`),
 
   // Modules
   listModules:    (p)    => api.get(`${K}/modules`, p),

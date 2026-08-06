@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Knowledge;
 
 use App\Libraries\AuditLogger;
+use App\Libraries\KnowledgeTaxonomyImporter;
 use App\Models\Knowledge\ProductModel;
 use App\Models\Knowledge\ProductAliasModel;
 use App\Models\Knowledge\KnowledgeRelationModel;
@@ -25,12 +26,39 @@ class ProductController extends BaseKnowledgeController
     {
         $filters = array_filter([
             'status' => $this->request->getGet('status'),
-            'q'      => $this->request->getGet('q'),
+            'q'      => $this->searchTerm(),
         ]);
         return $this->listPaged($filters);
     }
 
     public function show(int $id)  { return $this->showById($id); }
+
+    /**
+     * Seed reach_products from the legacy SaaS taxonomy.
+     *
+     * Idempotent: re-running never duplicates and never overwrites an approved
+     * product. Imported rows land in `needs_review`, so nothing reaches
+     * grounding without a human approval.
+     */
+    public function importTaxonomy()
+    {
+        $importer = new KnowledgeTaxonomyImporter();
+        $result   = $importer->run($this->userId());
+
+        $summary = [
+            'created' => count($result['created']),
+            'skipped' => count($result['skipped']),
+            'aliases' => count($result['aliases']),
+            'errors'  => count($result['errors']),
+        ];
+
+        $this->audit(AuditLogger::KNOWLEDGE_IMPORT, 'product', null, null, null, $summary);
+
+        return $this->ok($summary + [
+            'created_items' => $result['created'],
+            'error_items'   => $result['errors'],
+        ]);
+    }
 
     public function store()
     {

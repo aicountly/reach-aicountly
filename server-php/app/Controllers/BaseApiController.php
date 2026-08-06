@@ -76,6 +76,18 @@ abstract class BaseApiController extends Controller
     }
 
     /**
+     * Free-text search term for list endpoints.
+     *
+     * Accepts both `q` (canonical) and `search` (what the web client sends),
+     * mirroring the `limit`/`per_page` tolerance in pagination().
+     */
+    protected function searchTerm(): ?string
+    {
+        $term = trim((string) ($this->request->getGet('q') ?? $this->request->getGet('search') ?? ''));
+        return $term === '' ? null : $term;
+    }
+
+    /**
      * Common integer/limit helpers for paginated endpoints.
      */
     protected function pagination(int $defaultLimit = 25, int $maxLimit = 200): array

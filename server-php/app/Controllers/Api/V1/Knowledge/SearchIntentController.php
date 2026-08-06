@@ -24,7 +24,7 @@ class SearchIntentController extends BaseKnowledgeController
             'status'      => $this->request->getGet('status'),
             'intent_type' => $this->request->getGet('intent_type'),
             'funnel_stage'=> $this->request->getGet('funnel_stage'),
-            'q'           => $this->request->getGet('q'),
+            'q'           => $this->searchTerm(),
         ]));
     }
 

@@ -20,7 +20,7 @@ class MarketController extends BaseKnowledgeController
     {
         return $this->listPaged(array_filter([
             'status' => $this->request->getGet('status'),
-            'q'      => $this->request->getGet('q'),
+            'q'      => $this->searchTerm(),
         ]));
     }
 

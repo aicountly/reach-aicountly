@@ -23,7 +23,7 @@ class ContentPolicyController extends BaseKnowledgeController
         return $this->listPaged(array_filter([
             'status'      => $this->request->getGet('status'),
             'policy_type' => $this->request->getGet('policy_type'),
-            'q'           => $this->request->getGet('q'),
+            'q'           => $this->searchTerm(),
         ]));
     }
 
