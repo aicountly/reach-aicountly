@@ -12,8 +12,19 @@ use App\Libraries\Ai\AiProviderError;
  */
 class AiGenerationRunService
 {
-    public function create(int $requestId, int $providerId, int $modelId, int $attemptNumber, ?int $promptVersionId = null): array
-    {
+    /**
+     * @param bool $fallbackUsed True when this attempt is running on a model the
+     *                           fallback resolver chose after an earlier attempt
+     *                           failed, rather than the route's primary model.
+     */
+    public function create(
+        int $requestId,
+        int $providerId,
+        int $modelId,
+        int $attemptNumber,
+        ?int $promptVersionId = null,
+        bool $fallbackUsed = false,
+    ): array {
         $db = db_connect();
         $db->table('reach_ai_generation_runs')->insert([
             'generation_request_id' => $requestId,
@@ -22,6 +33,7 @@ class AiGenerationRunService
             'model_id'              => $modelId,
             'prompt_version_id'     => $promptVersionId,
             'status'                => 'pending',
+            'fallback_used'         => $fallbackUsed,
             'created_at'            => date('Y-m-d H:i:s'),
         ]);
         return $this->findById((int) $db->insertID());

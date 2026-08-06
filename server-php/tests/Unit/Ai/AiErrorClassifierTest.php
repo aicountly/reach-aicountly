@@ -34,6 +34,31 @@ class AiErrorClassifierTest extends CIUnitTestCase
         $this->assertTrue($error->isRetryable());
     }
 
+    /**
+     * A retired model must reach the fallback resolver. Gemini reports this as
+     * a 404 whose message would otherwise fall through to invalid_request, and
+     * before that to 'unknown' — neither of which allows a fallback hop, so the
+     * whole generation dead-ended on a model that can never work again.
+     */
+    public function testClassifiesRetiredModelAsProviderUnavailable(): void
+    {
+        $messages = [
+            'This model models/gemini-2.5-pro is no longer available to new users. Please update your code to use a newer model.',
+            'models/gemini-1.0-pro is not found for API version v1beta',
+            'The model `gpt-4-vision-preview` has been deprecated',
+            'The model `gpt-9` does not exist or you do not have access to it',
+        ];
+
+        foreach ($messages as $message) {
+            $error = $this->classifier->classify(new \RuntimeException($message));
+            $this->assertSame(
+                AiProviderError::CATEGORY_PROVIDER_UNAVAIL,
+                $error->category,
+                "Retired-model message should route to a fallback: {$message}",
+            );
+        }
+    }
+
     public function testClassifiesTimeout(): void
     {
         $error = $this->classifier->classify(new \RuntimeException('Connection timed out'));
