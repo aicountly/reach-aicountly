@@ -33,6 +33,9 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Campaigns')).not.toBeInTheDocument();
     expect(screen.getByText('Cover Gallery')).toBeInTheDocument();
     expect(screen.getByText('SEO Command Centre')).toBeInTheDocument();
+    // Promoted out of the Blog Command Centre tab strip, renamed so it no
+    // longer collides with 'SEO Command Centre' above it.
+    expect(screen.getByText('Blog SEO and Indexing')).toBeInTheDocument();
     expect(screen.getByText('Audit Logs')).toBeInTheDocument();
     expect(screen.getByText('Job Monitor')).toBeInTheDocument();
     expect(screen.getAllByText('Community Q&A').length).toBeGreaterThanOrEqual(1);

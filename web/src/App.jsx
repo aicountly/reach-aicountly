@@ -45,6 +45,8 @@ import { ApprovalsPage } from './pages/ApprovalsPage';
 
 import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
 import SeoLayout from './pages/seo-centre/SeoLayout.jsx';
+import BlogSeoLayout from './pages/blog-seo/BlogSeoLayout.jsx';
+import { BlogSeoScaffoldPage } from './pages/blog-seo/BlogSeoScaffoldPage.jsx';
 import { SeoOverviewPage } from './pages/seo-centre/SeoOverviewPage.jsx';
 import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx';
 import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
@@ -287,13 +289,15 @@ export default function App() {
           <Route path="publishing/emergency-unpublish" element={<EmergencyUnpublishPage />} />
           <Route path="published" element={<BlogPublishedManagePage />} />
 
-          <Route path="seo" element={<Navigate to="search" replace />} />
-          <Route path="seo/search" element={<BlogDeepLinkRedirect />} />
-          <Route path="seo/internal-links" element={<BlogScaffoldPage />} />
-          <Route path="seo/cannibalisation" element={<BlogScaffoldPage />} />
-          <Route path="seo/sitemap" element={<BlogDeepLinkRedirect />} />
-          <Route path="seo/technical" element={<BlogScaffoldPage />} />
-          <Route path="indexing" element={<BlogDeepLinkRedirect />} />
+          {/* Moved to the SEO sidebar block as "Blog SEO and Indexing";
+              kept as redirects so existing bookmarks keep working. */}
+          <Route path="seo" element={<Navigate to={ROUTES.BLOG_SEO} replace />} />
+          <Route path="seo/search" element={<Navigate to={ROUTES.BLOG_SEO_SEARCH} replace />} />
+          <Route path="seo/internal-links" element={<Navigate to={ROUTES.BLOG_SEO_INTERNAL_LINKS} replace />} />
+          <Route path="seo/cannibalisation" element={<Navigate to={ROUTES.BLOG_SEO_CANNIBALISATION} replace />} />
+          <Route path="seo/sitemap" element={<Navigate to={ROUTES.BLOG_SEO_SITEMAP} replace />} />
+          <Route path="seo/technical" element={<Navigate to={ROUTES.BLOG_SEO_TECHNICAL} replace />} />
+          <Route path="indexing" element={<Navigate to={ROUTES.BLOG_SEO_INDEXING} replace />} />
 
           <Route path="analytics" element={<Navigate to="portfolio" replace />} />
           <Route path="analytics/portfolio" element={<PortfolioPerformancePage />} />
@@ -516,6 +520,18 @@ export default function App() {
           <Route path="indexnow" element={<IndexNowOperationsPage />} />
           <Route path="sitemap" element={<SitemapOverviewPage />} />
           <Route path="connections" element={<ConnectorConfigPage />} />
+        </Route>
+
+        {/* Blog SEO and Indexing — promoted out of the Blog Command Centre
+            tab strip (its leaves used to redirect into /intelligence/*). */}
+        <Route path={ROUTES.BLOG_SEO} element={<BlogSeoLayout />}>
+          <Route index element={<Navigate to="search-console" replace />} />
+          <Route path="search-console" element={<SearchIntelligencePage />} />
+          <Route path="indexing" element={<IndexNowOperationsPage />} />
+          <Route path="internal-links" element={<BlogSeoScaffoldPage />} />
+          <Route path="cannibalisation" element={<BlogSeoScaffoldPage />} />
+          <Route path="sitemap" element={<SitemapOverviewPage />} />
+          <Route path="technical" element={<BlogSeoScaffoldPage />} />
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />

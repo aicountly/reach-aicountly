@@ -131,6 +131,10 @@ export const ROUTES = {
   BCC_PUBLISHING_ROLLBACK: '/blog-command-centre/publishing/rollback',
   BCC_PUBLISHING_UNPUBLISH: '/blog-command-centre/publishing/emergency-unpublish',
   BCC_PUBLISHED: '/blog-command-centre/published',
+  // 2026-08: the SEO and Indexing section moved out of the Blog Command
+  // Centre tab strip and became "Blog SEO and Indexing" under the SEO
+  // sidebar block (see BLOG_SEO_* below). These paths stay as redirects so
+  // existing bookmarks keep working.
   BCC_SEO: '/blog-command-centre/seo',
   BCC_SEO_SEARCH: '/blog-command-centre/seo/search',
   BCC_SEO_INTERNAL_LINKS: '/blog-command-centre/seo/internal-links',
@@ -162,4 +166,16 @@ export const ROUTES = {
   BCC_SETTINGS_STORAGE: '/blog-command-centre/settings/storage',
   BCC_SETTINGS_SEO: '/blog-command-centre/settings/seo',
   BCC_SETTINGS_NOTIFICATIONS: '/blog-command-centre/settings/notifications',
+
+  // Blog SEO and Indexing — sidebar SEO block, sibling of the SEO Command
+  // Centre. Was the Blog Command Centre's "SEO and Indexing" tab, which
+  // deep-linked out to Intelligence and ejected the operator from the BCC
+  // chrome; these leaves now render in place under their own sub-nav.
+  BLOG_SEO: '/blog-seo',
+  BLOG_SEO_SEARCH: '/blog-seo/search-console',
+  BLOG_SEO_INDEXING: '/blog-seo/indexing',
+  BLOG_SEO_INTERNAL_LINKS: '/blog-seo/internal-links',
+  BLOG_SEO_CANNIBALISATION: '/blog-seo/cannibalisation',
+  BLOG_SEO_SITEMAP: '/blog-seo/sitemap',
+  BLOG_SEO_TECHNICAL: '/blog-seo/technical',
 };

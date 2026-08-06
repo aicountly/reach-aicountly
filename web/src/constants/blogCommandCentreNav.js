@@ -122,35 +122,12 @@ export const BCC_SECTIONS = [
       { label: 'Emergency Unpublish', path: ROUTES.BCC_PUBLISHING_UNPUBLISH, treatment: 'NEW' },
     ],
   },
-  {
-    id: 'seo',
-    label: 'SEO and Indexing',
-    path: ROUTES.BCC_SEO,
-    leaves: [
-      {
-        label: 'Search Console',
-        path: ROUTES.BCC_SEO_SEARCH,
-        treatment: 'DEEP_LINK',
-        targetPath: '/intelligence/search',
-      },
-      {
-        label: 'Indexing Status',
-        path: ROUTES.BCC_INDEXING,
-        treatment: 'DEEP_LINK',
-        targetPath: '/intelligence/indexnow',
-        end: true,
-      },
-      { label: 'Internal Links', path: ROUTES.BCC_SEO_INTERNAL_LINKS, treatment: 'SCAFFOLD' },
-      { label: 'Cannibalisation', path: ROUTES.BCC_SEO_CANNIBALISATION, treatment: 'SCAFFOLD' },
-      {
-        label: 'Sitemap',
-        path: ROUTES.BCC_SEO_SITEMAP,
-        treatment: 'DEEP_LINK',
-        targetPath: '/intelligence/sitemaps',
-      },
-      { label: 'Technical SEO', path: ROUTES.BCC_SEO_TECHNICAL, treatment: 'SCAFFOLD' },
-    ],
-  },
+  // 2026-08: the "SEO and Indexing" section left this tab strip. Every one
+  // of its leaves was a DEEP_LINK into /intelligence/*, so clicking the tab
+  // ejected the operator out of the Blog Command Centre and into a surface
+  // with its own 15-tab strip. It is now "Blog SEO and Indexing" under the
+  // sidebar's SEO block (see constants/blogSeoNav.js); the old
+  // /blog-command-centre/seo/* paths redirect there.
   {
     id: 'analytics',
     label: 'Analytics',
