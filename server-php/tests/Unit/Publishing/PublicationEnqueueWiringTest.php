@@ -52,4 +52,37 @@ final class PublicationEnqueueWiringTest extends TestCase
 
         $this->assertSame(1001, $jobId);
     }
+
+    /**
+     * Only deployments still waiting to be picked up get re-armed. 'sending'
+     * means a worker holds the row right now — enqueueing a second job for it
+     * would run the same deployment twice.
+     */
+    public function testInFlightDeploymentIsNotRequeued(): void
+    {
+        $mock = $this->createMock(JobService::class);
+        $mock->expects($this->never())->method('enqueue');
+        $mock->expects($this->never())->method('enqueueAt');
+
+        $svc = new PublicationDeploymentService($mock);
+
+        $this->assertFalse($svc->ensureDeploymentJobIsLive([
+            'id'     => 29,
+            'status' => 'sending',
+        ]));
+        $this->assertFalse($svc->ensureDeploymentJobIsLive([
+            'id'     => 29,
+            'status' => 'scheduled',
+        ]));
+    }
+
+    public function testDeploymentWithoutAnIdIsNotRequeued(): void
+    {
+        $mock = $this->createMock(JobService::class);
+        $mock->expects($this->never())->method('enqueue');
+
+        $svc = new PublicationDeploymentService($mock);
+
+        $this->assertFalse($svc->ensureDeploymentJobIsLive(['status' => 'queued']));
+    }
 }

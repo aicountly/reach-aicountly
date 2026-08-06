@@ -207,8 +207,8 @@ class Enums extends BaseConfig
      */
     public array $publicationChannel = [
         'aicountly_website', 'youtube', 'linkedin', 'twitter', 'facebook',
-        'instagram', 'email_newsletter', 'whatsapp_broadcast', 'sms_blast',
-        'partner_portal', 'docs_site', 'webinar_platform', 'other',
+        'instagram', 'whatsapp_broadcast', 'sms_broadcast', 'email_campaign',
+        'help_centre', 'community_forum', 'press_release', 'partner_portal',
     ];
 
     /**

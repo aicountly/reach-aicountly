@@ -17,7 +17,9 @@ use App\Libraries\NotificationService;
  *  - Fires audit events and in-app notifications
  *  - Creates/updates reach_approvals records for the multi-stage workflow
  *
- * Phase 2 constraint: publication_status cannot become 'published'.
+ * Reaching 'published' is driven by the publishing pipeline
+ * (PublicationDeploymentService), never by an editor clicking through the
+ * workflow — the public site has to accept the deployment first.
  */
 class ContentWorkflowService
 {
@@ -27,6 +29,12 @@ class ContentWorkflowService
      * validation_pending is an optional staging state — validations are recorded
      * against an item without moving it, so draft and changes_requested submit
      * straight to review_pending (see submit()).
+     *
+     * 'published' is reachable from approved/scheduled/ready_for_publication:
+     * a manual "Publish now" goes straight from approved to the public site,
+     * and the previous map had no edge into 'published' at all, so a manually
+     * authored item stayed on 'approved' forever even after the public site
+     * had accepted and published it.
      */
     private const TRANSITIONS = [
         'idea'                  => ['brief', 'archived'],
@@ -35,10 +43,10 @@ class ContentWorkflowService
         'validation_pending'    => ['review_pending', 'draft', 'archived'],
         'review_pending'        => ['approved', 'changes_requested', 'rejected', 'archived'],
         'changes_requested'     => ['review_pending', 'draft', 'archived'],
-        'approved'              => ['scheduled', 'archived'],
-        'scheduled'             => ['ready_for_publication', 'approved', 'archived'],
-        'ready_for_publication' => ['archived'],
-        'published'             => ['refresh_due'],
+        'approved'              => ['scheduled', 'published', 'archived'],
+        'scheduled'             => ['ready_for_publication', 'approved', 'published', 'archived'],
+        'ready_for_publication' => ['published', 'scheduled', 'archived'],
+        'published'             => ['refresh_due', 'archived'],
         'refresh_due'           => ['draft'],
         'rejected'              => ['draft'],
         'archived'              => [],

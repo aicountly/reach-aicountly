@@ -51,6 +51,11 @@ export function ContentSchedulePage() {
     catch (err) { setError(err.message); }
   };
 
+  const targetName = (targetId) => {
+    const match = targets.find((t) => String(t.id) === String(targetId));
+    return match ? match.name : `Target #${targetId}`;
+  };
+
   if (loading) return <Loader />;
 
   return (
@@ -65,7 +70,9 @@ export function ContentSchedulePage() {
             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
               <div>
                 <div style={{ fontSize: 13 }}>{new Date(s.scheduled_at).toLocaleString()} ({s.timezone})</div>
-                <div style={{ fontSize: 11, color: '#6b7280' }}>Target #{s.publication_target_id} · {s.schedule_status}</div>
+                <div style={{ fontSize: 11, color: '#6b7280' }}>
+                  {targetName(s.publication_target_id)} · {s.schedule_status}
+                </div>
               </div>
               {s.cancelled_at === null && (
                 <button className="btn btn-ghost btn-sm" onClick={() => handleCancel(s.id)}>Cancel</button>
@@ -78,6 +85,13 @@ export function ContentSchedulePage() {
       {canSchedule && (
         <Card>
           <div style={{ fontWeight: 700, marginBottom: 12 }}>Schedule Publication</div>
+          {targets.length === 0 && (
+            <Alert variant="warning">
+              No active publication targets are configured, so nothing can be scheduled yet.
+              Run the pending database migrations to install the default set, or have an
+              administrator create one via <code>POST /api/v1/content/publication-targets</code>.
+            </Alert>
+          )}
           <form onSubmit={handleSchedule}>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Publication Target</label>

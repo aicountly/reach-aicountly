@@ -106,11 +106,26 @@ class ContentItemModel extends Model
         return $builder->orderBy('review_due_at', 'ASC')->findAll();
     }
 
+    /**
+     * Reduce a title to its URL slug form.
+     *
+     * The title MUST be lower-cased before the [^a-z0-9] filter runs: applying
+     * the filter first treats every capital as a separator, so
+     * "TDS Compliance Basics for Growing Companies" collapsed to
+     * "ompliance-asics-for-rowing-ompanies" — the first letter of each
+     * capitalised word was silently eaten and published as the public URL.
+     */
+    public static function slugifyTitle(string $title): string
+    {
+        $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
+
+        return $slug !== '' ? $slug : 'content';
+    }
+
     /** Generate a slug from the title, ensuring uniqueness. */
     public function buildUniqueSlug(string $title, ?int $excludeId = null): string
     {
-        $base = strtolower(preg_replace('/[^a-z0-9]+/', '-', $title));
-        $base = trim($base, '-');
+        $base = self::slugifyTitle($title);
         $slug = $base;
         $i    = 1;
 

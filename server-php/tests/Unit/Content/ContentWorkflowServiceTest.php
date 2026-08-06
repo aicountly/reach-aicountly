@@ -65,6 +65,30 @@ final class ContentWorkflowServiceTest extends TestCase
         $this->assertContains('archived', $allowed);
     }
 
+    /**
+     * A successful deployment marks the item published. Every state a
+     * deployment can legitimately start from must therefore have an edge into
+     * 'published' — without one, a manual "Publish now" left the item stuck on
+     * 'approved' even though the article was live on the public site.
+     */
+    public function testEveryPublishableStateCanReachPublished(): void
+    {
+        foreach (['approved', 'scheduled', 'ready_for_publication'] as $from) {
+            $this->assertContains(
+                'published',
+                $this->transitions[$from],
+                "A deployment can start from '{$from}' but the state machine blocks it from published"
+            );
+        }
+    }
+
+    public function testReadyForPublication_isNotADeadEnd(): void
+    {
+        $allowed = $this->transitions['ready_for_publication'];
+        $this->assertContains('published', $allowed);
+        $this->assertContains('archived', $allowed);
+    }
+
     public function testArchived_hasNoForwardTransitions(): void
     {
         $this->assertEmpty($this->transitions['archived']);

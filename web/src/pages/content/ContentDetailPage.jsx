@@ -13,6 +13,17 @@ import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
 const AWAITING_HUMAN = new Set(['review_pending', 'internal_review', 'seo_review']);
+// A deployment sitting in one of these has been accepted by Reach but not yet
+// carried out — the `publishing` queue worker still has to pick it up.
+const DEPLOYMENT_PENDING = new Set(['draft', 'ready', 'queued', 'sending']);
+const DEPLOYMENT_TONE = {
+  published: '#059669',
+  verified: '#059669',
+  scheduled: '#2563eb',
+  failed: '#dc2626',
+  unpublished: '#6b7280',
+  rolled_back: '#d97706',
+};
 // Mirrors the sources the submit endpoint accepts: ContentWorkflowService::submit()
 // for generic items, BlogHumanApprovalService::submitForReview() for blogs.
 const SUBMITTABLE = new Set(['draft', 'validation_pending', 'changes_requested', 'fact_verified']);
@@ -23,6 +34,7 @@ export function ContentDetailPage() {
   const { has } = usePermission();
   const [item, setItem]             = useState(null);
   const [transitions, setTrans]     = useState([]);
+  const [deployment, setDeployment] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [actioning, setActioning]   = useState(null);
@@ -32,6 +44,7 @@ export function ContentDetailPage() {
   const canApprove  = has('content.approve');
   const canReview   = has('content.review');
   const canPublish  = has('publishing.publish');
+  const canSeePublishing = has('publishing.view') || canPublish;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +62,30 @@ export function ContentDetailPage() {
       setLoading(false);
     }
   }, [id]);
+
+  // Publish is asynchronous: the API only queues a deployment, so without this
+  // the page gave no sign of whether the article ever reached the public site.
+  const loadDeployment = useCallback(async () => {
+    if (!canSeePublishing) return;
+    try {
+      const rows = await contentService.listDeployments(id);
+      setDeployment(Array.isArray(rows) && rows.length > 0 ? rows[0] : null);
+    } catch {
+      // Publishing visibility is supplementary — never block the detail page.
+      setDeployment(null);
+    }
+  }, [id, canSeePublishing]);
+
+  useEffect(() => { loadDeployment(); }, [loadDeployment]);
+
+  // While a deployment is waiting on the worker, poll so the page settles on
+  // the real outcome instead of leaving the user to guess.
+  const deploymentStatus = deployment?.status;
+  useEffect(() => {
+    if (!deploymentStatus || !DEPLOYMENT_PENDING.has(deploymentStatus)) return undefined;
+    const timer = setInterval(loadDeployment, 10000);
+    return () => clearInterval(timer);
+  }, [deploymentStatus, loadDeployment]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -90,6 +127,7 @@ export function ContentDetailPage() {
     try {
       await contentService.publishItem(id, item?.current_version_id);
       load();
+      loadDeployment();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -202,6 +240,42 @@ export function ContentDetailPage() {
           <div style={{ fontSize: 13 }}>{new Date(item.created_at).toLocaleString()}</div>
         </Card>
       </div>
+
+      {canSeePublishing && deployment && (
+        <Card style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 }}>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Publication</div>
+            <button className="btn btn-ghost btn-sm" onClick={loadDeployment}>Refresh</button>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: DEPLOYMENT_TONE[deployment.status] }}>
+            {deployment.status?.replace(/_/g, ' ')}
+            <span style={{ fontWeight: 400, color: '#6b7280' }}> · deployment #{deployment.id}</span>
+          </div>
+          {DEPLOYMENT_PENDING.has(deployment.status) && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.6 }}>
+              Queued for the publishing worker. If it stays here for more than a few minutes, the
+              worker is not draining the <code>publishing</code> queue — check the
+              <code> reach:work --queue=default,blog,publishing</code> cron.
+            </div>
+          )}
+          {deployment.status === 'failed' && (
+            <div style={{ fontSize: 12, color: '#dc2626', marginTop: 6, lineHeight: 1.6 }}>
+              {deployment.error_category?.replace(/_/g, ' ')}
+              {deployment.redacted_error ? ` — ${deployment.redacted_error}` : ''}
+            </div>
+          )}
+          {deployment.canonical_url && (
+            <div style={{ fontSize: 12, marginTop: 6 }}>
+              <a href={deployment.canonical_url} target="_blank" rel="noreferrer">{deployment.canonical_url}</a>
+            </div>
+          )}
+          {deployment.scheduled_at && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+              Scheduled for {new Date(deployment.scheduled_at).toLocaleString()}
+            </div>
+          )}
+        </Card>
+      )}
 
       {item.summary && (
         <Card style={{ marginTop: 12 }}>

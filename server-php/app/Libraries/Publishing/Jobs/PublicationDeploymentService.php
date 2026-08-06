@@ -96,6 +96,15 @@ class PublicationDeploymentService
             ->get()->getRowArray();
 
         if ($existing) {
+            // An in-flight deployment is only genuinely in flight while a job
+            // row still exists to move it. If that job was dead-lettered,
+            // cancelled, or completed without the deployment progressing (the
+            // classic case: the worker cron was not draining the `publishing`
+            // queue when the row was created), the deployment sits on 'queued'
+            // forever — and because this replay branch returns early, every
+            // later "Publish now" was a silent no-op. Re-arm the job instead.
+            $this->ensureDeploymentJobIsLive($existing);
+
             return (int) $existing['id'];
         }
 
@@ -135,6 +144,64 @@ class PublicationDeploymentService
         ], $createdBy);
 
         return $deploymentId;
+    }
+
+    /**
+     * Re-arm a stalled deployment: enqueue a fresh `reach.publication` job when
+     * no runnable one is left for it.
+     *
+     * Only deployments still waiting to be picked up ('queued') are re-armed.
+     * 'sending' means a worker holds it right now (or its lease is still being
+     * recovered by `reach:schedule`), and 'scheduled'/'verification_pending'
+     * are handled by their own follow-on jobs.
+     *
+     * @param array<string,mixed> $deployment
+     */
+    public function ensureDeploymentJobIsLive(array $deployment): bool
+    {
+        if (($deployment['status'] ?? '') !== 'queued') {
+            return false;
+        }
+
+        $deploymentId = (int) ($deployment['id'] ?? 0);
+        if ($deploymentId <= 0) {
+            return false;
+        }
+
+        try {
+            // Raw query: the JSONB `->>` operator must not go through the
+            // query builder's identifier escaping.
+            $row = $this->db->query(
+                "SELECT COUNT(*) AS live FROM reach_jobs
+                  WHERE job_type = ?
+                    AND status IN ('pending', 'processing')
+                    AND payload_json->>'deployment_id' = ?",
+                ['reach.publication', (string) $deploymentId],
+            )->getRowArray();
+
+            if ((int) ($row['live'] ?? 0) > 0) {
+                return false;
+            }
+
+            // The original idempotency key is still held by the dead job row,
+            // so mint a distinct one for the replacement.
+            $this->enqueuePublicationJob(
+                $deploymentId,
+                ((string) ($deployment['idempotency_key'] ?? "reach-deployment-{$deploymentId}")) . ':requeue-' . time(),
+                $deployment['scheduled_at'] ?? null,
+            );
+
+            AuditLogger::record('publishing.requeued', [
+                'deployment_id' => $deploymentId,
+                'reason'        => 'no_live_job',
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            log_message('error', 'Publication re-queue check failed: ' . $e->getMessage());
+
+            return false;
+        }
     }
 
     /**
@@ -333,20 +400,77 @@ class PublicationDeploymentService
             'resulting_status' => $status,
         ]);
 
-        if ($status === 'published' && ($deployment['content_item_id'] ?? null)) {
-            $this->tryTrackBlogStateTransition((int) $deployment['content_item_id']);
+        if (($deployment['content_item_id'] ?? null) && in_array($status, ['published', 'scheduled'], true)) {
+            $this->tryTrackContentItemState((int) $deployment['content_item_id'], $status, $deployment);
         }
     }
 
     /**
-     * Best-effort automation bookkeeping: items created and progressed by
-     * the roadmap-automation pipeline live in BlogStateMachine's vocabulary
-     * end-to-end (idea -> ... -> publishing -> published). Manually authored
-     * content that has never entered that pipeline uses a different
-     * workflow_status vocabulary (App\Libraries\ContentWorkflowService) and
-     * must not be forced through BlogStateMachine's adjacency rules here —
-     * any mismatch is swallowed so it never blocks a publish that already
-     * succeeded on the public site.
+     * Best-effort workflow bookkeeping after the public site has accepted a
+     * deployment. Two vocabularies share reach_content_items.workflow_status:
+     *
+     *  - Items created and progressed by the roadmap-automation pipeline live
+     *    in BlogStateMachine's vocabulary end-to-end (idea -> ... ->
+     *    publishing -> published) and must go through its adjacency rules.
+     *  - Manually authored Content Studio items use
+     *    App\Libraries\ContentWorkflowService's vocabulary. These never enter
+     *    the automation pipeline, so nothing used to move them at all — a
+     *    manual "Publish now" left the item sitting on 'approved' forever even
+     *    though the article was live, which reads in the UI as "still not
+     *    published".
+     *
+     * Everything here is swallowed so bookkeeping can never fail a publish
+     * that already succeeded on the public site.
+     */
+    private function tryTrackContentItemState(int $contentItemId, string $status, array $deployment): void
+    {
+        try {
+            $item = $this->db->table('reach_content_items')
+                ->where('id', $contentItemId)->get()->getRowArray();
+            if (! $item) {
+                return;
+            }
+
+            $from = strtolower((string) ($item['workflow_status'] ?? ''));
+
+            if (($item['content_type'] ?? '') === 'blog' && $from === \App\Libraries\Blog\BlogStateMachine::PUBLISHING) {
+                $this->tryTrackBlogStateTransition($contentItemId);
+                return;
+            }
+
+            // Content Studio vocabulary. Only advance from the states a
+            // deployment can legitimately start in, so a later deployment for
+            // an already-refreshed or archived item never drags it backwards.
+            $publishable = ['approved', 'scheduled', 'ready_for_publication'];
+            if (! in_array($from, $publishable, true)) {
+                return;
+            }
+
+            $now = date('Y-m-d H:i:s');
+
+            if ($status === 'scheduled') {
+                $updates = [
+                    'workflow_status' => 'scheduled',
+                    'scheduled_at'    => $deployment['scheduled_at'] ?? null,
+                    'updated_at'      => $now,
+                ];
+            } else {
+                $updates = [
+                    'workflow_status'    => 'published',
+                    'publication_status' => 'published',
+                    'published_at'       => $now,
+                    'updated_at'         => $now,
+                ];
+            }
+
+            $this->db->table('reach_content_items')->where('id', $contentItemId)->update($updates);
+        } catch (\Throwable) {
+            // Non-fatal bookkeeping only.
+        }
+    }
+
+    /**
+     * Advance an automation-native blog item through BlogStateMachine.
      */
     private function tryTrackBlogStateTransition(int $contentItemId): void
     {

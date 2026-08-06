@@ -37,11 +37,24 @@ class DeploymentController extends BaseApiController
                 return $this->ok([], $emptyMeta);
             }
 
-            $total = $db->table('reach_publication_deployments')->countAllResults();
+            // Content Studio asks for one item's deployments so the detail
+            // page can show what actually happened after "Publish now".
+            $contentItemId = (int) ($this->request->getGet('content_item_id') ?? 0);
+
+            $counter = $db->table('reach_publication_deployments');
+            if ($contentItemId > 0) {
+                $counter->where('content_item_id', $contentItemId);
+            }
+            $total = $counter->countAllResults();
 
             // Avoid table aliases in Query Builder — some CI4/Postgres
             // identifier escaping paths quote "table alias" as one name.
-            $rows = $db->table('reach_publication_deployments')
+            $builder = $db->table('reach_publication_deployments');
+            if ($contentItemId > 0) {
+                $builder->where('reach_publication_deployments.content_item_id', $contentItemId);
+            }
+
+            $rows = $builder
                 ->select(
                     'reach_publication_deployments.*, '
                     . 'reach_content_items.title AS content_title, '

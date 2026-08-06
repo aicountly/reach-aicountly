@@ -95,6 +95,8 @@ export const contentService = {
       scheduled_at: scheduledAt,
       ...(contentVersionId ? { content_version_id: contentVersionId } : {}),
     }),
+  listDeployments: (contentItemId) =>
+    request('GET', `/publishing/deployments?content_item_id=${contentItemId}`),
 
   // Knowledge mappings
   getMappings: (id) => request('GET', `/content/items/${id}/mappings`),

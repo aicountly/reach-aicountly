@@ -432,6 +432,31 @@ class ReachBlogDiagnose extends BaseCommand
             ];
         }
 
+        // A manual "Publish now" from Content Studio creates a deployment on the
+        // `publishing` queue without touching any BlogStateMachine state, so the
+        // blogs_stuck_publishing rule below never sees it. Flag deployments that
+        // have been sitting unprocessed regardless of which path created them.
+        $stalledDeployments = [];
+        foreach (($db['publication_deployments'] ?? []) as $dep) {
+            if (! in_array((string) ($dep['status'] ?? ''), ['queued', 'sending'], true)) {
+                continue;
+            }
+            $updatedAt = strtotime((string) ($dep['updated_at'] ?? ''));
+            if ($updatedAt !== false && (time() - $updatedAt) > 900) {
+                $stalledDeployments[] = (int) ($dep['id'] ?? 0);
+            }
+        }
+        if ($stalledDeployments !== []) {
+            $ids = implode(', ', $stalledDeployments);
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'publication_deployments_stalled',
+                'message'  => "Deployment(s) {$ids} have been queued/sending for over 15 minutes. "
+                    . 'The publishing queue is not being drained — confirm the worker cron includes '
+                    . '--queue=default,blog,publishing.',
+            ];
+        }
+
         $blogItems = $db['blog_content_items'] ?? [];
         $failedItems = (int) ($blogItems['failed'] ?? 0);
         $outlineReady = (int) ($blogItems['outline_ready'] ?? 0);
@@ -507,6 +532,10 @@ class ReachBlogDiagnose extends BaseCommand
         if (! empty($report['recent_failures'])) {
             $actions[] = 'Inspect draft AI failures: php spark reach:blog-failures';
             $actions[] = 'Retry stuck drafts: php spark reach:blog-advance --dispatch && php spark reach:work --queue blog,publishing,community,default --limit 20';
+        }
+        if (in_array('publication_deployments_stalled', $codes, true)) {
+            $actions[] = 'Drain the publishing queue now: php spark reach:work --queue=default,blog,publishing --once --limit=20';
+            $actions[] = 'Then confirm the crontab worker line includes the publishing queue (see docs/operations/REACH_WORKER_AND_CRON.md).';
         }
         if (in_array('blogs_stuck_publishing', $codes, true)) {
             $actions[] = 'Unstick publish: php spark reach:blog-advance --dispatch';

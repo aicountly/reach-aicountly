@@ -118,9 +118,48 @@ Navigate to Publishing → Verifications to view verification results. A `verifi
 
 Monitor for:
 - Deployments stuck in `sending` for more than 10 minutes
+- Deployments stuck in `queued` for more than 15 minutes
 - Deployments in `failed` status
 - Verifications in `failed` status
 - Connections with `unhealthy` or `degraded` health status
+
+---
+
+## "Publish now returned OK but the article is not live"
+
+`POST /v1/publishing/content/:id/publish` only *queues* a deployment — the HTTP
+200 with `{"status":"queued"}` means Reach accepted the request, not that the
+public site has the article. The Content Studio detail page shows the latest
+deployment's real status underneath the item so this is visible without a
+database query.
+
+If it stays on `queued`:
+
+1. **The worker is not draining the `publishing` queue.** This is the usual
+   cause. Confirm the cron line covers it:
+
+   ```bash
+   php spark reach:work --queue=default,blog,publishing --once --limit=20
+   ```
+
+   The crontab entry must list `publishing` — a worker started with the default
+   `--queue=default` leases nothing for publication. See
+   `docs/operations/REACH_WORKER_AND_CRON.md`.
+
+2. **Diagnose:** `php spark reach:blog-diagnose` reports
+   `database.jobs` (row counts per queue/status) and the last 15 deployments,
+   and raises `publication_deployments_stalled` when a deployment has been
+   queued or sending for over 15 minutes.
+
+3. **Re-trigger.** Pressing "Publish now" again is safe: a deployment that is
+   still `queued` with no live `reach.publication` job is re-armed with a fresh
+   job (audit event `publishing.requeued`) rather than being silently
+   deduplicated against the stalled one.
+
+Once a deployment reaches `published`, the content item moves to
+`workflow_status = published` with `published_at` set — an item still showing
+`approved` after a green deployment means the bookkeeping write failed and is
+worth reporting.
 
 ---
 
