@@ -75,6 +75,11 @@ against the article's category, portfolio stream, tags and title keywords —
 not by rotation order alone, which is what previously fronted a GST article
 with a landscape photo. Tuning:
 
+These are optional overrides — the defaults below are what runs unless a real
+`.env` says otherwise, and none of them appear in `.env.example`. See
+[REACH_ENV_REFERENCE.md](REACH_ENV_REFERENCE.md) for the full split between
+required settings and code-side policy.
+
 | Variable | Default | Effect |
 |---|---|---|
 | `BLOG_REQUIRE_COVER_IMAGE` | `true` | No blog publishes without a suitable cover; a miss parks the article for review |
