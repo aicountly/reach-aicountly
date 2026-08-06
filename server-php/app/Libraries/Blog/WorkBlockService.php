@@ -14,6 +14,7 @@ use App\Libraries\Blog\Roadmap\TopicScoringService;
 use App\Libraries\Blog\Verification\ClaimExtractor;
 use App\Libraries\Blog\Verification\CrossReviewRouter;
 use App\Libraries\Blog\Verification\FactVerificationService;
+use App\Libraries\Content\SlugBuilder;
 use App\Libraries\ContentVersionService;
 use App\Libraries\JobService;
 use App\Libraries\Publishing\Blog\BlogInternalLinkService;
@@ -2192,8 +2193,7 @@ class WorkBlockService
 
     public function buildUniqueSlug(string $title): string
     {
-        $base = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $title) ?? ''));
-        $base = trim($base, '-') ?: ('topic-' . bin2hex(random_bytes(4)));
+        $base = SlugBuilder::slug($title, 'topic-' . bin2hex(random_bytes(4)));
         $slug = $base;
         $i    = 1;
         while ($this->db->table('reach_content_items')->where('slug', $slug)->countAllResults() > 0) {

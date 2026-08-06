@@ -31,34 +31,26 @@ class AddActorColumns extends Migration
 
     public function up(): void
     {
-        // Users: mark the system/bot actor as non-login.
-        if (! $this->db->fieldExists('is_login_disabled', 'reach_users')) {
-            $this->forge->addColumn('reach_users', [
-                'is_login_disabled' => ['type' => 'BOOLEAN', 'default' => false, 'null' => false, 'after' => 'is_active'],
-                'actor_type'        => ['type' => 'VARCHAR', 'constraint' => 16, 'default' => 'human', 'null' => false, 'after' => 'role_id'],
-            ]);
-            $this->db->query(
-                "ALTER TABLE reach_users ADD CONSTRAINT reach_users_actor_type_chk CHECK (actor_type IN ('human','system','bot','service'))"
-            );
-        }
+        // ADD COLUMN IF NOT EXISTS rather than fieldExists(): the field list is
+        // cached per connection, so running this migration a second time in one
+        // process (a test refresh, or a worker that migrates while running) read
+        // the columns as already present, skipped them, and then failed on the
+        // CHECK constraint that references them.
+        $this->db->query('ALTER TABLE reach_users ADD COLUMN IF NOT EXISTS is_login_disabled BOOLEAN NOT NULL DEFAULT FALSE');
+        $this->db->query("ALTER TABLE reach_users ADD COLUMN IF NOT EXISTS actor_type VARCHAR(16) NOT NULL DEFAULT 'human'");
+        $this->db->query('ALTER TABLE reach_users DROP CONSTRAINT IF EXISTS reach_users_actor_type_chk');
+        $this->db->query(
+            "ALTER TABLE reach_users ADD CONSTRAINT reach_users_actor_type_chk CHECK (actor_type IN ('human','system','bot','service'))"
+        );
 
         foreach (self::TABLES as $table) {
-            if (! $this->db->tableExists($table)) {
+            if (! $this->db->tableExists($table, false)) {
                 continue;
             }
-            $columns = [];
-            if (! $this->db->fieldExists('created_actor_type', $table)) {
-                $columns['created_actor_type'] = ['type' => 'VARCHAR', 'constraint' => 16, 'null' => true];
-            }
-            if (! $this->db->fieldExists('created_by_service', $table)) {
-                $columns['created_by_service'] = ['type' => 'VARCHAR', 'constraint' => 64, 'null' => true];
-            }
-            if (! $this->db->fieldExists('generation_job_id', $table)) {
-                $columns['generation_job_id'] = ['type' => 'BIGINT', 'null' => true];
-            }
-            if ($columns) {
-                $this->forge->addColumn($table, $columns);
-            }
+            $this->db->query("ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS created_actor_type VARCHAR(16) NULL");
+            $this->db->query("ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS created_by_service VARCHAR(64) NULL");
+            $this->db->query("ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS generation_job_id BIGINT NULL");
+
             $checkName = "{$table}_created_actor_type_chk";
             $this->db->query("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS {$checkName}");
             $this->db->query(

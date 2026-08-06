@@ -26,6 +26,7 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [workflowStatus, setWorkflowStatus] = useState(defaultWorkflowStatus || '');
+  const [totalAcrossStatuses, setTotalAcrossStatuses] = useState(null);
   const nav = useNavigate();
 
   const load = useCallback(() => {
@@ -33,7 +34,23 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
     const params = { content_type: 'blog' };
     if (workflowStatus) params.workflow_status = workflowStatus;
     contentService.listItems(params)
-      .then((d) => setItems(d.items ?? d))
+      .then(async (d) => {
+        const rows = d.items ?? d;
+        setItems(rows);
+        // An empty status filter used to render as "No blog content items
+        // match this filter", which reads as an empty system. Find out whether
+        // the library is actually empty so the empty state can say which.
+        if (workflowStatus && (rows?.length ?? 0) === 0) {
+          try {
+            const all = await contentService.listItems({ content_type: 'blog' });
+            setTotalAcrossStatuses((all.items ?? all)?.length ?? 0);
+          } catch {
+            setTotalAcrossStatuses(0);
+          }
+        } else {
+          setTotalAcrossStatuses(null);
+        }
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [workflowStatus]);
@@ -80,12 +97,31 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
+
+      {!loading && items.length === 0 && workflowStatus && totalAcrossStatuses > 0 && (
+        <Alert variant="info">
+          No blog content is in <code>{workflowStatus.replace(/_/g, ' ')}</code> right now, but{' '}
+          {totalAcrossStatuses} blog item{totalAcrossStatuses === 1 ? '' : 's'} exist in other statuses.{' '}
+          <button
+            type="button"
+            className="btn btn--sm btn--secondary"
+            onClick={() => setWorkflowStatus('')}
+          >
+            Show all statuses
+          </button>
+        </Alert>
+      )}
+
       {loading ? <Loader /> : (
         <DataTable
           columns={columns}
           rows={items}
           onRowClick={(r) => nav(ROUTES.CONTENT_DETAIL.replace(':id', r.id))}
-          emptyMessage="No blog content items match this filter."
+          emptyMessage={
+            workflowStatus
+              ? `No blog content items are in "${workflowStatus.replace(/_/g, ' ')}".`
+              : 'No blog content items yet.'
+          }
         />
       )}
     </div>
