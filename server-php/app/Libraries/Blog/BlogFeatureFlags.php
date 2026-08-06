@@ -17,6 +17,7 @@ class BlogFeatureFlags
         'ai_generation'          => 'BLOG_AI_GENERATION_ENABLED',
         'fact_verification'      => 'BLOG_FACT_VERIFICATION_ENABLED',
         'image_generation'       => 'BLOG_IMAGE_GENERATION_ENABLED',
+        'require_cover_image'    => 'BLOG_REQUIRE_COVER_IMAGE',
         'auto_publish'           => 'BLOG_AUTO_PUBLISH_ENABLED',
         'file_rendering'         => 'BLOG_FILE_RENDERING_ENABLED',
         'db_body_fallback'       => 'BLOG_DB_BODY_FALLBACK_ENABLED',
@@ -34,7 +35,12 @@ class BlogFeatureFlags
         'BLOG_ROADMAP_OPTIMIZER_ENABLED'  => false,
         'BLOG_AI_GENERATION_ENABLED'      => false,
         'BLOG_FACT_VERIFICATION_ENABLED'  => false,
+        // Gates the PAID AI image leg only. The curated gallery is assigned
+        // regardless — see WorkBlockService::executeGenerateImage().
         'BLOG_IMAGE_GENERATION_ENABLED'   => false,
+        // No blog publishes without a topically suitable cover. Off = the old
+        // behaviour (missing cover is a warning on the listing card).
+        'BLOG_REQUIRE_COVER_IMAGE'        => true,
         'BLOG_AUTO_PUBLISH_ENABLED'       => false,
         'BLOG_FILE_RENDERING_ENABLED'     => false,
         'BLOG_DB_BODY_FALLBACK_ENABLED'   => true,

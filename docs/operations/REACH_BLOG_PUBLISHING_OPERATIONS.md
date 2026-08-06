@@ -77,16 +77,40 @@ with a landscape photo. Tuning:
 
 | Variable | Default | Effect |
 |---|---|---|
+| `BLOG_REQUIRE_COVER_IMAGE` | `true` | No blog publishes without a suitable cover; a miss parks the article for review |
 | `MEDIA_GALLERY_MIN_RELEVANCE` | `3` | Score floor an asset must clear to be assigned |
 | `MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK` | `false` | When true, falls back to any free cover instead of leaving the article without one |
 | `MEDIA_GALLERY_REUSE_COOLDOWN_DAYS` | `30` | Minimum gap before a cover is reused |
-| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Generate a cover for a routine blog when no gallery asset is relevant; set false to publish without one |
+| `BLOG_IMAGE_GENERATION_ENABLED` | `false` | Gates the **paid** AI image leg only — the gallery is assigned either way |
+| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Generate a cover when no gallery asset is relevant (needs the flag above) |
 | `BLOG_MIN_PUBLISH_WORDS` | `300` | Minimum publishable article length |
 
-If no gallery asset is relevant, a routine blog generates its own cover from
-the article title/summary rather than borrowing an unrelated image. Untagged
-gallery assets can never be matched — Quality → Media Gallery flags them and
-the deficit report counts them under `untagged`.
+Source order is gallery-first, generation-second. `BLOG_IMAGE_GENERATION_ENABLED`
+used to short-circuit the whole cover step, so choosing "gallery, not paid API"
+silently produced no cover at all; it now gates only the paid leg, and pipeline
+items fall back to the gallery whenever that leg is off or unusable.
+
+Untagged gallery assets can never be matched — Quality → Media Gallery flags
+them and the deficit report counts them under `untagged`.
+
+#### When no suitable cover exists
+
+With `BLOG_REQUIRE_COVER_IMAGE=true` (the default) the article does **not**
+walk on to publication:
+
+1. A `cover_image` validation is recorded as **failed** on the content item,
+   with the reason (`gallery_no_relevant_cover`, `image_generation_disabled`,
+   or the provider error).
+2. The item moves to `internal_review` — the Blog Command Centre review queue —
+   and the SEO step is *not* chained, so automation stops there.
+3. Readiness blocks every publish path twice over: gate 6 (unwaived failed
+   validation) and gate 11b (featured image missing).
+
+To clear it, either upload/tag a matching gallery asset and re-run the cover
+work block, or — when a post genuinely should go out without a hero — waive the
+`cover_image` validation with a reason (Daily Approval Centre →
+`POST /v1/approval-queue/:id/waive-validation`). The waiver is audited and
+downgrades gate 11b to a warning for that item only.
 
 ---
 
