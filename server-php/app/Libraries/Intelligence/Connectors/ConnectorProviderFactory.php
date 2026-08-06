@@ -19,13 +19,15 @@ class ConnectorProviderFactory
      * SEARCH_CONSOLE_USE_MOCK=true. A misconfigured live connector is returned as-is
      * so callers surface an honest "misconfigured" state instead of mock numbers.
      */
-    public static function searchConsole(): SearchConsoleConnectorInterface
+    public static function searchConsole(?string $siteProperty = null): SearchConsoleConnectorInterface
     {
-        if (self::$useMocks || self::envBool('SEARCH_CONSOLE_USE_MOCK')) {
-            return new MockSearchConsoleConnector(enabled: true);
-        }
+        $connector = (self::$useMocks || self::envBool('SEARCH_CONSOLE_USE_MOCK'))
+            ? new MockSearchConsoleConnector(enabled: true)
+            : new GoogleSearchConsoleConnector();
 
-        return new GoogleSearchConsoleConnector();
+        $siteProperty = trim((string) $siteProperty);
+
+        return $siteProperty === '' ? $connector : $connector->forSiteProperty($siteProperty);
     }
 
     /**

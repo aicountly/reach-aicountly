@@ -40,7 +40,7 @@ class AiErrorClassifierTest extends CIUnitTestCase
      * before that to 'unknown' — neither of which allows a fallback hop, so the
      * whole generation dead-ended on a model that can never work again.
      */
-    public function testClassifiesRetiredModelAsProviderUnavailable(): void
+    public function testClassifiesRetiredModelAsModelRetired(): void
     {
         $messages = [
             'This model models/gemini-2.5-pro is no longer available to new users. Please update your code to use a newer model.',
@@ -51,10 +51,48 @@ class AiErrorClassifierTest extends CIUnitTestCase
 
         foreach ($messages as $message) {
             $error = $this->classifier->classify(new \RuntimeException($message));
+
+            // These first landed on provider_unavailable, which does reach the
+            // fallback resolver — the property that mattered, asserted below.
+            // They now carry their own category because provider_unavailable is
+            // retryable, and retrying a withdrawn model spends one of the
+            // request's attempts on something that can never come back.
             $this->assertSame(
-                AiProviderError::CATEGORY_PROVIDER_UNAVAIL,
+                AiProviderError::CATEGORY_MODEL_RETIRED,
                 $error->category,
+                "Retired-model message should be recognised as such: {$message}",
+            );
+            $this->assertTrue(
+                $error->allowsFallback(),
                 "Retired-model message should route to a fallback: {$message}",
+            );
+            $this->assertFalse(
+                $error->isRetryable(),
+                "Retrying the same withdrawn model is wasted budget: {$message}",
+            );
+        }
+    }
+
+    /**
+     * gpt-5-mini rejecting the legacy 'max_tokens' classified as 'unknown',
+     * which is both uninformative and the one category that permits neither a
+     * retry nor a fallback hop — so an adapter bug looked like an unexplained
+     * provider failure.
+     */
+    public function testClassifiesRejectedRequestShapeAsInvalidRequest(): void
+    {
+        $messages = [
+            "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+            "Unsupported value: 'temperature' does not support 0.2 with this model.",
+            'Unrecognized request argument supplied: max_completion_tokens',
+        ];
+
+        foreach ($messages as $message) {
+            $error = $this->classifier->classify(new \RuntimeException($message));
+            $this->assertSame(
+                AiProviderError::CATEGORY_INVALID_REQUEST,
+                $error->category,
+                "Request-shape rejection should not fall through to 'unknown': {$message}",
             );
         }
     }

@@ -101,10 +101,44 @@ class SecretRedactor
         if (preg_match('/^[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}$/', $value)) {
             return true;
         }
+        if ($this->isKnownIdentifier($value)) {
+            return false;
+        }
         if (strlen($value) >= 32 && strpos($value, ' ') === false
             && preg_match('/^[A-Za-z0-9+\/=_-]+$/', $value)) {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Shapes that trip the length heuristic but are identifiers, not secrets.
+     *
+     * This matters more than it looks: UUIDs are this system's primary
+     * identifier everywhere — job payloads, audit records, deployment
+     * references — and a 36-character UUID is long, space-free and built
+     * entirely from characters the heuristic accepts. Redacting one does not
+     * merely obscure a log line; it destroys the value the consumer needs.
+     * A retry job whose deployment_uuid arrived as "[REDACTED]" could never
+     * find its deployment, and retried forever.
+     *
+     * The same applies to snake_case and kebab-case machine identifiers
+     * ("community_answer_generation_failed", "aicountly-compliance-desk"),
+     * which are error codes and slugs rather than credentials.
+     *
+     * Credentials do not look like this: an API key is an unbroken run of
+     * mixed-case alphanumerics, which still matches the heuristic below.
+     */
+    private function isKnownIdentifier(string $value): bool
+    {
+        // Canonical UUID, e.g. 871f4e3b-f3a6-4aec-a966-387bea6d9b44
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1) {
+            return true;
+        }
+
+        // Lowercase words joined by _ or - — snake_case/kebab-case identifiers.
+        // At least one separator is required so an unbroken lowercase hex blob
+        // (which a signing key can be) is still treated as a secret.
+        return preg_match('/^[a-z0-9]+([_-][a-z0-9]+)+$/', $value) === 1;
     }
 }

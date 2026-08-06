@@ -52,7 +52,10 @@ class ReachBlogFailures extends BaseCommand
             $aiRequests = [];
             if (SchemaGuard::hasTable($db, 'reach_ai_generation_requests')) {
                 $rows = $db->table('reach_ai_generation_requests')
-                    ->select('id, task_type, content_type, content_item_id, status, created_at, completed_at')
+                    ->select(
+                        'id, task_type, content_type, content_item_id, status, created_at, completed_at, '
+                        . 'error_category, redacted_error'
+                    )
                     ->where('status', 'failed')
                     ->orderBy('id', 'DESC')
                     ->limit($limit)
@@ -75,6 +78,12 @@ class ReachBlogFailures extends BaseCommand
                         'task_type'       => $row['task_type'],
                         'content_type'    => $row['content_type'],
                         'status'          => $row['status'],
+                        // Why the *request* failed. The last run reports
+                        // "completed" whenever the provider answered and
+                        // something after it rejected the output, so these two
+                        // fields are the only account of that case.
+                        'error_category'  => $row['error_category'] ?? null,
+                        'error'           => $row['redacted_error'] ?? null,
                         'created_at'      => $row['created_at'],
                         'last_run'        => $run,
                     ];

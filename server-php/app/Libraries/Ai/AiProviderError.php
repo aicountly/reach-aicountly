@@ -25,6 +25,17 @@ final class AiProviderError
     public const CATEGORY_CONTENT_BLOCKED   = 'content_blocked';
     public const CATEGORY_BUDGET_BLOCKED    = 'budget_blocked';
     public const CATEGORY_CANCELLED         = 'cancelled';
+    /**
+     * The provider has withdrawn the model we asked for.
+     *
+     * Distinct from CATEGORY_CONFIGURATION because nothing local is wrong:
+     * the route and the model row are valid, the model simply no longer
+     * exists upstream. Retrying the same model can never succeed, but another
+     * model can — so this must reach the fallback chain rather than failing
+     * the request outright.
+     */
+    public const CATEGORY_MODEL_RETIRED     = 'model_retired';
+
     public const CATEGORY_UNKNOWN           = 'unknown';
 
     private const RETRYABLE = [
@@ -45,5 +56,29 @@ final class AiProviderError
     public function isRetryable(): bool
     {
         return in_array($this->category, self::RETRYABLE, true);
+    }
+
+    /**
+     * Should the orchestrator try a different model rather than fail?
+     *
+     * Retrying the same model is pointless for these, but another model can
+     * still serve the request: the quota is per-account, the key is per
+     * provider, the withdrawn model is one row in a chain. Anything else —
+     * schema validation, blocked content, a malformed prompt — would fail the
+     * same way everywhere, so falling back only burns budget.
+     *
+     * Lives here rather than inline in the orchestrator so it can be tested
+     * without standing up a provider: this list silently excluding
+     * model_retired is what made a withdrawn model kill the whole request.
+     */
+    public function allowsFallback(): bool
+    {
+        return $this->isRetryable() || in_array($this->category, [
+            self::CATEGORY_BUDGET_BLOCKED,
+            self::CATEGORY_AUTHENTICATION,
+            self::CATEGORY_CONFIGURATION,
+            self::CATEGORY_PROVIDER_UNAVAIL,
+            self::CATEGORY_MODEL_RETIRED,
+        ], true);
     }
 }
