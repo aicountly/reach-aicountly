@@ -27,47 +27,71 @@ class DeploymentController extends BaseApiController
             'last_page' => 1,
         ];
 
-        try {
-            $db = $this->db();
+        $db = $this->db();
 
-            if (
-                ! $db->tableExists('reach_publication_deployments')
-                || ! $db->tableExists('reach_content_items')
-            ) {
-                return $this->ok([], $emptyMeta);
+        // Uncached: the cached variant answers from a per-connection
+        // listTables() snapshot, so a table created after the connection
+        // warmed up reads as missing — and this endpoint reports "missing" as
+        // an empty deployment list, which is indistinguishable from "healthy".
+        if (
+            ! $db->tableExists('reach_publication_deployments', false)
+            || ! $db->tableExists('reach_content_items', false)
+        ) {
+            return $this->ok([], $emptyMeta);
+        }
+
+        // Avoid table aliases in Query Builder — some CI4/Postgres
+        // identifier escaping paths quote "table alias" as one name.
+        $builder = $db->table('reach_publication_deployments')
+            ->select(
+                'reach_publication_deployments.*, '
+                . 'reach_content_items.title AS content_title, '
+                . 'reach_content_items.slug AS content_slug, '
+                . 'reach_content_items.content_type'
+            )
+            ->join(
+                'reach_content_items',
+                'reach_content_items.id = reach_publication_deployments.content_item_id',
+                'left'
+            );
+
+        // Without these a red "22 failed" dashboard card had no list behind
+        // it: 25 rows a page, newest first, no way to isolate the failures.
+        $status = trim((string) $this->request->getGet('status'));
+        if ($status !== '') {
+            $statuses = array_values(array_filter(array_map('trim', explode(',', $status))));
+            if ($statuses !== []) {
+                $builder->whereIn('reach_publication_deployments.status', $statuses);
             }
+        }
 
-            $total = $db->table('reach_publication_deployments')->countAllResults();
+        $contentType = trim((string) $this->request->getGet('content_type'));
+        if ($contentType !== '') {
+            $builder->where('reach_content_items.content_type', $contentType);
+        }
 
-            // Avoid table aliases in Query Builder — some CI4/Postgres
-            // identifier escaping paths quote "table alias" as one name.
-            $rows = $db->table('reach_publication_deployments')
-                ->select(
-                    'reach_publication_deployments.*, '
-                    . 'reach_content_items.title AS content_title, '
-                    . 'reach_content_items.content_type'
-                )
-                ->join(
-                    'reach_content_items',
-                    'reach_content_items.id = reach_publication_deployments.content_item_id',
-                    'left'
-                )
+        try {
+            $total = $builder->countAllResults(false);
+            $rows  = $builder
                 ->orderBy('reach_publication_deployments.updated_at', 'DESC')
                 ->limit($limit, $offset)
                 ->get()
                 ->getResultArray();
-
-            return $this->ok(is_array($rows) ? $rows : [], [
-                'total'     => $total,
-                'page'      => $page,
-                'per_page'  => $limit,
-                'last_page' => max(1, (int) ceil($total / $limit)),
-            ]);
         } catch (\Throwable $e) {
+            // Previously this returned an empty list, so a broken query read as
+            // "No deployments yet" — the UI cannot tell a healthy empty queue
+            // from a failure it should be shouting about. Say what happened.
             log_message('error', 'DeploymentController::index: ' . $e->getMessage());
-            // List endpoints must not hard-fail the Publishing UI.
-            return $this->ok([], $emptyMeta);
+
+            return $this->error('Could not load deployments.', 500);
         }
+
+        return $this->ok(is_array($rows) ? $rows : [], [
+            'total'     => $total,
+            'page'      => $page,
+            'per_page'  => $limit,
+            'last_page' => max(1, (int) ceil($total / $limit)),
+        ]);
     }
 
     public function show(int $id): \CodeIgniter\HTTP\ResponseInterface

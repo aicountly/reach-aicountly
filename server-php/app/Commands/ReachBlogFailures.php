@@ -104,6 +104,65 @@ class ReachBlogFailures extends BaseCommand
                 }
             }
 
+            // Publication deployments were missing here entirely, so a red
+            // "failed" count on the dashboard had no diagnosis path at all —
+            // not in the UI, and not from the CLI either.
+            $failedDeployments = [];
+            if ($db->tableExists('reach_publication_deployments') && $db->tableExists('reach_content_items')) {
+                $rows = $db->table('reach_publication_deployments')
+                    ->select(
+                        'reach_publication_deployments.id, reach_publication_deployments.content_item_id, '
+                        . 'reach_publication_deployments.operation, reach_publication_deployments.status, '
+                        . 'reach_publication_deployments.attempt_count, reach_publication_deployments.error_category, '
+                        . 'reach_publication_deployments.redacted_error, reach_publication_deployments.updated_at, '
+                        . 'reach_content_items.title, reach_content_items.content_type'
+                    )
+                    ->join(
+                        'reach_content_items',
+                        'reach_content_items.id = reach_publication_deployments.content_item_id',
+                        'left'
+                    )
+                    ->whereIn('reach_publication_deployments.status', ['failed', 'blocked'])
+                    ->orderBy('reach_publication_deployments.updated_at', 'DESC')
+                    ->limit($limit)
+                    ->get()
+                    ->getResultArray();
+
+                foreach ($rows as $row) {
+                    $failedDeployments[] = [
+                        'deployment_id'   => (int) $row['id'],
+                        'content_item_id' => (int) ($row['content_item_id'] ?? 0),
+                        'title'           => $row['title'],
+                        'content_type'    => $row['content_type'],
+                        'operation'       => $row['operation'],
+                        'status'          => $row['status'],
+                        'attempt_count'   => (int) ($row['attempt_count'] ?? 0),
+                        'error_category'  => $row['error_category'],
+                        'error'           => $row['redacted_error'],
+                        'updated_at'      => $row['updated_at'],
+                    ];
+                }
+            }
+
+            // Which categories dominate — the first thing you want when a
+            // couple of dozen deployments are sitting in failed.
+            $deploymentBreakdown = [];
+            if ($db->tableExists('reach_publication_deployments')) {
+                $rows = $db->table('reach_publication_deployments')
+                    ->select('status, error_category, COUNT(*) AS total', false)
+                    ->whereIn('status', ['failed', 'blocked'])
+                    ->groupBy(['status', 'error_category'])
+                    ->get()
+                    ->getResultArray();
+                foreach ($rows as $row) {
+                    $deploymentBreakdown[] = [
+                        'status'         => $row['status'],
+                        'error_category' => $row['error_category'] ?? '(none recorded)',
+                        'count'          => (int) $row['total'],
+                    ];
+                }
+            }
+
             $items = [];
             if ($db->tableExists('reach_content_items')) {
                 $items = $db->table('reach_content_items')
@@ -122,9 +181,12 @@ class ReachBlogFailures extends BaseCommand
                 'content_items' => $items,
                 'failed_blocks' => $failedBlocks,
                 'failed_ai'     => $aiRequests,
+                'failed_deployments'           => $failedDeployments,
+                'failed_deployment_breakdown'  => $deploymentBreakdown,
                 'retry'         => [
                     'php spark reach:blog-advance --dispatch',
                     'php spark reach:work --queue blog,publishing,community,default --limit 20',
+                    'POST /api/v1/publishing/deployments/{id}/retry — re-queue one failed deployment',
                 ],
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 

@@ -15,6 +15,9 @@ use Config\Database;
 
 class BlogCommandCentreController extends BaseApiController
 {
+    /** Window that decides whether publishing failures are still current. */
+    private const PUBLISHING_RECENT_DAYS = 7;
+
     public function overview()
     {
         $db    = Database::connect();
@@ -41,15 +44,17 @@ class BlogCommandCentreController extends BaseApiController
                 ->countAllResults();
         }
 
+        // The Production card counts pre-approval stages only. Without a total
+        // it cannot tell "no blog content exists" from "every blog has already
+        // moved past production" — and it reported both as NO DATA.
+        $blogTotal = (int) $db->table('reach_content_items')
+            ->where('content_type', 'blog')
+            ->where('deleted_at IS NULL', null, false)
+            ->countAllResults();
+
         $portfolio = (new BlogPortfolioService())->get();
 
-        $publishing = [
-            'queued'    => (int) $db->table('reach_publication_deployments')->where('status', 'queued')->countAllResults(),
-            'sending'   => (int) $db->table('reach_publication_deployments')->where('status', 'sending')->countAllResults(),
-            'failed'    => (int) $db->table('reach_publication_deployments')->where('status', 'failed')->countAllResults(),
-            'published' => (int) $db->table('reach_publication_deployments')->where('status', 'published')->countAllResults(),
-            'verified'  => (int) $db->table('reach_publication_deployments')->where('status', 'verified')->countAllResults(),
-        ];
+        $publishing = $this->publishingSummary($db);
 
         $workBlocks = [
             'pending'   => (int) $db->table('reach_work_blocks')->where('eligibility_status', 'pending')->countAllResults(),
@@ -60,6 +65,7 @@ class BlogCommandCentreController extends BaseApiController
 
         return $this->ok([
             'workflow_counts' => $workflowCounts,
+            'content'         => ['blog_total' => $blogTotal],
             'portfolio'       => [
                 'marketing_percent'          => (int) ($portfolio['marketing_percent'] ?? 45),
                 'product_percent'            => (int) ($portfolio['product_percent'] ?? 35),
@@ -74,6 +80,74 @@ class BlogCommandCentreController extends BaseApiController
                 'enabled' => $flags->isEnabled('automation'),
             ],
         ]);
+    }
+
+    /**
+     * Deployment counts for the Publishing card.
+     *
+     * Scoped to blog content: this table also carries knowledge-base
+     * deployments, and counting those made the Blog dashboard report work it
+     * does not own. `failed_recent` drives the card's status so a single old
+     * failure cannot pin it to ERROR forever, while `failed` keeps the
+     * lifetime total for context.
+     *
+     * @return array<string, int>
+     */
+    private function publishingSummary($db): array
+    {
+        $empty = [
+            'queued'        => 0,
+            'sending'       => 0,
+            'in_flight'     => 0,
+            'failed'        => 0,
+            'failed_recent' => 0,
+            'published'     => 0,
+            'verified'      => 0,
+            'recent_days'   => self::PUBLISHING_RECENT_DAYS,
+        ];
+
+        // Uncached: tableExists() otherwise answers from a per-connection
+        // listTables() snapshot, so a long-lived worker that warmed the cache
+        // before a migration reports a live table as missing — and "missing"
+        // here renders as a dashboard full of zeroes.
+        if (
+            ! $db->tableExists('reach_publication_deployments', false)
+            || ! $db->tableExists('reach_content_items', false)
+        ) {
+            return $empty;
+        }
+
+        $blogCount = function (array $statuses, ?string $since = null) use ($db): int {
+            $builder = $db->table('reach_publication_deployments')
+                ->join(
+                    'reach_content_items',
+                    'reach_content_items.id = reach_publication_deployments.content_item_id',
+                    'inner',
+                )
+                ->where('reach_content_items.content_type', 'blog')
+                ->whereIn('reach_publication_deployments.status', $statuses);
+
+            if ($since !== null) {
+                $builder->where('reach_publication_deployments.updated_at >=', $since);
+            }
+
+            return (int) $builder->countAllResults();
+        };
+
+        $since = date('Y-m-d H:i:s', strtotime('-' . self::PUBLISHING_RECENT_DAYS . ' days'));
+
+        return [
+            'queued'        => $blogCount(['queued']),
+            'sending'       => $blogCount(['sending']),
+            // Anything the pipeline is still working on. Without this the card
+            // showed neither the work in progress nor why nothing was moving.
+            'in_flight'     => $blogCount(['queued', 'sending', 'accepted', 'scheduled', 'verification_pending']),
+            'failed'        => $blogCount(['failed', 'blocked']),
+            'failed_recent' => $blogCount(['failed', 'blocked'], $since),
+            'published'     => $blogCount(['published']),
+            'verified'      => $blogCount(['verified']),
+            'recent_days'   => self::PUBLISHING_RECENT_DAYS,
+        ];
     }
 
     /**
