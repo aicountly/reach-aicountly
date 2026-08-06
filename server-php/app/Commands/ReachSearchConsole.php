@@ -186,16 +186,30 @@ class ReachSearchConsole extends BaseCommand
                 ->get()->getResultArray(), 'unmapped_url');
         }
 
+        // Show the identity's URL beside the item's current slug. The URL is
+        // taken from the deployment that published the post, which records what
+        // was live at that moment — if the slug has since been changed without
+        // re-publishing, the two disagree and the identity is stale.
         $identities = [];
         if ($db->tableExists('reach_content_identities', false)) {
-            $identities = array_column($db->table('reach_content_identities')
-                ->select('canonical_url')
-                ->where('tenant_id', $tenantId)
-                ->where('canonical_url IS NOT NULL', null, false)
-                ->orderBy('id', 'ASC')
+            $identities = $db->table('reach_content_identities ci')
+                ->select('ci.source_id, ci.canonical_url, i.slug AS current_slug, i.workflow_status')
+                ->join('reach_content_items i', 'i.id = ci.source_id', 'left')
+                ->where('ci.tenant_id', $tenantId)
+                ->where('ci.content_type', 'blog')
+                ->orderBy('ci.id', 'ASC')
                 ->limit(50)
-                ->get()->getResultArray(), 'canonical_url');
+                ->get()->getResultArray();
+
+            foreach ($identities as &$identity) {
+                $identity['url_slug'] = ContentIdentitySyncService::slugOf((string) $identity['canonical_url']);
+                $identity['stale']    = $identity['current_slug'] !== null
+                    && $identity['url_slug'] !== strtolower((string) $identity['current_slug']);
+            }
+            unset($identity);
         }
+
+        $stale = count(array_filter($identities, static fn (array $i): bool => (bool) $i['stale']));
 
         $slugIndex = (new ContentIdentitySyncService())->slugIndex($tenantId);
         $unmatched = [];
@@ -210,7 +224,14 @@ class ReachSearchConsole extends BaseCommand
 
         return [
             'reported_but_unclaimed' => $unmatched,
-            'canonical_urls_on_file' => $identities,
+            'identities'             => $identities,
+            'stale_identities'       => $stale,
+            'stale_note' => $stale === 0
+                ? null
+                : $stale . ' identity/identities hold a URL whose slug differs from the content item\'s '
+                    . 'current slug. The URL comes from the deployment that published the post, so this '
+                    . 'means the slug changed without re-publishing: the stored URL is what is actually '
+                    . 'live, and the current slug is not. Re-publish to reconcile them.',
             'hint' => $findings === []
                 ? null
                 : 'A Search Console property covers the whole site, so marketing, guide and pricing '
