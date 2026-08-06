@@ -36,6 +36,8 @@ cd server-php
 composer install
 cp .env.example .env
 # fill DB_*, JWT_SECRET, SUPER_ADMIN_*, CONSOLE_*, ENGAGE_*, WORKER_*, AICOUNTLY_SITE_*
+# .env.example carries only what must be set; every optional override and its
+# built-in default is in docs/operations/REACH_ENV_REFERENCE.md
 php spark migrate
 php spark db:seed InitialReachSeeder
 php spark serve --port=8080

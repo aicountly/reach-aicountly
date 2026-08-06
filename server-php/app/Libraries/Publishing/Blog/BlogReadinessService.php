@@ -140,10 +140,25 @@ class BlogReadinessService
             $blocking[] = 'Author reference is not defined';
         }
 
-        // Gate 11b: cover image present (warning — a publish without a hero is
-        // allowed, but the listing card renders a blank tile).
+        // Gate 11b: cover image present.
+        //
+        // Blocking by default (BLOG_REQUIRE_COVER_IMAGE): a blog must not go
+        // live with a blank listing tile. The escape hatch is deliberate and
+        // audited — waive the item's `cover_image` validation with a reason
+        // and this downgrades to a warning, so one post can go out without a
+        // hero without anyone having to disable the rule for every post.
         if ($profile && trim((string) ($profile['featured_image_reference'] ?? '')) === '') {
-            $warnings[] = 'Featured image is not assigned; the listing card will render without a cover';
+            $waived = $this->db->table('reach_content_validations')
+                ->where('content_item_id', $contentItemId)
+                ->where('validation_type', 'cover_image')
+                ->where('waived_at IS NOT NULL', null, false)
+                ->countAllResults() > 0;
+
+            if ((new \App\Libraries\Blog\BlogFeatureFlags())->isEnabled('require_cover_image') && ! $waived) {
+                $blocking[] = 'Featured image is not assigned; a suitable cover is required before publication';
+            } else {
+                $warnings[] = 'Featured image is not assigned; the listing card will render without a cover';
+            }
         }
 
         // Gate 12: featured image alt text

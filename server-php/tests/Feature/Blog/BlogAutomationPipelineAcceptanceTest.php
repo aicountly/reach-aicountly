@@ -240,6 +240,39 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $this->assertTrue($approval->verifyForPublication($contentItemId, $contentVersionId));
 
         // -----------------------------------------------------------------
+        // Step 14b: cover image. BLOG_IMAGE_GENERATION_ENABLED is off, so the
+        // paid leg never runs — the curated gallery must still supply a
+        // topically matched cover, and without one the item may not proceed
+        // (BLOG_REQUIRE_COVER_IMAGE).
+        // -----------------------------------------------------------------
+        $this->seedGalleryAsset(['gst', 'returns']);
+
+        $imageBlockId = $this->workBlocks->create([
+            'block_type' => WorkBlockService::TYPE_GENERATE_IMAGE,
+            'content_item_id' => $contentItemId,
+            'content_version_id' => $contentVersionId,
+        ]);
+        $imageResult = $this->workBlocks->execute($imageBlockId);
+
+        $this->assertArrayNotHasKey(
+            'image_failed',
+            $imageResult,
+            'The gallery must supply a cover even with the paid image API disabled: ' . json_encode($imageResult),
+        );
+        $this->assertGreaterThanOrEqual(3, (int) ($imageResult['relevance_score'] ?? 0), 'Assigned cover must clear the relevance floor.');
+
+        $coverProfile = $db->table('reach_blog_publication_profiles')
+            ->where('content_item_id', $contentItemId)->get()->getRowArray();
+        $this->assertNotEmpty($coverProfile['featured_image_reference'] ?? '', 'Cover URL must be written to the publication profile.');
+        $this->assertNotEmpty($coverProfile['featured_image_alt'] ?? '', 'Alt text is a blocking readiness gate.');
+
+        $coverValidation = $db->table('reach_content_validations')
+            ->where('content_item_id', $contentItemId)
+            ->where('validation_type', 'cover_image')
+            ->get()->getRowArray();
+        $this->assertSame('passed', $coverValidation['validation_status'] ?? null);
+
+        // -----------------------------------------------------------------
         // Step 15: schedule publication through the real deployment service
         // -----------------------------------------------------------------
         $existingConn = $db->table('reach_publication_connections')
@@ -594,11 +627,15 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
             'updated_at'           => date('Y-m-d H:i:s'),
         ]);
         $db->table('reach_blog_publication_profiles')->insert([
-            'content_item_id'  => $contentItemId,
-            'author_reference' => 'aicountly-editorial',
-            'excerpt'          => 'Deterministic fixture excerpt.',
-            'created_at'       => date('Y-m-d H:i:s'),
-            'updated_at'       => date('Y-m-d H:i:s'),
+            'content_item_id'          => $contentItemId,
+            'author_reference'         => 'aicountly-editorial',
+            'excerpt'                  => 'Deterministic fixture excerpt.',
+            // A cover is a blocking readiness gate (BLOG_REQUIRE_COVER_IMAGE);
+            // this fixture stands in for an item that already has one.
+            'featured_image_reference' => 'https://reach.aicountly.org/api/v1/public/media/e2e-fixture.webp?sig=test',
+            'featured_image_alt'       => 'Fixture cover for the acceptance article',
+            'created_at'               => date('Y-m-d H:i:s'),
+            'updated_at'               => date('Y-m-d H:i:s'),
         ]);
 
         $existingConn = $db->table('reach_publication_connections')
@@ -662,6 +699,33 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $db->table('reach_content_items')->where('id', $contentItemId)->update(['current_version_id' => $contentVersionId]);
 
         return [$contentItemId, $contentVersionId];
+    }
+
+    /**
+     * An active gallery cover tagged so CoverRelevanceScorer can match it to
+     * the fixture article. No binary is needed: assignment reads the row and
+     * hands back a signed URL.
+     *
+     * @param list<string> $tags
+     */
+    private function seedGalleryAsset(array $tags, ?string $stream = null): int
+    {
+        $db  = Database::connect();
+        $key = bin2hex(random_bytes(8));
+
+        $db->table('reach_media_gallery_assets')->insert([
+            'asset_uuid'       => 'e2e-' . $key,
+            'kind'             => 'gallery_upload',
+            'file_path'        => 'media/e2e/' . $key . '.webp',
+            'mime'             => 'image/webp',
+            'bytes'            => 2048,
+            'checksum_sha256'  => hash('sha256', $key),
+            'category_tags'    => json_encode($tags),
+            'portfolio_stream' => $stream,
+            'status'           => 'active',
+        ]);
+
+        return (int) $db->insertID();
     }
 
     /**
