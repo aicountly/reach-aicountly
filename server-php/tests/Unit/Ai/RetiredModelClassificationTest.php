@@ -57,6 +57,7 @@ final class RetiredModelClassificationTest extends CIUnitTestCase
             'The model `gpt-4-vision-preview` does not exist',
             'model not found',
             'The model has been deprecated and is no longer served',
+            'This model is retired',
         ] as $message) {
             $this->assertSame(
                 AiProviderError::CATEGORY_MODEL_RETIRED,
