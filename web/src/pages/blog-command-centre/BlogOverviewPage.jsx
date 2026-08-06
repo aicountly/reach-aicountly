@@ -47,6 +47,45 @@ function roadmapStatus(enabled, lastRun) {
 }
 
 /**
+ * Publishing card status.
+ *
+ * ERROR is reserved for failures inside the recent window; older ones drop to
+ * WARN. A lifetime failed count kept the card permanently red, which made it
+ * useless as a signal — you could not tell a broken pipeline from one bad
+ * deployment months ago.
+ */
+function publishingStatus(publishing) {
+  if ((publishing.failed_recent ?? 0) > 0) return 'ERROR';
+  if ((publishing.failed ?? 0) > 0) return 'WARN';
+  if ((publishing.published ?? 0) > 0 || (publishing.verified ?? 0) > 0) return 'OK';
+  if ((publishing.in_flight ?? 0) > 0) return 'OK';
+  return 'NO DATA';
+}
+
+function publishingDetail(publishing) {
+  const failedRecent = publishing.failed_recent ?? 0;
+  const failed = publishing.failed ?? 0;
+  const days = publishing.recent_days ?? 7;
+
+  if (failedRecent > 0) {
+    return `${failedRecent} failed in the last ${days} days — open to retry.`;
+  }
+  if (failed > 0) {
+    return `No failures in the last ${days} days; ${failed} older one${failed === 1 ? '' : 's'} still unresolved.`;
+  }
+  if ((publishing.verified ?? 0) > 0) {
+    return `${publishing.verified} deployment${publishing.verified === 1 ? '' : 's'} verified live.`;
+  }
+  return null;
+}
+
+function publishingLink(publishing) {
+  return (publishing.failed ?? 0) > 0
+    ? `${ROUTES.BCC_PUBLISHING_DEPLOYMENTS}?status=failed,blocked`
+    : ROUTES.BCC_PUBLISHING_DEPLOYMENTS;
+}
+
+/**
  * Builds the six dashboard cards from the real overview payload. Every card
  * reports an explicit state so an empty system reads as "no data yet" rather
  * than implying activity that has not happened.
@@ -67,6 +106,7 @@ function buildCards(data) {
   const reviewStage = (workflow.seo_review ?? 0) + (workflow.internal_review ?? 0)
     + (workflow.changes_requested ?? 0);
   const inProduction = briefStage + draftStage + reviewStage;
+  const blogTotal = data.content?.blog_total ?? 0;
   const textProviders = countProviders(providers.text);
   const imageProviders = countProviders(providers.image);
   const lastRun = optimizer.last_run;
@@ -76,8 +116,20 @@ function buildCards(data) {
       key: 'production',
       title: 'Production',
       icon: Factory,
-      link: reviewStage > 0 ? ROUTES.BCC_VERIFICATION : ROUTES.BCC_PIPELINE_DRAFTS,
-      status: inProduction > 0 ? 'OK' : 'NO DATA',
+      // Never send someone to the Drafts filter when there are no drafts —
+      // that lands on "No blog content items match this filter" and reads as
+      // an empty system. With nothing in production, show the whole library.
+      link: reviewStage > 0
+        ? ROUTES.BCC_VERIFICATION
+        : inProduction > 0
+          ? ROUTES.BCC_PIPELINE_DRAFTS
+          : ROUTES.BCC_PIPELINE_VERSIONS,
+      // NO DATA means "no blog content exists". A library that has simply moved
+      // past the production stages is IDLE, not empty.
+      status: inProduction > 0 ? 'OK' : blogTotal > 0 ? 'IDLE' : 'NO DATA',
+      detail: inProduction === 0 && blogTotal > 0
+        ? `Nothing in production — all ${blogTotal} blog item${blogTotal === 1 ? '' : 's'} are past this stage.`
+        : null,
       metrics: [
         metric('briefs/outlines', briefStage),
         metric('drafts', draftStage),
@@ -117,10 +169,14 @@ function buildCards(data) {
       key: 'publishing',
       title: 'Publishing',
       icon: Globe,
-      link: ROUTES.BCC_PUBLISHING_READY,
-      status: (publishing.failed ?? 0) > 0 ? 'ERROR' : (publishing.published ?? 0) > 0 ? 'OK' : 'NO DATA',
+      // The metrics on this card are deployment states, so it has to land on
+      // the deployment list — pre-filtered to the failures when it is red.
+      // It used to link to Ready to Publish, which cannot show a single one.
+      link: publishingLink(publishing),
+      status: publishingStatus(publishing),
+      detail: publishingDetail(publishing),
       metrics: [
-        metric('queued', publishing.queued ?? 0),
+        metric('in flight', publishing.in_flight ?? publishing.queued ?? 0),
         metric('published', publishing.published ?? 0),
         metric('failed', publishing.failed ?? 0),
       ],
