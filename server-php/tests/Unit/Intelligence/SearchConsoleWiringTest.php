@@ -225,4 +225,62 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
     {
         $this->assertSame('', ContentIdentitySyncService::normaliseUrl('   '));
     }
+
+    // --- Slug matching across the /blog/ → /blogs/ redirect ---------------
+
+    /**
+     * The public site 301s /blog/{slug} to /blogs/{slug} and Search Console
+     * reports the destination, so an identity built from CanonicalUrlPolicy
+     * never matches on an exact comparison. The slug survives the redirect.
+     */
+    public function testSlugSurvivesThePathPrefixRedirect(): void
+    {
+        $stored   = 'https://www.aicountly.com/blog/gst-return-due-dates';
+        $reported = 'https://aicountly.com/blogs/gst-return-due-dates';
+
+        $this->assertNotSame(
+            ContentIdentitySyncService::normaliseUrl($stored),
+            ContentIdentitySyncService::normaliseUrl($reported),
+            'These are deliberately unequal — that is why the exact match failed.',
+        );
+        $this->assertSame(
+            ContentIdentitySyncService::slugOf($stored),
+            ContentIdentitySyncService::slugOf($reported),
+        );
+    }
+
+    public function testSlugIgnoresTrailingSlashAndQueryString(): void
+    {
+        $this->assertSame(
+            'gst-returns',
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns/?utm_source=x'),
+        );
+    }
+
+    /**
+     * A bare host must never produce a slug — otherwise the homepage's search
+     * traffic would be attributed to whichever post sorted first.
+     */
+    public function testBareHostHasNoSlug(): void
+    {
+        $this->assertSame('', ContentIdentitySyncService::slugOf('https://aicountly.com'));
+        $this->assertSame('', ContentIdentitySyncService::slugOf('https://aicountly.com/'));
+        $this->assertSame('', ContentIdentitySyncService::slugOf(''));
+    }
+
+    public function testSlugIsCaseInsensitive(): void
+    {
+        $this->assertSame(
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/GST-Returns'),
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blog/gst-returns'),
+        );
+    }
+
+    public function testDistinctPostsKeepDistinctSlugs(): void
+    {
+        $this->assertNotSame(
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns'),
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/tds-returns'),
+        );
+    }
 }
