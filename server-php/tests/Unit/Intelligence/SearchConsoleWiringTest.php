@@ -278,4 +278,30 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
             ContentIdentitySyncService::normaliseUrl('https://www.aicountly.com/blogs/dashboard'),
         );
     }
+
+    /**
+     * After a slug repair the item's slug is corrected immediately but the post
+     * is only re-published later, so the live URL and the slug-derived URL
+     * disagree and Google reports whichever it last crawled. Both must resolve
+     * to the same post — the host and www difference between the two sources
+     * must not stop that.
+     */
+    public function testPreAndPostRepairUrlsForOnePostAreDistinctButBothResolvable(): void
+    {
+        $published  = 'https://www.aicountly.com/blogs/nput-ax-redit-xplained-for-mall-usinesses';
+        $fromSlug   = 'https://www.aicountly.com/blogs/gst-input-tax-credit-explained-for-small-businesses';
+        $asReported = 'https://aicountly.com/blogs/gst-input-tax-credit-explained-for-small-businesses';
+
+        // Different URLs — indexing only one of them loses the other's traffic.
+        $this->assertNotSame(
+            ContentIdentitySyncService::normaliseUrl($published),
+            ContentIdentitySyncService::normaliseUrl($fromSlug),
+        );
+
+        // Google drops the www; the index must still recognise the slug URL.
+        $this->assertSame(
+            ContentIdentitySyncService::normaliseUrl($fromSlug),
+            ContentIdentitySyncService::normaliseUrl($asReported),
+        );
+    }
 }
