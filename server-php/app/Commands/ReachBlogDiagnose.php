@@ -9,6 +9,7 @@ use Config\Database;
 use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:blog-diagnose` — one-shot health check for blog cron / automation.
@@ -143,7 +144,7 @@ class ReachBlogDiagnose extends BaseCommand
         $snap = ['ok' => true];
 
         try {
-            if ($db->tableExists('reach_optimizer_runs')) {
+            if (SchemaGuard::hasTable($db, 'reach_optimizer_runs')) {
                 $row = $db->table('reach_optimizer_runs')->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
                 $snap['last_optimizer_run'] = $row ? [
                     'id'                  => (int) $row['id'],
@@ -160,7 +161,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_optimizer_runs';
             }
 
-            if ($db->tableExists('reach_topic_clusters')) {
+            if (SchemaGuard::hasTable($db, 'reach_topic_clusters')) {
                 $approvedClusters = (int) $db->table('reach_topic_clusters')
                     ->where('status', 'approved')
                     ->where('deleted_at IS NULL', null, false)
@@ -170,7 +171,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_topic_clusters';
             }
 
-            if ($db->tableExists('reach_topic_candidates')) {
+            if (SchemaGuard::hasTable($db, 'reach_topic_candidates')) {
                 $rows = $db->query(
                     'SELECT status, COUNT(*) AS cnt FROM reach_topic_candidates GROUP BY status ORDER BY status'
                 )->getResultArray();
@@ -198,7 +199,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_topic_candidates';
             }
 
-            if ($db->tableExists('reach_work_blocks')) {
+            if (SchemaGuard::hasTable($db, 'reach_work_blocks')) {
                 $rows = $db->query(
                     'SELECT eligibility_status, block_type, COUNT(*) AS cnt
                      FROM reach_work_blocks
@@ -214,7 +215,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_work_blocks';
             }
 
-            if ($db->tableExists('reach_jobs')) {
+            if (SchemaGuard::hasTable($db, 'reach_jobs')) {
                 $rows = $db->query(
                     'SELECT queue, status, COUNT(*) AS cnt
                      FROM reach_jobs
@@ -230,7 +231,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_jobs';
             }
 
-            if ($db->tableExists('reach_content_items')) {
+            if (SchemaGuard::hasTable($db, 'reach_content_items')) {
                 $rows = $db->query(
                     "SELECT workflow_status, COUNT(*) AS cnt
                      FROM reach_content_items
@@ -247,7 +248,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_content_items';
             }
 
-            if ($db->tableExists('reach_publication_deployments')) {
+            if (SchemaGuard::hasTable($db, 'reach_publication_deployments')) {
                 $snap['publication_deployments'] = $db->table('reach_publication_deployments')
                     ->select('id, content_item_id, status, public_content_id, error_category, redacted_error, updated_at')
                     ->orderBy('id', 'DESC')
@@ -258,7 +259,7 @@ class ReachBlogDiagnose extends BaseCommand
                 $snap['missing_table'][] = 'reach_publication_deployments';
             }
 
-            if ($db->tableExists('reach_work_blocks') && $db->tableExists('reach_content_items')) {
+            if (SchemaGuard::hasTable($db, 'reach_work_blocks') && SchemaGuard::hasTable($db, 'reach_content_items')) {
                 $snap['publish_pipeline_blocks'] = $db->query(
                     "SELECT wb.id, wb.content_item_id, wb.block_type, wb.eligibility_status,
                             wb.failure_classification, wb.updated_at
@@ -537,7 +538,7 @@ class ReachBlogDiagnose extends BaseCommand
     {
         try {
             $db = Database::connect();
-            if (! $db->tableExists('reach_work_blocks')) {
+            if (! SchemaGuard::hasTable($db, 'reach_work_blocks')) {
                 return [];
             }
             $rows = $db->table('reach_work_blocks')

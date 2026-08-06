@@ -6,6 +6,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:blog-failures` — show why GENERATE_DRAFT / AI requests failed.
@@ -24,7 +25,7 @@ class ReachBlogFailures extends BaseCommand
 
         try {
             $failedBlocks = [];
-            if ($db->tableExists('reach_work_blocks')) {
+            if (SchemaGuard::hasTable($db, 'reach_work_blocks')) {
                 $rows = $db->table('reach_work_blocks')
                     ->select('id, content_item_id, block_type, eligibility_status, failure_classification, output_json, updated_at')
                     ->where('eligibility_status', 'failed')
@@ -49,7 +50,7 @@ class ReachBlogFailures extends BaseCommand
             }
 
             $aiRequests = [];
-            if ($db->tableExists('reach_ai_generation_requests')) {
+            if (SchemaGuard::hasTable($db, 'reach_ai_generation_requests')) {
                 $rows = $db->table('reach_ai_generation_requests')
                     ->select('id, task_type, content_type, content_item_id, status, created_at, completed_at')
                     ->where('status', 'failed')
@@ -59,7 +60,7 @@ class ReachBlogFailures extends BaseCommand
                     ->getResultArray();
                 foreach ($rows as $row) {
                     $run = null;
-                    if ($db->tableExists('reach_ai_generation_runs')) {
+                    if (SchemaGuard::hasTable($db, 'reach_ai_generation_runs')) {
                         $run = $db->table('reach_ai_generation_runs')
                             ->select('status, error_category, redacted_error_message, duration_ms')
                             ->where('generation_request_id', (int) $row['id'])
@@ -86,7 +87,7 @@ class ReachBlogFailures extends BaseCommand
                 'perplexity_key_set' => $this->envSet('AI_PERPLEXITY_API_KEY'),
                 'routes'             => [],
             ];
-            if ($db->tableExists('reach_ai_model_routes')) {
+            if (SchemaGuard::hasTable($db, 'reach_ai_model_routes')) {
                 try {
                     $routes = $db->table('reach_ai_model_routes r')
                         ->select('r.task_type, r.content_type, r.priority, r.enabled, m.model_key, m.enabled AS model_enabled, p.provider_key, p.status AS provider_status')
@@ -108,7 +109,7 @@ class ReachBlogFailures extends BaseCommand
             // "failed" count on the dashboard had no diagnosis path at all —
             // not in the UI, and not from the CLI either.
             $failedDeployments = [];
-            if ($db->tableExists('reach_publication_deployments') && $db->tableExists('reach_content_items')) {
+            if (SchemaGuard::hasTable($db, 'reach_publication_deployments') && SchemaGuard::hasTable($db, 'reach_content_items')) {
                 $rows = $db->table('reach_publication_deployments')
                     ->select(
                         'reach_publication_deployments.id, reach_publication_deployments.content_item_id, '
@@ -147,7 +148,7 @@ class ReachBlogFailures extends BaseCommand
             // Which categories dominate — the first thing you want when a
             // couple of dozen deployments are sitting in failed.
             $deploymentBreakdown = [];
-            if ($db->tableExists('reach_publication_deployments')) {
+            if (SchemaGuard::hasTable($db, 'reach_publication_deployments')) {
                 $rows = $db->table('reach_publication_deployments')
                     ->select('status, error_category, COUNT(*) AS total', false)
                     ->whereIn('status', ['failed', 'blocked'])
@@ -164,7 +165,7 @@ class ReachBlogFailures extends BaseCommand
             }
 
             $items = [];
-            if ($db->tableExists('reach_content_items')) {
+            if (SchemaGuard::hasTable($db, 'reach_content_items')) {
                 $items = $db->table('reach_content_items')
                     ->select('id, title, workflow_status, current_version_id')
                     ->where('content_type', 'blog')

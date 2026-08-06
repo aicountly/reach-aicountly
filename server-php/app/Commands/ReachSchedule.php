@@ -6,6 +6,7 @@ use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Config\Services;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark reach:schedule` — housekeeping for the reach_jobs queue.
@@ -57,7 +58,7 @@ class ReachSchedule extends BaseCommand
     {
         try {
             $db = Database::connect();
-            if (! $db->tableExists('reach_ai_model_routes')) {
+            if (! SchemaGuard::hasTable($db, 'reach_ai_model_routes')) {
                 return false;
             }
             $count = (int) $db->table('reach_ai_model_routes')

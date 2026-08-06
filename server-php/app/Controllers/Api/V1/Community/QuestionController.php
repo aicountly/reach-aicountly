@@ -7,6 +7,7 @@ use App\Libraries\Community\CommunityQuestionIntakeService;
 use App\Libraries\Community\CommunityQuestionRepository;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class QuestionController extends BaseApiController
 {
@@ -36,7 +37,7 @@ class QuestionController extends BaseApiController
 
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_questions')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_questions')) {
                 return $this->response->setJSON($empty);
             }
 

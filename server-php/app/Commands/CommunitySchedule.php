@@ -9,6 +9,7 @@ use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Config\Services;
 use Throwable;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * `php spark community:schedule` — periodic housekeeping for Community Q&A.
@@ -119,7 +120,7 @@ class CommunitySchedule extends BaseCommand
 
         try {
             $db = Database::connect();
-            if (! $db->tableExists('reach_community_official_answers')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
                 return $stats;
             }
 

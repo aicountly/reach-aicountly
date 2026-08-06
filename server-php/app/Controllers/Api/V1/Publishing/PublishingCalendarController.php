@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Publishing;
 
 use App\Controllers\Api\V1\BaseApiController;
+use App\Libraries\Database\SchemaGuard;
 
 class PublishingCalendarController extends BaseApiController
 {
@@ -12,8 +13,8 @@ class PublishingCalendarController extends BaseApiController
             $db = \Config\Database::connect();
 
             if (
-                ! $db->tableExists('reach_publication_deployments')
-                || ! $db->tableExists('reach_content_items')
+                ! SchemaGuard::hasTable($db, 'reach_publication_deployments')
+                || ! SchemaGuard::hasTable($db, 'reach_content_items')
             ) {
                 return $this->ok([]);
             }

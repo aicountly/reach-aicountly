@@ -7,6 +7,7 @@ use App\Models\CommunityModerationFindingModel;
 use App\Libraries\Community\OfficialAnswerModerationService;
 use App\Libraries\AuditLogger;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class CommunityModerationController extends BaseApiController
 {
@@ -35,7 +36,7 @@ class CommunityModerationController extends BaseApiController
 
         try {
             $db = db_connect();
-            if (! $db->tableExists('reach_community_moderation_findings')) {
+            if (! SchemaGuard::hasTable($db, 'reach_community_moderation_findings')) {
                 return $this->response->setJSON($empty);
             }
 
@@ -51,7 +52,7 @@ class CommunityModerationController extends BaseApiController
                 ->orderBy('reach_community_moderation_findings.created_at', 'ASC')
                 ->limit($perPage, $offset);
 
-            if ($db->tableExists('reach_community_answer_versions')) {
+            if (SchemaGuard::hasTable($db, 'reach_community_answer_versions')) {
                 $builder->select(
                     'reach_community_moderation_findings.*, '
                     . 'reach_community_answer_versions.answer_id, '

@@ -9,6 +9,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Distribution\ConsentService;
 use App\Models\Distribution\ChannelConsentModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class ConsentController extends BaseApiController
 {
@@ -36,7 +37,7 @@ class ConsentController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_channel_consents')) {
+            if (! SchemaGuard::hasTable($db, 'reach_channel_consents')) {
                 return $this->ok([
                     'data'     => [],
                     'total'    => 0,

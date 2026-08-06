@@ -9,6 +9,7 @@ use App\Libraries\Video\VideoConnectionService;
 use App\Libraries\Video\VideoPublicationRepository;
 use App\Models\Video\VideoPublicationProfileModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class VideoConnectionController extends BaseApiController
 {
@@ -34,7 +35,7 @@ class VideoConnectionController extends BaseApiController
     {
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_publication_connections')) {
+            if (! SchemaGuard::hasTable($db, 'reach_publication_connections')) {
                 return $this->ok(['data' => []]);
             }
 

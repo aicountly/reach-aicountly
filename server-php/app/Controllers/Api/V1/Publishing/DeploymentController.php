@@ -6,6 +6,7 @@ use App\Controllers\Api\V1\BaseApiController;
 use App\Libraries\Publishing\Jobs\PublicationRetryService;
 use App\Libraries\Publishing\Jobs\PublicationVerificationService;
 use App\Libraries\Publishing\Jobs\PublicationRollbackService;
+use App\Libraries\Database\SchemaGuard;
 
 class DeploymentController extends BaseApiController
 {
@@ -29,13 +30,9 @@ class DeploymentController extends BaseApiController
 
         $db = $this->db();
 
-        // Uncached: the cached variant answers from a per-connection
-        // listTables() snapshot, so a table created after the connection
-        // warmed up reads as missing — and this endpoint reports "missing" as
-        // an empty deployment list, which is indistinguishable from "healthy".
         if (
-            ! $db->tableExists('reach_publication_deployments', false)
-            || ! $db->tableExists('reach_content_items', false)
+            ! SchemaGuard::hasTable($db, 'reach_publication_deployments')
+            || ! SchemaGuard::hasTable($db, 'reach_content_items')
         ) {
             return $this->ok([], $emptyMeta);
         }
@@ -100,8 +97,8 @@ class DeploymentController extends BaseApiController
             $db = $this->db();
 
             if (
-                ! $db->tableExists('reach_publication_deployments')
-                || ! $db->tableExists('reach_content_items')
+                ! SchemaGuard::hasTable($db, 'reach_publication_deployments')
+                || ! SchemaGuard::hasTable($db, 'reach_content_items')
             ) {
                 return $this->notFound('Deployment not found');
             }
@@ -138,7 +135,7 @@ class DeploymentController extends BaseApiController
     {
         try {
             $db = $this->db();
-            if (! $db->tableExists('reach_publication_verifications')) {
+            if (! SchemaGuard::hasTable($db, 'reach_publication_verifications')) {
                 return $this->ok([]);
             }
 

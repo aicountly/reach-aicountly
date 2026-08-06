@@ -4,6 +4,7 @@ namespace App\Libraries\Blog\Roadmap;
 
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use App\Libraries\Database\SchemaGuard;
 
 /**
  * Score stability, caps, and cooldown enforcement for roadmap optimisation.
@@ -74,7 +75,7 @@ class StabilityController
 
     public function countWeeklyCreateDecisions(string $sinceDate): int
     {
-        if (! $this->db()->tableExists('reach_roadmap_decisions')) {
+        if (! SchemaGuard::hasTable($this->db(), 'reach_roadmap_decisions')) {
             return 0;
         }
 

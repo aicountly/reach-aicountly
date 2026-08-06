@@ -6,6 +6,7 @@ namespace App\Controllers\Api\V1\Distribution;
 
 use App\Controllers\BaseApiController;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class AnalyticsController extends BaseApiController
 {
@@ -37,7 +38,7 @@ class AnalyticsController extends BaseApiController
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('reach_campaign_operational_metrics')) {
+            if (! SchemaGuard::hasTable($db, 'reach_campaign_operational_metrics')) {
                 return $this->ok($empty());
             }
 
@@ -50,7 +51,7 @@ class AnalyticsController extends BaseApiController
 
             // Avoid table aliases in Query Builder — some CI4/Postgres
             // identifier escaping paths quote "table alias" as one name.
-            $hasDispatches = $db->tableExists('reach_campaign_dispatches');
+            $hasDispatches = SchemaGuard::hasTable($db, 'reach_campaign_dispatches');
             $select = $hasDispatches
                 ? 'reach_campaign_operational_metrics.*, '
                     . 'reach_campaign_dispatches.campaign_id, '

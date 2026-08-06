@@ -11,6 +11,7 @@ use App\Libraries\Video\VideoProjectRepository;
 use App\Models\Video\VideoPublicationProfileModel;
 use App\Models\Video\VideoProjectModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Database\SchemaGuard;
 
 class VideoPublicationController extends BaseApiController
 {
@@ -132,8 +133,8 @@ class VideoPublicationController extends BaseApiController
         try {
             $db = \Config\Database::connect();
             if (
-                ! $db->tableExists('reach_publication_deployments')
-                || ! $db->tableExists('reach_video_projects')
+                ! SchemaGuard::hasTable($db, 'reach_publication_deployments')
+                || ! SchemaGuard::hasTable($db, 'reach_video_projects')
             ) {
                 return $this->ok($empty);
             }
