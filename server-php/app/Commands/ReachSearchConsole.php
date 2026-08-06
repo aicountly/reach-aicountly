@@ -213,9 +213,11 @@ class ReachSearchConsole extends BaseCommand
             'canonical_urls_on_file' => $identities,
             'hint' => $findings === []
                 ? null
-                : 'Compare the two lists. A matching slug under a different path prefix means the '
-                    . 'stored canonical URL is wrong (the public site 301s /blog/ to /blogs/); ingestion '
-                    . 'will still attribute those rows by slug.',
+                : 'A Search Console property covers the whole site, so marketing, guide and pricing '
+                    . 'URLs appear here and are correctly ignored — Reach only claims content it '
+                    . 'publishes. Investigate only when a URL that IS a tracked post fails to match: '
+                    . 'compare it against canonical_urls_on_file. slug_known means a post with that '
+                    . 'final segment exists at a different path, which points at a stale canonical URL.',
         ];
     }
 

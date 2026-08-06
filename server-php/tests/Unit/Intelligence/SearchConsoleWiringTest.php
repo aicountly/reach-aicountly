@@ -226,29 +226,15 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
         $this->assertSame('', ContentIdentitySyncService::normaliseUrl('   '));
     }
 
-    // --- Slug matching across the /blog/ → /blogs/ redirect ---------------
+    // --- Slug helpers (diagnostic only) ----------------------------------
 
     /**
-     * The public site 301s /blog/{slug} to /blogs/{slug} and Search Console
-     * reports the destination, so an identity built from CanonicalUrlPolicy
-     * never matches on an exact comparison. The slug survives the redirect.
+     * slugOf backs the `unmapped` diagnostic, which reports whether a blog with
+     * the same final path segment exists. It is deliberately NOT used to
+     * attribute traffic: a Search Console property covers the whole site, so
+     * /guides/hrms/dashboard and a post slugged "dashboard" would collide and
+     * a marketing page's clicks would be credited to a blog post.
      */
-    public function testSlugSurvivesThePathPrefixRedirect(): void
-    {
-        $stored   = 'https://www.aicountly.com/blog/gst-return-due-dates';
-        $reported = 'https://aicountly.com/blogs/gst-return-due-dates';
-
-        $this->assertNotSame(
-            ContentIdentitySyncService::normaliseUrl($stored),
-            ContentIdentitySyncService::normaliseUrl($reported),
-            'These are deliberately unequal — that is why the exact match failed.',
-        );
-        $this->assertSame(
-            ContentIdentitySyncService::slugOf($stored),
-            ContentIdentitySyncService::slugOf($reported),
-        );
-    }
-
     public function testSlugIgnoresTrailingSlashAndQueryString(): void
     {
         $this->assertSame(
@@ -257,10 +243,6 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
         );
     }
 
-    /**
-     * A bare host must never produce a slug — otherwise the homepage's search
-     * traffic would be attributed to whichever post sorted first.
-     */
     public function testBareHostHasNoSlug(): void
     {
         $this->assertSame('', ContentIdentitySyncService::slugOf('https://aicountly.com'));
@@ -272,7 +254,7 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
     {
         $this->assertSame(
             ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/GST-Returns'),
-            ContentIdentitySyncService::slugOf('https://aicountly.com/blog/gst-returns'),
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns'),
         );
     }
 
@@ -281,6 +263,19 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
         $this->assertNotSame(
             ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns'),
             ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/tds-returns'),
+        );
+    }
+
+    /**
+     * Attribution is exact-match only. A guide and a post that happen to share
+     * a final segment are different pages, and the fact table must not merge
+     * them.
+     */
+    public function testGuideAndBlogSharingASegmentAreNotTheSameUrl(): void
+    {
+        $this->assertNotSame(
+            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/guides/hrms/dashboard'),
+            ContentIdentitySyncService::normaliseUrl('https://www.aicountly.com/blogs/dashboard'),
         );
     }
 }

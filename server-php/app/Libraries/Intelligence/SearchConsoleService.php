@@ -268,20 +268,18 @@ class SearchConsoleService
         // Refresh identities first: a post published since the last run has no
         // identity yet, and its Search Console rows would be filed as unmapped.
         $this->identitySync->syncBlogs($tenantId);
-        $urlIndex  = $this->identitySync->urlIndex($tenantId);
-        $slugIndex = $this->identitySync->slugIndex($tenantId);
+        $urlIndex = $this->identitySync->urlIndex($tenantId);
 
         $runId = $this->runModel->startRun($connectionId, 'search_metrics', $runType, $dateFrom, $dateTo);
 
         $this->auditLogger->log(null, AuditLogger::SEARCH_INGESTION_STARTED, 'ingestion_run', $runId,
             null, ['from' => $dateFrom, 'to' => $dateTo, 'run_type' => $runType], null, 'system');
 
-        $ingested   = 0;
-        $skipped    = 0;
-        $failed     = 0;
-        $pages      = 0;
-        $viaSlug    = 0;
-        $warnings   = [];
+        $ingested    = 0;
+        $skipped     = 0;
+        $failed      = 0;
+        $pages       = 0;
+        $warnings    = [];
         $cursorState = null;
 
         try {
@@ -305,16 +303,6 @@ class SearchConsoleService
                 foreach ($batch->rows as $row) {
                     $pageUrl    = trim((string) ($row['page_url'] ?? ''));
                     $identityId = $urlIndex[ContentIdentitySyncService::normaliseUrl($pageUrl)] ?? null;
-
-                    // Fall back to the slug when the path prefix differs — the
-                    // public site 301s /blog/{slug} to /blogs/{slug} and Search
-                    // Console reports the destination.
-                    if ($identityId === null) {
-                        $identityId = $slugIndex[ContentIdentitySyncService::slugOf($pageUrl)] ?? null;
-                        if ($identityId !== null) {
-                            $viaSlug++;
-                        }
-                    }
 
                     if ($identityId === null) {
                         $this->recordUnmappedUrl($connectionId, $runId, $pageUrl);
@@ -345,11 +333,13 @@ class SearchConsoleService
                     . $dateFrom . '..' . $dateTo . '.';
             }
 
-            // Slug matching keeps data flowing, but it is a symptom: the stored
-            // canonical URL does not equal the URL Google actually reports.
-            if ($viaSlug > 0) {
-                $warnings[] = $viaSlug . ' row(s) matched by slug because the stored canonical URL '
-                    . 'differs from the URL Search Console reports (the public site 301s /blog/ to /blogs/).';
+            // A property covers the whole site, so most rows legitimately belong
+            // to pages Reach does not own (marketing, guides, pricing). Say so,
+            // rather than letting a high skip count read as a failure.
+            if ($skipped > 0 && $ingested === 0) {
+                $warnings[] = 'All ' . $skipped . ' row(s) were for URLs no Reach content claims. '
+                    . 'Run `reach:search-console unmapped` to see them — if they are marketing or guide '
+                    . 'pages this is correct, and it means the tracked posts have no search traffic yet.';
             }
 
             if ($advanceCursor) {
@@ -370,7 +360,6 @@ class SearchConsoleService
                 'date_to'       => $dateTo,
                 'pages'         => $pages,
                 'ingested'      => $ingested,
-                'matched_by_slug' => $viaSlug,
                 'skipped'       => $skipped,
                 'failed'        => $failed,
                 'truncated'     => $truncated,
