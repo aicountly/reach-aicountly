@@ -10,9 +10,17 @@
 P .env
 - .env
 
-# Preserve server runtime data across --delete deploys
+# Preserve server runtime data across --delete deploys.
+#
+# The trailing /*** is load-bearing. rsync matches every path it is about to
+# delete against these rules individually, and "writable/uploads/" matches only
+# the directory entry — not writable/uploads/media/covers/2026/08/x.webp, which
+# was therefore deleted on every deploy while the directory itself survived.
+# That left gallery rows in the database pointing at binaries that no longer
+# existed: covers 404'd in the console and on aicountly.com. "dir/***" is the
+# documented idiom for "this directory and everything inside it".
 P writable/.reach_seed_complete
-P writable/cache/
-P writable/logs/
-P writable/session/
-P writable/uploads/
+P writable/cache/***
+P writable/logs/***
+P writable/session/***
+P writable/uploads/***
