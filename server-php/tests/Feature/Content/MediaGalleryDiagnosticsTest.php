@@ -80,6 +80,33 @@ final class MediaGalleryDiagnosticsTest extends ApiTestCase
         unlink($present);
     }
 
+    public function testStorageLocationIsReported(): void
+    {
+        $_ENV['MEDIA_SIGNING_KEY'] = str_repeat('a', 64);
+        $_ENV['MEDIA_STORAGE_PATH'] = '/home/reachaicountly/cover_images';
+
+        $data = $this->list();
+
+        $this->assertSame('/home/reachaicountly/cover_images/', $data['storage_path']);
+        $this->assertTrue($data['storage_outside_deploy'], 'A path outside the API directory is out of rsync --delete reach.');
+
+        unset($_ENV['MEDIA_STORAGE_PATH']);
+    }
+
+    public function testStorageInsideTheDeployTreeIsFlagged(): void
+    {
+        $_ENV['MEDIA_SIGNING_KEY'] = str_repeat('a', 64);
+        unset($_ENV['MEDIA_STORAGE_PATH']);
+        putenv('MEDIA_STORAGE_PATH');
+
+        $data = $this->list();
+
+        $this->assertFalse(
+            $data['storage_outside_deploy'],
+            'The default writable/ location sits inside the rsynced tree and must say so.',
+        );
+    }
+
     public function testFilePathIsNeverExposed(): void
     {
         $_ENV['MEDIA_SIGNING_KEY'] = str_repeat('a', 64);
