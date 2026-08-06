@@ -258,6 +258,16 @@ Answer type: {$answerType}
 Provide an accurate, grounded, helpful official answer. Cite AICOUNTLY knowledge sources where applicable.
 Do not make unsupported compliance, tax, or legal assertions.
 If the answer requires professional advice, set requires_professional_review to true.
+
+Format answer_body as an HTML fragment, matching the publishing contract the
+public site renders. Nothing here previously stated a format, so the format
+was whatever the model happened to produce that run.
+
+Use only these tags: <p>, <br>, <h2>, <h3>, <h4>, <strong>, <em>, <ul>, <ol>,
+<li>, <blockquote>, <code>, <pre>, <a href>, and table tags. Anything else is
+stripped before publication, so content placed in other tags is lost.
+Do not wrap the answer in <html>, <body>, markdown code fences, or a heading
+that repeats the question title. Start directly with the first block element.
 PROMPT;
     }
 
@@ -284,6 +294,15 @@ PROMPT;
                 'instructions'  => $prompt,
                 'answer_schema' => $contentType,
                 'product'       => (string) ($groundingCtx['product'] ?? ''),
+                // AiGenerationOrchestrator::resolveProductSlug() reads
+                // 'product_slug'; passing only 'product' meant it always
+                // resolved null, so buildForIntent() ran with the non-numeric
+                // task type, fell through to ['intent' => ..., 'product' =>
+                // null], and every community answer was generated with no
+                // knowledge grounding — while the prompt told the model to
+                // cite AICOUNTLY knowledge sources. Send the key the
+                // orchestrator actually looks for, and only when there is one.
+                'product_slug'  => ((string) ($groundingCtx['product'] ?? '')) ?: null,
                 'jurisdiction'  => (string) ($groundingCtx['jurisdiction'] ?? ''),
                 // Strict OpenAI ⇄ Gemini alternation. Soft hint only: the
                 // router boosts the preferred provider's route but still
