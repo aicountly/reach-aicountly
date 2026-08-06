@@ -173,10 +173,18 @@ class CommunityPublicSitePublisher implements CommunityPublisherInterface
         $requestId   = ($body['request_id'] ?? '') ?: $this->generateRequestId();
         $idempotency = $body['idempotency_key'] ?? $requestId;
 
+        // The receiver derives the signed path from parse_url(REQUEST_URI,
+        // PHP_URL_PATH), which drops the query string. Every other endpoint
+        // here is query-less so the distinction never showed up, but
+        // getChanges() carries ?since=&limit= — signing the query too made
+        // its signature unverifiable and every change-feed pull failed auth.
+        // Sign the path only; the request still goes to the full URL.
+        $signedPath = parse_url($path, PHP_URL_PATH) ?: $path;
+
         $headers = $requireAuth
             ? $this->signer->buildAuthHeaders(
                 $method,
-                $path,
+                $signedPath,
                 $rawBody,
                 $idempotency,
                 $requestId,
