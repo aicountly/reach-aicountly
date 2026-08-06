@@ -88,7 +88,12 @@ chmod -R 775 writable/cache writable/session writable/logs writable/uploads 2>/d
   chmod -R 777 writable/cache writable/session writable/logs writable/uploads
 
 echo "---- Running database migrations ----"
-CI_ENVIRONMENT=production "${PHP_BIN}" spark migrate --no-interaction 2>&1
+# reach:migrate, not the framework's migrate: CI4's Migrate::run() returns
+# nothing even when a migration throws, and Boot::runCommand() turns a
+# non-int return into EXIT_SUCCESS. `spark migrate` therefore exits 0 on
+# failure, which `set -e` cannot catch — a broken migration would leave the
+# deploy green with the site running against a stale schema.
+CI_ENVIRONMENT=production "${PHP_BIN}" spark reach:migrate 2>&1
 
 echo "---- Syncing repo content-base into topic candidates ----"
 CI_ENVIRONMENT=production "${PHP_BIN}" spark reach:content-base-sync 2>&1 || echo "WARNING: content-base sync failed (will retry on the daily schedule)"
