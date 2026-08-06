@@ -258,6 +258,16 @@ Answer type: {$answerType}
 Provide an accurate, grounded, helpful official answer. Cite AICOUNTLY knowledge sources where applicable.
 Do not make unsupported compliance, tax, or legal assertions.
 If the answer requires professional advice, set requires_professional_review to true.
+
+Format answer_body as an HTML fragment, matching the publishing contract the
+public site renders. Nothing here previously stated a format, so the format
+was whatever the model happened to produce that run.
+
+Use only these tags: <p>, <br>, <h2>, <h3>, <h4>, <strong>, <em>, <ul>, <ol>,
+<li>, <blockquote>, <code>, <pre>, <a href>, and table tags. Anything else is
+stripped before publication, so content placed in other tags is lost.
+Do not wrap the answer in <html>, <body>, markdown code fences, or a heading
+that repeats the question title. Start directly with the first block element.
 PROMPT;
     }
 
