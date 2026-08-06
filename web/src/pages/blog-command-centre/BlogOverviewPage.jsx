@@ -7,6 +7,7 @@ import { blogCommandCentreService } from '../../services/blogCommandCentreServic
 import { ROUTES } from '../../constants/routes';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
+import { formatDate } from '../../utils/formatDate';
 
 const OK_STATUSES = ['OK', 'CONNECTED', 'ENABLED'];
 
@@ -148,7 +149,9 @@ function buildCards(data) {
           ? 'Last optimiser run was skipped'
           : undefined,
       metrics: [
-        metric('last run', lastRun?.run_for_date),
+        // Passed as an argument rather than rendered in JSX, which is how it
+        // escaped the dd-mm-yyyy sweep and kept showing the raw API date.
+        metric('last run', formatDate(lastRun?.run_for_date)),
         metric('scored', lastRun?.candidates_scored),
         metric('decisions', lastRun?.decisions_created),
       ],
