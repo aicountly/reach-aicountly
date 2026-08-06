@@ -108,9 +108,12 @@ class OfficialAnswerGenerationService
         $groundingCtx = $this->buildGroundingContext($question, $answer);
         $prompt       = $this->buildPrompt($question, $answer, $answerType, $groundingCtx);
 
-        // Use mock in test/mock env, real orchestrator in production
+        // Use mock in test/mock env, real orchestrator in production. The flag
+        // is parsed as a boolean: "false" is a truthy *string*, and the old
+        // !empty() check therefore fed the mock's "This is a draft response"
+        // stub into production for anyone who wrote the flag out explicitly.
         $isTestEnv = ($_ENV['APP_ENV'] ?? 'production') === 'testing'
-                  || !empty($_ENV['REACH_PUB_COMMUNITY_MOCK']);
+                  || CommunityPublisherFactory::mockForced();
 
         if ($isTestEnv) {
             $aiOutput = $this->mockGenerationOutput($question, $answerType);
@@ -120,10 +123,20 @@ class OfficialAnswerGenerationService
         }
 
         // Extract content from AI output
-        $content  = $aiOutput['answer_body']  ?? ($aiOutput['body_html'] ?? '');
-        $excerpt  = $aiOutput['short_answer'] ?? ($aiOutput['summary'] ?? '');
+        $content  = trim((string) ($aiOutput['answer_body']  ?? ($aiOutput['body_html'] ?? '')));
+        $excerpt  = trim((string) ($aiOutput['short_answer'] ?? ($aiOutput['summary'] ?? '')));
         $sources  = $aiOutput['source_references'] ?? [];
         $riskClass = $aiOutput['risk_classification'] ?? 'low';
+
+        // An empty body used to be saved as a version, so the answer looked
+        // "generated" while the public payload would have been blank. Fail the
+        // generation instead — the caller marks it retryable.
+        if ($content === '') {
+            throw new \RuntimeException('community_answer_generation_returned_empty_body');
+        }
+        if ($excerpt === '') {
+            $excerpt = $this->deriveExcerpt($content);
+        }
 
         // Store version
         $version = $this->versions->createVersion(
@@ -189,7 +202,31 @@ Answer type: {$answerType}
 Provide an accurate, grounded, helpful official answer. Cite AICOUNTLY knowledge sources where applicable.
 Do not make unsupported compliance, tax, or legal assertions.
 If the answer requires professional advice, set requires_professional_review to true.
+
+REQUIRED OUTPUT FIELDS (all of them, in the structured JSON response):
+- answer_title: a short factual title for the answer.
+- answer_body: the full answer as HTML (<p>, <ul>, <ol>, <h3> only), at least
+  400 characters of real prose. Never a placeholder or a title-only body.
+- short_answer: a 1–2 sentence summary, 10–300 characters.
+- source_references: [] when nothing is cited; never omit the key.
+- risk_classification: one of low | medium | high | critical.
+- limitations, recommended_disclosure, claims_used, citations_used, risk_notes.
+- requires_professional_review, requires_legal_review, requires_product_review: booleans.
 PROMPT;
+    }
+
+    /** Fallback short answer when the provider returns a body but no summary. */
+    private function deriveExcerpt(string $html, int $limit = 280): string
+    {
+        $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags($html)));
+        if ($text === '' || mb_strlen($text) <= $limit) {
+            return $text;
+        }
+
+        $cut  = mb_substr($text, 0, $limit - 1);
+        $stop = mb_strrpos($cut, ' ');
+
+        return rtrim($stop !== false ? mb_substr($cut, 0, $stop) : $cut, " .,;:-") . '…';
     }
 
     /**
@@ -205,9 +242,16 @@ PROMPT;
         $requests = new AiGenerationRequestService();
         $request  = $requests->create([
             // Routed via reach_ai_model_routes; reach:ai-seed-catalog seeds
-            // community_answer routes for both providers.
-            'task_type'    => 'community_answer',
-            'content_type' => 'generic',
+            // community_answer routes with content_type NULL, which the router
+            // matches for any content type on this task.
+            'task_type' => 'community_answer',
+            // MUST be the community schema key, not 'generic'. The orchestrator
+            // derives the structured-output schema from content_type, so
+            // 'generic' asked the provider for {title, summary, ...} while this
+            // service read {answer_body, short_answer, ...}. Every real
+            // generation therefore failed schema validation and the answer was
+            // parked in validation_failed with zero versions.
+            'content_type' => $contentType,
             'parameters'   => [
                 'instructions'  => $prompt,
                 'answer_schema' => $contentType,

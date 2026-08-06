@@ -21,7 +21,21 @@ class StabilityController
         $this->minScoreMovement ??= (float) env('BLOG_ROADMAP_MIN_SCORE_MOVEMENT', 5);
         $this->cooldownDays ??= (int) env('BLOG_ROADMAP_COOLDOWN_DAYS', 14);
         $this->maxDailyCandidates ??= (int) env('BLOG_ROADMAP_MAX_DAILY_CANDIDATES', 10);
-        $this->maxWeeklyPublications ??= (int) env('BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS', 5);
+
+        // The weekly ceiling is counted over a rolling 7 days of CREATE-type
+        // decisions, so a value below the daily cap does not "smooth" output —
+        // it stops it. The old default of 5 against a daily cap of 10 let the
+        // optimiser create ten items on one day and then hold every candidate
+        // for the next six, which reads in the panel as "the cron stopped
+        // making blogs". Default to a full week at the daily rate; an explicit
+        // env value still wins, and countersunk misconfigurations are reported
+        // by capsSnapshot()/reach:blog-diagnose rather than silently overridden.
+        if ($this->maxWeeklyPublications === null) {
+            $configured = env('BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS');
+            $this->maxWeeklyPublications = ($configured === null || $configured === '' || $configured === false)
+                ? $this->maxDailyCandidates * 7
+                : (int) $configured;
+        }
     }
 
     public function shouldSkipForMovement(float $new, ?float $prev): bool
@@ -70,6 +84,21 @@ class StabilityController
         $margin    = (float) env('BLOG_ROADMAP_PORTFOLIO_OVER_PCT_MARGIN', 15);
 
         return $actualPct > ($targetPct + $margin);
+    }
+
+    /**
+     * Current cap configuration plus the misconfiguration that most often
+     * explains "no new blogs today": a weekly ceiling below the daily cap.
+     *
+     * @return array{daily_cap:int,weekly_cap:int,weekly_cap_below_daily:bool}
+     */
+    public function capsSnapshot(): array
+    {
+        return [
+            'daily_cap'              => $this->maxDailyCandidates,
+            'weekly_cap'             => $this->maxWeeklyPublications,
+            'weekly_cap_below_daily' => $this->maxWeeklyPublications < $this->maxDailyCandidates,
+        ];
     }
 
     public function countWeeklyCreateDecisions(string $sinceDate): int

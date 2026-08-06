@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Blog\ContentBaseService;
 use App\Libraries\Community\CommunityOperationalAgentService;
 use CodeIgniter\CLI\BaseCommand;
@@ -26,6 +27,8 @@ use Config\Database;
  */
 class CommunityAgentsRun extends BaseCommand
 {
+    use ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'community:agents-run';
     protected $description = 'Select community work and dispatch the disclosed official-identity agents.';
@@ -47,7 +50,7 @@ class CommunityAgentsRun extends BaseCommand
 
     public function run(array $params): int
     {
-        $limit = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 6)));
+        $limit = max(1, (int) ($this->sparkOption('limit', $params, '6') ?? 6));
 
         $lockFile = WRITEPATH . 'community-agents-run.lock';
         $fp       = fopen($lockFile, 'c+');

@@ -154,9 +154,7 @@ class AiGenerationOrchestrator
 
         // --- Prompt preparation ---
         $promptVersion = $this->resolvePromptVersion($request);
-        $outputSchema  = $promptVersion
-            ? json_decode($promptVersion['output_schema_json'] ?? '{}', true)
-            : OutputSchemaRegistry::get($request['content_type'] ?? 'generic');
+        $outputSchema  = $this->resolveOutputSchema($request, $promptVersion);
 
         $systemPrompt = $this->buildSystemPrompt($promptVersion, $groundingContext, $request);
         $userPrompt   = $this->buildUserPrompt($promptVersion, $request);
@@ -356,6 +354,46 @@ class AiGenerationOrchestrator
         return $params['product_slug'] ?? null;
     }
 
+    /**
+     * The structured-output contract is code, not data.
+     *
+     * `resolvePromptVersion()` matches on task_type alone, so one stored
+     * `draft_generation` prompt supplied the schema for every draft request —
+     * and a stale `output_schema_json` in that row silently overrode the
+     * governed registry. In production that row still required body_markdown
+     * and body_plain_text alongside body_html, which the registry deliberately
+     * relaxed ("providers are not forced to emit three long duplicates"), and
+     * its properties did not drive StructuredOutputCoercer's maxLength
+     * truncation. The result was a run of
+     * `schema_validation_failed | $.body_markdown is required` and
+     * `$.summary must be at most 1024 characters` draft failures.
+     *
+     * So: when the registry governs this content type, the registry wins and
+     * the prompt version contributes only its prompt text. A content type the
+     * registry does not know still falls back to the stored schema.
+     *
+     * @param array<string,mixed>      $request
+     * @param array<string,mixed>|null $promptVersion
+     * @return array<string,mixed>
+     */
+    private function resolveOutputSchema(array $request, ?array $promptVersion): array
+    {
+        $contentType = (string) ($request['content_type'] ?? 'generic');
+
+        if (OutputSchemaRegistry::has($contentType)) {
+            return OutputSchemaRegistry::get($contentType);
+        }
+
+        if ($promptVersion !== null) {
+            $stored = json_decode($promptVersion['output_schema_json'] ?? '{}', true);
+            if (is_array($stored) && $stored !== []) {
+                return $stored;
+            }
+        }
+
+        return OutputSchemaRegistry::get($contentType);
+    }
+
     private function resolvePromptVersion(array $request): ?array
     {
         if (! empty($request['prompt_version_id'])) {
@@ -423,6 +461,16 @@ class AiGenerationOrchestrator
     {
         $task = (string) ($request['task_type'] ?? '');
         $type = (string) ($request['content_type'] ?? '');
+
+        if ($task === 'community_answer' || str_starts_with($type, 'community_answer.')) {
+            return $userPrompt
+                . "\n\nCRITICAL ANSWER REQUIREMENTS:\n"
+                . "- Populate answer_body with the complete answer as HTML prose (at least 400 characters).\n"
+                . "- Populate short_answer with a 1–2 sentence summary (10–300 characters).\n"
+                . "- Emit every required key, using [] or false rather than omitting one.\n"
+                . "- Never output placeholders such as \"TBD\", \"Untitled draft\", or a title-only body.\n";
+        }
+
         if ($task !== 'draft_generation' || $type !== 'blog_post') {
             return $userPrompt;
         }

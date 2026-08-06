@@ -59,6 +59,7 @@ class ReachBlogDiagnose extends BaseCommand
                 'optimizer_preferred_hour_ist' => ((int) $nowIst->format('H') === 0),
                 'dispatch_window_open_ist'     => $this->isWithinDispatchWindow($nowIst),
             ],
+            'roadmap_caps'     => $this->roadmapCaps(),
             'database'         => $this->databaseSnapshot(),
             'recent_failures'  => $this->recentFailures(),
             'ai_keys'          => [
@@ -132,6 +133,30 @@ class ReachBlogDiagnose extends BaseCommand
     /**
      * @return array<string, mixed>
      */
+    /**
+     * The rolling weekly ceiling is the most common reason the panel shows
+     * "yesterday's blogs and nothing new" while every cron is healthy.
+     *
+     * @return array<string,mixed>
+     */
+    private function roadmapCaps(): array
+    {
+        try {
+            $stability = new \App\Libraries\Blog\Roadmap\StabilityController();
+            $caps      = $stability->capsSnapshot();
+            $since     = date('Y-m-d', strtotime('-7 days'));
+            $used      = $stability->countWeeklyCreateDecisions($since);
+
+            return $caps + [
+                'weekly_used'        => $used,
+                'weekly_window_from' => $since,
+                'weekly_cap_reached' => $used >= $caps['weekly_cap'],
+            ];
+        } catch (Throwable $e) {
+            return ['error' => mb_substr($e->getMessage(), 0, 200)];
+        }
+    }
+
     private function databaseSnapshot(): array
     {
         try {
@@ -210,6 +235,16 @@ class ReachBlogDiagnose extends BaseCommand
                     'block_type'         => $r['block_type'],
                     'count'              => (int) $r['cnt'],
                 ], $rows);
+
+                // 'processing' is not a state anything reopens, so a handler
+                // that died mid-execute strands the item silently.
+                $snap['stalled_processing_blocks'] = array_map(static fn ($r) => [
+                    'id'              => (int) $r['id'],
+                    'block_type'      => $r['block_type'],
+                    'content_item_id' => (int) ($r['content_item_id'] ?? 0),
+                    'attempt_count'   => (int) ($r['attempt_count'] ?? 0),
+                    'updated_at'      => $r['updated_at'] ?? null,
+                ], (new \App\Libraries\Blog\WorkBlockService())->stalledProcessingBlocks(30, 25));
             } else {
                 $snap['missing_table'][] = 'reach_work_blocks';
             }
@@ -325,6 +360,53 @@ class ReachBlogDiagnose extends BaseCommand
                 'code'     => 'no_cron_log_files',
                 'message'  => 'No worker/schedule/dispatch/optimizer cron log files found under writable/logs. Crontab is almost certainly missing, using the wrong cd path, or not redirecting stdout.',
             ];
+        } else {
+            // A *partial* crontab was previously invisible here: worker.log and
+            // schedule.log existing was enough to pass, while the missing
+            // blog-dispatch/blog-optimizer lines are precisely what stops new
+            // blogs from being created.
+            $missing = [];
+            foreach ($cronLogs as $name => $meta) {
+                if (empty($meta['exists']) || (int) ($meta['bytes'] ?? 0) === 0) {
+                    $missing[] = $name;
+                }
+            }
+            if ($missing !== []) {
+                $issues[] = [
+                    'severity' => 'blocking',
+                    'code'     => 'partial_cron_install',
+                    'message'  => 'Some cron log files are missing or empty: ' . implode(', ', $missing)
+                                . '. The matching crontab lines are not installed (or redirect elsewhere). '
+                                . 'blog-dispatch.log/blog-optimizer.log missing means no new blog items are ever created.',
+                ];
+            }
+        }
+
+        $caps = $report['roadmap_caps'] ?? [];
+        if (! empty($caps['weekly_cap_below_daily'])) {
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'weekly_cap_below_daily_cap',
+                'message'  => sprintf(
+                    'BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS=%d is below BLOG_ROADMAP_MAX_DAILY_CANDIDATES=%d. '
+                    . 'One day of output consumes the entire rolling week, so the optimiser holds every candidate '
+                    . 'for the next six days and the panel shows no new blogs.',
+                    (int) $caps['weekly_cap'],
+                    (int) $caps['daily_cap'],
+                ),
+            ];
+        } elseif (! empty($caps['weekly_cap_reached'])) {
+            $issues[] = [
+                'severity' => 'warning',
+                'code'     => 'weekly_publication_cap_reached',
+                'message'  => sprintf(
+                    'The rolling weekly cap is spent (%d/%d CREATE decisions since %s). No new blog items will be '
+                    . 'created until the oldest decisions roll out of the 7-day window.',
+                    (int) ($caps['weekly_used'] ?? 0),
+                    (int) ($caps['weekly_cap'] ?? 0),
+                    (string) ($caps['weekly_window_from'] ?? '-'),
+                ),
+            ];
         }
 
         if (! empty($report['stop_worker_file'])) {
@@ -377,12 +459,36 @@ class ReachBlogDiagnose extends BaseCommand
             ];
         }
 
+        $stalled = $db['stalled_processing_blocks'] ?? [];
+        if (is_array($stalled) && $stalled !== []) {
+            $types = array_values(array_unique(array_column($stalled, 'block_type')));
+            $issues[] = [
+                'severity' => 'blocking',
+                'code'     => 'work_blocks_stalled_processing',
+                'message'  => count($stalled) . ' work block(s) wedged in "processing" for over 30 minutes ('
+                            . implode(', ', $types) . '). The handler died without marking them failed, and nothing '
+                            . 'reopens "processing" — their content items cannot move. reach:schedule now recovers these.',
+            ];
+        }
+
         $eligible = (int) ($db['topic_candidates']['eligible_for_run'] ?? 0);
+        $dailyCap = (int) ($report['roadmap_caps']['daily_cap'] ?? 0);
         if ($eligible === 0) {
             $issues[] = [
                 'severity' => 'blocking',
                 'code'     => 'no_eligible_candidates',
                 'message'  => 'No eligible topic candidates (status candidate/scored, unlocked, not in cooldown). Optimiser will score 0 and create 0 blogs.',
+            ];
+        } elseif ($dailyCap > 0 && $eligible < $dailyCap) {
+            // The optimiser can only create as many items as it has candidates.
+            // A backlog of 1 against a daily cap of 10 caps output at one blog
+            // a day no matter how healthy every cron is.
+            $issues[] = [
+                'severity' => 'warning',
+                'code'     => 'candidate_backlog_below_daily_cap',
+                'message'  => "Only {$eligible} eligible topic candidate(s) against a daily cap of {$dailyCap}. "
+                            . 'Blog output is limited by the backlog, not by the caps. Approve more topic clusters in '
+                            . 'Knowledge or run reach:blog-discover-topics.',
             ];
         }
 
@@ -485,10 +591,30 @@ class ReachBlogDiagnose extends BaseCommand
         $actions = [];
         $codes = array_column($report['verdict'] ?? [], 'code');
 
-        if (in_array('no_cron_log_files', $codes, true) || in_array('optimizer_stale', $codes, true)) {
+        if (in_array('work_blocks_stalled_processing', $codes, true)) {
+            $actions[] = 'Recover wedged blocks: php spark reach:schedule   (then re-dispatch: php spark reach:blog-dispatch --force)';
+            $actions[] = 'See why they died: php spark reach:blog-failures';
+        }
+
+        if (in_array('candidate_backlog_below_daily_cap', $codes, true)) {
+            $actions[] = 'Top up the backlog: php spark reach:blog-discover-topics --limit=10   (needs approved topic clusters in Knowledge)';
+        }
+
+        if (in_array('no_cron_log_files', $codes, true)
+            || in_array('partial_cron_install', $codes, true)
+            || in_array('optimizer_stale', $codes, true)
+        ) {
             $actions[] = 'Install/fix cPanel cron lines from docs/blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md (must include reach:blog-dispatch + reach:work --queue=default,blog,publishing + reach:blog-optimize-roadmap + reach:schedule).';
             $actions[] = 'Confirm cron cd path is the real server-php directory that contains this WRITEPATH.';
             $actions[] = 'Confirm PHP binary with: which php; ls -la $(which php)';
+        }
+
+        if (in_array('weekly_cap_below_daily_cap', $codes, true)) {
+            $actions[] = 'Raise BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS in server-php/.env to at least 7x BLOG_ROADMAP_MAX_DAILY_CANDIDATES (or delete the line to use that as the default), then re-run: php spark reach:blog-optimize-roadmap --force';
+        }
+
+        if (in_array('weekly_publication_cap_reached', $codes, true)) {
+            $actions[] = 'The rolling weekly cap is spent. Raise BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS, or wait for the 7-day window to roll off, then: php spark reach:blog-optimize-roadmap --force';
         }
 
         if (in_array('stop_reach_worker_present', $codes, true)) {

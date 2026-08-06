@@ -96,6 +96,18 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 # Every 30 minutes — community agent work selection (disclosed identities;
 # window 09:00–19:00 IST and daily caps enforced inside the service).
 */30 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:agents-run >> writable/logs/community-agents.log 2>&1
+
+# Every 15 minutes — community answer advance. REQUIRED: agents-run only
+# *creates* the draft. Without this line a generated draft never gets
+# validated, never reaches the review queue, and never publishes, and a failed
+# generation stays in validation_failed forever with no retry.
+*/15 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:advance >> writable/logs/community-advance.log 2>&1
+
+# Every 30 minutes — rescue blog items parked in changes_requested /
+# publish_queued. The state machine chains successors on transition, so items
+# that stalled (fact-check soft fail, a failed publish) have no other way back
+# into the queue.
+*/30 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-advance --dispatch >> writable/logs/blog-advance.log 2>&1
 ```
 
 Daily jobs handled by `reach:schedule` (no extra cron lines needed):
@@ -136,6 +148,51 @@ BLOG_AUTO_PUBLISH_ENABLED=false
 
 Also ensure eligible rows exist in `reach_topic_candidates`
 (`status` = `candidate` or `scored`, not locked, not in cooldown).
+
+### The cap that silently stops blog production
+
+`BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS` is a **rolling 7-day** ceiling on
+CREATE-type roadmap decisions. If it is lower than
+`BLOG_ROADMAP_MAX_DAILY_CANDIDATES`, one day of output consumes the whole
+week and the optimiser then holds *every* candidate for six days — which in
+the Reach panel looks identical to "the cron stopped making blogs".
+
+```env
+BLOG_ROADMAP_MAX_DAILY_CANDIDATES=10
+BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS=70   # >= 7x the daily cap
+```
+
+Leave `BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS` unset to default to 7x the daily
+cap. `php spark reach:blog-diagnose` reports `roadmap_caps` with
+`weekly_used` / `weekly_cap` / `weekly_cap_reached`, and flags the
+below-daily misconfiguration as blocking.
+
+## Required `.env` flags for Community Q&A to publish
+
+```env
+AICOUNTLY_PUBLIC_SITE_BASE_URL=https://aicountly.com
+AICOUNTLY_PUBLIC_SITE_SERVICE_TOKEN=...     # must match the site side
+AICOUNTLY_PUBLIC_SITE_SIGNING_KEY=...       # must match the site side
+AICOUNTLY_PUBLIC_SITE_KEY_ID=reach-v1
+# Optional. Tier 0/1 (product usage, general education) only; tier 2/3
+# (GST, income tax, company law, payroll) always require a human approval.
+COMMUNITY_AUTO_PUBLISH_ENABLED=false
+```
+
+`REACH_PUB_COMMUNITY_MOCK` must be **absent or `false`**. Note that it is
+parsed as a boolean — writing any non-boolean value there routes every
+publish into the in-memory mock and nothing reaches aicountly.com.
+
+Diagnose the whole chain with:
+
+```bash
+php spark community:diagnose
+```
+
+It reports the automation window, publisher credentials + live
+`/api/reach/v1/health`, whether an enabled `community_answer` AI route
+exists, question/answer status histograms, deployment states, and a verdict
+with the exact next command. Exit code `2` means something blocking.
 
 ## Graceful stop pattern
 
@@ -208,3 +265,7 @@ weekly cron:
 - Do **not** install only the Phase 0 worker/schedule crons and expect
   blogs to generate — you also need `reach:blog-dispatch` and
   `reach:blog-optimize-roadmap`.
+- Do **not** install `community:agents-run` without `community:advance` and
+  expect Q&A to appear on aicountly.com. `agents-run` only creates the draft;
+  `advance` is what validates it, routes it to the review queue, and (for
+  tier 0/1 with the flag on) approves and publishes it.

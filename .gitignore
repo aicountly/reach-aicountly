@@ -28,3 +28,4 @@
 
 .DS_Store
 Thumbs.db
+/server-php/writable/*.lock
