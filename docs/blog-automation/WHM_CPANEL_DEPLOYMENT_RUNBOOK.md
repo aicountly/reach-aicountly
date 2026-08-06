@@ -292,11 +292,133 @@ source on the authoritative host list or they are reported as unsupported.
 
 ### Google Search Console (live connector)
 
-1. Create a Google Cloud service account and download its JSON key.
-2. Upload the key **outside the document root**, e.g. `/home/<cpanel_user>/secure/gsc.json`,
-   then `chmod 400` it and make sure both the web user and the cron user can read it.
-3. In Search Console, add the service account's `client_email` as a user on the property.
-4. Set:
+Reach reads Search Console with a **service account** — a robot Google identity
+with its own email address. There is no OAuth consent screen, no browser
+redirect and no refresh token to expire: the server signs a JWT with the
+service account's private key and exchanges it for a short-lived access token
+on every call. Nothing needs re-authorising later.
+
+Two identities are involved and they are easy to confuse:
+
+| | Where it lives | What it is for |
+|---|---|---|
+| The **property** (`aicountly.com`) | Search Console | The site whose figures you want |
+| The **service account** | Google Cloud + the Reach server | The robot that reads them |
+
+The property covers the **public site** (`aicountly.com`, where blogs are
+served). The key file goes on the **Reach** cPanel account (`reach.aicountly.org`),
+because Reach is what performs the ingestion. Do not put the key on the
+`aicountlycom` account.
+
+#### 1a. GOOGLE CLOUD — create the service account and its key
+
+Do this while signed in as a Google account that can create GCP projects. It
+does **not** have to be the same account that owns the Search Console property.
+
+1. Open <https://console.cloud.google.com> → project picker → **New Project**.
+   Name it something durable, e.g. `aicountly-reach`. (An existing project is
+   fine — no need to create one per integration.)
+2. With that project selected, go to **APIs & Services → Library**, search for
+   **Google Search Console API**, open it and press **Enable**.
+   The API's service name is `searchconsole.googleapis.com`. This is the only
+   API Reach needs; do not enable the Indexing API for this.
+3. Go to **IAM & Admin → Service Accounts → Create service account**.
+   - *Service account name*: `reach-search-console`
+   - *Description*: `Read-only Search Console ingestion for Reach`
+   - Press **Create and continue**.
+4. **Skip the "Grant this service account access to project" step.** Press
+   **Continue**, then **Done**. This step trips people up: Reach needs **no**
+   GCP IAM role at all. Search Console permissions are granted inside Search
+   Console itself (step 1b), not through Google Cloud IAM. Adding a project
+   role here grants nothing useful and widens the account's reach.
+5. Open the service account you just created and copy its **email**. It looks
+   like `reach-search-console@aicountly-reach.iam.gserviceaccount.com`. This is
+   the `client_email` Reach reports in diagnostics, and the address you will
+   paste into Search Console.
+6. Go to the **Keys** tab → **Add key → Create new key → JSON → Create**.
+   The browser downloads a `.json` file **once**. Google keeps no copy of the
+   private key — if it is lost, delete the key and create a new one.
+
+Treat that file exactly like a password. It grants read access to the property
+for anyone holding it. Do not email it, paste it into a chat, commit it, or
+store it in the Reach database — Reach deliberately stores only the *env var
+name* pointing at it, never its contents.
+
+> If **Create new key** is greyed out, an organisation policy
+> (`constraints/iam.disableServiceAccountKeyCreation`) is blocking key creation.
+> A Google Workspace admin has to grant an exception for the project.
+
+#### 1b. SEARCH CONSOLE — grant the service account access
+
+Do this signed in as an **owner** of the `aicountly.com` property; only owners
+can add users.
+
+1. Open <https://search.google.com/search-console> and select the property.
+2. Note its exact form — you will need it verbatim later:
+   - a **Domain** property shows as `aicountly.com` → the env value is
+     `sc-domain:aicountly.com`
+   - a **URL-prefix** property shows as `https://aicountly.com/` → the env value
+     is `https://aicountly.com/`, **including the trailing slash**
+3. **Settings → Users and permissions → Add user**.
+4. Paste the service account email from step 1a.5.
+5. Permission: **Full**. (**Restricted** is enough for reading Performance data
+   if you prefer least privilege — Reach only ever requests the read-only scope
+   `webmasters.readonly` and never writes.) Press **Add**.
+
+There is no invitation to accept — a service account cannot click a link. The
+grant is effective immediately.
+
+> If the property is Domain-verified but blogs are served from a subdomain or a
+> different host, add the service account to whichever property actually
+> receives the traffic. Reach queries exactly one property string.
+
+#### 1c. REACH CPANEL — install the key file
+
+Upload the JSON to the Reach account, outside the document root. SFTP or the
+cPanel File Manager both work; the commands below assume SSH.
+
+```bash
+# REACH CPANEL (as the cPanel user, not root)
+mkdir -p ~/secure
+chmod 700 ~/secure
+# upload the downloaded file to ~/secure/gsc.json, then:
+chmod 400 ~/secure/gsc.json
+
+# Confirm it parses and is not truncated by the transfer
+php -r 'var_dump(array_keys(json_decode(file_get_contents(getenv("HOME")."/secure/gsc.json"), true)));'
+# expect: type, project_id, private_key_id, private_key, client_email, ...
+```
+
+Then confirm it is genuinely not web-reachable:
+
+```bash
+realpath ~/secure/gsc.json | grep public_html && echo "STOP — inside the docroot"
+curl -sS -o /dev/null -w '%{http_code}\n' https://reach.aicountly.org/secure/gsc.json
+# expect 404 (or 403) — anything else means it is exposed
+```
+
+Two host-specific things to check:
+
+- **Which user PHP runs as.** On cPanel with PHP-FPM or suPHP, both the web
+  requests and cron run as the cPanel user, so `chmod 400` owned by that user is
+  readable by both. If PHP runs as `nobody` (mod_php/DSO), `400` will be
+  unreadable from the web and you need `chmod 440` plus `chgrp nobody`. You do
+  not have to guess — `reach:search-console doctor` (step 6) reports
+  `file_readable` from whichever context you run it in.
+- **`open_basedir`.** If the account has it set, the key must sit under a
+  permitted prefix. Anywhere inside `/home/<cpanel_user>` normally qualifies.
+
+#### 1d. Set the environment
+
+`SEARCH_CONSOLE_SITE_PROPERTY` must match step 1b.2 **character for character** —
+`sc-domain:aicountly.com` and `https://aicountly.com/` are different properties
+to Google, and a mismatch surfaces as `PermissionDenied` rather than "not found".
+
+CodeIgniter re-reads `.env` on every request, so no PHP restart is needed; if
+the host runs OPcache in a mode that caches beyond the request, reloading
+PHP-FPM is harmless.
+
+Set:
 
 ```env
 SEARCH_CONSOLE_ENABLED=true
@@ -333,8 +455,12 @@ php spark reach:search-console register     # creates the stored connection from
 php spark reach:search-console health       # live authenticated check
 ```
 
-   If `properties` comes back empty, step 3 has not taken effect — the service
-   account is authenticated but has no grant on the property.
+   If `properties` comes back empty, step 1b has not taken effect — the service
+   account is authenticated but has no grant on the property. `properties` is
+   the single most useful command here: it lists what Google will actually let
+   this service account read, so comparing it against
+   `SEARCH_CONSOLE_SITE_PROPERTY` settles any "is it the grant or the string?"
+   question outright.
 
 8. Map live blog URLs, then pull the first data:
 
@@ -372,6 +498,35 @@ connection and advances one 14-day slice of any active backfill.
 Verify it is flowing from the UI at **Intelligence → Search**, which shows the
 connector state, recent ingestion runs, and any unmapped URLs; the same actions
 (health check, ingest, backfill, sync identities) are available there as buttons.
+
+#### Troubleshooting
+
+Every message below is emitted verbatim by the connector, so you can match on
+the text. Run `php spark reach:search-console doctor` first — it names most of
+these without contacting Google at all.
+
+| What you see | What it means | Fix |
+|---|---|---|
+| `SEARCH_CONSOLE_ENABLED is false.` | The connector is switched off. | Set it `true` in `server-php/.env`. |
+| `SEARCH_CONSOLE_SERVICE_ACCOUNT_KEY_PATH is not set.` | Env var empty. | Point it at the absolute path from step 1c. |
+| `Service-account key file does not exist at the configured path.` | Wrong path, or the upload landed elsewhere. | `ls -l` the path as the cPanel user. |
+| `Service-account key file is not readable by the web/CLI user.` | Permissions or `open_basedir`. | See the PHP-user note in step 1c. |
+| `...missing private_key or client_email.` | Truncated or wrong JSON — often an OAuth *client* JSON rather than a *service account* key. | Re-download from **Keys → Add key → JSON** on the service account. |
+| `SEARCH_CONSOLE_SITE_PROPERTY is not set.` | Env var empty. | Copy the property string exactly as step 1b.2. |
+| `Google rejected the service-account credentials.` (401) | Key deleted/disabled, or the project's clock-skew tolerance exceeded. | Confirm the key still exists in GCP; check server time with `timedatectl`. |
+| `Service account is authenticated but has no access to <property>.` (403) | Auth works; the grant or the property string is wrong. | Run `properties` and compare against the env value character for character. |
+| `properties` returns `[]` | No property grants at all. | Redo step 1b as a property **owner**. |
+| `google_search_console: quota exceeded (HTTP 429).` | Rate limited. | Transient; the daily job retries. Avoid repeated manual backfills. |
+| `Requested window is entirely inside the ... data lag.` | You asked for days Google has not finalised. | Expected. Widen the range or wait. |
+| Card reads `CONNECTED`, `facts (28d)` is `0` | Credentials fine, nothing ingested yet. | Run step 8, or wait for 04:00. |
+| `ingest` reports rows `skipped` and few/none ingested | Search Console URLs match no content identity. | Run `sync-identities`; then check **Intelligence → Search → Unmapped URLs** — usually the live canonical URL differs from the deployment record. |
+| Card reads `MOCK` | `SEARCH_CONSOLE_USE_MOCK=true`. | Set it `false`. Figures until then are simulated. |
+
+Rotating the key later: create the new key in GCP, upload it, update
+`SEARCH_CONSOLE_SERVICE_ACCOUNT_KEY_PATH` (or overwrite the file in place), run
+`reach:search-console health`, and only then delete the old key in GCP. The
+Search Console grant is attached to the service account, not to the key, so it
+survives rotation untouched.
 
 #### Which flag does what
 
