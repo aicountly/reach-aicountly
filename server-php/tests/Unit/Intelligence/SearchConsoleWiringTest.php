@@ -225,4 +225,57 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
     {
         $this->assertSame('', ContentIdentitySyncService::normaliseUrl('   '));
     }
+
+    // --- Slug helpers (diagnostic only) ----------------------------------
+
+    /**
+     * slugOf backs the `unmapped` diagnostic, which reports whether a blog with
+     * the same final path segment exists. It is deliberately NOT used to
+     * attribute traffic: a Search Console property covers the whole site, so
+     * /guides/hrms/dashboard and a post slugged "dashboard" would collide and
+     * a marketing page's clicks would be credited to a blog post.
+     */
+    public function testSlugIgnoresTrailingSlashAndQueryString(): void
+    {
+        $this->assertSame(
+            'gst-returns',
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns/?utm_source=x'),
+        );
+    }
+
+    public function testBareHostHasNoSlug(): void
+    {
+        $this->assertSame('', ContentIdentitySyncService::slugOf('https://aicountly.com'));
+        $this->assertSame('', ContentIdentitySyncService::slugOf('https://aicountly.com/'));
+        $this->assertSame('', ContentIdentitySyncService::slugOf(''));
+    }
+
+    public function testSlugIsCaseInsensitive(): void
+    {
+        $this->assertSame(
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/GST-Returns'),
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns'),
+        );
+    }
+
+    public function testDistinctPostsKeepDistinctSlugs(): void
+    {
+        $this->assertNotSame(
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/gst-returns'),
+            ContentIdentitySyncService::slugOf('https://aicountly.com/blogs/tds-returns'),
+        );
+    }
+
+    /**
+     * Attribution is exact-match only. A guide and a post that happen to share
+     * a final segment are different pages, and the fact table must not merge
+     * them.
+     */
+    public function testGuideAndBlogSharingASegmentAreNotTheSameUrl(): void
+    {
+        $this->assertNotSame(
+            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/guides/hrms/dashboard'),
+            ContentIdentitySyncService::normaliseUrl('https://www.aicountly.com/blogs/dashboard'),
+        );
+    }
 }

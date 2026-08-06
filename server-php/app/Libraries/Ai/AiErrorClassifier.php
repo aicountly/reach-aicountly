@@ -27,19 +27,29 @@ class AiErrorClassifier
             return new AiProviderError(AiProviderError::CATEGORY_RATE_LIMITED, $raw);
         }
 
-        // A retired or unavailable model is permanent for *this* model but the
-        // route's other models may be fine, so it must reach the fallback
-        // resolver rather than dead-ending as 'unknown'. Checked before the
-        // invalid-request rules below, which would otherwise swallow the 404
-        // these arrive as (e.g. Gemini: "models/gemini-2.5-pro is no longer
-        // available to new users").
+        // A model the provider has withdrawn. Permanent for *this* model, but
+        // the route's other models may be fine, so it must reach the fallback
+        // resolver rather than dead-ending as 'unknown' — which is what turned
+        // an OpenAI quota failure into eight failed community answers: the hop
+        // to Gemini landed on the retired gemini-2.5-pro and stopped there.
+        //
+        // Runs ahead of the invalid-request rules below, which would otherwise
+        // swallow the 404 Gemini reports this as. Distinct from
+        // provider_unavailable because that category is retryable, and retrying
+        // a withdrawn model spends an attempt on something that can never come
+        // back; this one falls back without retrying.
         if (str_contains($msg, 'no longer available')
             || str_contains($msg, 'model not found')
-            || str_contains($msg, 'is not found for api version')
             || str_contains($msg, 'model_not_found')
+            || str_contains($msg, 'is not found')
+            || str_contains($msg, 'does not exist')
             || str_contains($msg, 'has been deprecated')
-            || str_contains($msg, 'does not exist or you do not have access')) {
-            return new AiProviderError(AiProviderError::CATEGORY_PROVIDER_UNAVAIL, $raw);
+            || str_contains($msg, 'is deprecated')
+            // Deliberately not "model … not supported": OpenAI phrases a
+            // request-shape rejection that way ("'max_tokens' is not supported
+            // with this model"), which is an adapter bug, not a dead model.
+            || (str_contains($msg, 'model') && str_contains($msg, 'retired'))) {
+            return new AiProviderError(AiProviderError::CATEGORY_MODEL_RETIRED, $raw);
         }
 
         if (str_contains($msg, 'timeout') || str_contains($msg, 'timed out') || str_contains($msg, 'connection timed')) {

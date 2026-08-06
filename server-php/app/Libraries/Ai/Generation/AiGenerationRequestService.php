@@ -65,6 +65,25 @@ class AiGenerationRequestService
         );
     }
 
+    /**
+     * Fail a request *and* say why on the row itself.
+     *
+     * The reason used to live only in the app log and the audit log, so the
+     * request row could not explain itself and anything reading the table —
+     * reach:blog-failures, the AI Ops screens — had to fall back to the last
+     * run. Failures raised after a provider call succeeds (schema validation,
+     * stub bodies) leave that run marked "completed", so the diagnosis read
+     * "failed, no error" and dead-ended.
+     */
+    public function markFailed(int $id, string $category, string $message): void
+    {
+        $this->updateStatus($id, 'failed', [
+            'error_category' => mb_substr($category, 0, 64),
+            'redacted_error' => mb_substr($message, 0, 2000),
+            'failed_at'      => date('Y-m-d H:i:s'),
+        ]);
+    }
+
     public function linkJob(int $requestId, int $jobId): void
     {
         $this->updateStatus($requestId, 'queued', ['job_id' => $jobId]);

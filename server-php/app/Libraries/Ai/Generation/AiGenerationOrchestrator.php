@@ -290,7 +290,23 @@ class AiGenerationOrchestrator
                         'total_tokens' => $result->totalTokens,
                     ]);
                 } else {
-                    $this->failRequest($requestId, 'schema_validation_failed', 'AI output did not pass schema validation.');
+                    // The artifact already holds the field-level errors, and
+                    // the work block records them. Pass them through instead of
+                    // a generic sentence, so the request row names the field
+                    // that failed rather than only the fact that one did.
+                    $errors = $artifact['schema_validation_errors'] ?? null;
+                    if (is_string($errors)) {
+                        $decoded = json_decode($errors, true);
+                        $errors  = is_array($decoded) ? $decoded : [$errors];
+                    }
+
+                    $this->failRequest(
+                        $requestId,
+                        'schema_validation_failed',
+                        is_array($errors) && $errors !== []
+                            ? 'AI output did not pass schema validation: ' . implode('; ', array_map('strval', $errors))
+                            : 'AI output did not pass schema validation.',
+                    );
                 }
 
                 return;
@@ -301,12 +317,7 @@ class AiGenerationOrchestrator
                 $category = $e->getProviderError()->category;
                 // Quota/auth failures are not "retry same provider", but should still
                 // hop to a configured fallback (e.g. OpenAI quota → Gemini).
-                $allowFallback = $e->isRetryable() || in_array($category, [
-                    AiProviderError::CATEGORY_BUDGET_BLOCKED,
-                    AiProviderError::CATEGORY_AUTHENTICATION,
-                    AiProviderError::CATEGORY_CONFIGURATION,
-                    AiProviderError::CATEGORY_PROVIDER_UNAVAIL,
-                ], true);
+                $allowFallback = $e->getProviderError()->allowsFallback();
 
                 if (! $allowFallback) {
                     $this->failRequest($requestId, $category, $e->getProviderError()->message);
@@ -334,7 +345,11 @@ class AiGenerationOrchestrator
 
     private function failRequest(int $requestId, string $reason, string $message): void
     {
-        $this->requests->updateStatus($requestId, 'failed');
+        // On the row, not only in the logs: a request that cannot say why it
+        // failed forces every diagnosis through the last run, which reports
+        // "completed" whenever the provider succeeded and something after it
+        // rejected the output.
+        $this->requests->markFailed($requestId, $reason, $message);
         // Always write to app log — AuditLogger can fail in CLI contexts and
         // previously swallowed the only copy of the failure reason.
         log_message('error', "AI generation request {$requestId} failed: {$reason} — {$message}");

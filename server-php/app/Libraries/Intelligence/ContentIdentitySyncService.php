@@ -110,6 +110,65 @@ class ContentIdentitySyncService
     }
 
     /**
+     * Final path segment → identity id, for URLs whose *prefix* differs from
+     * the one Reach generated.
+     *
+     * The public site 301s /blog/{slug} to /blogs/{slug}, and Search Console
+     * reports the destination, so an identity built from CanonicalUrlPolicy
+     * ("/blog/…") never matches the reported URL ("/blogs/…") on an exact
+     * comparison. The slug survives the redirect, so it is the stable part.
+     *
+     * Ambiguous slugs are dropped rather than guessed: if two identities end in
+     * the same segment there is no way to know which one the traffic belongs
+     * to, and attributing it to either would be a fabrication.
+     *
+     * @return array<string, int>
+     */
+    public function slugIndex(int $tenantId): array
+    {
+        if (! SchemaGuard::hasTable($this->db, 'reach_content_identities')) {
+            return [];
+        }
+
+        $rows = $this->db->table('reach_content_identities')
+            ->select('id, canonical_url')
+            ->where('tenant_id', $tenantId)
+            ->where('canonical_url IS NOT NULL', null, false)
+            ->get()->getResultArray();
+
+        $index  = [];
+        $counts = [];
+        foreach ($rows as $row) {
+            $slug = self::slugOf((string) $row['canonical_url']);
+            if ($slug === '') {
+                continue;
+            }
+            $counts[$slug] = ($counts[$slug] ?? 0) + 1;
+            $index[$slug] ??= (int) $row['id'];
+        }
+
+        foreach ($counts as $slug => $count) {
+            if ($count > 1) {
+                unset($index[$slug]);
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * The last path segment of a URL, lower-cased. Empty when the URL has no
+     * path — a bare host must never match a post.
+     */
+    public static function slugOf(string $url): string
+    {
+        $normalised = self::normaliseUrl($url);
+        $position   = strrpos($normalised, '/');
+
+        return $position === false ? '' : strtolower(substr($normalised, $position + 1));
+    }
+
+    /**
      * Compare URLs the way Search Console and a CMS disagree about them:
      * scheme, a leading "www.", a trailing slash, query strings, fragments and
      * case in the host are all noise. The path's case is preserved because it

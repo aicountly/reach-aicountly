@@ -275,11 +275,11 @@ class SearchConsoleService
         $this->auditLogger->log(null, AuditLogger::SEARCH_INGESTION_STARTED, 'ingestion_run', $runId,
             null, ['from' => $dateFrom, 'to' => $dateTo, 'run_type' => $runType], null, 'system');
 
-        $ingested = 0;
-        $skipped  = 0;
-        $failed   = 0;
-        $pages    = 0;
-        $warnings = [];
+        $ingested    = 0;
+        $skipped     = 0;
+        $failed      = 0;
+        $pages       = 0;
+        $warnings    = [];
         $cursorState = null;
 
         try {
@@ -331,6 +331,15 @@ class SearchConsoleService
             if ($truncated) {
                 $warnings[] = 'Stopped after ' . self::MAX_PAGES . ' pages; more rows remain for '
                     . $dateFrom . '..' . $dateTo . '.';
+            }
+
+            // A property covers the whole site, so most rows legitimately belong
+            // to pages Reach does not own (marketing, guides, pricing). Say so,
+            // rather than letting a high skip count read as a failure.
+            if ($skipped > 0 && $ingested === 0) {
+                $warnings[] = 'All ' . $skipped . ' row(s) were for URLs no Reach content claims. '
+                    . 'Run `reach:search-console unmapped` to see them — if they are marketing or guide '
+                    . 'pages this is correct, and it means the tracked posts have no search traffic yet.';
             }
 
             if ($advanceCursor) {

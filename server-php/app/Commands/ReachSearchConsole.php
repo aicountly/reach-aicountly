@@ -27,6 +27,9 @@ use CodeIgniter\CLI\CLI;
  *   ingest [id]         run the incremental window now
  *   backfill [id] [--days=90]   queue historical backfill
  *   status [id]         cursor, last run and health
+ *   unmapped            URLs Google reports that no content claims, beside the
+ *                       canonical URLs Reach holds — the two lists side by side
+ *                       are what diagnoses a zero-ingest run
  */
 class ReachSearchConsole extends BaseCommand
 {
@@ -54,6 +57,7 @@ class ReachSearchConsole extends BaseCommand
                     (int) (CLI::getOption('days') ?: 90),
                 ),
                 'status'          => SearchConsoleService::make()->connectionStatus($this->resolveConnection($argument, $tenantId)),
+                'unmapped'        => $this->unmapped($tenantId),
                 default           => throw new \InvalidArgumentException("Unknown action '{$action}'. See: {$this->usage}"),
             };
 
@@ -160,6 +164,61 @@ class ReachSearchConsole extends BaseCommand
         }
 
         return ['connection_id' => $id, 'site_property' => $property, 'created' => ! $existing];
+    }
+
+    /**
+     * The two lists that explain a zero-ingest run: what Google reported and
+     * could not be placed, against what Reach believes each post's URL is.
+     *
+     * @return array<string, mixed>
+     */
+    private function unmapped(int $tenantId): array
+    {
+        $db = \Config\Database::connect();
+
+        $findings = [];
+        if ($db->tableExists('reach_content_mapping_findings', false)) {
+            $findings = array_column($db->table('reach_content_mapping_findings')
+                ->select('unmapped_url')
+                ->where('resolution_status', 'unresolved')
+                ->orderBy('id', 'DESC')
+                ->limit(50)
+                ->get()->getResultArray(), 'unmapped_url');
+        }
+
+        $identities = [];
+        if ($db->tableExists('reach_content_identities', false)) {
+            $identities = array_column($db->table('reach_content_identities')
+                ->select('canonical_url')
+                ->where('tenant_id', $tenantId)
+                ->where('canonical_url IS NOT NULL', null, false)
+                ->orderBy('id', 'ASC')
+                ->limit(50)
+                ->get()->getResultArray(), 'canonical_url');
+        }
+
+        $slugIndex = (new ContentIdentitySyncService())->slugIndex($tenantId);
+        $unmatched = [];
+        foreach ($findings as $url) {
+            $slug = ContentIdentitySyncService::slugOf((string) $url);
+            $unmatched[] = [
+                'url'        => $url,
+                'slug'       => $slug,
+                'slug_known' => isset($slugIndex[$slug]),
+            ];
+        }
+
+        return [
+            'reported_but_unclaimed' => $unmatched,
+            'canonical_urls_on_file' => $identities,
+            'hint' => $findings === []
+                ? null
+                : 'A Search Console property covers the whole site, so marketing, guide and pricing '
+                    . 'URLs appear here and are correctly ignored — Reach only claims content it '
+                    . 'publishes. Investigate only when a URL that IS a tracked post fails to match: '
+                    . 'compare it against canonical_urls_on_file. slug_known means a post with that '
+                    . 'final segment exists at a different path, which points at a stale canonical URL.',
+        ];
     }
 
     private function resolveConnection(int $connectionId, int $tenantId): int
