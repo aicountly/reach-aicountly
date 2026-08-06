@@ -13,6 +13,8 @@ import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
 const AWAITING_HUMAN = new Set(['review_pending', 'internal_review', 'seo_review']);
+// Mirrors the sources ContentWorkflowService::submit() accepts.
+const SUBMITTABLE = new Set(['draft', 'validation_pending', 'changes_requested']);
 const PUBLISHABLE = new Set(['approved', 'scheduled']);
 
 export function ContentDetailPage() {
@@ -131,7 +133,7 @@ export function ContentDetailPage() {
               <Edit2 size={13} /> Edit
             </Link>
           )}
-          {canSubmit && item.workflow_status === 'draft' && (
+          {canSubmit && SUBMITTABLE.has(item.workflow_status) && (
             <button className="btn btn-primary" onClick={handleSubmit} disabled={actioning === 'submit'}>
               Submit for Review
             </button>

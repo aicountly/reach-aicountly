@@ -34,6 +34,22 @@ final class ContentWorkflowServiceTest extends TestCase
         $this->assertContains('validation_pending', $this->transitions['draft']);
     }
 
+    /**
+     * submit() accepts draft, validation_pending and changes_requested as sources
+     * and transitions to review_pending — every one of those must be a legal edge,
+     * otherwise "Submit for Review" fails with "Cannot transition from ...".
+     */
+    public function testEverySubmitSourceCanReachReviewPending(): void
+    {
+        foreach (['draft', 'validation_pending', 'changes_requested'] as $from) {
+            $this->assertContains(
+                'review_pending',
+                $this->transitions[$from],
+                "submit() accepts '{$from}' but the state machine blocks it from review_pending"
+            );
+        }
+    }
+
     public function testReviewPending_canTransitionToApprovedOrChangesRequestedOrRejected(): void
     {
         $allowed = $this->transitions['review_pending'];

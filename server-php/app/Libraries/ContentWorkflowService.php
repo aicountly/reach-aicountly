@@ -21,14 +21,20 @@ use App\Libraries\NotificationService;
  */
 class ContentWorkflowService
 {
-    /** Valid state machine transitions: [from => [to, ...]] */
+    /**
+     * Valid state machine transitions: [from => [to, ...]]
+     *
+     * validation_pending is an optional staging state — validations are recorded
+     * against an item without moving it, so draft and changes_requested submit
+     * straight to review_pending (see submit()).
+     */
     private const TRANSITIONS = [
         'idea'                  => ['brief', 'archived'],
         'brief'                 => ['draft', 'idea', 'archived'],
-        'draft'                 => ['validation_pending', 'brief', 'archived'],
+        'draft'                 => ['validation_pending', 'review_pending', 'brief', 'archived'],
         'validation_pending'    => ['review_pending', 'draft', 'archived'],
         'review_pending'        => ['approved', 'changes_requested', 'rejected', 'archived'],
-        'changes_requested'     => ['draft', 'archived'],
+        'changes_requested'     => ['review_pending', 'draft', 'archived'],
         'approved'              => ['scheduled', 'archived'],
         'scheduled'             => ['ready_for_publication', 'approved', 'archived'],
         'ready_for_publication' => ['archived'],
@@ -252,10 +258,12 @@ class ContentWorkflowService
     {
         $stages = ['editorial_review'];
 
-        if (in_array($item['risk_level'] ?? 'low', ['high', 'critical'], true)) {
+        $risk = $item['risk_level'] ?? 'low';
+
+        if (in_array($risk, ['high', 'critical'], true)) {
             $stages[] = 'subject_matter_review';
             $stages[] = 'compliance_review';
-        } elseif ($item['risk_level'] === 'medium') {
+        } elseif ($risk === 'medium') {
             $stages[] = 'subject_matter_review';
         }
 
