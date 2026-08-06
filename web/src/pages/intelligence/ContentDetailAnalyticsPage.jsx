@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { BarChart2 } from 'lucide-react';
 import api from '../../services/api.js';
+import { formatDate } from '../../utils/formatDate';
 
 export default function ContentDetailAnalyticsPage() {
   const { id } = useParams();
@@ -84,7 +85,7 @@ export default function ContentDetailAnalyticsPage() {
                 <tbody>
                   {facts.map((f, i) => (
                     <tr key={f.id || i}>
-                      <td>{f.metric_date || f.date || '—'}</td>
+                      <td>{formatDate(f.metric_date || f.date)}</td>
                       <td style={{ textAlign: 'right' }}>{Number(f.sessions || f.session_count || 0).toLocaleString()}</td>
                       <td style={{ textAlign: 'right' }}>
                         {f.engagement_rate == null

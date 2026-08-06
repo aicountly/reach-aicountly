@@ -8,6 +8,7 @@ import { Card } from '../../components/common/Card';
 import { BlogArticlePreview, BlogReviewMetaRow } from './BlogArticlePreview';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDateTime } from '../../utils/formatDate';
 
 const AWAITING = new Set(['internal_review', 'seo_review', 'review_pending']);
 const PUBLISHABLE = new Set(['approved', 'scheduled']);
@@ -195,7 +196,7 @@ export function BlogReviewDetailPage() {
               <div>Current version: #{item.current_version_id || '—'}</div>
               {version?.version_number != null && <div>Number: {version.version_number}</div>}
               {version?.created_at && (
-                <div>Created: {new Date(version.created_at).toLocaleString()}</div>
+                <div>Created: {formatDateTime(version.created_at)}</div>
               )}
               {isStub && <div style={{ color: '#b45309', marginTop: 8 }}>Stub body detected</div>}
             </div>

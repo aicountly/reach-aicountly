@@ -7,6 +7,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { formatDateTime } from '../../utils/formatDate';
 
 const EMPTY = { template_name: '', template_params: '', audience_filter: '', scheduled_at: '' };
 
@@ -50,8 +51,8 @@ export function WhatsappListPage() {
     { key: 'template_name', label: 'Template' },
     { key: 'audience_filter', label: 'Audience', render: (r) => r.audience_filter?.segment || '—' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'sent_at', label: 'Sent', render: (r) => r.sent_at ? new Date(r.sent_at).toLocaleString() : '—' },
-    { key: 'scheduled_at', label: 'Scheduled', render: (r) => r.scheduled_at ? new Date(r.scheduled_at).toLocaleString() : '—' },
+    { key: 'sent_at', label: 'Sent', render: (r) => r.sent_at ? formatDateTime(r.sent_at) : '—' },
+    { key: 'scheduled_at', label: 'Scheduled', render: (r) => r.scheduled_at ? formatDateTime(r.scheduled_at) : '—' },
   ];
 
   return (

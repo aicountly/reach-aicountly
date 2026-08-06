@@ -11,6 +11,7 @@ import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDate } from '../../utils/formatDate';
 
 const CONTENT_TYPES = [
   '', 'blog', 'knowledge_base', 'community_question', 'community_answer',
@@ -55,8 +56,8 @@ export function ContentListPage() {
     )},
     { key: 'status', label: 'Status', render: (r) => <ContentStatusBadge status={r.workflow_status} /> },
     { key: 'risk', label: 'Risk', render: (r) => <ContentRiskBadge level={r.risk_level} /> },
-    { key: 'due', label: 'Due', render: (r) => r.review_due_at ? new Date(r.review_due_at).toLocaleDateString() : '—' },
-    { key: 'created', label: 'Created', render: (r) => new Date(r.created_at).toLocaleDateString() },
+    { key: 'due', label: 'Due', render: (r) => r.review_due_at ? formatDate(r.review_due_at) : '—' },
+    { key: 'created', label: 'Created', render: (r) => formatDate(r.created_at) },
   ];
 
   return (

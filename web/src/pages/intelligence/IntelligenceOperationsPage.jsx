@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, RefreshCw, CheckCircle, AlertCircle, XCircle, Settings } from 'lucide-react';
 import { listConnectors } from '../../services/intelligenceService.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 const StatusIcon = ({ status }) => {
   if (status === 'healthy' || status === 'completed' || status === 'ok') {
@@ -102,7 +103,7 @@ export default function IntelligenceOperationsPage() {
                         </td>
                         <td className="text-xs text-muted">
                           {c.last_checked_at || c.updated_at
-                            ? new Date(c.last_checked_at || c.updated_at).toLocaleString()
+                            ? formatDateTime(c.last_checked_at || c.updated_at)
                             : '—'}
                         </td>
                       </tr>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
+import { formatDateTime } from '../../utils/formatDate';
 
 const TRANSITION_STATUSES = ['triaged', 'in_progress', 'closed', 'spam'];
 
@@ -76,7 +77,7 @@ export default function QuestionWorkspacePage() {
             <dt>Source</dt><dd>{question.source_platform ?? '—'}</dd>
             <dt>Risk</dt><dd>{question.risk_classification ?? '—'}</dd>
             <dt>Triage score</dt><dd>{question.triage_score ?? '—'}</dd>
-            <dt>Received</dt><dd>{question.source_received_at ?? '—'}</dd>
+            <dt>Received</dt><dd>{formatDateTime(question.source_received_at)}</dd>
           </dl>
           <div className="mt-3">
             <p className="label">Body</p>

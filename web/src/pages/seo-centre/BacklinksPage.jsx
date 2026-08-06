@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { formatDate } from '../../utils/formatDate';
 
 export function BacklinksPage() {
   const [data, setData] = useState(null);
@@ -41,7 +42,7 @@ export function BacklinksPage() {
               <tbody>
                 {snapshots.map((snap) => (
                   <tr key={snap.id}>
-                    <td>{snap.snapshot_date}</td>
+                    <td>{formatDate(snap.snapshot_date)}</td>
                     <td>{snap.provider}</td>
                     <td>{snap.internal_links}</td>
                     <td>{snap.published_urls}</td>

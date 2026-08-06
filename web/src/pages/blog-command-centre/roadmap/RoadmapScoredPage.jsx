@@ -4,6 +4,7 @@ import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { RoadmapEmptyState, TrendCell } from './roadmapShared';
 import { formatScore } from './roadmapFormat';
+import { formatDate } from '../../../utils/formatDate';
 
 const FACTORS = [
   ['search_opportunity', 'Search'],
@@ -93,7 +94,7 @@ export function RoadmapScoredPage() {
                         : <span className="badge badge--danger">-{formatScore(row.deduction_total)}</span>}
                     </td>
                     <td><TrendCell value={row.trend_7d} /></td>
-                    <td>{row.scored_for_date ?? '—'}</td>
+                    <td>{formatDate(row.scored_for_date)}</td>
                     <td>
                       <button
                         type="button"

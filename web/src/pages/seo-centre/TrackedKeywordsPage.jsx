@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { formatDate } from '../../utils/formatDate';
 
 export function TrackedKeywordsPage() {
   const [keywords, setKeywords] = useState([]);
@@ -75,7 +76,7 @@ export function TrackedKeywordsPage() {
                       <td>{snap?.clicks ?? '—'}</td>
                       <td>{snap?.impressions ?? '—'}</td>
                       <td className="text-sm" style={{ maxWidth: '20rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{snap?.best_page_url || '—'}</td>
-                      <td className="text-sm">{snap?.metric_date || '—'}</td>
+                      <td className="text-sm">{formatDate(snap?.metric_date)}</td>
                     </tr>
                   );
                 })}

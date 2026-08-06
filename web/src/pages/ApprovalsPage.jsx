@@ -7,6 +7,7 @@ import { Loader } from '../components/common/Loader';
 import { DataTable } from '../components/common/DataTable';
 import { ApprovalBadge } from '../components/common/ApprovalBadge';
 import { usePermission } from '../hooks/usePermission';
+import { formatDate } from '../utils/formatDate';
 
 /** Fetch approval queue from Phase 2 endpoint, fall back to Phase 0 list. */
 async function fetchQueue(area) {
@@ -213,7 +214,7 @@ export function ApprovalsPage() {
     { key: 'risk', label: 'Risk', render: (r) => r.risk_level ? <RiskBadge level={r.risk_level} /> : '—' },
     { key: 'due', label: 'Review Due', render: (r) => r.review_due_at ? (
       <span style={{ color: new Date(r.review_due_at) < new Date() ? '#ef4444' : undefined }}>
-        {new Date(r.review_due_at).toLocaleDateString()}
+        {formatDate(r.review_due_at)}
       </span>
     ) : '—' },
     { key: 'product', label: 'Product', render: (r) => r.primary_product_id ? `#${r.primary_product_id}` : '—' },

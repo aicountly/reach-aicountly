@@ -8,6 +8,7 @@ import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { ClaimRiskBadge } from '../../components/knowledge/ClaimRiskBadge';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const RISK_OPTIONS   = ['', 'low', 'medium', 'high', 'critical'];
@@ -44,8 +45,8 @@ export function ClaimListPage() {
     )},
     { key: 'risk_level', label: 'Risk', render: (r) => <ClaimRiskBadge risk={r.risk_level} /> },
     { key: 'requires_evidence', label: 'Evidence req.', render: (r) => r.requires_evidence ? 'Yes' : 'No' },
-    { key: 'valid_from', label: 'Valid from', render: (r) => r.valid_from ? new Date(r.valid_from).toLocaleDateString() : '—' },
-    { key: 'valid_until', label: 'Valid until', render: (r) => r.valid_until ? new Date(r.valid_until).toLocaleDateString() : '—' },
+    { key: 'valid_from', label: 'Valid from', render: (r) => r.valid_from ? formatDate(r.valid_from) : '—' },
+    { key: 'valid_until', label: 'Valid until', render: (r) => r.valid_until ? formatDate(r.valid_until) : '—' },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
   ];
 

@@ -10,6 +10,7 @@ import { ChannelBadge } from '../../components/common/ChannelBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
 import { FilterBar } from '../../components/common/FilterBar';
 import { Modal } from '../../components/common/Modal';
+import { formatDateTime } from '../../utils/formatDate';
 
 const CHANNELS = ['linkedin','twitter','facebook','instagram','youtube','whatsapp_channel','email_newsletter'];
 
@@ -56,7 +57,7 @@ export function SocialPlannerPage() {
     )},
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'approval_status', label: 'Approval', render: (r) => <ApprovalBadge status={r.approval_status} /> },
-    { key: 'scheduled_at', label: 'Scheduled', render: (r) => r.scheduled_at ? new Date(r.scheduled_at).toLocaleString() : '—' },
+    { key: 'scheduled_at', label: 'Scheduled', render: (r) => r.scheduled_at ? formatDateTime(r.scheduled_at) : '—' },
   ];
 
   return (

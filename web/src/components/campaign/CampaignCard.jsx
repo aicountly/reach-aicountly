@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ChannelBadge } from '../common/ChannelBadge';
 import { StatusBadge } from '../common/StatusBadge';
+import { formatDate } from '../../utils/formatDate';
 
 export function CampaignCard({ campaign }) {
   return (
@@ -13,7 +14,7 @@ export function CampaignCard({ campaign }) {
         <h3 style={{ fontSize: '1rem', marginTop: 8, fontWeight: 600 }}>{campaign.name}</h3>
         {campaign.objective && <p className="text-sm text-secondary mt-1">{campaign.objective}</p>}
         <div className="text-xs text-muted mt-2">
-          {campaign.start_date || '—'} → {campaign.end_date || '—'}
+          {formatDate(campaign.start_date)} → {formatDate(campaign.end_date)}
         </div>
         <div className="flex justify-end mt-3">
           <Link to={`/campaigns/${campaign.id}`} className="btn btn-secondary btn-sm">Open</Link>

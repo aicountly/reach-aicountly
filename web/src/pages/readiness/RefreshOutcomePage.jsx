@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Target } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDate } from '../../utils/formatDate';
 import {
   listRefreshOutcomes,
   getRefreshOutcome,
@@ -60,15 +61,6 @@ function formatMetricName(name) {
   return String(name || '')
     .replace(/^observed_change_/, '')
     .replace(/_/g, ' ');
-}
-
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return String(value);
-  }
 }
 
 function changeTone(pct) {

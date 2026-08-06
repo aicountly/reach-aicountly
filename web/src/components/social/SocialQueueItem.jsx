@@ -1,10 +1,6 @@
 import { ChannelBadge } from '../common/ChannelBadge';
 import { StatusBadge } from '../common/StatusBadge';
-
-function formatDate(v) {
-  if (!v) return '—';
-  try { return new Date(v).toLocaleString(); } catch { return String(v); }
-}
+import { formatDateTime } from '../../utils/formatDate';
 
 export function SocialQueueItem({ post, onMarkPosted }) {
   return (
@@ -13,7 +9,7 @@ export function SocialQueueItem({ post, onMarkPosted }) {
         <ChannelBadge channel={post.channel} />
         <StatusBadge status={post.status} />
         <span className="text-xs text-muted" style={{ marginLeft: 'auto' }}>
-          Scheduled: {formatDate(post.scheduled_at)}
+          Scheduled: {formatDateTime(post.scheduled_at)}
         </span>
       </div>
       <div className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{post.content}</div>

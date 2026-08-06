@@ -8,6 +8,7 @@ import { Loader } from '../../components/common/Loader';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
 import { ChannelBadge } from '../../components/common/ChannelBadge';
+import { formatDate } from '../../utils/formatDate';
 
 const NEXT_STATUS = ['draft','pending_approval','approved','scheduled','running','completed','paused','archived'];
 
@@ -56,8 +57,8 @@ export function CampaignDetailPage() {
             <div><div className="text-xs text-muted">Target audience</div><div className="text-sm">{Array.isArray(c.target_audience) ? c.target_audience.join(' · ') : (c.target_audience || '—')}</div></div>
             <div><div className="text-xs text-muted">Products promoted</div><div className="text-sm">{Array.isArray(c.products_promoted) ? c.products_promoted.join(', ') : (c.products_promoted || '—')}</div></div>
             <div><div className="text-xs text-muted">Budget</div><div className="text-sm">{c.budget_amount ? `${c.currency || ''} ${c.budget_amount}` : '—'}</div></div>
-            <div><div className="text-xs text-muted">Start</div><div className="text-sm">{c.start_date || '—'}</div></div>
-            <div><div className="text-xs text-muted">End</div><div className="text-sm">{c.end_date || '—'}</div></div>
+            <div><div className="text-xs text-muted">Start</div><div className="text-sm">{formatDate(c.start_date)}</div></div>
+            <div><div className="text-xs text-muted">End</div><div className="text-sm">{formatDate(c.end_date)}</div></div>
             <div><div className="text-xs text-muted">Leads generated</div><div className="text-sm">{c.leads_generated ?? 0}</div></div>
             <div><div className="text-xs text-muted">Landing page URL</div><div className="text-sm" style={{ overflowWrap: 'anywhere' }}>{c.landing_page_url || '—'}</div></div>
           </div>

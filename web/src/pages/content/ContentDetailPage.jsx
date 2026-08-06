@@ -11,6 +11,7 @@ import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { WorkflowStatusBar } from '../../components/content/WorkflowStatusBar';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDate, formatDateTime } from '../../utils/formatDate';
 
 const AWAITING_HUMAN = new Set(['review_pending', 'internal_review', 'seo_review']);
 // Mirrors the sources the submit endpoint accepts: ContentWorkflowService::submit()
@@ -194,12 +195,12 @@ export function ContentDetailPage() {
         <Card>
           <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Review Due</div>
           <div style={{ fontSize: 13, color: item.review_due_at && new Date(item.review_due_at) < new Date() ? '#ef4444' : undefined }}>
-            {item.review_due_at ? new Date(item.review_due_at).toLocaleDateString() : '—'}
+            {item.review_due_at ? formatDate(item.review_due_at) : '—'}
           </div>
         </Card>
         <Card>
           <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Created</div>
-          <div style={{ fontSize: 13 }}>{new Date(item.created_at).toLocaleString()}</div>
+          <div style={{ fontSize: 13 }}>{formatDateTime(item.created_at)}</div>
         </Card>
       </div>
 

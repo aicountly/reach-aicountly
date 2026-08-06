@@ -5,6 +5,7 @@ import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { VersionDiff } from '../../components/content/VersionDiff';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function ContentVersionsPage() {
   const { id } = useParams();
@@ -60,7 +61,7 @@ export function ContentVersionsPage() {
               }}>
                 <div style={{ fontWeight: 700 }}>v{v.version_number} {v.is_current && <span style={{ color: '#2563eb' }}>(current)</span>}</div>
                 <div style={{ color: '#6b7280' }}>{v.change_summary || 'No summary'}</div>
-                <div style={{ color: '#9ca3af', fontSize: 10 }}>{v.created_at ? new Date(v.created_at).toLocaleString() : ''}</div>
+                <div style={{ color: '#9ca3af', fontSize: 10 }}>{v.created_at ? formatDateTime(v.created_at) : ''}</div>
                 <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setCompareA(v.id)} style={{ fontSize: 10 }}>Set A</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => setCompareB(v.id)} style={{ fontSize: 10 }}>Set B</button>

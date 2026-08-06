@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDateTime } from '../../utils/formatDate';
 
 export default function VerificationListPage() {
   const [verifications, setVerifications] = useState([]);
@@ -69,7 +70,7 @@ export default function VerificationListPage() {
                   <td><span className={`badge ${statusClass(v.status)}`}>{v.status}</span></td>
                   <td><code>{v.expected_value ?? '—'}</code></td>
                   <td><code>{v.actual_value ?? '—'}</code></td>
-                  <td>{v.checked_at ? new Date(v.checked_at).toLocaleString() : '—'}</td>
+                  <td>{v.checked_at ? formatDateTime(v.checked_at) : '—'}</td>
                 </tr>
               ))}
             </tbody>

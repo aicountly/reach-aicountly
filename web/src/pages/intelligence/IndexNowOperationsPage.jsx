@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Zap, Send, RefreshCw, CheckCircle, Clock, Shield, XCircle, AlertTriangle } from 'lucide-react';
 import { submitIndexNowUrl, retryIndexNowPending } from '../../services/intelligenceService.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 export default function IndexNowOperationsPage() {
   const [url, setUrl] = useState('');
@@ -203,7 +204,7 @@ export default function IndexNowOperationsPage() {
                     <td>{s.attempt_count ?? 1}</td>
                     <td className="text-sm text-muted">
                       {s.submitted_at
-                        ? new Date(s.submitted_at).toLocaleString()
+                        ? formatDateTime(s.submitted_at)
                         : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                             <Clock size={12} aria-hidden="true" />

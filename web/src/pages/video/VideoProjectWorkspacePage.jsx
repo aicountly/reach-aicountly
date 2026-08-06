@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDate } from '../../utils/formatDate';
 
 function ProjectStatusBadge({ status }) {
   const colorMap = {
@@ -84,9 +85,9 @@ function ProjectOverviewTab({ project, onRefresh: _onRefresh }) {
           <dt>Title</dt>
           <dd>{project.title}</dd>
           <dt>Created</dt>
-          <dd>{project.created_at ? new Date(project.created_at).toLocaleDateString() : '—'}</dd>
+          <dd>{project.created_at ? formatDate(project.created_at) : '—'}</dd>
           <dt>Last updated</dt>
-          <dd>{project.updated_at ? new Date(project.updated_at).toLocaleDateString() : '—'}</dd>
+          <dd>{project.updated_at ? formatDate(project.updated_at) : '—'}</dd>
         </dl>
       </section>
       <section className="card">

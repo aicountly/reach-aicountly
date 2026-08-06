@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 export default function VideoPublicationListPage() {
   const [pubs, setPubs]       = useState([]);
@@ -66,7 +67,7 @@ export default function VideoPublicationListPage() {
                       : '—'}
                   </td>
                   <td><span className="badge badge--neutral">{p.status}</span></td>
-                  <td>{p.completed_at ? new Date(p.completed_at).toLocaleDateString() : '—'}</td>
+                  <td>{p.completed_at ? formatDate(p.completed_at) : '—'}</td>
                 </tr>
               ))}
             </tbody>

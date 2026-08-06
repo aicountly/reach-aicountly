@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_OPTS = [
   { value: '', label: 'All' },
@@ -98,7 +99,7 @@ export default function QuestionInboxPage() {
                 </td>
                 <td>{q.risk_classification ?? '—'}</td>
                 <td>{q.triage_score ?? '—'}</td>
-                <td>{q.source_received_at ? new Date(q.source_received_at).toLocaleDateString() : '—'}</td>
+                <td>{q.source_received_at ? formatDate(q.source_received_at) : '—'}</td>
                 <td>
                   <Link to={`/community/questions/${q.external_id}`} className="btn btn--sm">Open</Link>
                 </td>

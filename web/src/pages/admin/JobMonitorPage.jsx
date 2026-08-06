@@ -9,10 +9,11 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { FilterBar } from '../../components/common/FilterBar';
 import { Pagination } from '../../components/common/Pagination';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDateTime } from '../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'pending', 'processing', 'completed', 'failed', 'dead_letter', 'cancelled'];
 
-function fmt(dt) { return dt ? new Date(dt).toLocaleString() : '—'; }
+function fmt(dt) { return dt ? formatDateTime(dt) : '—'; }
 
 export function JobMonitorPage() {
   const [rows, setRows]   = useState([]);

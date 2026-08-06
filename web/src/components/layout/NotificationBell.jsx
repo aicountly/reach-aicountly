@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { contentService } from '../../services/contentService';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function NotificationBell() {
   const [count, setCount]       = useState(0);
@@ -107,7 +108,7 @@ export function NotificationBell() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{n.notification_type?.replace(/\./g, ' ')}</div>
                   <div style={{ fontSize: 11, color: '#374151', marginTop: 2 }}>{n.message}</div>
-                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{new Date(n.created_at).toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{formatDateTime(n.created_at)}</div>
                 </div>
                 <button
                   onClick={() => markRead(n.id)}

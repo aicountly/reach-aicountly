@@ -5,6 +5,7 @@ import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function ContentSchedulePage() {
   const { id } = useParams();
@@ -64,7 +65,7 @@ export function ContentSchedulePage() {
           {schedules.map((s) => (
             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
               <div>
-                <div style={{ fontSize: 13 }}>{new Date(s.scheduled_at).toLocaleString()} ({s.timezone})</div>
+                <div style={{ fontSize: 13 }}>{formatDateTime(s.scheduled_at)} ({s.timezone})</div>
                 <div style={{ fontSize: 11, color: '#6b7280' }}>Target #{s.publication_target_id} · {s.schedule_status}</div>
               </div>
               {s.cancelled_at === null && (

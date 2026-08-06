@@ -7,6 +7,7 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 
@@ -47,7 +48,7 @@ export function MarketListPage() {
       return <div className="text-sm">{codes.length > 0 ? codes.join(', ') : '—'}</div>;
     }},
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
-    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDate(r.updated_at) : '—' },
   ];
 
   return (

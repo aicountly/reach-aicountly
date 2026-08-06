@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MessageSquare, Check, Trash2 } from 'lucide-react';
 import { contentService } from '../../services/contentService';
+import { formatDateTime } from '../../utils/formatDate';
 
 function CommentBubble({ comment, onResolve, onDelete, canModerate }) {
   return (
@@ -13,7 +14,7 @@ function CommentBubble({ comment, onResolve, onDelete, canModerate }) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ fontSize: 11, color: '#6b7280' }}>
-          #{comment.created_by || 'System'} · {comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}
+          #{comment.created_by || 'System'} · {comment.created_at ? formatDateTime(comment.created_at) : ''}
           {comment.resolved_at && <span style={{ marginLeft: 6, color: '#10b981' }}>✓ Resolved</span>}
         </div>
         {canModerate && !comment.resolved_at && (

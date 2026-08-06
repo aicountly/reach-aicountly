@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { normalizeVideoList } from './videoListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 function ConnectionCard({ connection, onRevoke, onHealthCheck }) {
   const [health, setHealth] = useState(null);
@@ -23,7 +24,7 @@ function ConnectionCard({ connection, onRevoke, onHealthCheck }) {
           <dt>Auth</dt>
           <dd>{connection.authentication_type}</dd>
           <dt>Created</dt>
-          <dd>{connection.created_at ? new Date(connection.created_at).toLocaleDateString() : '—'}</dd>
+          <dd>{connection.created_at ? formatDate(connection.created_at) : '—'}</dd>
         </dl>
         <div className="btn-group mt-3">
           <button className="btn btn--sm btn--outline" onClick={checkHealth} disabled={checking}>

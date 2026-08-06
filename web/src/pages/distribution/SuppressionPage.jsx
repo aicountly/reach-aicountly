@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { formatDate } from '../../utils/formatDate';
 
 const SUPPRESSION_REASONS = ['unsubscribe', 'bounce', 'complaint', 'manual', 'legal', 'opt_out', 'invalid_address'];
 
@@ -141,7 +142,7 @@ export default function SuppressionPage() {
                 <td><span className="badge badge--neutral">{s.channel}</span></td>
                 <td>{s.address_masked ?? '***'}</td>
                 <td>{s.reason}</td>
-                <td>{s.suppressed_at ? new Date(s.suppressed_at).toLocaleDateString() : '—'}</td>
+                <td>{s.suppressed_at ? formatDate(s.suppressed_at) : '—'}</td>
                 <td>
                   <button className="btn btn--sm btn--error" onClick={() => handleRemove(s.id)}>
                     Remove

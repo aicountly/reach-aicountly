@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { listGenerations } from '../../services/aiService.js';
 import AiGenerationBadge from '../../components/ai/AiGenerationBadge.jsx';
+import { formatDate } from '../../utils/formatDate';
 
 export default function AiGenerationsPage() {
   const [requests, setRequests] = useState([]);
@@ -64,7 +65,7 @@ export default function AiGenerationsPage() {
                   <td>{r.content_type}</td>
                   <td><AiGenerationBadge status={r.status} /></td>
                   <td className="text-muted text-xs">{r.requested_actor_type}</td>
-                  <td className="text-muted text-xs">{r.created_at?.slice(0, 10)}</td>
+                  <td className="text-muted text-xs">{formatDate(r.created_at)}</td>
                 </tr>
               ))}
             </tbody>

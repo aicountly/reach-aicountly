@@ -5,6 +5,7 @@ import {
   listVisibilityRuns,
   listVisibilityObservations,
 } from '../../services/intelligenceService.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 export default function VisibilityOverviewPage() {
   const [cards, setCards] = useState([
@@ -116,7 +117,7 @@ export default function VisibilityOverviewPage() {
                           {mentioned == null && <span className="text-muted text-xs">—</span>}
                         </td>
                         <td className="text-xs text-muted">
-                          {r.ran_at || r.created_at ? new Date(r.ran_at || r.created_at).toLocaleString() : '—'}
+                          {r.ran_at || r.created_at ? formatDateTime(r.ran_at || r.created_at) : '—'}
                         </td>
                       </tr>
                     );

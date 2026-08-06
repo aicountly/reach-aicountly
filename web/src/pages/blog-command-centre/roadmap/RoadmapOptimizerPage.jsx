@@ -4,6 +4,7 @@ import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { RoadmapEmptyState } from './roadmapShared';
 import { formatScore } from './roadmapFormat';
+import { formatDate } from '../../../utils/formatDate';
 
 const WEIGHT_FIELDS = [
   ['search_opportunity', 'Search opportunity'],
@@ -107,7 +108,7 @@ export function RoadmapOptimizerPage() {
             <tbody>
               {runs.map((run) => (
                 <tr key={run.id}>
-                  <td>{run.run_for_date}</td>
+                  <td>{formatDate(run.run_for_date)}</td>
                   <td><span className={`badge badge--${statusVariant(run.status)}`}>{run.status}</span></td>
                   <td>{run.candidates_scored ?? 0}</td>
                   <td>{run.decisions_created ?? 0}</td>
@@ -154,7 +155,7 @@ export function RoadmapOptimizerPage() {
                       : <span className="text-muted">—</span>}
                   </td>
                   <td>{decision.decision_reason ?? '—'}</td>
-                  <td>{decision.decided_for_date}</td>
+                  <td>{formatDate(decision.decided_for_date)}</td>
                 </tr>
               ))}
             </tbody>

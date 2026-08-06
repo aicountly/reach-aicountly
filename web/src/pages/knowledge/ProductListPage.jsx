@@ -11,6 +11,7 @@ import { Pagination } from '../../components/common/Pagination';
 import { Modal } from '../../components/common/Modal';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const EMPTY_FORM = { name: '', slug: '', short_description: '', description: '', public_url: '' };
@@ -100,7 +101,7 @@ export function ProductListPage() {
     { key: 'public_url', label: 'URL', render: (r) => r.public_url ? (
       <a href={r.public_url} target="_blank" rel="noreferrer" className="text-sm">↗</a>
     ) : '—' },
-    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDate(r.updated_at) : '—' },
   ];
 
   return (

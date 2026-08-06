@@ -1,10 +1,6 @@
 import { StatusBadge } from '../common/StatusBadge';
 import { ApprovalBadge } from '../common/ApprovalBadge';
-
-function formatDate(v) {
-  if (!v) return '';
-  try { return new Date(v).toLocaleString(); } catch { return String(v); }
-}
+import { formatDateTime } from '../../utils/formatDate';
 
 export function BotReportTimeline({ reports = [] }) {
   if (!reports.length) {
@@ -15,7 +11,7 @@ export function BotReportTimeline({ reports = [] }) {
       {reports.map((r) => (
         <div className="bot-timeline__item" key={r.id}>
           <div className="bot-timeline__meta">
-            {formatDate(r.created_at)} • mode: {r.mode}
+            {formatDateTime(r.created_at, '')} • mode: {r.mode}
           </div>
           <div className="bot-timeline__title">
             {String(r.action || '').replace(/_/g, ' ')}

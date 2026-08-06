@@ -4,6 +4,7 @@ import {
   listDisasterRecovery,
   recordDisasterRecoveryTest,
 } from '../../services/readinessService.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 const DR_TYPES = ['backup_verify', 'restore_verify', 'rollback_verify', 'migration_verify'];
 
@@ -185,7 +186,7 @@ export default function DisasterRecoveryPage() {
                   <td>{t.environment}</td>
                   <td><span className={`badge ${badgeFor(t.status)}`}>{t.status}</span></td>
                   <td className="text-sm text-muted">
-                    {t.tested_at ? new Date(t.tested_at).toLocaleString() : '—'}
+                    {t.tested_at ? formatDateTime(t.tested_at) : '—'}
                   </td>
                 </tr>
               ))}

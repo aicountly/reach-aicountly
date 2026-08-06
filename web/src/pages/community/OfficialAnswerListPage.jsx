@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
+import { formatDate } from '../../utils/formatDate';
 
 // Values mirror App\Enums\CommunityAnswerStatus — the old list used
 // invented statuses (draft/generated/pending_approval) that exist nowhere,
@@ -98,7 +99,7 @@ export default function OfficialAnswerListPage() {
                 <td>{a.risk_classification ?? '—'}</td>
                 <td>{a.ai_assisted ? 'Yes' : 'No'}</td>
                 <td>{a.human_reviewed ? 'Yes' : 'No'}</td>
-                <td>{a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}</td>
+                <td>{a.updated_at ? formatDate(a.updated_at) : '—'}</td>
                 <td>
                   <Link to={`/community/answers/${a.uuid ?? a.external_id}`} className="btn btn--sm">Edit</Link>
                 </td>

@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
 import { RequirePermission } from '../../components/auth/RequirePermission';
 import { ROUTES } from '../../constants/routes';
+import { formatDateTime } from '../../utils/formatDate';
 
 const BOT_ACTIONS = [
   ['generate_campaign_ideas',       'Generate campaign ideas'],
@@ -73,7 +74,7 @@ export function BotQueuePage() {
     { key: 'action', label: 'Action', render: (r) => (r.action || '').replace(/_/g,' ') },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'requested_by', label: 'By', render: (r) => r.requested_by || '—' },
-    { key: 'created_at', label: 'When', render: (r) => r.created_at ? new Date(r.created_at).toLocaleString() : '—' },
+    { key: 'created_at', label: 'When', render: (r) => r.created_at ? formatDateTime(r.created_at) : '—' },
     { key: 'error_message', label: 'Error', render: (r) => r.error_message ? <span className="text-danger text-xs">{r.error_message}</span> : '—' },
   ];
 

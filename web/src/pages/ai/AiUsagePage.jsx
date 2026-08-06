@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { listAiUsage } from '../../services/aiService.js';
+import { formatDate } from '../../utils/formatDate';
 
 export default function AiUsagePage() {
   const [usage, setUsage] = useState([]);
@@ -44,7 +45,7 @@ export default function AiUsagePage() {
             <tbody>
               {usage.map((u, i) => (
                 <tr key={u.id || i}>
-                  <td className="text-muted">{u.usage_date}</td>
+                  <td className="text-muted">{formatDate(u.usage_date)}</td>
                   <td>{u.task_type}</td>
                   <td className="text-muted">{u.content_type}</td>
                   <td className="text-muted">{u.input_tokens?.toLocaleString()}</td>

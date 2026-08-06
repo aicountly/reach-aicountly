@@ -1,4 +1,5 @@
 import { History, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { formatDateTime } from '../../utils/formatDate';
 
 const RUNS = [
   { id: 1, prompt: '"Best accounting software" (India)', model: 'gpt-4o', status: 'completed', cost_cents: 42, mentioned: true, ran_at: '2026-07-15T07:30:00Z' },
@@ -46,7 +47,7 @@ export default function VisibilityRunHistoryPage() {
                   {r.mentioned === null && <span className="text-gray-300 text-xs">—</span>}
                 </td>
                 <td className="px-4 py-3 text-right text-gray-600">{r.cost_cents > 0 ? `¢${r.cost_cents}` : '—'}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{new Date(r.ran_at).toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{formatDateTime(r.ran_at)}</td>
               </tr>
             ))}
           </tbody>

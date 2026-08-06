@@ -7,6 +7,7 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { SearchBar } from '../../components/common/SearchBar';
 import { Pagination } from '../../components/common/Pagination';
 import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatusBadge';
+import { formatDate } from '../../utils/formatDate';
 
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 
@@ -38,9 +39,9 @@ export function CitationListPage() {
       </div>
     )},
     { key: 'source_id', label: 'Source ID', render: (r) => r.source_id ?? '—' },
-    { key: 'accessed_at', label: 'Accessed', render: (r) => r.accessed_at ? new Date(r.accessed_at).toLocaleDateString() : '—' },
+    { key: 'accessed_at', label: 'Accessed', render: (r) => r.accessed_at ? formatDate(r.accessed_at) : '—' },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
-    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—' },
+    { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDate(r.updated_at) : '—' },
   ];
 
   return (

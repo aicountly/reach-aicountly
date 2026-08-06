@@ -7,6 +7,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
+import { formatDateTime } from '../../utils/formatDate';
 
 export function BotReportsPage() {
   const [rows, setRows] = useState([]);
@@ -28,7 +29,7 @@ export function BotReportsPage() {
     { key: 'mode', label: 'Mode' },
     { key: 'approval_status', label: 'Approval', render: (r) => <ApprovalBadge status={r.approval_status} /> },
     { key: 'publishing_status', label: 'Publishing', render: (r) => <StatusBadge status={r.publishing_status || 'none'} /> },
-    { key: 'created_at', label: 'When', render: (r) => r.created_at ? new Date(r.created_at).toLocaleString() : '—' },
+    { key: 'created_at', label: 'When', render: (r) => r.created_at ? formatDateTime(r.created_at) : '—' },
   ];
 
   return (

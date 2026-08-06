@@ -8,6 +8,7 @@ import { ContentStatusBadge } from '../../components/content/ContentStatusBadge'
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
 import { ROUTES } from '../../constants/routes';
+import { formatDate } from '../../utils/formatDate';
 
 const WORKFLOW_STATUSES = [
   '', 'idea', 'brief', 'brief_ready', 'outline_ready', 'draft', 'draft_generating',
@@ -49,7 +50,7 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
     )},
     { key: 'status', label: 'Status', render: (r) => <ContentStatusBadge status={r.workflow_status} /> },
     { key: 'risk', label: 'Risk', render: (r) => <ContentRiskBadge level={r.risk_level} /> },
-    { key: 'created', label: 'Created', render: (r) => new Date(r.created_at).toLocaleDateString() },
+    { key: 'created', label: 'Created', render: (r) => formatDate(r.created_at) },
   ];
 
   return (
