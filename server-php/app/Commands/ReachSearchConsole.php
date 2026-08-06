@@ -33,6 +33,8 @@ use CodeIgniter\CLI\CLI;
  */
 class ReachSearchConsole extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:search-console';
     protected $description = 'Diagnose, register and run the Google Search Console connector.';
@@ -42,7 +44,7 @@ class ReachSearchConsole extends BaseCommand
     {
         $action   = strtolower(trim((string) ($params[0] ?? 'doctor')));
         $argument = isset($params[1]) ? (int) $params[1] : 0;
-        $tenantId = (int) (CLI::getOption('tenant') ?: 1);
+        $tenantId = (int) ($this->sparkOption('tenant', $params, '1') ?? '1');
 
         try {
             $payload = match ($action) {
@@ -54,7 +56,7 @@ class ReachSearchConsole extends BaseCommand
                 'ingest'          => SearchConsoleService::make()->ingestIncremental($this->resolveConnection($argument, $tenantId)),
                 'backfill'        => SearchConsoleService::make()->initiateBackfill(
                     $this->resolveConnection($argument, $tenantId),
-                    (int) (CLI::getOption('days') ?: 90),
+                    (int) ($this->sparkOption('days', $params, '90') ?? '90'),
                 ),
                 'status'          => SearchConsoleService::make()->connectionStatus($this->resolveConnection($argument, $tenantId)),
                 'unmapped'        => $this->unmapped($tenantId),
