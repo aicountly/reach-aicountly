@@ -16,6 +16,16 @@ const REFRESH_MS = 45_000;
 
 const n = (value) => (typeof value === 'number' ? value : 0);
 
+/**
+ * Deep-link only when the tile has rows to show.
+ *
+ * A filtered list reached from a tile reading 0 lands on "nothing matches
+ * this filter", which reads as a broken screen rather than an idle one. The
+ * Blog Command Centre's overview cards already follow this rule; tiles now
+ * do too, falling back to the unfiltered surface.
+ */
+const linkIfAny = (count, filtered, fallback) => (n(count) > 0 ? filtered : fallback);
+
 function Tile({ label, value, hint, icon: Icon, to }) {
   const body = (
     <div className="stat-tile" style={{ height: '100%' }}>
@@ -93,13 +103,13 @@ export function DashboardPage() {
 
       <div className="grid grid-4">
         <Tile label="Blog — in progress"      value={inFlight}           hint={`${n(blog.total)} total · ${n(blog.drafts)} drafts`} icon={FileText}  to={ROUTES.BLOG_COMMAND_CENTRE} />
-        <Tile label="Blog — in review"        value={blog.in_review}     hint={`${n(blog.approved)} approved`}      icon={FileText}  to={ROUTES.BLOG_COMMAND_CENTRE} />
-        <Tile label="Blog — published"        value={blog.published}     hint={`${n(blog.pending_publishing)} pending publish`} icon={FileText} to={ROUTES.BLOG_COMMAND_CENTRE} />
+        <Tile label="Blog — in review"        value={blog.in_review}     hint={`${n(blog.approved)} approved`}      icon={FileText}  to={linkIfAny(blog.in_review, ROUTES.BCC_VERIFICATION, ROUTES.BLOG_COMMAND_CENTRE)} />
+        <Tile label="Blog — published"        value={blog.published}     hint={`${n(blog.pending_publishing)} pending publish`} icon={FileText} to={linkIfAny(blog.published, ROUTES.BCC_PUBLISHED, ROUTES.BLOG_COMMAND_CENTRE)} />
         <Tile label="Campaigns — running"     value={camp.running}       hint={`${n(camp.total)} total`}            icon={Megaphone} to={ROUTES.CAMPAIGN_LIST} />
         <Tile label="Social — queue"          value={soc.queue}          hint={`${n(soc.posted)} posted`}           icon={Share2}    to={ROUTES.SOCIAL_QUEUE} />
         <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${n(leads.pushed)} pushed`}         icon={Users}     to={ROUTES.ENGAGE_PUSH} />
         <Tile label="Approvals — pending"     value={appr.pending}       hint={`${n(appr.total)} total`}            icon={ShieldCheck} to={ROUTES.APPROVALS} />
-        <Tile label="Bot — running jobs"      value={bot.queue_running}  hint={`${n(bot.queue_queued)} queued · ${n(bot.reports_total)} reports`} icon={Bot} to={ROUTES.BOT_QUEUE} />
+        <Tile label="Bot — running jobs"      value={bot.queue_running}  hint={`${n(bot.queue_queued)} queued · ${n(bot.reports_total)} reports`} icon={Bot} to={linkIfAny(bot.queue_running, `${ROUTES.JOBS}?status=processing`, ROUTES.JOBS)} />
       </div>
 
       <div className="grid grid-4 mt-4">
@@ -125,10 +135,17 @@ export function DashboardPage() {
 
         <Card title={<span className="flex items-center gap-2"><ListChecks size={14}/> Bot activity</span>}>
           <div className="grid grid-2">
-            <Tile label="Reports total"    value={bot.reports_total} />
-            <Tile label="Reports pending"  value={bot.reports_pending} />
-            <Tile label="Queue completed"  value={bot.queue_completed} />
-            <Tile label="Queue failed"     value={bot.queue_failed} />
+            <Tile label="Reports total"    value={bot.reports_total}
+                  to={ROUTES.BOT_REPORTS} />
+            <Tile label="Reports pending"  value={bot.reports_pending}
+                  to={linkIfAny(bot.reports_pending, `${ROUTES.BOT_REPORTS}?approval_status=pending`, ROUTES.BOT_REPORTS)} />
+            {/* queue_* sums reach_marketing_bot_queue and reach_jobs; the Job
+                Monitor is the canonical queue surface and the one still in the
+                sidebar, so both land there filtered to the status counted. */}
+            <Tile label="Queue completed"  value={bot.queue_completed}
+                  to={linkIfAny(bot.queue_completed, `${ROUTES.JOBS}?status=completed`, ROUTES.JOBS)} />
+            <Tile label="Queue failed"     value={bot.queue_failed}
+                  to={linkIfAny(bot.queue_failed, `${ROUTES.JOBS}?status=failed`, ROUTES.JOBS)} />
           </div>
         </Card>
       </div>

@@ -23,7 +23,7 @@ class CanonicalUrlPolicyIntegrationTest extends CIUnitTestCase
     public function testFullBlogUrlStructure(): void
     {
         $url = $this->policy->resolve('blog', 'how-to-use-banking-module', 'self_canonical');
-        $this->assertSame('https://aicountly.com/blog/how-to-use-banking-module', $url);
+        $this->assertSame('https://aicountly.com/blogs/how-to-use-banking-module', $url);
         $this->assertStringStartsWith('https://', $url);
     }
 
@@ -35,7 +35,7 @@ class CanonicalUrlPolicyIntegrationTest extends CIUnitTestCase
 
     public function testCanonicalToExistingPreservesExactUrl(): void
     {
-        $existing = 'https://aicountly.com/blog/original-article-slug';
+        $existing = 'https://aicountly.com/blogs/original-article-slug';
         $url      = $this->policy->resolve('blog', 'new-slug', 'canonical_to_existing', $existing);
         $this->assertSame($existing, $url);
     }
@@ -49,7 +49,7 @@ class CanonicalUrlPolicyIntegrationTest extends CIUnitTestCase
 
     public function testRedirectToExistingReturnsTarget(): void
     {
-        $target = 'https://aicountly.com/blog/primary-post';
+        $target = 'https://aicountly.com/blogs/primary-post';
         $url    = $this->policy->resolve('blog', 'old-slug', 'redirect_to_existing', $target);
         $this->assertSame($target, $url);
     }

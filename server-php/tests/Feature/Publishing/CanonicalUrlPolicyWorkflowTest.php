@@ -23,7 +23,7 @@ class CanonicalUrlPolicyWorkflowTest extends CIUnitTestCase
     public function testBlogPostUrlFormat(): void
     {
         $url = $this->policy->resolve('blog', 'how-aicountly-automates-gst-filing', 'self_canonical');
-        $this->assertSame('https://aicountly.com/blog/how-aicountly-automates-gst-filing', $url);
+        $this->assertSame('https://aicountly.com/blogs/how-aicountly-automates-gst-filing', $url);
         $this->assertStringNotContainsString('/help/', $url);
     }
 
@@ -50,7 +50,7 @@ class CanonicalUrlPolicyWorkflowTest extends CIUnitTestCase
 
     public function testCanonicalToExistingForUpdatedContent(): void
     {
-        $existingUrl = 'https://aicountly.com/blog/original-article-title';
+        $existingUrl = 'https://aicountly.com/blogs/original-article-title';
         $url         = $this->policy->resolve('blog', 'new-article-slug', 'canonical_to_existing', $existingUrl);
         $this->assertSame($existingUrl, $url);
     }

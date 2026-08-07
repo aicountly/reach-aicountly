@@ -30,6 +30,8 @@ use Throwable;
  */
 class ReachBlogFixReadiness extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-fix-readiness';
     protected $description = 'Create missing SEO/publication profiles for blog items past approval.';
@@ -50,8 +52,8 @@ class ReachBlogFixReadiness extends BaseCommand
     public function run(array $params): int
     {
         // CLI::getOption() only sees real argv; command() passes flags in $params.
-        $apply = (CLI::getOption('apply') !== null) || array_key_exists('apply', $params);
-        $limit = max(0, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 0)));
+        $apply = $this->sparkFlag('apply', $params);
+        $limit = max(0, (int) ($this->sparkOption('limit', $params, '0') ?? '0'));
 
         $db = Database::connect();
 

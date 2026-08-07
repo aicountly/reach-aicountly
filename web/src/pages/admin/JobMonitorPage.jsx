@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, RotateCcw, XCircle } from 'lucide-react';
 import { jobService } from '../../services/jobService';
 import { Card } from '../../components/common/Card';
@@ -20,8 +21,19 @@ export function JobMonitorPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage]   = useState(1);
   const [limit]           = useState(25);
-  const [status, setStatus] = useState('');
-  const [queue, setQueue]   = useState('');
+  // Filters live in the URL, not local state: the dashboard's queue tiles
+  // link straight to their own rows (?status=failed), and a filtered view
+  // stays shareable and survives the back button.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const status = searchParams.get('status') ?? '';
+  const queue  = searchParams.get('queue') ?? '';
+
+  const setFilter = (key, value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value); else next.delete(key);
+    setSearchParams(next, { replace: true });
+    setPage(1);
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [notice, setNotice]   = useState(null);
@@ -96,14 +108,14 @@ export function JobMonitorPage() {
       </div>
 
       <FilterBar>
-        <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
+        <select value={status} onChange={(e) => setFilter('status', e.target.value)}>
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>{s ? s.replace(/_/g, ' ') : 'All statuses'}</option>
           ))}
         </select>
         <input
           value={queue}
-          onChange={(e) => setQueue(e.target.value)}
+          onChange={(e) => setFilter('queue', e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); load(); } }}
           placeholder="Queue name (e.g. default, marketing_bot)"
           style={{ minWidth: 220 }}

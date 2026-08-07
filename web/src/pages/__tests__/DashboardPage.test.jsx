@@ -87,4 +87,57 @@ describe('DashboardPage', () => {
 
     await waitFor(() => expect(screen.getByText('boom')).toBeInTheDocument());
   });
+
+  // The four Bot activity tiles had no `to` prop at all, so Tile rendered a
+  // plain div and clicking them did nothing. Every KPI card must lead
+  // somewhere, and to the rows it actually counted.
+  it('makes every KPI card clickable', async () => {
+    renderWithAuth(<DashboardPage />);
+    await waitFor(() => expect(screen.getByText('Blog — in progress')).toBeInTheDocument());
+
+    const labels = [
+      'Blog — in progress', 'Blog — in review', 'Blog — published',
+      'Campaigns — running', 'Social — queue', 'Leads — pending push',
+      'Approvals — pending', 'Bot — running jobs',
+      'Content — in review', 'Content — scheduled', 'Blog — needs attention',
+      'Campaigns — dispatch queue',
+      'Reports total', 'Reports pending', 'Queue completed', 'Queue failed',
+    ];
+
+    for (const label of labels) {
+      const tile = screen.getByText(label).closest('a');
+      expect(tile, `${label} is not a link`).not.toBeNull();
+      expect(tile.getAttribute('href')).toBeTruthy();
+    }
+  });
+
+  it('sends the bot activity cards to the rows they counted', async () => {
+    renderWithAuth(<DashboardPage />);
+    await waitFor(() => expect(screen.getByText('Reports total')).toBeInTheDocument());
+
+    const href = (label) => screen.getByText(label).closest('a').getAttribute('href');
+
+    expect(href('Reports total')).toBe('/bot/reports');
+    expect(href('Reports pending')).toBe('/bot/reports?approval_status=pending');
+    // queue_* sums the bot queue and reach_jobs; Job Monitor is the canonical
+    // surface for those rows, filtered to the status the tile counted.
+    expect(href('Queue completed')).toBe('/admin/jobs?status=completed');
+    expect(href('Queue failed')).toBe('/admin/jobs?status=failed');
+  });
+
+  it('does not deep-link a zero tile into an empty filtered list', async () => {
+    dashboardService.summary.mockResolvedValue({
+      ...summary,
+      bot: { ...summary.bot, queue_failed: 0, reports_pending: 0 },
+    });
+    renderWithAuth(<DashboardPage />);
+    await waitFor(() => expect(screen.getByText('Queue failed')).toBeInTheDocument());
+
+    const href = (label) => screen.getByText(label).closest('a').getAttribute('href');
+
+    // Unfiltered, so the card reads as "nothing failed" rather than landing on
+    // "no rows match this filter", which looks like a broken screen.
+    expect(href('Queue failed')).toBe('/admin/jobs');
+    expect(href('Reports pending')).toBe('/bot/reports');
+  });
 });
