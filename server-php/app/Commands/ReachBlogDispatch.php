@@ -13,6 +13,8 @@ use DateTimeZone;
  */
 class ReachBlogDispatch extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-dispatch';
     protected $description = 'Dispatch eligible blog work blocks within the Asia/Kolkata automation window.';
@@ -20,8 +22,8 @@ class ReachBlogDispatch extends BaseCommand
 
     public function run(array $params): int
     {
-        $force = (bool) (CLI::getOption('force') ?? ($params['force'] ?? false));
-        $limit = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 25)));
+        $force = $this->sparkFlag('force', $params);
+        $limit = max(1, (int) ($this->sparkOption('limit', $params, '25') ?? '25'));
 
         if (! $force && ! $this->isWithinAutomationWindow()) {
             $out = json_encode([

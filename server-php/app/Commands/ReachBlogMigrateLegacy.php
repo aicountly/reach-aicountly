@@ -12,6 +12,8 @@ use Config\Database;
  */
 class ReachBlogMigrateLegacy extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-migrate-legacy';
     protected $description = 'Migrate reach_blog_posts rows into reach_content_items (content_type=blog).';
@@ -19,10 +21,10 @@ class ReachBlogMigrateLegacy extends BaseCommand
 
     public function run(array $params): int
     {
-        $dryRun     = (bool) (CLI::getOption('dry-run') ?? ($params['dry-run'] ?? false));
-        $batchSize  = max(1, (int) (CLI::getOption('batch-size') ?? ($params['batch-size'] ?? 50)));
-        $resumeFrom = max(0, (int) (CLI::getOption('resume-from') ?? ($params['resume-from'] ?? 0)));
-        $report     = (bool) (CLI::getOption('report') ?? ($params['report'] ?? false));
+        $dryRun     = $this->sparkFlag('dry-run', $params);
+        $batchSize  = max(1, (int) ($this->sparkOption('batch-size', $params, '50') ?? '50'));
+        $resumeFrom = max(0, (int) ($this->sparkOption('resume-from', $params, '0') ?? '0'));
+        $report     = $this->sparkFlag('report', $params);
 
         $db = Database::connect();
 

@@ -17,6 +17,8 @@ use App\Libraries\KnowledgeTaxonomyImporter;
  */
 class ReachImportTaxonomy extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:import-taxonomy';
     protected $description = 'Idempotently import legacy SaaS product taxonomy into the knowledge store.';
@@ -24,7 +26,7 @@ class ReachImportTaxonomy extends BaseCommand
 
     public function run(array $params): int
     {
-        $dryRun = (bool) (CLI::getOption('dry-run') ?? ($params['dry-run'] ?? false));
+        $dryRun = $this->sparkFlag('dry-run', $params);
 
         CLI::write('[reach:import-taxonomy] Starting legacy taxonomy import…', 'yellow');
 

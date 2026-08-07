@@ -194,20 +194,20 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
     public static function equivalentUrlProvider(): array
     {
         return [
-            'trailing slash' => ['https://aicountly.com/blog/gst', 'https://aicountly.com/blog/gst/'],
-            'scheme'         => ['http://aicountly.com/blog/gst', 'https://aicountly.com/blog/gst'],
-            'www prefix'     => ['https://www.aicountly.com/blog/gst', 'https://aicountly.com/blog/gst'],
-            'host case'      => ['https://AICOUNTLY.com/blog/gst', 'https://aicountly.com/blog/gst'],
-            'query string'   => ['https://aicountly.com/blog/gst?utm_source=x', 'https://aicountly.com/blog/gst'],
-            'fragment'       => ['https://aicountly.com/blog/gst#intro', 'https://aicountly.com/blog/gst'],
+            'trailing slash' => ['https://aicountly.com/blogs/gst', 'https://aicountly.com/blogs/gst/'],
+            'scheme'         => ['http://aicountly.com/blogs/gst', 'https://aicountly.com/blogs/gst'],
+            'www prefix'     => ['https://www.aicountly.com/blogs/gst', 'https://aicountly.com/blogs/gst'],
+            'host case'      => ['https://AICOUNTLY.com/blogs/gst', 'https://aicountly.com/blogs/gst'],
+            'query string'   => ['https://aicountly.com/blogs/gst?utm_source=x', 'https://aicountly.com/blogs/gst'],
+            'fragment'       => ['https://aicountly.com/blogs/gst#intro', 'https://aicountly.com/blogs/gst'],
         ];
     }
 
     public function testDifferentPathsDoNotMatch(): void
     {
         $this->assertNotSame(
-            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blog/gst'),
-            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blog/tds'),
+            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blogs/gst'),
+            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blogs/tds'),
         );
     }
 
@@ -216,8 +216,8 @@ final class SearchConsoleWiringTest extends CIUnitTestCase
         // Most servers serve these as different resources; collapsing them would
         // silently attribute one post's traffic to another.
         $this->assertNotSame(
-            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blog/GST'),
-            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blog/gst'),
+            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blogs/GST'),
+            ContentIdentitySyncService::normaliseUrl('https://aicountly.com/blogs/gst'),
         );
     }
 

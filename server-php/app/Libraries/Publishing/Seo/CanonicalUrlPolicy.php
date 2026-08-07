@@ -62,7 +62,15 @@ class CanonicalUrlPolicy
     public function buildUrl(string $contentType, string $slug): string
     {
         $pathPrefix = match ($contentType) {
-            'blog'           => '/blog/',
+            // aicountly.com serves articles at /blogs/{slug} and 301s /blog/{slug}
+            // to it. Emitting the singular form produced a URL that never
+            // resolved directly — every consumer got a redirect at best, and a
+            // 404 when the slug had also changed, which is how a URL comparison
+            // built on this reported "not live" for a post that was.
+            'blog'           => '/blogs/',
+            // Left as-is deliberately: the public router has no /help/{slug}
+            // route, so the correct knowledge-base prefix is unverified. Fixing
+            // it on a guess would trade one wrong URL for another.
             'knowledge_base' => '/help/',
             default          => '/',
         };

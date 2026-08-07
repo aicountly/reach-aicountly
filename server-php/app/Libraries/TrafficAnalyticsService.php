@@ -366,7 +366,11 @@ final class TrafficAnalyticsService
 
     private function marketingSiteUrl(): string
     {
-        return rtrim(trim((string) (env('AICOUNTLY_SITE_URL') ?? 'https://www.aicountly.com')), '/');
+        // Apex, not www: aicountly.com 301s every www URL to the apex host and
+        // the deploy asserts it does, so www is never a destination — only a
+        // redirect source. Defaulting to it produced URLs one hop away from the
+        // ones the site actually serves and Search Console actually reports.
+        return rtrim(trim((string) (env('AICOUNTLY_SITE_URL') ?? 'https://aicountly.com')), '/');
     }
 
     private function portalSiteUrl(): string

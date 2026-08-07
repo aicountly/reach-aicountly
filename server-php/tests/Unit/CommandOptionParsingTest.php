@@ -22,42 +22,41 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class CommandOptionParsingTest extends CIUnitTestCase
 {
-    /** Commands invoked from cron or runbooks with =-style options. */
-    private const MUST_PARSE_EQUALS_FORM = [
-        'ReachWork.php',
-        'ReachSchedule.php',
-        'ReachSearchConsole.php',
-        'ReachBlogUrlDrift.php',
-        'ReachBlogRepublish.php',
-        'ReachBlogAdvance.php',
-    ];
+    /**
+     * ReachMigrate is the deliberate exception: it declares a single-dash
+     * option (`-g group`), which CodeIgniter's parser handles correctly and
+     * sparkOption — which scans argv for `--name` — would not. Converting it
+     * would break the one command that currently works.
+     */
+    private const SINGLE_DASH_OPTIONS = ['ReachMigrate.php'];
 
     /**
-     * @dataProvider cronInvokedCommandProvider
+     * Every command that reads a --option must go through the trait. Asserted
+     * over the whole directory rather than a hand-kept list, so a new command
+     * cannot quietly reintroduce the bug by not being added to it.
      */
-    public function testCronInvokedCommandsParseTheEqualsForm(string $file): void
+    public function testEveryCommandReadingOptionsParsesTheEqualsForm(): void
     {
-        $source = (string) file_get_contents(APPPATH . 'Commands/' . $file);
+        $offenders = [];
 
-        $this->assertStringContainsString(
-            'ParsesSparkOptions',
-            $source,
-            $file . ' takes options from cron or a runbook using --opt=value, which '
-                . 'CLI::getOption() does not see. It must use ParsesSparkOptions.',
-        );
-    }
+        foreach (glob(APPPATH . 'Commands/*.php') ?: [] as $path) {
+            $file = basename($path);
+            if (in_array($file, self::SINGLE_DASH_OPTIONS, true)) {
+                continue;
+            }
 
-    /**
-     * @return array<string, array{0: string}>
-     */
-    public static function cronInvokedCommandProvider(): array
-    {
-        $cases = [];
-        foreach (self::MUST_PARSE_EQUALS_FORM as $file) {
-            $cases[$file] = [$file];
+            $source = (string) file_get_contents($path);
+            if (str_contains($source, 'CLI::getOption') && !str_contains($source, 'ParsesSparkOptions')) {
+                $offenders[] = $file;
+            }
         }
 
-        return $cases;
+        $this->assertSame(
+            [],
+            $offenders,
+            "These read options through CLI::getOption() alone, which does not see --opt=value:\n  "
+                . implode("\n  ", $offenders),
+        );
     }
 
     /**

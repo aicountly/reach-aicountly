@@ -23,7 +23,7 @@ class CanonicalUrlPolicyEdgeCasesTest extends CIUnitTestCase
     public function testBuildUrlForBlog(): void
     {
         $url = $this->policy->buildUrl('blog', 'my-post');
-        $this->assertSame('https://aicountly.com/blog/my-post', $url);
+        $this->assertSame('https://aicountly.com/blogs/my-post', $url);
     }
 
     public function testBuildUrlForKnowledgeBase(): void
@@ -41,18 +41,18 @@ class CanonicalUrlPolicyEdgeCasesTest extends CIUnitTestCase
     public function testSlugLeadingSlashIsStripped(): void
     {
         $url = $this->policy->buildUrl('blog', '/my-post');
-        $this->assertSame('https://aicountly.com/blog/my-post', $url);
+        $this->assertSame('https://aicountly.com/blogs/my-post', $url);
     }
 
     public function testHistoricalArchivePreferenceReturnsUrl(): void
     {
         $url = $this->policy->resolve('blog', 'old-post', 'historical_archive');
-        $this->assertSame('https://aicountly.com/blog/old-post', $url);
+        $this->assertSame('https://aicountly.com/blogs/old-post', $url);
     }
 
     public function testRedirectToExistingReturnsTargetUrl(): void
     {
-        $target = 'https://aicountly.com/blog/main-post';
+        $target = 'https://aicountly.com/blogs/main-post';
         $url    = $this->policy->resolve('blog', 'redirect-slug', 'redirect_to_existing', $target);
         $this->assertSame($target, $url);
     }
@@ -67,7 +67,7 @@ class CanonicalUrlPolicyEdgeCasesTest extends CIUnitTestCase
     {
         $policy = new CanonicalUrlPolicy('https://aicountly.com/');
         $url    = $policy->buildUrl('blog', 'post');
-        $this->assertSame('https://aicountly.com/blog/post', $url);
+        $this->assertSame('https://aicountly.com/blogs/post', $url);
     }
 
     /** @dataProvider slugEdgeCases */
