@@ -17,6 +17,8 @@ use CodeIgniter\CLI\CLI;
  */
 class ReachBlogCoverSweep extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-cover-sweep';
     protected $description = 'Re-attempt cover assignment for blog articles parked without one.';
@@ -25,7 +27,7 @@ class ReachBlogCoverSweep extends BaseCommand
 
     public function run(array $params): int
     {
-        $limit = (int) ($params['limit'] ?? CLI::getOption('limit') ?? 25);
+        $limit = (int) ($this->sparkOption('limit', $params, '25') ?? '25');
 
         try {
             $result = (new CoverSweepService())->sweep($limit);

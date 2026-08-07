@@ -17,6 +17,8 @@ use Throwable;
  */
 class ReachBlogBootstrap extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-bootstrap';
     protected $description = 'Cold-start approved topic clusters and pinned pilot candidates.';
@@ -24,9 +26,9 @@ class ReachBlogBootstrap extends BaseCommand
 
     public function run(array $params): int
     {
-        $pilots   = max(1, (int) (CLI::getOption('pilots') ?? ($params['pilots'] ?? 5)));
-        $optimize = CLI::getOption('optimize') !== null || array_key_exists('optimize', $params);
-        $dispatch = CLI::getOption('dispatch') !== null || array_key_exists('dispatch', $params);
+        $pilots   = max(1, (int) ($this->sparkOption('pilots', $params, '5') ?? '5'));
+        $optimize = $this->sparkFlag('optimize', $params);
+        $dispatch = $this->sparkFlag('dispatch', $params);
 
         try {
             $cold   = new BlogColdStartService();

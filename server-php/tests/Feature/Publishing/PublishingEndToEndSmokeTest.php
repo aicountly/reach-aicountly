@@ -33,7 +33,7 @@ class PublishingEndToEndSmokeTest extends CIUnitTestCase
         // 2. Build canonical URL
         $urlPolicy = new CanonicalUrlPolicy('https://aicountly.com');
         $canonical = $urlPolicy->resolve('blog', 'what-is-bank-reconciliation', 'self_canonical');
-        $this->assertSame('https://aicountly.com/blog/what-is-bank-reconciliation', $canonical);
+        $this->assertSame('https://aicountly.com/blogs/what-is-bank-reconciliation', $canonical);
 
         // 3. Generate metadata
         $metadata = new BlogMetadataService();

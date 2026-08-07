@@ -21,7 +21,7 @@ class CanonicalUrlPolicyTest extends CIUnitTestCase
     public function testSelfCanonicalBuildsCorrectUrl(): void
     {
         $url = $this->policy->resolve('blog', 'my-blog-post', 'self_canonical');
-        $this->assertSame('https://aicountly.com/blog/my-blog-post', $url);
+        $this->assertSame('https://aicountly.com/blogs/my-blog-post', $url);
     }
 
     public function testKnowledgeBaseUsesHelpPath(): void
@@ -32,7 +32,7 @@ class CanonicalUrlPolicyTest extends CIUnitTestCase
 
     public function testCanonicalToExistingUsesProvidedUrl(): void
     {
-        $existing = 'https://aicountly.com/blog/canonical-post';
+        $existing = 'https://aicountly.com/blogs/canonical-post';
         $url = $this->policy->resolve('blog', 'new-slug', 'canonical_to_existing', $existing);
         $this->assertSame($existing, $url);
     }
@@ -46,7 +46,7 @@ class CanonicalUrlPolicyTest extends CIUnitTestCase
     public function testNoindexResolvesToSelfPath(): void
     {
         $url = $this->policy->resolve('blog', 'hidden-post', 'noindex');
-        $this->assertSame('https://aicountly.com/blog/hidden-post', $url);
+        $this->assertSame('https://aicountly.com/blogs/hidden-post', $url);
     }
 
     public function testUnknownPreferenceThrows(): void

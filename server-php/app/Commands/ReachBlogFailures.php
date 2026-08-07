@@ -13,6 +13,8 @@ use App\Libraries\Database\SchemaGuard;
  */
 class ReachBlogFailures extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-failures';
     protected $description = 'Show recent failed blog work blocks and AI generation errors.';
@@ -20,7 +22,7 @@ class ReachBlogFailures extends BaseCommand
 
     public function run(array $params): int
     {
-        $limit = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 10)));
+        $limit = max(1, (int) ($this->sparkOption('limit', $params, '10') ?? '10'));
         $db    = Database::connect();
 
         try {

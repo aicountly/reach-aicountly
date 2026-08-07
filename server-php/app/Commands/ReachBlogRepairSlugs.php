@@ -25,6 +25,8 @@ use App\Libraries\Database\SchemaGuard;
  */
 class ReachBlogRepairSlugs extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-repair-slugs';
     protected $description = 'Repair content slugs corrupted by the case-sensitive slug filter.';
@@ -43,9 +45,9 @@ class ReachBlogRepairSlugs extends BaseCommand
         // CLI::getOption() only sees real argv; the command() helper hands
         // flags over in $params, so both have to be consulted or the write
         // flag silently reads as "dry run".
-        $apply = (CLI::getOption('apply') !== null) || array_key_exists('apply', $params);
-        $type  = (string) (CLI::getOption('type') ?? ($params['type'] ?? ''));
-        $limit = max(0, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 0)));
+        $apply = $this->sparkFlag('apply', $params);
+        $type  = (string) ($this->sparkOption('type', $params, '') ?? '');
+        $limit = max(0, (int) ($this->sparkOption('limit', $params, '0') ?? '0'));
 
         $db = Database::connect();
 

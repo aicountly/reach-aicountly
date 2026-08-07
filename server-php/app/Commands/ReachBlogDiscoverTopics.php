@@ -21,6 +21,8 @@ use App\Libraries\Database\SchemaGuard;
  */
 class ReachBlogDiscoverTopics extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-discover-topics';
     protected $description = 'Discover or seed topic candidates for the blog roadmap.';
@@ -28,12 +30,12 @@ class ReachBlogDiscoverTopics extends BaseCommand
 
     public function run(array $params): int
     {
-        $title  = CLI::getOption('title') ?? ($params['title'] ?? null);
-        $limit  = max(1, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 10)));
-        $pin    = CLI::getOption('pin') !== null || array_key_exists('pin', $params);
-        $stream = (string) (CLI::getOption('stream') ?? ($params['stream'] ?? 'marketing'));
-        $enqueue = CLI::getOption('enqueue') !== null || array_key_exists('enqueue', $params);
-        $noBootstrap = CLI::getOption('no-bootstrap') !== null || array_key_exists('no-bootstrap', $params);
+        $title  = $this->sparkOption('title', $params);
+        $limit  = max(1, (int) ($this->sparkOption('limit', $params, '10') ?? '10'));
+        $pin    = $this->sparkFlag('pin', $params);
+        $stream = (string) ($this->sparkOption('stream', $params, 'marketing') ?? 'marketing');
+        $enqueue = $this->sparkFlag('enqueue', $params);
+        $noBootstrap = $this->sparkFlag('no-bootstrap', $params);
 
         try {
             if (is_string($title) && trim($title) !== '') {

@@ -13,6 +13,8 @@ use DateTimeZone;
  */
 class ReachBlogOptimizeRoadmap extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-optimize-roadmap';
     protected $description = 'Score topic candidates and produce roadmap decisions (preferred 00:30 Asia/Kolkata).';
@@ -20,12 +22,12 @@ class ReachBlogOptimizeRoadmap extends BaseCommand
 
     public function run(array $params): int
     {
-        $force  = (bool) (CLI::getOption('force') ?? ($params['force'] ?? false));
-        $dryRun = (bool) (CLI::getOption('dry-run') ?? ($params['dry-run'] ?? false));
-        $limit  = CLI::getOption('limit') ?? ($params['limit'] ?? null);
+        $force  = $this->sparkFlag('force', $params);
+        $dryRun = $this->sparkFlag('dry-run', $params);
+        $limit  = $this->sparkOption('limit', $params);
         $limit  = $limit !== null && $limit !== '' ? max(0, (int) $limit) : 0;
 
-        $dateOpt = CLI::getOption('date') ?? ($params['date'] ?? null);
+        $dateOpt = $this->sparkOption('date', $params);
         $forDate = is_string($dateOpt) && $dateOpt !== ''
             ? $dateOpt
             : $this->nowKolkata()->format('Y-m-d');

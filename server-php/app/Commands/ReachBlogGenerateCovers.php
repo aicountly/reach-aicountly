@@ -40,6 +40,8 @@ use Throwable;
  */
 class ReachBlogGenerateCovers extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-generate-covers';
     protected $description = 'Queue cover-image generation for blog items missing a featured image.';
@@ -57,8 +59,8 @@ class ReachBlogGenerateCovers extends BaseCommand
     public function run(array $params): int
     {
         // CLI::getOption() only sees real argv; command() passes flags in $params.
-        $apply = (CLI::getOption('apply') !== null) || array_key_exists('apply', $params);
-        $limit = max(0, (int) (CLI::getOption('limit') ?? ($params['limit'] ?? 0)));
+        $apply = $this->sparkFlag('apply', $params);
+        $limit = max(0, (int) ($this->sparkOption('limit', $params, '0') ?? '0'));
 
         $db = Database::connect();
 

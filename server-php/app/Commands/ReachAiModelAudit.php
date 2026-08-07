@@ -30,6 +30,8 @@ use Throwable;
  */
 class ReachAiModelAudit extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'reach:ai-model-audit';
     protected $description = 'Report (and optionally disable) AI models the provider has withdrawn.';
@@ -41,7 +43,7 @@ class ReachAiModelAudit extends BaseCommand
     public function run(array $params): int
     {
         // CLI::getOption() only sees real argv; command() passes flags in $params.
-        $apply = (CLI::getOption('apply') !== null) || array_key_exists('apply', $params);
+        $apply = $this->sparkFlag('apply', $params);
 
         $db = Database::connect();
 
