@@ -24,6 +24,8 @@ use Config\Database;
  */
 class CommunityCategoryCheck extends BaseCommand
 {
+    use \App\Commands\Concerns\ParsesSparkOptions;
+
     protected $group       = 'Reach';
     protected $name        = 'community:category-check';
     protected $description = 'Report community categories that do not resolve to a public-site category slug.';
@@ -55,7 +57,7 @@ class CommunityCategoryCheck extends BaseCommand
 
     public function run(array $params): int
     {
-        $asJson = array_key_exists('json', $params) || CLI::getOption('json');
+        $asJson = $this->sparkFlag('json', $params);
 
         $rows = Database::connect()->query(
             "SELECT COALESCE(NULLIF(TRIM(category), ''), '(none)') AS category,
