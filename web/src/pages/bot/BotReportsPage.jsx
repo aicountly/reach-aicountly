@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { botService } from '../../services/botService';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
@@ -15,13 +15,21 @@ export function BotReportsPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  // The dashboard's "Reports pending" tile links here with the filter it
+  // counted, so the page opens on those rows rather than the whole log.
+  // BotReportController::index already filters on approval_status.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const approvalStatus = searchParams.get('approval_status') ?? '';
+
   useEffect(() => {
     setLoading(true);
-    botService.reports({ limit: 100 })
+    const params = { limit: 100 };
+    if (approvalStatus) params.approval_status = approvalStatus;
+    botService.reports(params)
       .then((d) => setRows(d.items || d))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [approvalStatus]);
 
   const columns = [
     { key: 'id', label: '#' },
@@ -39,6 +47,15 @@ export function BotReportsPage() {
           <h1>Marketing bot reports</h1>
           <p className="text-sm text-muted">Local audit log of what the bot understood, generated and did.</p>
         </div>
+        {approvalStatus && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setSearchParams({}, { replace: true })}
+          >
+            Clear “{approvalStatus}” filter
+          </button>
+        )}
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
@@ -48,7 +65,9 @@ export function BotReportsPage() {
             columns={columns}
             rows={rows}
             onRowClick={(r) => navigate(`/bot/reports/${r.id}`)}
-            emptyMessage="No bot reports yet."
+            emptyMessage={approvalStatus
+              ? `No bot reports with approval status “${approvalStatus}”.`
+              : 'No bot reports yet.'}
           />
         </Card>
       )}
