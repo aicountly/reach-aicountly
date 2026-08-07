@@ -137,6 +137,30 @@ describe('Cover gallery', () => {
     expect(screen.getByPlaceholderText('gst, accounting')).toHaveValue('gstr, mismatch, reconciliation');
   });
 
+  it('rejects an oversize file locally instead of letting PHP swallow it', async () => {
+    mediaGalleryService.list.mockResolvedValue({
+      assets: [], signing_key_configured: true, files_missing: 0,
+      storage_path: '/home/reachaicountly/cover_images/',
+      storage_writable: true, storage_outside_deploy: true,
+      max_upload_bytes: 2 * 1024 * 1024,
+    });
+    const user = userEvent.setup();
+    renderWithAuth(<MediaGalleryPage />);
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Upload/ })).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /Upload/ }));
+
+    // The limit shown must be the server's, not the app's aspiration.
+    expect(await screen.findByText(/max 2.0 MB/)).toBeInTheDocument();
+
+    const big = new File([new Uint8Array(3 * 1024 * 1024)], 'cover.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText(/Image \(max/), big);
+    await user.click(screen.getByRole('button', { name: /^Upload$/ }));
+
+    await waitFor(() => expect(screen.getByText(/this server accepts at most 2.0 MB/)).toBeInTheDocument());
+    expect(mediaGalleryService.upload).not.toHaveBeenCalled();
+  });
+
   it('warns when the cover directory is unwritable, because uploads will fail', async () => {
     mediaGalleryService.list.mockResolvedValue({
       assets: [], signing_key_configured: true, files_missing: 0,

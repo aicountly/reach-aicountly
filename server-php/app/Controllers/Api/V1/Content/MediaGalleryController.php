@@ -56,20 +56,59 @@ class MediaGalleryController extends BaseApiController
             )),
             'storage_path'           => $store->storagePath(),
             'storage_writable'       => $store->storageWritable(),
+            // The effective ceiling, not the app's aspiration. PHP silently
+            // discards $_FILES when the body exceeds post_max_size, so a UI
+            // promising 4 MB over a 2 MB php.ini produces "field is required"
+            // for a file the operator can plainly see attached.
+            'max_upload_bytes'       => self::maxUploadBytes(),
             // Storing under the deploy tree is what let rsync --delete erase
             // every cover; say so while it is still the case.
             'storage_outside_deploy' => ! str_starts_with($store->storagePath(), rtrim(ROOTPATH, '/')),
         ]);
     }
 
+    /** Application cap; the effective limit is the smaller of this and php.ini. */
+    private const APP_MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
     public function upload()
     {
         $file = $this->request->getFile('file');
-        if ($file === null || ! $file->isValid()) {
+
+        if ($file === null) {
+            // PHP drops $_FILES wholesale when the request body exceeds
+            // post_max_size — no error code, no file, and $_POST empty too.
+            // Distinguishing that from a genuinely absent field is the
+            // difference between "the server is misconfigured for the size you
+            // sent" and "you forgot to attach something".
+            $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+            $postMax       = self::iniBytes('post_max_size');
+
+            if ($contentLength > 0 && $postMax > 0 && $contentLength > $postMax) {
+                return $this->fail(sprintf(
+                    'The upload was %s but this server accepts at most %s per request '
+                    . '(PHP post_max_size). The file never reached the application. '
+                    . 'Raise post_max_size and upload_max_filesize, or upload a smaller image.',
+                    self::humanBytes($contentLength),
+                    self::humanBytes($postMax),
+                ), 413);
+            }
+
             return $this->fail('Multipart field "file" is required.', 422);
         }
-        if ($file->getSize() > 4 * 1024 * 1024) {
-            return $this->fail('File exceeds the 4 MB upload limit.', 422);
+
+        if (! $file->isValid()) {
+            // getErrorString() turns UPLOAD_ERR_INI_SIZE into something an
+            // operator can act on instead of a bare "invalid file".
+            return $this->fail('Upload failed: ' . $file->getErrorString(), 422);
+        }
+
+        $max = self::maxUploadBytes();
+        if ($file->getSize() > $max) {
+            return $this->fail(sprintf(
+                'File is %s; the limit here is %s.',
+                self::humanBytes((int) $file->getSize()),
+                self::humanBytes($max),
+            ), 422);
         }
 
         $binary = (string) file_get_contents($file->getTempName());
@@ -134,5 +173,46 @@ class MediaGalleryController extends BaseApiController
     public function deficit()
     {
         return $this->ok((new MediaGalleryDeficitService())->report());
+    }
+
+    /**
+     * The largest upload that can actually succeed: the application cap, or
+     * PHP's limits when they are lower. Both matter — upload_max_filesize
+     * rejects the file with an error code, post_max_size discards the whole
+     * body before PHP populates $_FILES at all.
+     */
+    private static function maxUploadBytes(): int
+    {
+        $limits = array_filter([
+            self::APP_MAX_UPLOAD_BYTES,
+            self::iniBytes('upload_max_filesize'),
+            self::iniBytes('post_max_size'),
+        ], static fn (int $bytes): bool => $bytes > 0);
+
+        return $limits === [] ? self::APP_MAX_UPLOAD_BYTES : min($limits);
+    }
+
+    /** php.ini shorthand ("8M", "1G") in bytes. 0 when unset or unlimited. */
+    private static function iniBytes(string $key): int
+    {
+        $raw = trim((string) ini_get($key));
+        if ($raw === '' || $raw === '-1') {
+            return 0;
+        }
+
+        $value = (int) $raw;
+        return match (strtolower(substr($raw, -1))) {
+            'g'     => $value * 1024 * 1024 * 1024,
+            'm'     => $value * 1024 * 1024,
+            'k'     => $value * 1024,
+            default => $value,
+        };
+    }
+
+    private static function humanBytes(int $bytes): string
+    {
+        return $bytes >= 1024 * 1024
+            ? round($bytes / 1024 / 1024, 1) . ' MB'
+            : round($bytes / 1024) . ' KB';
     }
 }
