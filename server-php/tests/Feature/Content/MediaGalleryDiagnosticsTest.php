@@ -107,6 +107,65 @@ final class MediaGalleryDiagnosticsTest extends ApiTestCase
         );
     }
 
+    public function testTheEffectiveUploadLimitIsReported(): void
+    {
+        $_ENV['MEDIA_SIGNING_KEY'] = str_repeat('a', 64);
+
+        $max = $this->list()['max_upload_bytes'];
+
+        $this->assertGreaterThan(0, $max);
+        $this->assertLessThanOrEqual(4 * 1024 * 1024, $max, 'The app cap is the ceiling.');
+
+        // Whatever php.ini allows, the reported figure must not exceed it —
+        // promising more is what produced "field is required" for a file the
+        // operator could see attached.
+        foreach (['upload_max_filesize', 'post_max_size'] as $key) {
+            $raw = trim((string) ini_get($key));
+            if ($raw === '' || $raw === '-1') {
+                continue;
+            }
+            $bytes = (int) $raw * match (strtolower(substr($raw, -1))) {
+                'g' => 1024 ** 3, 'm' => 1024 ** 2, 'k' => 1024, default => 1,
+            };
+            $this->assertLessThanOrEqual($bytes, $max, "Reported limit exceeds php.ini {$key}.");
+        }
+    }
+
+    public function testAnOversizeBodyIsReportedAsATooLargeUpload(): void
+    {
+        $headers = $this->authAs('super_admin');
+
+        // Reproduces what PHP does past post_max_size: a content length with
+        // no $_FILES at all. Without this branch the operator is told the
+        // field is missing for a file they can see attached.
+        $postMax = trim((string) ini_get('post_max_size'));
+        if ($postMax === '' || $postMax === '-1') {
+            $this->markTestSkipped('post_max_size is unlimited in this environment.');
+        }
+
+        $bytes = (int) $postMax * match (strtolower(substr($postMax, -1))) {
+            'g' => 1024 ** 3, 'm' => 1024 ** 2, 'k' => 1024, default => 1,
+        };
+
+        $_SERVER['CONTENT_LENGTH'] = (string) ($bytes + 1);
+        $response = $this->withHeaders($headers)->call('POST', 'v1/media/gallery');
+        unset($_SERVER['CONTENT_LENGTH']);
+
+        $this->assertSame(413, $response->response()->getStatusCode());
+        $body = json_decode((string) $response->getJSON(), true);
+        $this->assertStringContainsString('never reached the application', $body['error'] ?? '');
+    }
+
+    public function testAMissingFieldStillReadsAsAMissingField(): void
+    {
+        $headers  = $this->authAs('super_admin');
+        $response = $this->withHeaders($headers)->call('POST', 'v1/media/gallery');
+
+        $this->assertSame(422, $response->response()->getStatusCode());
+        $body = json_decode((string) $response->getJSON(), true);
+        $this->assertStringContainsString('is required', $body['error'] ?? '');
+    }
+
     public function testFilePathIsNeverExposed(): void
     {
         $_ENV['MEDIA_SIGNING_KEY'] = str_repeat('a', 64);

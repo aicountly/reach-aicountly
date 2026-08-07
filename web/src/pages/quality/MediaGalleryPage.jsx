@@ -83,6 +83,7 @@ export function MediaGalleryPage() {
     storage_path: '',
     storage_writable: true,
     storage_outside_deploy: true,
+    max_upload_bytes: 0,
   });
   const [deficit, setDeficit] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +106,7 @@ export function MediaGalleryPage() {
           storage_path: listRes?.storage_path ?? '',
           storage_writable: listRes?.storage_writable,
           storage_outside_deploy: listRes?.storage_outside_deploy,
+          max_upload_bytes: listRes?.max_upload_bytes ?? 0,
         });
         setDeficit(deficitRes);
         setError('');
@@ -122,6 +124,17 @@ export function MediaGalleryPage() {
       setError('Choose an image file first.');
       return;
     }
+    // Catch it here rather than letting PHP discard the body and answer
+    // "field is required" for a file the operator can see attached.
+    if (meta.max_upload_bytes && file.size > meta.max_upload_bytes) {
+        setError(
+          `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB; this server accepts at most `
+          + `${(meta.max_upload_bytes / 1024 / 1024).toFixed(1)} MB. Re-export it smaller, or raise `
+          + 'post_max_size and upload_max_filesize in php.ini.',
+        );
+        return;
+    }
+
     setUploading(true);
     setError('');
     setNotice('');
@@ -314,7 +327,9 @@ export function MediaGalleryPage() {
           <Card title="Upload cover image">
             <form onSubmit={handleUpload} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'end' }}>
               <label>
-                <span className="text-muted" style={{ display: 'block' }}>Image (max 4 MB, stored as WebP)</span>
+                <span className="text-muted" style={{ display: 'block' }}>
+                  Image (max {meta.max_upload_bytes ? `${(meta.max_upload_bytes / 1024 / 1024).toFixed(1)} MB` : '4 MB'}, stored as WebP)
+                </span>
                 <input ref={fileRef} type="file" accept="image/*" />
               </label>
               <label>
