@@ -477,6 +477,19 @@ tr:hover td { background: rgba(37, 176, 3, 0.06); }
 .stat-tile__value { font-size: 1.6rem; font-weight: 700; margin-top: 0.15rem; }
 .stat-tile__hint  { font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 0.25rem; }
 
+/* A tile inside a link is a destination — say so. Nothing distinguished a
+   clickable KPI card from an inert one, which is how four dead cards on the
+   dashboard went unnoticed. Scoped to anchors, so plain tiles are untouched. */
+a .stat-tile { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+a:hover .stat-tile {
+  border-color: var(--color-primary);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 8%);
+}
+a:focus-visible .stat-tile {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th {
   font-size: 0.68rem;
