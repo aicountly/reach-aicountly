@@ -34,6 +34,11 @@ function isRotationReady(asset) {
   return asset?.status === 'active' && asset?.kind === 'gallery_upload' && !isUnmatchable(asset);
 }
 
+/** Retired and gone for good — settled business, not worth a tile by default. */
+function isRetiredMissing(asset) {
+  return asset?.status === 'retired' && !!asset?.file_missing;
+}
+
 /** Alt text describes the asset; the stored prompt is a paragraph, not alt text. */
 function altFor(asset) {
   const tags = assetTags(asset);
@@ -93,6 +98,7 @@ export function MediaGalleryPage() {
   const [tags, setTags] = useState('');
   const [stream, setStream] = useState('');
   const [tab, setTab] = useState('deficit');
+  const [showRetiredMissing, setShowRetiredMissing] = useState(false);
   const fileRef = useRef(null);
 
   const load = useCallback(() => {
@@ -358,44 +364,62 @@ export function MediaGalleryPage() {
 
         {tab === 'gallery' && (
           <Card title={`Gallery (${assets.length})`}>
-            {assets.length === 0 ? (
-              <p className="text-muted">
-                No covers yet. Routine blogs park for review until a suitable cover exists.
-              </p>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                {assets.map((asset) => (
-                  <div key={asset.id} className="card" style={{ padding: '0.5rem' }}>
-                    <Thumb asset={asset} servable={meta.signing_key_configured} />
-                    <div className="text-sm" style={{ marginTop: '0.5rem' }}>
-                      <div>
-                        <span className={`badge ${asset.status === 'active' ? 'badge--success' : 'badge--muted'}`}>{asset.status}</span>
-                        {' '}<span className="text-muted">{asset.kind}</span>
-                        {asset.status === 'active' && isUnmatchable(asset) && (
-                          <> <span className="badge badge--warning">untagged · never assigned</span></>
-                        )}
-                        {asset.status === 'active' && asset.kind !== 'gallery_upload' && (
-                          <> <span className="badge badge--muted">not in rotation</span></>
-                        )}
-                      </div>
-                      <div className="text-muted">
-                        {assetTags(asset).length > 0 ? assetTags(asset).join(', ') : 'no tags'}
-                        {asset.portfolio_stream ? ` · ${asset.portfolio_stream}` : ''}
-                      </div>
-                      <div className="text-muted">Used {asset.times_used}× {asset.last_used_at ? `· last ${formatDate(asset.last_used_at)}` : ''}</div>
-                      <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRetag(asset)}>
-                          Edit tags
-                        </button>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRetire(asset)}>
-                          {asset.status === 'active' ? 'Retire' : 'Reactivate'}
-                        </button>
-                      </div>
+            {(() => {
+              const hiddenCount = assets.filter(isRetiredMissing).length;
+              const visibleAssets = showRetiredMissing ? assets : assets.filter((a) => !isRetiredMissing(a));
+              return (
+                <>
+                  {hiddenCount > 0 && (
+                    <p className="text-sm text-muted" style={{ marginBottom: '0.75rem' }}>
+                      {hiddenCount} retired cover{hiddenCount === 1 ? '' : 's'} with no file on disk{' '}
+                      {showRetiredMissing ? 'shown below' : 'hidden'} — settled business, kept as a record only.
+                      {' '}
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowRetiredMissing((v) => !v)}>
+                        {showRetiredMissing ? 'Hide them' : 'Show them'}
+                      </button>
+                    </p>
+                  )}
+                  {visibleAssets.length === 0 ? (
+                    <p className="text-muted">
+                      No covers yet. Routine blogs park for review until a suitable cover exists.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                      {visibleAssets.map((asset) => (
+                        <div key={asset.id} className="card" style={{ padding: '0.5rem' }}>
+                          <Thumb asset={asset} servable={meta.signing_key_configured} />
+                          <div className="text-sm" style={{ marginTop: '0.5rem' }}>
+                            <div>
+                              <span className={`badge ${asset.status === 'active' ? 'badge--success' : 'badge--muted'}`}>{asset.status}</span>
+                              {' '}<span className="text-muted">{asset.kind}</span>
+                              {asset.status === 'active' && isUnmatchable(asset) && (
+                                <> <span className="badge badge--warning">untagged · never assigned</span></>
+                              )}
+                              {asset.status === 'active' && asset.kind !== 'gallery_upload' && (
+                                <> <span className="badge badge--muted">not in rotation</span></>
+                              )}
+                            </div>
+                            <div className="text-muted">
+                              {assetTags(asset).length > 0 ? assetTags(asset).join(', ') : 'no tags'}
+                              {asset.portfolio_stream ? ` · ${asset.portfolio_stream}` : ''}
+                            </div>
+                            <div className="text-muted">Used {asset.times_used}× {asset.last_used_at ? `· last ${formatDate(asset.last_used_at)}` : ''}</div>
+                            <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRetag(asset)}>
+                                Edit tags
+                              </button>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRetire(asset)}>
+                                {asset.status === 'active' ? 'Retire' : 'Reactivate'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </>
+              );
+            })()}
           </Card>
         )}
       </div>
