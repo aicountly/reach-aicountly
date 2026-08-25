@@ -6,7 +6,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 
 /**
- * Phase 4 â€” Reconciliation service for publication deployments.
+ * Phase 4 — Reconciliation service for publication deployments.
  *
  * Finds deployments that are claimed as published/verified but
  * whose public-site status does not match. Enqueues reconciliation

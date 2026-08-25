@@ -7,7 +7,7 @@ use App\Libraries\JobService;
 use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
 
 /**
- * Phase 4 â€” Retry service with exponential backoff for failed publication deployments.
+ * Phase 4 — Retry service with exponential backoff for failed publication deployments.
  *
  * Retries are automatic only for retryable error categories.
  * Non-retryable errors require human resolution.

@@ -6,7 +6,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 
 /**
- * Phase 4 â€” Verifies published content on the public site against 11 criteria.
+ * Phase 4 — Verifies published content on the public site against 11 criteria.
  *
  * Stores each criterion result in reach_publication_verifications.
  */

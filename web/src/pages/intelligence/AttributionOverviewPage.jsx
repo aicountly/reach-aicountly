@@ -94,6 +94,7 @@ export default function AttributionOverviewPage() {
                             background: 'var(--color-primary)',
                             height: 8,
                             borderRadius: 999,
+                            transition: 'width 0.3s ease',
                           }}
                         />
                       </div>

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { analyticsService } from '../../services/analyticsService';
 import { KPICard } from '../charts/KPICard';
 import { LineChart } from '../charts/LineChart';
@@ -213,7 +213,7 @@ export function TrafficAnalyticsSection() {
           <p className="text-sm text-muted">
             Web traffic from Google Analytics 4
             {!dataLoading && (
-              <> ┬╖ Viewing <strong>{selectedStreamLabel}</strong></>
+              <> · Viewing <strong>{selectedStreamLabel}</strong></>
             )}
           </p>
         </div>
@@ -261,7 +261,7 @@ export function TrafficAnalyticsSection() {
           style={{ marginBottom: '1rem' }}
         >
           <Loader />
-          <span>Loading GA4 data for {selectedStreamLabel}ΓÇª</span>
+          <span>Loading GA4 data for {selectedStreamLabel}…</span>
         </div>
       )}
 
@@ -298,9 +298,9 @@ export function TrafficAnalyticsSection() {
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 size={16} style={{ color: 'var(--color-success)' }} />
             <span>
-              Live GA4 data ΓÇö <strong>{selectedStreamLabel}</strong>
+              Live GA4 data — <strong>{selectedStreamLabel}</strong>
               {currentStreamConfig?.property_id && (
-                <span className="text-muted"> ┬╖ Property {currentStreamConfig.property_id}</span>
+                <span className="text-muted"> · Property {currentStreamConfig.property_id}</span>
               )}
             </span>
           </div>
@@ -362,7 +362,7 @@ export function TrafficAnalyticsSection() {
                   {(config.streams || []).map((s) => (
                     <tr key={s.id}>
                       <td>{s.label || streamLabel(streamOptions, s.id)}</td>
-                      <td className="text-muted">{s.property_id || 'ΓÇö'}</td>
+                      <td className="text-muted">{s.property_id || '—'}</td>
                       <td>
                         {s.api_ok ? (
                           <span style={{ color: 'var(--color-success)' }}>Live</span>
@@ -402,7 +402,7 @@ export function TrafficAnalyticsSection() {
               <LineChart data={trend} labelKey="label" valueKey="value" />
             ) : (
               <p className="text-sm text-muted">
-                {dataLoading ? 'LoadingΓÇª' : 'Not enough trend data'}
+                {dataLoading ? 'Loading…' : 'Not enough trend data'}
               </p>
             )}
           </Card>
@@ -411,7 +411,7 @@ export function TrafficAnalyticsSection() {
               <PieChart data={channels} labelKey="label" valueKey="value" />
             ) : (
               <p className="text-sm text-muted">
-                {dataLoading ? 'LoadingΓÇª' : 'No source data'}
+                {dataLoading ? 'Loading…' : 'No source data'}
               </p>
             )}
           </Card>
@@ -443,7 +443,7 @@ export function TrafficAnalyticsSection() {
               </div>
             ) : (
               <p className="text-sm text-muted">
-                {dataLoading ? 'LoadingΓÇª' : 'No page data'}
+                {dataLoading ? 'Loading…' : 'No page data'}
               </p>
             )}
           </Card>
@@ -453,7 +453,7 @@ export function TrafficAnalyticsSection() {
             ) : (
               <p className="text-sm text-muted">
                 {dataLoading
-                  ? 'LoadingΓÇª'
+                  ? 'Loading…'
                   : unconfigured
                     ? 'Configure GA4 for this stream to see lead events'
                     : 'No lead events recorded in this period'}

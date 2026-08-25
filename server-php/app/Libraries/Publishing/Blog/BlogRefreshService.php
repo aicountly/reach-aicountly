@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\Blog;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 â€” Blog content refresh lifecycle management.
+ * Phase 4 — Blog content refresh lifecycle management.
  *
  * Manages when published blogs need review or refresh.
  * Refresh triggers are recorded in reach_publication_refresh_reviews.
