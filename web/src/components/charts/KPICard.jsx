@@ -1,4 +1,4 @@
-﻿export function KPICard({ title, value, subtitle, icon: Icon, color = 'var(--color-primary)' }) {
+export function KPICard({ title, value, subtitle, icon: Icon, color = 'var(--color-primary)' }) {
   return (
     <div className="card" style={{ padding: '1.25rem' }}>
       <div className="flex items-center justify-between">

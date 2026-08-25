@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\Seo;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 â€” Indexing readiness: evaluates whether content is ready
+ * Phase 4 — Indexing readiness: evaluates whether content is ready
  * to be included in the sitemap and indexed by search engines.
  *
  * Fires the indexing_ready audit event when all criteria pass.

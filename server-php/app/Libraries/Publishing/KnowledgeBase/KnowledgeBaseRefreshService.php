@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\KnowledgeBase;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 â€” Knowledge-base content refresh lifecycle.
+ * Phase 4 — Knowledge-base content refresh lifecycle.
  */
 class KnowledgeBaseRefreshService
 {

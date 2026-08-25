@@ -22,7 +22,7 @@ function BudgetBar({ used, hard }) {
           }}
           aria-hidden="true"
         >
-          <div style={{ width: `${pct}%`, height: '100%', background: barColor }} />
+          <div style={{ width: `${pct}%`, height: '100%', background: barColor, transition: 'width 0.3s ease' }} />
         </div>
       )}
     </div>

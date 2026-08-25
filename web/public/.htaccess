@@ -1,6 +1,11 @@
 RewriteEngine On
 RewriteBase /
 
+# Serve every text response as UTF-8. A Content-Type charset from the server
+# overrides the <meta charset> in index.html, so a cPanel default of
+# ISO-8859-1 would render the portal's punctuation as mojibake.
+AddDefaultCharset utf-8
+
 # API: never serve the SPA for /api/* — Apache must handle the api/ folder
 RewriteRule ^api(?:/|$) - [L]
 

@@ -5,7 +5,7 @@ namespace App\Libraries\Publishing\Seo;
 use App\Libraries\AuditLogger;
 
 /**
- * Phase 4 â€” Verifies that a published URL appears in the public-site sitemap.
+ * Phase 4 — Verifies that a published URL appears in the public-site sitemap.
  *
  * Fetches the public sitemap XML and checks for the canonical URL.
  * Result is stored in reach_publication_verifications.
