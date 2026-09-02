@@ -26,6 +26,20 @@ final class SaasProductTaxonomy
             'our_people'          => 'AICountly Our People',
             'manage_account'      => 'AICountly Manage',
             'buddy'               => 'AICountly AI Pulse',
+            'drive'               => 'AICountly Drive',
+            'connect'             => 'AICountly Connect',
+            'notes'               => 'AICountly Notes',
+            'pos'                 => 'AICountly POS',
+            'billing'             => 'AICountly Billing',
+            'inventory'           => 'AICountly Inventory',
+            'sales'               => 'AICountly Sales',
+            'purchase'            => 'AICountly Purchase',
+            'insights'            => 'AICountly Insights',
+            'remote'              => 'AICountly Remote',
+            'advisor'             => 'AICountly Advisor',
+            'appointments'        => 'AICountly Appointments',
+            'contracts'           => 'AICountly Contracts',
+            'pay'                 => 'AICountly Pay',
         ];
     }
 
@@ -133,6 +147,20 @@ final class SaasProductTaxonomy
             'our_people'          => ['/our-people'],
             'manage_account'      => ['/manage'],
             'buddy'               => ['/buddy'],
+            'drive'               => ['/drive'],
+            'connect'             => ['/connect'],
+            'notes'               => ['/notes'],
+            'pos'                 => ['/pos'],
+            'billing'             => ['/billing'],
+            'inventory'           => ['/inventory'],
+            'sales'               => ['/sales'],
+            'purchase'            => ['/purchase'],
+            'insights'            => ['/insights'],
+            'remote'              => ['/remote'],
+            'advisor'             => ['/advisor'],
+            'appointments'        => ['/appointments'],
+            'contracts'           => ['/contracts'],
+            'pay'                 => ['/pay'],
         ];
 
         return $paths[$slug] ?? ['/' . str_replace('_', '-', $slug)];

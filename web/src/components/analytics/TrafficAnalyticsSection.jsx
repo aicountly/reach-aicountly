@@ -32,6 +32,20 @@ const SAAS_PRODUCTS_FALLBACK = {
   our_people: 'Aicountly Our People',
   manage_account: 'Aicountly Manage',
   buddy: 'Aicountly AI Pulse',
+  drive: 'Aicountly Drive',
+  connect: 'Aicountly Connect',
+  notes: 'Aicountly Notes',
+  pos: 'Aicountly POS',
+  billing: 'Aicountly Billing',
+  inventory: 'Aicountly Inventory',
+  sales: 'Aicountly Sales',
+  purchase: 'Aicountly Purchase',
+  insights: 'Aicountly Insights',
+  remote: 'Aicountly Remote',
+  advisor: 'Aicountly Advisor',
+  appointments: 'Aicountly Appointments',
+  contracts: 'Aicountly Contracts',
+  pay: 'Aicountly Pay',
 };
 
 function buildSaasStreamOptions(products) {
