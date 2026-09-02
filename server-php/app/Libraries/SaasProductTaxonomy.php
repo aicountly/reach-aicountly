@@ -109,6 +109,8 @@ final class SaasProductTaxonomy
             'auditor',
             'smart_books',
             'hrms',
+            'notes',
+            'pos',
         ], true);
     }
 
@@ -118,6 +120,8 @@ final class SaasProductTaxonomy
             'auditor'     => 'https://auditor.aicountly.com',
             'smart_books' => 'https://books.aicountly.com',
             'hrms'        => 'https://hrms.aicountly.com',
+            'notes'       => 'https://notes.aicountly.com',
+            'pos'         => 'https://pos.aicountly.com',
         ];
 
         return $urls[self::normalizeProductSlug($slug)] ?? null;
