@@ -23,6 +23,9 @@ final class SaasProductTaxonomy
             'chat'                => 'AICountly Chat',
             'flow'                => 'AICountly Flow',
             'my_account'          => 'My Account',
+            'our_people'          => 'AICountly Our People',
+            'manage_account'      => 'AICountly Manage',
+            'buddy'               => 'AICountly AI Pulse',
         ];
     }
 
@@ -127,6 +130,9 @@ final class SaasProductTaxonomy
             'chat'                => ['/chat'],
             'flow'                => ['/flow'],
             'my_account'          => ['/dashboard', '/my-account', '/account'],
+            'our_people'          => ['/our-people'],
+            'manage_account'      => ['/manage'],
+            'buddy'               => ['/buddy'],
         ];
 
         return $paths[$slug] ?? ['/' . str_replace('_', '-', $slug)];

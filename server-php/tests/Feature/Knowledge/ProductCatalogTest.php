@@ -37,8 +37,8 @@ final class ProductCatalogTest extends ApiTestCase
         $expected = count(SaasProductTaxonomy::products());
         $this->assertSame($expected, $summary['created']);
 
-        // Alias rows may legitimately report errors (the taxonomy carries a
-        // dangling `manage` → `manage_account` alias); product rows may not.
+        // Alias rows may legitimately report errors if a canonical slug is
+        // ever missing from the product catalogue; product rows may not.
         $productErrors = array_filter($summary['error_items'], static fn ($e) => isset($e['slug']));
         $this->assertSame([], $productErrors, 'No product should fail to import');
 

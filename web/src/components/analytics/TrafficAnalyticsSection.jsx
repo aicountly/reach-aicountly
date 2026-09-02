@@ -29,6 +29,9 @@ const SAAS_PRODUCTS_FALLBACK = {
   docs: 'Aicountly Docs',
   chat: 'Aicountly Chat',
   my_account: 'My Account',
+  our_people: 'Aicountly Our People',
+  manage_account: 'Aicountly Manage',
+  buddy: 'Aicountly AI Pulse',
 };
 
 function buildSaasStreamOptions(products) {
