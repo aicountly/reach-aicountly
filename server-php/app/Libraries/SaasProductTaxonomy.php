@@ -82,7 +82,7 @@ final class SaasProductTaxonomy
     public static function trafficAnalyticsSaasProducts(): array
     {
         $catalog = self::products();
-        unset($catalog['flow']);
+        unset($catalog['flow'], $catalog['docs'], $catalog['chat']);
         uasort($catalog, static fn (string $a, string $b): int => strcasecmp($a, $b));
 
         return $catalog;

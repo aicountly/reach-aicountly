@@ -26,8 +26,6 @@ const SAAS_PRODUCTS_FALLBACK = {
   auditor: 'Aicountly Auditor',
   vault: 'Aicountly Vault',
   hrms: 'Aicountly HRMS',
-  docs: 'Aicountly Docs',
-  chat: 'Aicountly Chat',
   my_account: 'My Account',
   our_people: 'Aicountly Our People',
   manage_account: 'Aicountly Manage',
