@@ -12,8 +12,6 @@ import {
 
 const BASE_STREAM_OPTIONS = [
   { value: 'all', label: 'All sites' },
-  { value: 'marketing_site', label: 'Marketing site' },
-  { value: 'portal', label: 'Reach portal' },
 ];
 
 /** Fallback when desk taxonomy has not loaded yet (mirrors DeskTaxonomy::trafficAnalyticsSaasProducts). */
@@ -125,11 +123,15 @@ export function TrafficAnalyticsSection() {
   }, []);
 
   useEffect(() => {
-    if (!streamInitialized && config?.default_stream && stream === 'all') {
+    if (streamInitialized || stream !== 'all' || !config?.default_stream) return;
+    // The backend may default to a stream (e.g. marketing_site/portal) that
+    // isn't offered in this dropdown — stay on "All sites" rather than
+    // switching to a value with no matching <option>.
+    if (streamOptions.some((opt) => opt.value === config.default_stream)) {
       setStream(config.default_stream);
-      setStreamInitialized(true);
     }
-  }, [config, stream, streamInitialized]);
+    setStreamInitialized(true);
+  }, [config, stream, streamInitialized, streamOptions]);
 
   useEffect(() => {
     if (configLoading && stream === 'all') {
