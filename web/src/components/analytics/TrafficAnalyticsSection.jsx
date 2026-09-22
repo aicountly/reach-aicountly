@@ -186,6 +186,8 @@ export function TrafficAnalyticsSection() {
   }
 
   const totals = overview?.totals || {};
+  const comparison = overview?.comparison || {};
+  const periodLabel = `${days}d`;
   const allMetricsZero = !unconfigured && !dataLoading && (
     (totals.sessions ?? 0) === 0
     && (totals.users ?? 0) === 0
@@ -407,10 +409,39 @@ export function TrafficAnalyticsSection() {
         }}
       >
         <div className="grid grid-4" style={{ marginBottom: '1.5rem' }}>
-          <KPICard title="Sessions" value={totals.sessions ?? 0} icon={Activity} color="var(--color-primary)" />
-          <KPICard title="Users" value={totals.users ?? 0} icon={Users} color="var(--color-success)" />
-          <KPICard title="Pageviews" value={totals.pageviews ?? 0} icon={Eye} color="var(--color-warning)" />
-          <KPICard title="Bounce rate" value={`${totals.bounce_rate ?? 0}%`} icon={MousePointerClick} color="var(--color-danger)" />
+          <KPICard
+            title="Sessions"
+            value={totals.sessions ?? 0}
+            icon={Activity}
+            color="var(--color-primary)"
+            comparison={comparison.sessions}
+            periodLabel={periodLabel}
+          />
+          <KPICard
+            title="Users"
+            value={totals.users ?? 0}
+            icon={Users}
+            color="var(--color-success)"
+            comparison={comparison.users}
+            periodLabel={periodLabel}
+          />
+          <KPICard
+            title="Pageviews"
+            value={totals.pageviews ?? 0}
+            icon={Eye}
+            color="var(--color-warning)"
+            comparison={comparison.pageviews}
+            periodLabel={periodLabel}
+          />
+          <KPICard
+            title="Bounce rate"
+            value={`${totals.bounce_rate ?? 0}%`}
+            icon={MousePointerClick}
+            color="var(--color-danger)"
+            comparison={comparison.bounce_rate}
+            invert
+            periodLabel={periodLabel}
+          />
         </div>
 
         <div className="grid grid-2" style={{ marginBottom: '1.5rem', gap: '1.5rem' }}>
