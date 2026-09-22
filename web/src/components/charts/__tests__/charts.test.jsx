@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LineChart } from '../LineChart';
 import { PieChart } from '../PieChart';
 import { BarChart } from '../BarChart';
+import { KPICard } from '../KPICard';
 import { CompletenessGauge } from '../../knowledge/CompletenessGauge';
 
 const TREND = [
@@ -136,6 +137,80 @@ describe('BarChart', () => {
     const widest = () => container.querySelectorAll('.chart-bar-fill')[1];
 
     await waitFor(() => expect(widest()).toHaveStyle({ width: '100%' }));
+  });
+});
+
+describe('KPICard', () => {
+  it('renders the value with no comparison badge when none is given', () => {
+    render(<KPICard title="Sessions" value={1747} />);
+    expect(screen.getByText('1747')).toBeInTheDocument();
+    expect(screen.queryByText(/vs prior/)).not.toBeInTheDocument();
+  });
+
+  it('shows a rise in green for a normal metric', () => {
+    render(
+      <KPICard
+        title="Sessions"
+        value={1747}
+        comparison={{ previous: 1400, delta: 347, delta_pct: 24.8 }}
+        periodLabel="30d"
+      />,
+    );
+    const badge = screen.getByText('+24.8% vs prior 30d');
+    expect(badge.closest('p')).toHaveStyle({ color: 'var(--color-success)' });
+  });
+
+  it('shows a drop in red for a normal metric', () => {
+    render(
+      <KPICard
+        title="Sessions"
+        value={1000}
+        comparison={{ previous: 1400, delta: -400, delta_pct: -28.6 }}
+        periodLabel="30d"
+      />,
+    );
+    const badge = screen.getByText('-28.6% vs prior 30d');
+    expect(badge.closest('p')).toHaveStyle({ color: 'var(--color-danger)' });
+  });
+
+  it('flips good/bad for an inverted metric like bounce rate', () => {
+    render(
+      <KPICard
+        title="Bounce rate"
+        value="63.4%"
+        comparison={{ previous: 70, delta: -6.6, delta_pct: -9.4 }}
+        invert
+        periodLabel="30d"
+      />,
+    );
+    // A falling bounce rate is an improvement, so it reads green even though delta_pct < 0.
+    const badge = screen.getByText('-9.4% vs prior 30d');
+    expect(badge.closest('p')).toHaveStyle({ color: 'var(--color-success)' });
+  });
+
+  it('marks a metric with no prior baseline as New rather than a bogus percentage', () => {
+    render(
+      <KPICard
+        title="Sessions"
+        value={42}
+        comparison={{ previous: 0, delta: 42, delta_pct: null }}
+        periodLabel="30d"
+      />,
+    );
+    expect(screen.getByText('New · vs prior 30d')).toBeInTheDocument();
+  });
+
+  it('shows a flat, muted badge for no change', () => {
+    render(
+      <KPICard
+        title="Pageviews"
+        value={1257}
+        comparison={{ previous: 1257, delta: 0, delta_pct: 0 }}
+        periodLabel="30d"
+      />,
+    );
+    const badge = screen.getByText('0% vs prior 30d');
+    expect(badge.closest('p')).toHaveStyle({ color: 'var(--color-text-muted)' });
   });
 });
 

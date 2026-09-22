@@ -29,7 +29,7 @@ final class TrafficAnalyticsService
 
     public function overview(int $days, string $stream): array
     {
-        $cacheKey   = 'traffic_overview_v3';
+        $cacheKey   = 'traffic_overview_v4';
         $paramsHash = md5("days={$days}&stream={$stream}");
         $cached     = $this->cache->get($cacheKey, $paramsHash);
         if ($cached !== null && empty($cached['_demo']) && empty($cached['_unconfigured'])) {
@@ -58,9 +58,67 @@ final class TrafficAnalyticsService
             }
         }
 
+        $result['comparison'] = self::buildComparison($result['totals'] ?? [], $result['previous_totals'] ?? []);
+
         $this->cache->set($cacheKey, $paramsHash, $result, self::CACHE_TTL_SECONDS);
 
         return ['data' => $result, 'demo' => false, 'unconfigured' => false, 'cached' => false];
+    }
+
+    /**
+     * [startDate, endDate] (Y-m-d, inclusive) for the period immediately
+     * preceding a "last $days days" window that ends on $referenceDate
+     * (defaults to today) — same length as that window, no gap or overlap.
+     * A pure function of its arguments so it's unit-testable without mocking
+     * GA4 or the system clock.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function previousPeriodDates(int $days, ?string $referenceDate = null): array
+    {
+        $reference = $referenceDate ?? date('Y-m-d');
+
+        return [
+            date('Y-m-d', strtotime($reference . ' -' . ($days * 2 + 1) . ' days')),
+            date('Y-m-d', strtotime($reference . ' -' . ($days + 1) . ' days')),
+        ];
+    }
+
+    /**
+     * Per-metric comparison of $current totals against $previous totals:
+     * `previous` (the prior-period value), `delta` (absolute change), and
+     * `delta_pct` (percent change, or null when the previous period has no
+     * baseline to compare against — i.e. it was 0 and the current period isn't).
+     *
+     * @param array<string, mixed> $current
+     * @param array<string, mixed> $previous
+     * @return array<string, array{previous: int|float, delta: float, delta_pct: ?float}>
+     */
+    public static function buildComparison(array $current, array $previous): array
+    {
+        $fields = ['sessions', 'users', 'pageviews', 'new_users', 'bounce_rate'];
+        $out    = [];
+
+        foreach ($fields as $field) {
+            $curVal  = (float) ($current[$field] ?? 0);
+            $prevVal = (float) ($previous[$field] ?? 0);
+
+            if ($prevVal > 0) {
+                $deltaPct = round((($curVal - $prevVal) / $prevVal) * 100, 1);
+            } elseif ($curVal > 0) {
+                $deltaPct = null;
+            } else {
+                $deltaPct = 0.0;
+            }
+
+            $out[$field] = [
+                'previous'  => $previous[$field] ?? 0,
+                'delta'     => round($curVal - $prevVal, 2),
+                'delta_pct' => $deltaPct,
+            ];
+        }
+
+        return $out;
     }
 
     public function sources(int $days, string $stream): array
@@ -308,20 +366,23 @@ final class TrafficAnalyticsService
 
     private function emptyOverview(int $days, string $stream, string $reason): array
     {
+        $zeroTotals = [
+            'sessions'    => 0,
+            'users'       => 0,
+            'pageviews'   => 0,
+            'new_users'   => 0,
+            'bounce_rate' => 0,
+        ];
+
         return [
-            'trend'          => [],
-            'totals'         => [
-                'sessions'    => 0,
-                'users'       => 0,
-                'pageviews'   => 0,
-                'new_users'   => 0,
-                'bounce_rate' => 0,
-            ],
-            'top_pages'      => [],
-            'days'           => $days,
-            '_unconfigured'  => true,
-            '_reason'        => $reason,
-            '_stream'        => $stream,
+            'trend'           => [],
+            'totals'          => $zeroTotals,
+            'previous_totals' => $zeroTotals,
+            'top_pages'       => [],
+            'days'            => $days,
+            '_unconfigured'   => true,
+            '_reason'         => $reason,
+            '_stream'         => $stream,
         ];
     }
 
@@ -635,6 +696,24 @@ final class TrafficAnalyticsService
 
         $totalsReport = Ga4AnalyticsClient::runReport($token, $propertyId, $totalsBody);
 
+        [$previousStartDate, $previousEndDate] = self::previousPeriodDates($days);
+        $previousTotalsBody = [
+            'dateRanges'         => [['startDate' => $previousStartDate, 'endDate' => $previousEndDate]],
+            'metrics'            => [
+                ['name' => 'sessions'],
+                ['name' => 'activeUsers'],
+                ['name' => 'screenPageViews'],
+                ['name' => 'newUsers'],
+                ['name' => 'bounceRate'],
+            ],
+            'metricAggregations' => ['TOTAL'],
+        ];
+        if ($pathFilter !== null) {
+            $previousTotalsBody['dimensionFilter'] = $pathFilter;
+        }
+
+        $previousTotalsReport = Ga4AnalyticsClient::runReport($token, $propertyId, $previousTotalsBody);
+
         $pagesBody = [
             'dateRanges' => [['startDate' => $startDate, 'endDate' => 'today']],
             'dimensions' => [['name' => 'pagePath'], ['name' => 'pageTitle']],
@@ -653,10 +732,11 @@ final class TrafficAnalyticsService
         }
 
         return [
-            'trend'     => $this->parseTrendRows($trendReport ?? []),
-            'totals'    => $this->parseTotalsRow($totalsReport ?? []),
-            'top_pages' => $this->parsePageRows($pagesReport ?? [], $site),
-            'days'      => $days,
+            'trend'           => $this->parseTrendRows($trendReport ?? []),
+            'totals'          => $this->parseTotalsRow($totalsReport ?? []),
+            'previous_totals' => $this->parseTotalsRow($previousTotalsReport ?? []),
+            'top_pages'       => $this->parsePageRows($pagesReport ?? [], $site),
+            'days'            => $days,
         ];
     }
 
@@ -751,10 +831,11 @@ final class TrafficAnalyticsService
         $combined = array_shift($results);
         foreach ($results as $next) {
             $combined = [
-                'trend'     => $this->mergeTrendRows($combined['trend'] ?? [], $next['trend'] ?? []),
-                'totals'    => $this->mergeTotals($combined['totals'] ?? [], $next['totals'] ?? []),
-                'top_pages' => $this->mergeTopPages($combined['top_pages'] ?? [], $next['top_pages'] ?? []),
-                'days'      => $days,
+                'trend'           => $this->mergeTrendRows($combined['trend'] ?? [], $next['trend'] ?? []),
+                'totals'          => $this->mergeTotals($combined['totals'] ?? [], $next['totals'] ?? []),
+                'previous_totals' => $this->mergeTotals($combined['previous_totals'] ?? [], $next['previous_totals'] ?? []),
+                'top_pages'       => $this->mergeTopPages($combined['top_pages'] ?? [], $next['top_pages'] ?? []),
+                'days'            => $days,
             ];
         }
 
