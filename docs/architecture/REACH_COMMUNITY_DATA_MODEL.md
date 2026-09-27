@@ -82,7 +82,7 @@ Classification results per question (may be updated as models improve).
 | language_detected | VARCHAR(10) | |
 | complexity_score | DECIMAL(4,3) | |
 | classified_at | TIMESTAMPTZ | |
-| classified_by | VARCHAR(40) | 'ai' or 'human' |
+| classified_by | VARCHAR(40) | 'ai', 'human' or 'heuristic' (widened by 2026-09-27-100001) |
 | model_slug | VARCHAR(120) | Model used for classification |
 
 ---

@@ -3,7 +3,9 @@
 namespace App\Commands;
 
 use App\Libraries\Blog\ContentBaseService;
+use App\Libraries\Community\CommunityAgentWorkSelector;
 use App\Libraries\Community\CommunityOperationalAgentService;
+use App\Libraries\Community\CommunityQuestionIntakeService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -17,9 +19,15 @@ use Config\Database;
  *   1. curate_question   — content-base question seeds not yet ingested
  *                          (the "approved source" the curation service
  *                          documented as a business decision).
- *   2. draft_answer      — triaged questions with no official answer,
- *                          routed to the matching expert desk by category.
- *   3. categorize_question — questions still missing a category.
+ *   2. intake processing — questions that were never classified (a curation
+ *                          that failed part-way, or a source not processed
+ *                          inline) get classification, triage and the
+ *                          duplicate check, so none reaches a desk unscreened.
+ *   3. draft_answer      — screened questions with no official answer,
+ *                          routed to the matching expert desk by category,
+ *                          plus first drafts whose generation failed, retried
+ *                          by their owning desk on a backoff schedule.
+ *   4. categorize_question — questions still missing a category.
  *
  * Every dispatch (success/blocked/failed) is audited to
  * reach_community_agent_runs. No engagement actions exist to dispatch.
@@ -63,10 +71,12 @@ class CommunityAgentsRun extends BaseCommand
         }
 
         try {
-            $agent   = new CommunityOperationalAgentService();
-            $results = [
+            $agent    = new CommunityOperationalAgentService();
+            $selector = new CommunityAgentWorkSelector();
+            $results  = [
                 'curated'     => $this->curateSeeds($agent, min(2, $limit)),
-                'answered'    => $this->draftAnswers($agent, min(3, $limit)),
+                'processed'   => $this->completeIntakeProcessing($selector, $limit),
+                'answered'    => $this->draftAnswers($agent, $selector, min(3, $limit)),
                 'categorized' => $this->categorizeQuestions($agent, min(3, $limit)),
             ];
 
@@ -90,10 +100,14 @@ class CommunityAgentsRun extends BaseCommand
         $db    = Database::connect();
         $seeds = (new ContentBaseService($db))->communityQuestionSeeds()['seeds'] ?? [];
 
+        // Attempts, not successes, bound the run: a curation that fails after
+        // intake has still created a question, so a persistent failure must
+        // not sweep through every seed in one tick.
+        $attempts   = 0;
         $dispatched = 0;
         $outcomes   = [];
         foreach ($seeds as $seed) {
-            if ($dispatched >= $limit) {
+            if ($attempts >= $limit) {
                 break;
             }
             $key = trim((string) ($seed['key'] ?? ''));
@@ -101,6 +115,8 @@ class CommunityAgentsRun extends BaseCommand
                 continue;
             }
 
+            // A question left unclassified by a failed curation is finished by
+            // the intake-processing step, so existing is enough to skip here.
             $exists = $db->table('reach_community_questions')
                 ->where('external_question_id', $key)
                 ->countAllResults() > 0;
@@ -108,6 +124,7 @@ class CommunityAgentsRun extends BaseCommand
                 continue;
             }
 
+            $attempts++;
             try {
                 $result = $agent->dispatch(self::CURATOR_SLUG, 'curate_question', [
                     'title'                => (string) $seed['question'],
@@ -116,8 +133,8 @@ class CommunityAgentsRun extends BaseCommand
                     'source_type'          => 'official_question',
                     'external_question_id' => $key,
                 ]);
-                $outcomes[] = ['seed' => $key, 'status' => $result['status'] ?? 'success'];
-                if (($result['status'] ?? '') === 'blocked') {
+                $outcomes[] = ['seed' => $key] + self::outcomeOf($result);
+                if (! empty($result['blocked'])) {
                     break; // window closed or cap reached — no point iterating further
                 }
                 $dispatched++;
@@ -132,43 +149,59 @@ class CommunityAgentsRun extends BaseCommand
     /**
      * @return array<string,mixed>
      */
-    private function draftAnswers(CommunityOperationalAgentService $agent, int $limit): array
+    private function completeIntakeProcessing(CommunityAgentWorkSelector $selector, int $limit): array
     {
-        $db = Database::connect();
-
-        $questions = $db->query(
-            "SELECT q.id, q.uuid, q.category
-             FROM reach_community_questions q
-             WHERE q.status IN ('intake', 'triaged')
-               AND q.moderation_state = 'clean'
-               AND q.personal_data_detected = FALSE
-               AND NOT EXISTS (
-                   SELECT 1 FROM reach_community_official_answers a WHERE a.question_id = q.id
-               )
-             ORDER BY q.triage_score DESC, q.id ASC
-             LIMIT ?",
-            [$limit]
-        )->getResultArray();
-
-        $dispatched = 0;
-        $outcomes   = [];
-        foreach ($questions as $question) {
-            $desk = self::CATEGORY_DESKS[strtolower((string) ($question['category'] ?? ''))] ?? self::DEFAULT_DESK;
-
+        $intake    = new CommunityQuestionIntakeService();
+        $completed = 0;
+        $outcomes  = [];
+        foreach ($selector->questionsAwaitingProcessing($limit) as $questionId) {
             try {
-                $result = $agent->dispatch($desk, 'draft_answer', [
-                    'question_uuid' => (string) $question['uuid'],
-                ]);
-                $outcomes[] = ['question_id' => (int) $question['id'], 'desk' => $desk, 'status' => $result['status'] ?? 'success'];
-                if (($result['status'] ?? '') !== 'blocked') {
-                    $dispatched++;
-                }
+                $intake->completeProcessing($questionId);
+                $outcomes[] = ['question_id' => $questionId, 'status' => 'success'];
+                $completed++;
             } catch (\Throwable $e) {
-                $outcomes[] = ['question_id' => (int) $question['id'], 'desk' => $desk, 'status' => 'failed', 'error' => substr($e->getMessage(), 0, 120)];
+                $outcomes[] = ['question_id' => $questionId, 'status' => 'failed', 'error' => substr($e->getMessage(), 0, 120)];
             }
         }
 
-        return ['dispatched' => $dispatched, 'outcomes' => $outcomes];
+        return ['completed' => $completed, 'outcomes' => $outcomes];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function draftAnswers(CommunityOperationalAgentService $agent, CommunityAgentWorkSelector $selector, int $limit): array
+    {
+        $work = $selector->draftCandidates($limit);
+
+        $dispatched = 0;
+        $outcomes   = [];
+        foreach ($work['candidates'] as $candidate) {
+            // A retry goes to the desk that owns the answer; a first draft to the category's desk.
+            $desk = $candidate['owner_slug']
+                ?? self::CATEGORY_DESKS[strtolower($candidate['category'])]
+                ?? self::DEFAULT_DESK;
+            $base = [
+                'question_id' => $candidate['question_id'],
+                'desk'        => $desk,
+                'attempt'     => $candidate['attempt'],
+            ];
+
+            try {
+                $result = $agent->dispatch($desk, 'draft_answer', [
+                    'question_uuid' => $candidate['question_uuid'],
+                    'attempt'       => $candidate['attempt'],
+                ]);
+                $outcomes[] = $base + self::outcomeOf($result);
+                if (empty($result['blocked'])) {
+                    $dispatched++;
+                }
+            } catch (\Throwable $e) {
+                $outcomes[] = $base + ['status' => 'failed', 'error' => substr($e->getMessage(), 0, 120)];
+            }
+        }
+
+        return ['dispatched' => $dispatched, 'exhausted' => $work['exhausted'], 'outcomes' => $outcomes];
     }
 
     /**
@@ -202,7 +235,7 @@ class CommunityAgentsRun extends BaseCommand
                     'question_id' => (int) $question['id'],
                     'category'    => $category,
                 ]);
-                $outcomes[] = ['question_id' => (int) $question['id'], 'status' => $result['status'] ?? 'success'];
+                $outcomes[] = ['question_id' => (int) $question['id']] + self::outcomeOf($result);
                 $dispatched++;
             } catch (\Throwable $e) {
                 $outcomes[] = ['question_id' => (int) $question['id'], 'status' => 'failed', 'error' => substr($e->getMessage(), 0, 120)];
@@ -210,5 +243,21 @@ class CommunityAgentsRun extends BaseCommand
         }
 
         return ['dispatched' => $dispatched, 'outcomes' => $outcomes];
+    }
+
+    /**
+     * dispatch() reports a window or cap refusal as ['blocked' => true,
+     * 'reason' => ...] rather than throwing; anything else it returns is a
+     * success. Reading a 'status' key instead logged every refusal as success.
+     *
+     * @return array{status: string, reason?: string}
+     */
+    private static function outcomeOf(array $result): array
+    {
+        if (! empty($result['blocked'])) {
+            return ['status' => 'blocked', 'reason' => (string) ($result['reason'] ?? '')];
+        }
+
+        return ['status' => 'success'];
     }
 }

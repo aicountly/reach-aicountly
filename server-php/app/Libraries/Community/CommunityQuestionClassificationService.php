@@ -84,12 +84,14 @@ class CommunityQuestionClassificationService
         }
 
         if ($personalDataDetected) {
-            // Update the question record
-            $this->repo->findById((int) $question['id']); // ensure fresh
-            model(\App\Models\CommunityQuestionModel::class)->update(
-                (int) $question['id'],
-                ['personal_data_detected' => true, 'sensitivity_flags' => ['personal_data']]
-            );
+            // Through the repository: sensitivity_flags is a TEXT[] column and a
+            // bare PHP array is a malformed array literal to Postgres, so the
+            // screen used to crash on exactly the questions it exists to catch.
+            $this->repo->save([
+                'id'                     => (int) $question['id'],
+                'personal_data_detected' => true,
+                'sensitivity_flags'      => ['personal_data'],
+            ]);
         }
 
         return [

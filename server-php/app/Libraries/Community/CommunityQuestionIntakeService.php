@@ -76,6 +76,36 @@ class CommunityQuestionIntakeService
     }
 
     /**
+     * Run the classification, triage and duplicate check a question should
+     * have had at intake.
+     *
+     * Classification is also the personal-data screen, so a question that
+     * skipped it — its intake failed part-way, or its source is not processed
+     * inline — must not reach an answer desk until this has run. Every step is
+     * an upsert or a read, so repeating it is safe.
+     *
+     * @return array{question_id: int, risk: ?string, triage_score: float, duplicate_count: int}
+     */
+    public function completeProcessing(int $questionId): array
+    {
+        $classification = $this->classifier->classifyById($questionId);
+        $triageScore    = $this->triage->scoreById($questionId);
+
+        $question = $this->repo->findById($questionId);
+        if ($question === null) {
+            throw new RuntimeException("Question #{$questionId} disappeared during processing.");
+        }
+        $duplicates = $this->duplicates->checkInline($question);
+
+        return [
+            'question_id'     => $questionId,
+            'risk'            => $classification['risk_classification'] ?? null,
+            'triage_score'    => $triageScore,
+            'duplicate_count' => count($duplicates['duplicate_candidates'] ?? []),
+        ];
+    }
+
+    /**
      * Import multiple genuine questions retaining source provenance.
      */
     public function importBatch(array $questions, string $sourceType, ?int $actorId = null): array

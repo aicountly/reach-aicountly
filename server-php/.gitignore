@@ -11,6 +11,7 @@
 /writable/debugbar/*
 /writable/htmlpurifier/*
 /writable/migrations.lock
+/writable/community-agents-run.lock
 .env
 .env.*
 !.env.example

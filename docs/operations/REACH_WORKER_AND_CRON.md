@@ -180,6 +180,13 @@ weekly cron:
 7. **Bot dispatch surge:** the `bot.dispatch` route is IP+user throttled
    (30/min/user); if you need higher throughput, add a dedicated `bots`
    queue and start a second worker slot for it.
+8. **Community answers stuck in `validation_failed`:** `community:agents-run`
+   retries a first draft whose generation failed, on its owning desk, up to
+   6 attempts (waits double from 30 min to a 12 h cap). Its JSON line reports
+   questions past that budget as `answered.exhausted`; the error for each
+   attempt is in the Agent Operations run history. After fixing the cause
+   (usually a missing AI route — run `reach:ai-seed-catalog`), regenerate
+   those from the Official Answer editor.
 
 ## Monitoring
 
