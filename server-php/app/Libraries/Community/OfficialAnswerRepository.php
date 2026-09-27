@@ -5,6 +5,7 @@ namespace App\Libraries\Community;
 use App\Enums\CommunityAnswerStatus;
 use App\Models\CommunityAnswerVersionModel;
 use App\Models\CommunityOfficialAnswerModel;
+use App\Models\CommunityQuestionModel;
 use RuntimeException;
 
 /**
@@ -15,7 +16,8 @@ class OfficialAnswerRepository
 {
     public function __construct(
         private readonly CommunityOfficialAnswerModel $answerModel = new CommunityOfficialAnswerModel(),
-        private readonly CommunityAnswerVersionModel  $versionModel = new CommunityAnswerVersionModel()
+        private readonly CommunityAnswerVersionModel  $versionModel = new CommunityAnswerVersionModel(),
+        private readonly CommunityQuestionModel       $questionModel = new CommunityQuestionModel()
     ) {}
 
     public function findById(int $id): ?array
@@ -135,11 +137,26 @@ class OfficialAnswerRepository
         ]);
     }
 
-    public function listByStatus(?string $status, int $limit = 100): array
+    /** Newest first; narrowed to one question's answers when its UUID is given. */
+    public function listByStatus(?string $status, int $limit = 100, ?string $questionUuid = null): array
     {
+        // Resolved before the shared model builder is touched, so an unknown
+        // question cannot leave half-built query state behind on it.
+        $questionId = null;
+        if ($questionUuid !== null && $questionUuid !== '') {
+            $question = $this->questionModel->findByUuid($questionUuid);
+            if ($question === null) {
+                return [];
+            }
+            $questionId = (int) $question['id'];
+        }
+
         $builder = $this->answerModel->orderBy('id', 'DESC')->limit($limit);
         if ($status !== null && $status !== '') {
             $builder = $builder->where('status', $status);
+        }
+        if ($questionId !== null) {
+            $builder = $builder->where('question_id', $questionId);
         }
 
         return $builder->findAll();

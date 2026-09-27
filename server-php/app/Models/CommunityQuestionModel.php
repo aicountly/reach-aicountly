@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Model;
 
 class CommunityQuestionModel extends Model
 {
+    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+
     protected $table         = 'reach_community_questions';
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
@@ -34,16 +37,30 @@ class CommunityQuestionModel extends Model
         'personal_data_detected' => 'boolean',
     ];
 
+    // A malformed id must be a miss, not a query: Postgres rejects it on the
+    // uuid column, which surfaced as a 500 for /community/questions/undefined.
     public function findByUuid(string $uuid): ?array
     {
+        if (! preg_match(self::UUID_PATTERN, $uuid)) {
+            return null;
+        }
         return $this->where('uuid', $uuid)->first();
+    }
+
+    /** One question in the same shape as an inbox row. */
+    public function findDetailByUuid(string $uuid): ?array
+    {
+        if (! preg_match(self::UUID_PATTERN, $uuid)) {
+            return null;
+        }
+        $row = $this->inboxQuery()->where('q.uuid', $uuid)->get()->getRowArray();
+
+        return $row === null ? null : $this->convertToReturnType($row, 'array');
     }
 
     public function listForInbox(array $filters = [], int $page = 1, int $perPage = 25): array
     {
-        $builder = $this->db->table($this->table . ' q')
-            ->select('q.*, s.title AS space_title, s.slug AS space_slug')
-            ->join('reach_community_spaces s', 's.id = q.space_id', 'left');
+        $builder = $this->inboxQuery();
 
         if (!empty($filters['status'])) {
             $builder->where('q.status', $filters['status']);
@@ -76,7 +93,32 @@ class CommunityQuestionModel extends Model
             ->get()
             ->getResultArray();
 
+        // A raw builder skips $casts, so Postgres booleans would arrive as the
+        // strings 't'/'f' — and 'f' is truthy to every client.
+        $rows = array_map(fn (array $row): array => $this->convertToReturnType($row, 'array'), $rows);
+
         return ['data' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+    }
+
+    /**
+     * The question with its space and current risk.
+     *
+     * Risk is not a question column: it lives on the classification rows. A
+     * question can carry several (older duplicates survive), and the
+     * classifier keeps the highest id current, so that is the row read here.
+     * It is a SELECT-list subquery rather than a LATERAL join so that
+     * countAllResults(), which swaps the SELECT list out, skips it.
+     */
+    private function inboxQuery(): BaseBuilder
+    {
+        return $this->db->table($this->table . ' q')
+            ->select('q.*, s.title AS space_title, s.slug AS space_slug')
+            ->select(
+                '(SELECT c.risk_classification FROM reach_community_question_classifications c'
+                . ' WHERE c.question_id = q.id ORDER BY c.id DESC LIMIT 1) AS risk_classification',
+                false
+            )
+            ->join('reach_community_spaces s', 's.id = q.space_id', 'left');
     }
 
     public function countByStatus(): array

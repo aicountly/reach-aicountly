@@ -65,7 +65,7 @@ class QuestionController extends BaseApiController
     /** GET /community/questions/(:segment) */
     public function show(string $uuid): ResponseInterface
     {
-        $question = $this->repo->findByUuid($uuid);
+        $question = $this->repo->findDetailByUuid($uuid);
         if (!$question) {
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
         }
@@ -96,6 +96,7 @@ class QuestionController extends BaseApiController
     {
         $body      = $this->request->getJSON(true) ?? [];
         $newStatus = $body['status'] ?? '';
+        $note      = trim((string) ($body['note'] ?? ''));
 
         $question = $this->repo->findByUuid($uuid);
         if (!$question) {
@@ -115,7 +116,13 @@ class QuestionController extends BaseApiController
             return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
         }
 
-        AuditLogger::record(AuditLogger::COMMUNITY_QUESTION_STATUS_CHANGED, compact('uuid', 'newStatus'));
+        // The workspace sends an optional note with each change; the audit
+        // trail is the only place it is kept.
+        AuditLogger::record(
+            AuditLogger::COMMUNITY_QUESTION_STATUS_CHANGED,
+            compact('uuid', 'newStatus', 'note'),
+            $this->userId()
+        );
         return $this->response->setJSON(['success' => true]);
     }
 

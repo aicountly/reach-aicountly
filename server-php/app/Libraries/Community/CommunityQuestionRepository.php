@@ -27,6 +27,12 @@ class CommunityQuestionRepository
         return $this->model->findByUuid($uuid);
     }
 
+    /** The question with its space and current risk, as the inbox lists it. */
+    public function findDetailByUuid(string $uuid): ?array
+    {
+        return $this->model->findDetailByUuid($uuid);
+    }
+
     public function requireByUuid(string $uuid): array
     {
         $q = $this->model->findByUuid($uuid);
