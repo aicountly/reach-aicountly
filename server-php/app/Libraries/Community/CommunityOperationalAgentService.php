@@ -44,6 +44,12 @@ class CommunityOperationalAgentService
     /** Actions that create new public-facing content are window-gated; pure review/analysis actions are not. */
     private const WINDOW_GATED_ACTIONS = ['curate_question', 'draft_answer', 'post_comment'];
 
+    /**
+     * Automatic draft attempts a question gets before the bot stops retrying
+     * it. After that a human can still regenerate from the answer editor.
+     */
+    public const MAX_AUTOMATIC_DRAFT_ATTEMPTS = 6;
+
     public function __construct(
         private readonly CommunityOfficialIdentityModel      $identityModel = new CommunityOfficialIdentityModel(),
         private readonly CommunityAgentRunModel               $runModel      = new CommunityAgentRunModel(),
@@ -68,6 +74,31 @@ class CommunityOperationalAgentService
     public static function dailyCapFor(string $action): ?int
     {
         return self::DAILY_CAPS[$action] ?? null;
+    }
+
+    /**
+     * How long to wait after a question's Nth failed automatic draft.
+     *
+     * Doubling from 30 minutes (one agents-run tick), capped at 12 hours: the
+     * five waits before the last attempt total 15.5 hours, so a provider
+     * outage or a missing route gets most of a day to recover rather than
+     * one failed tick stranding the question for good — without hammering a
+     * provider that is already failing.
+     */
+    public static function draftRetryBackoffSeconds(int $failedAttempts): int
+    {
+        return (int) min(43200, 1800 * (2 ** max(0, $failedAttempts - 1)));
+    }
+
+    /** Is a question with this many failed automatic drafts due another attempt? */
+    public static function isDraftRetryDue(int $failedAttempts, int $secondsSinceLastFailure): bool
+    {
+        if ($failedAttempts <= 0) {
+            return true;
+        }
+
+        return $failedAttempts < self::MAX_AUTOMATIC_DRAFT_ATTEMPTS
+            && $secondsSinceLastFailure >= self::draftRetryBackoffSeconds($failedAttempts);
     }
 
     /**
@@ -129,7 +160,18 @@ class CommunityOperationalAgentService
             throw new \InvalidArgumentException('draft_answer requires question_uuid.');
         }
 
-        $answer = $this->answers->createDraft($questionUuid, $identity['slug'], $actorId);
+        // A first draft whose generation failed is retried in place. The owning
+        // desk retries it, so the answer is never re-attributed to another
+        // identity behind its back.
+        $answer = $this->answers->findRetryableDraft($questionUuid);
+        if ($answer !== null && (int) $answer['identity_id'] !== (int) $identity['id']) {
+            throw new \RuntimeException(
+                "Answer {$answer['uuid']} belongs to another official identity; only its owner retries its generation."
+            );
+        }
+        $retried = $answer !== null;
+        $answer ??= $this->answers->createDraft($questionUuid, $identity['slug'], $actorId);
+
         $generation = $this->answers->requestGeneration(
             (string) $answer['uuid'],
             (string) ($context['answer_type'] ?? 'detailed'),
@@ -140,6 +182,7 @@ class CommunityOperationalAgentService
             'answer_uuid'          => $answer['uuid'],
             'version_number'       => $generation['version']['version_number'] ?? null,
             'risk_classification'  => $generation['risk_classification'] ?? null,
+            'retried'              => $retried,
         ];
     }
 

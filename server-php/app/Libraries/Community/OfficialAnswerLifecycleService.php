@@ -26,6 +26,16 @@ use RuntimeException;
  */
 class OfficialAnswerLifecycleService
 {
+    /**
+     * Statuses a first draft can have its generation requested again from.
+     * Only drafts that never produced a version qualify — once content exists,
+     * fixing it is a human edit, not another generation.
+     */
+    public const GENERATION_RETRYABLE_STATUSES = [
+        CommunityAnswerStatus::DraftRequested,
+        CommunityAnswerStatus::ValidationFailed,
+    ];
+
     public function __construct(
         private readonly OfficialAnswerRepository        $answerRepo    = new OfficialAnswerRepository(),
         private readonly CommunityQuestionRepository     $questionRepo  = new CommunityQuestionRepository(),
@@ -131,6 +141,29 @@ class OfficialAnswerLifecycleService
         ], $actorId);
 
         return $this->answerRepo->findById($answerId) ?? [];
+    }
+
+    /**
+     * The question's answer when its first draft failed or never ran, so its
+     * generation can be requested again in place; null otherwise.
+     *
+     * createDraft() refuses a second answer for a question, so without this a
+     * failed first generation left the question holding an empty answer that
+     * nothing would ever retry.
+     */
+    public function findRetryableDraft(string $questionUuid): ?array
+    {
+        $question = $this->questionRepo->requireByUuid($questionUuid);
+        $answer   = $this->answerModel->findByQuestionId((int) $question['id']);
+
+        if ($answer === null
+            || ! in_array(CommunityAnswerStatus::tryFrom((string) $answer['status']), self::GENERATION_RETRYABLE_STATUSES, true)
+            || $this->answerRepo->getLatestVersion((int) $answer['id']) !== null
+        ) {
+            return null;
+        }
+
+        return $answer;
     }
 
     /** Request AI generation of a draft for an existing answer record. */

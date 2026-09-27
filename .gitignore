@@ -15,6 +15,7 @@
 !/server-php/writable/uploads/.gitkeep
 /server-php/writable/debugbar/*
 /server-php/writable/migrations.lock
+/server-php/writable/community-agents-run.lock
 /server-php/.env
 /server-php/.env.*
 !/server-php/.env.example
