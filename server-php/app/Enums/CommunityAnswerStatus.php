@@ -68,6 +68,18 @@ enum CommunityAnswerStatus: string
         return $this === self::Approved || $this === self::Scheduled;
     }
 
+    /**
+     * Submitted and waiting on an approver. submitForReview() moves a draft
+     * into editorial review, and on into professional review when its risk
+     * tier needs one; approval is the way out of both.
+     *
+     * @return list<self>
+     */
+    public static function awaitingApproval(): array
+    {
+        return [self::EditorialReview, self::ProfessionalReview];
+    }
+
     public function isPubliclyVisible(): bool
     {
         return $this === self::Published;

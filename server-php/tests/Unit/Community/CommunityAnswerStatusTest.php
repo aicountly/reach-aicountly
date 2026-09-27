@@ -109,6 +109,22 @@ final class CommunityAnswerStatusTest extends TestCase
         $this->assertTrue(CommunityAnswerStatus::ValidationFailed->canTransitionTo(CommunityAnswerStatus::DraftGenerated));
     }
 
+    /** What the "Pending approval" tiles count; it once counted a status that does not exist. */
+    public function testAwaitingApprovalIsBothReviewQueues(): void
+    {
+        $this->assertSame(
+            [CommunityAnswerStatus::EditorialReview, CommunityAnswerStatus::ProfessionalReview],
+            CommunityAnswerStatus::awaitingApproval()
+        );
+    }
+
+    public function testEveryStatusAwaitingApprovalCanBeApproved(): void
+    {
+        foreach (CommunityAnswerStatus::awaitingApproval() as $status) {
+            $this->assertTrue($status->canTransitionTo(CommunityAnswerStatus::Approved), $status->value);
+        }
+    }
+
     public function testChangesRequestedCanRetryGeneration(): void
     {
         $this->assertTrue(CommunityAnswerStatus::ChangesRequested->canTransitionTo(CommunityAnswerStatus::Generating));
