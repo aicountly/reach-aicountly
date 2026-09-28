@@ -53,14 +53,16 @@ export default function CommunityOverviewPage() {
     <div className="community-overview">
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-card__value">{q.new ?? 0}</div>
+          {/* 'intake' is a new question's status; there is no 'new' status,
+              so this tile read 0 and its link filtered to nothing. */}
+          <div className="stat-card__value">{q.intake ?? 0}</div>
           <div className="stat-card__label">New questions</div>
-          <Link to="/community/questions?status=new" className="stat-card__link">View →</Link>
+          <Link to="/community/questions?status=intake" className="stat-card__link">View →</Link>
         </div>
         <div className="stat-card">
           <div className="stat-card__value">{stats?.pending_approval ?? 0}</div>
           <div className="stat-card__label">Pending approval</div>
-          <Link to="/community/answers?status=pending_approval" className="stat-card__link">Review →</Link>
+          <Link to="/community/answers?status=awaiting_approval" className="stat-card__link">Review →</Link>
         </div>
         <div className="stat-card">
           <div className="stat-card__value">{stats?.published_answers ?? 0}</div>

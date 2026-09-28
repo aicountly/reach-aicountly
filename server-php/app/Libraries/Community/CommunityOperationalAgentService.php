@@ -44,6 +44,18 @@ class CommunityOperationalAgentService
     /** Actions that create new public-facing content are window-gated; pure review/analysis actions are not. */
     private const WINDOW_GATED_ACTIONS = ['curate_question', 'draft_answer', 'post_comment'];
 
+    /** The expert desk that answers each question category; anything else goes to DEFAULT_DESK. */
+    private const CATEGORY_DESKS = [
+        'accounting'     => 'aicountly-accounting-guide',
+        'gst'            => 'aicountly-gst-guide',
+        'income-tax'     => 'aicountly-income-tax-desk',
+        'tds-tcs'        => 'aicountly-income-tax-desk',
+        'payroll-hr'     => 'aicountly-payroll-desk',
+        'product-guides' => 'aicountly-smart-books-guide',
+        'books'          => 'aicountly-smart-books-guide',
+    ];
+    private const DEFAULT_DESK = 'aicountly-compliance-desk';
+
     /**
      * Automatic draft attempts a question gets before the bot stops retrying
      * it. After that a human can still regenerate from the answer editor.
@@ -74,6 +86,26 @@ class CommunityOperationalAgentService
     public static function dailyCapFor(string $action): ?int
     {
         return self::DAILY_CAPS[$action] ?? null;
+    }
+
+    /**
+     * The desk that answers a question in this category. The agents run and
+     * a person creating an answer both route through here, so a question
+     * lands on the same desk whoever starts its draft.
+     */
+    public static function deskForCategory(?string $category): string
+    {
+        return self::CATEGORY_DESKS[strtolower($category ?? '')] ?? self::DEFAULT_DESK;
+    }
+
+    /**
+     * Every desk deskForCategory() can return.
+     *
+     * @return list<string>
+     */
+    public static function answerDesks(): array
+    {
+        return array_values(array_unique([...array_values(self::CATEGORY_DESKS), self::DEFAULT_DESK]));
     }
 
     /**

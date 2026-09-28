@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 import { formatDate } from '../../utils/formatDate';
 
+// Values mirror App\Enums\CommunityQuestionStatus, limited to the ones a
+// question reaches today (the rest track the answer lifecycle, which does not
+// write back past draft_requested). The old new/in_progress/answered/closed/
+// spam values exist nowhere, so those filters always came back empty.
 const STATUS_OPTS = [
   { value: '', label: 'All' },
-  { value: 'new', label: 'New' },
+  { value: 'intake', label: 'Intake' },
   { value: 'triaged', label: 'Triaged' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'answered', label: 'Answered' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'spam', label: 'Spam' },
+  { value: 'draft_requested', label: 'Draft requested' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'duplicate_merged', label: 'Duplicate merged' },
 ];
 const SORT_OPTS = [
   { value: 'triage_score_desc', label: 'Triage score' },
@@ -20,26 +23,32 @@ const SORT_OPTS = [
 ];
 
 const STATUS_CLASS = {
-  new: 'badge--info',
+  intake: 'badge--info',
   triaged: 'badge--info',
-  in_progress: 'badge--warning',
-  answered: 'badge--success',
-  closed: 'badge--neutral',
-  spam: 'badge--error',
+  draft_requested: 'badge--warning',
+  archived: 'badge--neutral',
+  duplicate_merged: 'badge--neutral',
 };
 
 export default function QuestionInboxPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The filter lives in the URL so the Overview tiles can link to it.
+  const status = searchParams.get('status') ?? '';
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
-  const [status, setStatus]       = useState('');
   const [sort, setSort]           = useState('triage_score_desc');
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  function changeStatus(value) {
+    setSearchParams(value ? { status: value } : {}, { replace: true });
+    setPage(1);
+  }
+
   function load() {
     setLoading(true);
-    api.get('v1/community/questions', { status: status || undefined, sort, page })
+    api.getPage('v1/community/questions', { status: status || undefined, sort, page })
       .then(r => {
         setQuestions(normalizeCommunityList(r));
         setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
@@ -59,13 +68,13 @@ export default function QuestionInboxPage() {
       <div className="toolbar mb-3">
         <label className="toolbar__label">
           Status
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="form-select form-select--sm">
+          <select value={status} onChange={e => changeStatus(e.target.value)} className="form-select form-select--sm">
             {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
           </select>
         </label>
         <label className="toolbar__label">
           Sort
-          <select value={sort} onChange={e => setSort(e.target.value)} className="form-select form-select--sm">
+          <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }} className="form-select form-select--sm">
             {SORT_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
@@ -97,11 +106,14 @@ export default function QuestionInboxPage() {
                 <td>
                   <span className={`badge ${STATUS_CLASS[q.status] ?? 'badge--neutral'}`}>{q.status}</span>
                 </td>
+                {/* Field names are the API row's own (QuestionController::index):
+                    uuid is the public id the workspace route resolves, and
+                    intake_timestamp is when Reach received the question. */}
                 <td>{q.risk_classification ?? '—'}</td>
                 <td>{q.triage_score ?? '—'}</td>
-                <td>{q.source_received_at ? formatDate(q.source_received_at) : '—'}</td>
+                <td>{formatDate(q.intake_timestamp)}</td>
                 <td>
-                  <Link to={`/community/questions/${q.external_id}`} className="btn btn--sm">Open</Link>
+                  <Link to={`/community/questions/${q.uuid}`} className="btn btn--sm">Open</Link>
                 </td>
               </tr>
             ))}

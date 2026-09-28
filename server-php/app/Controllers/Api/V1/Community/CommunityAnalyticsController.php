@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
+use App\Enums\CommunityAnswerStatus;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Libraries\Database\SchemaGuard;
 
@@ -45,8 +46,10 @@ class CommunityAnalyticsController extends BaseApiController
                     ->where('status', 'published')
                     ->countAllResults();
 
+                // There is no 'pending_approval' answer status; counting it made
+                // this tile a permanent 0 while answers sat in review.
                 $pendingApproval = (int) $db->table('reach_community_official_answers')
-                    ->where('status', 'pending_approval')
+                    ->whereIn('status', array_column(CommunityAnswerStatus::awaitingApproval(), 'value'))
                     ->countAllResults();
             }
 

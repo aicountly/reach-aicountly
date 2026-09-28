@@ -4,6 +4,8 @@ namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
 use App\Enums\CommunityRiskTier;
+use App\Libraries\Community\CommunityOperationalAgentService;
+use App\Libraries\Community\CommunityQuestionRepository;
 use App\Libraries\Community\OfficialAnswerLifecycleService;
 use App\Libraries\Community\OfficialAnswerRepository;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -23,37 +25,59 @@ class OfficialAnswerController extends BaseApiController
 {
     private OfficialAnswerRepository $repo;
     private OfficialAnswerLifecycleService $lifecycle;
+    private CommunityQuestionRepository $questions;
 
     public function __construct()
     {
         $this->repo      = new OfficialAnswerRepository();
         $this->lifecycle = new OfficialAnswerLifecycleService();
+        $this->questions = new CommunityQuestionRepository();
     }
 
     /** GET /community/answers */
     public function index(): ResponseInterface
     {
-        $status  = (string) ($this->request->getGet('status') ?? '');
-        $perPage = min((int) ($this->request->getGet('per_page') ?? 100), 100);
+        $status       = (string) ($this->request->getGet('status') ?? '');
+        $questionUuid = (string) ($this->request->getGet('question_uuid') ?? '');
+        $page         = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage      = max(1, min((int) ($this->request->getGet('per_page') ?? 25), 100));
+        $empty        = [
+            'data' => [],
+            'meta' => ['current_page' => $page, 'per_page' => $perPage, 'total' => 0, 'last_page' => 0],
+        ];
 
         try {
             $db = db_connect();
             if (! SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
-                return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
+                return $this->response->setJSON($empty);
             }
 
             // Empty status = "All" in the UI — list everything. The old
             // 'draft_requested' default made the All view silently show a
             // single status and hide failed/generated drafts entirely.
-            $items = $this->repo->listByStatus($status !== '' ? $status : null, $perPage);
+            // question_uuid scopes the list to one question (its workspace);
+            // ignoring it listed every answer there as that question's own.
+            // The pager reads total and last_page: page used to be ignored
+            // and total was the size of the one page returned.
+            $result = $this->repo->paginate(
+                $status !== '' ? $status : null,
+                $page,
+                $perPage,
+                $questionUuid !== '' ? $questionUuid : null,
+            );
 
             return $this->response->setJSON([
-                'data' => is_array($items) ? $items : [],
-                'meta' => ['total' => is_array($items) ? count($items) : 0],
+                'data' => $result['data'],
+                'meta' => [
+                    'current_page' => $page,
+                    'per_page'     => $perPage,
+                    'total'        => $result['total'],
+                    'last_page'    => (int) ceil($result['total'] / $perPage),
+                ],
             ]);
         } catch (\Throwable $e) {
             log_message('error', 'OfficialAnswerController::index: ' . $e->getMessage());
-            return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
+            return $this->response->setJSON($empty);
         }
     }
 
@@ -72,17 +96,24 @@ class OfficialAnswerController extends BaseApiController
     {
         $body         = $this->request->getJSON(true) ?? [];
         $questionUuid = (string) ($body['question_uuid'] ?? '');
-        $identitySlug = (string) ($body['official_identity_slug'] ?? 'aicountly-official');
+        $identitySlug = trim((string) ($body['official_identity_slug'] ?? ''));
 
         if ($questionUuid === '') {
             return $this->unprocessable('question_uuid is required.');
         }
 
-        return $this->guard(
-            fn () => $this->response->setStatusCode(201)->setJSON([
+        return $this->guard(function () use ($questionUuid, $identitySlug) {
+            // No identity named: take the desk the agents run would route the
+            // question to. Inside guard() so an unknown question stays a 404.
+            if ($identitySlug === '') {
+                $question     = $this->questions->requireByUuid($questionUuid);
+                $identitySlug = CommunityOperationalAgentService::deskForCategory($question['category'] ?? null);
+            }
+
+            return $this->response->setStatusCode(201)->setJSON([
                 'data' => $this->lifecycle->createDraft($questionUuid, $identitySlug, $this->userId()),
-            ])
-        );
+            ]);
+        });
     }
 
     /** POST /community/answers/(:segment)/generate */

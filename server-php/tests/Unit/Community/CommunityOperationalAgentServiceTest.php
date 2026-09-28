@@ -6,9 +6,10 @@ use App\Libraries\Community\CommunityOperationalAgentService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Pure, DB-free tests of the role -> action authorization map and the
- * window/cap classification static helpers. This is the map that stands
- * between "an official identity" and "an arbitrary community mutation" —
+ * Pure, DB-free tests of the role -> action authorization map, the
+ * window/cap classification static helpers and the category -> answer desk
+ * routing. The role map is the one that stands between "an official
+ * identity" and "an arbitrary community mutation" —
  * every one of the five roles must resolve to exactly its own action set,
  * with no overlap that would let e.g. a thread_facilitator draft an answer.
  */
@@ -86,5 +87,54 @@ final class CommunityOperationalAgentServiceTest extends TestCase
     {
         $this->assertNull(CommunityOperationalAgentService::dailyCapFor('categorize_question'));
         $this->assertNull(CommunityOperationalAgentService::dailyCapFor('flag_objection'));
+    }
+
+    /** @dataProvider categoryDeskProvider */
+    public function testEachMappedCategoryRoutesToItsDesk(string $category, string $desk): void
+    {
+        $this->assertSame($desk, CommunityOperationalAgentService::deskForCategory($category));
+    }
+
+    public static function categoryDeskProvider(): array
+    {
+        return [
+            ['accounting', 'aicountly-accounting-guide'],
+            ['gst', 'aicountly-gst-guide'],
+            ['income-tax', 'aicountly-income-tax-desk'],
+            ['tds-tcs', 'aicountly-income-tax-desk'],
+            ['payroll-hr', 'aicountly-payroll-desk'],
+            ['product-guides', 'aicountly-smart-books-guide'],
+            ['books', 'aicountly-smart-books-guide'],
+        ];
+    }
+
+    public function testCategoryDeskRoutingIgnoresCase(): void
+    {
+        $this->assertSame('aicountly-gst-guide', CommunityOperationalAgentService::deskForCategory('GST'));
+        $this->assertSame('aicountly-income-tax-desk', CommunityOperationalAgentService::deskForCategory('Income-Tax'));
+        $this->assertSame('aicountly-payroll-desk', CommunityOperationalAgentService::deskForCategory('PAYROLL-HR'));
+    }
+
+    public function testUnmappedOrMissingCategoryRoutesToTheComplianceDesk(): void
+    {
+        foreach (['company-law', 'general', '', null] as $category) {
+            $this->assertSame(
+                'aicountly-compliance-desk',
+                CommunityOperationalAgentService::deskForCategory($category),
+                var_export($category, true)
+            );
+        }
+    }
+
+    public function testAnswerDesksListsEachRoutableDeskOnce(): void
+    {
+        $this->assertSame([
+            'aicountly-accounting-guide',
+            'aicountly-gst-guide',
+            'aicountly-income-tax-desk',
+            'aicountly-payroll-desk',
+            'aicountly-smart-books-guide',
+            'aicountly-compliance-desk',
+        ], CommunityOperationalAgentService::answerDesks());
     }
 }

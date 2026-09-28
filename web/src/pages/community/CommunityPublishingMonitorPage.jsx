@@ -23,7 +23,7 @@ export default function CommunityPublishingMonitorPage() {
 
   function load() {
     setLoading(true);
-    api.get('v1/community/deployments', { page })
+    api.getPage('v1/community/deployments', { page })
       .then(r => {
         setDeployments(normalizeCommunityList(r));
         setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
@@ -82,7 +82,7 @@ export default function CommunityPublishingMonitorPage() {
             <tr><td colSpan={7} className="muted">No deployments.</td></tr>
           ) : deployments.map(d => (
             <tr key={d.id}>
-              <td><code className="text-xs">{d.external_id?.slice(0, 8)}…</code></td>
+              <td><code className="text-xs">{d.uuid?.slice(0, 8)}…</code></td>
               <td>
                 {d.answer_uuid
                   ? <Link to={`/community/answers/${d.answer_uuid}`}>{d.answer_uuid.slice(0, 8)}…</Link>
@@ -96,10 +96,10 @@ export default function CommunityPublishingMonitorPage() {
               <td>{d.updated_at ? formatDate(d.updated_at) : '—'}</td>
               <td>
                 {d.status === 'failed' && (
-                  <button className="btn btn--sm mr-1" onClick={() => handleRetry(d.external_id)}>Retry</button>
+                  <button className="btn btn--sm mr-1" onClick={() => handleRetry(d.uuid)}>Retry</button>
                 )}
                 {d.status === 'confirmed' && (
-                  <button className="btn btn--sm btn--ghost" onClick={() => handleVerify(d.external_id)}>Verify</button>
+                  <button className="btn btn--sm btn--ghost" onClick={() => handleVerify(d.uuid)}>Verify</button>
                 )}
               </td>
             </tr>

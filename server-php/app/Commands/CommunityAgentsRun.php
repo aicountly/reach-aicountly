@@ -44,17 +44,6 @@ class CommunityAgentsRun extends BaseCommand
     private const CURATOR_SLUG = 'aicountly-question-curator';
     private const STEWARD_SLUG = 'aicountly-community-steward';
 
-    private const CATEGORY_DESKS = [
-        'accounting'          => 'aicountly-accounting-guide',
-        'gst'                 => 'aicountly-gst-guide',
-        'income-tax'          => 'aicountly-income-tax-desk',
-        'tds-tcs'             => 'aicountly-income-tax-desk',
-        'payroll-hr'          => 'aicountly-payroll-desk',
-        'product-guides'      => 'aicountly-smart-books-guide',
-        'books'               => 'aicountly-smart-books-guide',
-    ];
-    private const DEFAULT_DESK = 'aicountly-compliance-desk';
-
     public function run(array $params): int
     {
         $limit = max(1, (int) ($this->sparkOption('limit', $params, '6') ?? '6'));
@@ -178,9 +167,7 @@ class CommunityAgentsRun extends BaseCommand
         $outcomes   = [];
         foreach ($work['candidates'] as $candidate) {
             // A retry goes to the desk that owns the answer; a first draft to the category's desk.
-            $desk = $candidate['owner_slug']
-                ?? self::CATEGORY_DESKS[strtolower($candidate['category'])]
-                ?? self::DEFAULT_DESK;
+            $desk = $candidate['owner_slug'] ?? CommunityOperationalAgentService::deskForCategory($candidate['category']);
             $base = [
                 'question_id' => $candidate['question_id'],
                 'desk'        => $desk,

@@ -2,6 +2,8 @@
 
 namespace App\Libraries\Community;
 
+use App\Enums\CommunityAnswerStatus;
+
 /**
  * Phase 5 — Community Analytics Service.
  *
@@ -43,7 +45,7 @@ class CommunityAnalyticsService
             'questions_by_status'   => array_column($questionStats, 'cnt', 'status'),
             'answers_by_status'     => array_column($answerStats, 'cnt', 'status'),
             'published_answers'     => (int) $db->table('reach_community_official_answers')->where('status', 'published')->countAllResults(),
-            'pending_approval'      => (int) $db->table('reach_community_official_answers')->where('status', 'pending_approval')->countAllResults(),
+            'pending_approval'      => (int) $db->table('reach_community_official_answers')->whereIn('status', array_column(CommunityAnswerStatus::awaitingApproval(), 'value'))->countAllResults(),
             'open_moderation_flags' => (int) $db->table('reach_community_moderation_findings')->where('status', 'open')->countAllResults(),
         ];
     }

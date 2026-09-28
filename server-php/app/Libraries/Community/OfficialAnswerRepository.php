@@ -5,6 +5,7 @@ namespace App\Libraries\Community;
 use App\Enums\CommunityAnswerStatus;
 use App\Models\CommunityAnswerVersionModel;
 use App\Models\CommunityOfficialAnswerModel;
+use App\Models\CommunityQuestionModel;
 use RuntimeException;
 
 /**
@@ -15,7 +16,8 @@ class OfficialAnswerRepository
 {
     public function __construct(
         private readonly CommunityOfficialAnswerModel $answerModel = new CommunityOfficialAnswerModel(),
-        private readonly CommunityAnswerVersionModel  $versionModel = new CommunityAnswerVersionModel()
+        private readonly CommunityAnswerVersionModel  $versionModel = new CommunityAnswerVersionModel(),
+        private readonly CommunityQuestionModel       $questionModel = new CommunityQuestionModel()
     ) {}
 
     public function findById(int $id): ?array
@@ -135,14 +137,45 @@ class OfficialAnswerRepository
         ]);
     }
 
-    public function listByStatus(?string $status, int $limit = 100): array
+    /**
+     * Filter value for every answer waiting on an approver — what the
+     * Pending approval tiles count — since that spans two statuses.
+     */
+    public const AWAITING_APPROVAL = 'awaiting_approval';
+
+    /**
+     * One page of answers, newest first, and how many the filters match.
+     * $status is an answer status or AWAITING_APPROVAL; a question UUID
+     * narrows it to that question's answers.
+     *
+     * @return array{data: list<array>, total: int}
+     */
+    public function paginate(?string $status, int $page, int $perPage, ?string $questionUuid = null): array
     {
-        $builder = $this->answerModel->orderBy('id', 'DESC')->limit($limit);
-        if ($status !== null && $status !== '') {
-            $builder = $builder->where('status', $status);
+        // Resolved before the shared model builder is touched, so an unknown
+        // question cannot leave half-built query state behind on it.
+        $questionId = null;
+        if ($questionUuid !== null && $questionUuid !== '') {
+            $question = $this->questionModel->findByUuid($questionUuid);
+            if ($question === null) {
+                return ['data' => [], 'total' => 0];
+            }
+            $questionId = (int) $question['id'];
         }
 
-        return $builder->findAll();
+        if ($status === self::AWAITING_APPROVAL) {
+            $this->answerModel->whereIn('status', array_column(CommunityAnswerStatus::awaitingApproval(), 'value'));
+        } elseif ($status !== null && $status !== '') {
+            $this->answerModel->where('status', $status);
+        }
+        if ($questionId !== null) {
+            $this->answerModel->where('question_id', $questionId);
+        }
+
+        $total = $this->answerModel->countAllResults(false);
+        $rows  = $this->answerModel->orderBy('id', 'DESC')->findAll($perPage, max(0, ($page - 1) * $perPage));
+
+        return ['data' => $rows, 'total' => $total];
     }
 
     public function countByStatus(): array
