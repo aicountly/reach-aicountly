@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Community;
 
+use App\Libraries\Community\CommunityOperationalAgentService;
 use App\Libraries\Community\CommunityQuestionIntakeService;
 use App\Libraries\Community\OfficialAnswerLifecycleService;
+use App\Models\CommunityOfficialIdentityModel;
 use Tests\Support\ApiTestCase;
 
 /**
@@ -117,12 +119,95 @@ final class OfficialAnswerApiTest extends ApiTestCase
         $this->assertSame($question['uuid'], $data['question_uuid']);
     }
 
-    private function intake(string $title): array
+    public function testCreateAnswerWithoutAnIdentityDraftsAsTheCategoryDesk(): void
+    {
+        // The question workspace names no identity. The old fallback was a
+        // retired identity, so every draft it asked for was refused.
+        $question = $this->intake('How do I file a GSTR-1 nil return?');
+
+        $answer = $this->createAnswer(['question_uuid' => $question['uuid']]);
+
+        $this->assertSame($this->identityId('aicountly-gst-guide'), (int) $answer['identity_id']);
+    }
+
+    public function testCreateAnswerTreatsABlankIdentityAsUnnamed(): void
+    {
+        foreach (['', null] as $slug) {
+            $question = $this->intake('How do I file a GSTR-1 nil return?');
+
+            $answer = $this->createAnswer(['question_uuid' => $question['uuid'], 'official_identity_slug' => $slug]);
+
+            $this->assertSame($this->identityId('aicountly-gst-guide'), (int) $answer['identity_id'], var_export($slug, true));
+        }
+    }
+
+    public function testCreateAnswerForACategoryWithoutADeskDraftsAsTheComplianceDesk(): void
+    {
+        $question = $this->intake('When is the annual return due under the Companies Act?', 'company-law');
+
+        $answer = $this->createAnswer(['question_uuid' => $question['uuid']]);
+
+        $this->assertSame($this->identityId('aicountly-compliance-desk'), (int) $answer['identity_id']);
+    }
+
+    public function testCreateAnswerKeepsAnExplicitIdentity(): void
+    {
+        $question = $this->intake('How do I file a GSTR-1 nil return?');
+
+        $answer = $this->createAnswer([
+            'question_uuid'          => $question['uuid'],
+            'official_identity_slug' => 'aicountly-income-tax-desk',
+        ]);
+
+        $this->assertSame($this->identityId('aicountly-income-tax-desk'), (int) $answer['identity_id']);
+    }
+
+    public function testCreateAnswerForAnUnknownQuestionIsNotFound(): void
+    {
+        $headers = $this->authAs('reach_admin');
+        foreach (['00000000-0000-0000-0000-000000000000', 'undefined'] as $questionUuid) {
+            $response = $this->withHeaders($headers)
+                ->withBodyFormat('json')
+                ->call('POST', 'v1/community/answers', ['question_uuid' => $questionUuid]);
+            $this->assertSame(404, $response->response()->getStatusCode(), $questionUuid);
+        }
+    }
+
+    public function testEveryRoutedDeskIsAnActiveExpertAnswerIdentity(): void
+    {
+        // Desks are routed to by slug, so one a migration renames or retires
+        // must fail here rather than as a 422 in the question workspace.
+        $identities = new CommunityOfficialIdentityModel();
+        foreach (CommunityOperationalAgentService::answerDesks() as $slug) {
+            $identity = $identities->findBySlug($slug);
+            $this->assertNotNull($identity, "{$slug} is not seeded");
+            $this->assertTrue($identity['is_active'], "{$slug} is not active");
+            $this->assertSame('expert_answer_assistant', $identity['operational_role'], "{$slug} cannot draft answers");
+        }
+    }
+
+    /** The created answer; fails with the error body unless the POST returned 201. */
+    private function createAnswer(array $body): array
+    {
+        $response = $this->withHeaders($this->authAs('reach_admin'))
+            ->withBodyFormat('json')
+            ->call('POST', 'v1/community/answers', $body);
+        $this->assertSame(201, $response->response()->getStatusCode(), (string) $response->getJSON());
+
+        return json_decode((string) $response->getJSON(), true)['data'];
+    }
+
+    private function identityId(string $slug): int
+    {
+        return (int) (new CommunityOfficialIdentityModel())->findBySlug($slug)['id'];
+    }
+
+    private function intake(string $title, string $category = 'gst'): array
     {
         return (new CommunityQuestionIntakeService())->intake([
             'source_type' => 'manual',
             'title'       => $title,
-            'category'    => 'gst',
+            'category'    => $category,
         ]);
     }
 }

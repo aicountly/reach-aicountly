@@ -4,6 +4,8 @@ namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
 use App\Enums\CommunityRiskTier;
+use App\Libraries\Community\CommunityOperationalAgentService;
+use App\Libraries\Community\CommunityQuestionRepository;
 use App\Libraries\Community\OfficialAnswerLifecycleService;
 use App\Libraries\Community\OfficialAnswerRepository;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -23,11 +25,13 @@ class OfficialAnswerController extends BaseApiController
 {
     private OfficialAnswerRepository $repo;
     private OfficialAnswerLifecycleService $lifecycle;
+    private CommunityQuestionRepository $questions;
 
     public function __construct()
     {
         $this->repo      = new OfficialAnswerRepository();
         $this->lifecycle = new OfficialAnswerLifecycleService();
+        $this->questions = new CommunityQuestionRepository();
     }
 
     /** GET /community/answers */
@@ -79,17 +83,24 @@ class OfficialAnswerController extends BaseApiController
     {
         $body         = $this->request->getJSON(true) ?? [];
         $questionUuid = (string) ($body['question_uuid'] ?? '');
-        $identitySlug = (string) ($body['official_identity_slug'] ?? 'aicountly-official');
+        $identitySlug = trim((string) ($body['official_identity_slug'] ?? ''));
 
         if ($questionUuid === '') {
             return $this->unprocessable('question_uuid is required.');
         }
 
-        return $this->guard(
-            fn () => $this->response->setStatusCode(201)->setJSON([
+        return $this->guard(function () use ($questionUuid, $identitySlug) {
+            // No identity named: take the desk the agents run would route the
+            // question to. Inside guard() so an unknown question stays a 404.
+            if ($identitySlug === '') {
+                $question     = $this->questions->requireByUuid($questionUuid);
+                $identitySlug = CommunityOperationalAgentService::deskForCategory($question['category'] ?? null);
+            }
+
+            return $this->response->setStatusCode(201)->setJSON([
                 'data' => $this->lifecycle->createDraft($questionUuid, $identitySlug, $this->userId()),
-            ])
-        );
+            ]);
+        });
     }
 
     /** POST /community/answers/(:segment)/generate */
