@@ -26,8 +26,8 @@ describe('CommunityOverviewPage', () => {
 
   it('renders stat cards when data loads', async () => {
     api.get.mockResolvedValueOnce({
-      questions_by_status: { new: 5 },
-      answers_by_status: { draft: 2, published: 10 },
+      questions_by_status: { intake: 5, draft_requested: 8 },
+      answers_by_status: { draft_generated: 2, published: 10 },
       published_answers: 10,
       pending_approval: 3,
       open_moderation_flags: 1,
@@ -38,6 +38,27 @@ describe('CommunityOverviewPage', () => {
     expect(screen.getByText('Published answers')).toBeInTheDocument();
     expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Pending approval')).toBeInTheDocument();
+  });
+
+  // The tile read questions_by_status.new and linked ?status=new; there is no
+  // such status, so it showed 0 and its link filtered to nothing.
+  it('counts New questions from intake and links each tile to a real filter', async () => {
+    api.get.mockResolvedValueOnce({
+      questions_by_status: { intake: 7, draft_requested: 8 },
+      answers_by_status: {},
+      published_answers: 0,
+      pending_approval: 4,
+      open_moderation_flags: 0,
+    });
+    renderWithAuth(<CommunityOverviewPage />, ctx);
+
+    const newTile = (await screen.findByText('New questions')).closest('.stat-card');
+    expect(newTile).toHaveTextContent('7');
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('/community/questions?status=intake');
+    expect(hrefs).toContain('/community/answers?status=awaiting_approval');
+    expect(hrefs).not.toContain('/community/questions?status=new');
+    expect(hrefs).not.toContain('/community/answers?status=pending_approval');
   });
 
   it('shows error when API fails', async () => {

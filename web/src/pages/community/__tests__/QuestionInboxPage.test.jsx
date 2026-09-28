@@ -151,6 +151,37 @@ describe('QuestionInboxPage', () => {
     await waitFor(() => expect(requestedUrls(fetch).at(-1)).toContain('status=intake'));
   });
 
+  it('starts filtered by the status in the URL, as the Overview tiles link it', async () => {
+    const fetch = stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
+    renderWithAuth(<QuestionInboxPage />, { ...ctx, route: '/community/questions?status=intake' });
+    await screen.findByText(QUESTION.title);
+
+    expect(requestedUrls(fetch)[0]).toContain('status=intake');
+    expect(screen.getByDisplayValue('Intake')).toBeInTheDocument();
+  });
+
+  it('sends the chosen sort to the API', async () => {
+    const fetch = stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
+    renderWithAuth(<QuestionInboxPage />, ctx);
+    await screen.findByText(QUESTION.title);
+
+    await userEvent.setup().selectOptions(screen.getByDisplayValue('Triage score'), 'newest');
+    await waitFor(() => expect(requestedUrls(fetch).at(-1)).toContain('sort=newest'));
+  });
+
+  // The client used to unwrap { data, meta } down to data, so last_page never
+  // arrived and the pager never rendered, however many questions there were.
+  it('pages through a list the API reports as longer than one page', async () => {
+    const fetch = stubApi({
+      'GET v1/community/questions': [200, { data: [QUESTION], meta: { current_page: 1, per_page: 25, total: 60, last_page: 3 } }],
+    });
+    renderWithAuth(<QuestionInboxPage />, ctx);
+
+    expect(await screen.findByText('Page 1 / 3')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(requestedUrls(fetch).at(-1)).toContain('page=2'));
+  });
+
   it('shows error on API failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch failed')));
     renderWithAuth(<QuestionInboxPage />, ctx);

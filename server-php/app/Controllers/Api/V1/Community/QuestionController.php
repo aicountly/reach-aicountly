@@ -25,6 +25,7 @@ class QuestionController extends BaseApiController
         $perPage = min((int) ($this->request->getGet('per_page') ?? 25), 100);
         $status  = $this->request->getGet('status');
         $spaceId = $this->request->getGet('space_id');
+        $sort    = $this->request->getGet('sort');
         $empty   = [
             'data' => [],
             'meta' => [
@@ -41,8 +42,14 @@ class QuestionController extends BaseApiController
                 return $this->response->setJSON($empty);
             }
 
+            // Keys are the ones listForInbox() reads; compact('spaceId') named
+            // the space filter spaceId, so it was silently ignored.
             $result = $this->repo->listForInbox(
-                filters: array_filter(compact('status', 'spaceId')),
+                filters: array_filter([
+                    'status'   => $status,
+                    'space_id' => $spaceId,
+                    'sort'     => $sort,
+                ]),
                 page: $page,
                 perPage: $perPage,
             );

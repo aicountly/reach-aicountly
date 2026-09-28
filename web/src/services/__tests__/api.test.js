@@ -87,4 +87,19 @@ describe('api wrapper', () => {
       expect(err.retryAfter).toBe(12);
     }
   });
+
+  it('getPage keeps the pagination meta that get() drops', async () => {
+    const body = { data: [{ id: 1 }], meta: { current_page: 1, last_page: 3, total: 55 } };
+    global.fetch.mockResolvedValueOnce(jsonResponse(200, body));
+    global.fetch.mockResolvedValueOnce(jsonResponse(200, body));
+
+    expect(await api.get('v1/community/questions')).toEqual([{ id: 1 }]);
+    expect(await api.getPage('v1/community/questions', { page: 2 })).toEqual(body);
+    expect(global.fetch.mock.calls[1][0]).toMatch(/v1\/community\/questions\?page=2$/);
+  });
+
+  it('getPage still throws on an error response', async () => {
+    global.fetch.mockResolvedValueOnce(jsonResponse(500, { ok: false, error: 'boom' }));
+    await expect(api.getPage('v1/community/questions')).rejects.toMatchObject({ status: 500, message: 'boom' });
+  });
 });

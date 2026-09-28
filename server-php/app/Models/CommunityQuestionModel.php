@@ -9,6 +9,16 @@ class CommunityQuestionModel extends Model
 {
     private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
+    /**
+     * The inbox's sort options as ORDER BY terms; an unknown value sorts by
+     * triage. id breaks ties so a row cannot move between pages.
+     */
+    private const INBOX_SORTS = [
+        'triage_score_desc' => [['q.triage_score', 'DESC'], ['q.intake_timestamp', 'DESC'], ['q.id', 'DESC']],
+        'newest'            => [['q.intake_timestamp', 'DESC'], ['q.id', 'DESC']],
+        'oldest'            => [['q.intake_timestamp', 'ASC'], ['q.id', 'ASC']],
+    ];
+
     protected $table         = 'reach_community_questions';
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
@@ -87,9 +97,11 @@ class CommunityQuestionModel extends Model
         $total = $builder->countAllResults(false);
         $offset = ($page - 1) * $perPage;
 
-        $rows = $builder->orderBy('q.triage_score', 'DESC')
-            ->orderBy('q.intake_timestamp', 'DESC')
-            ->limit($perPage, $offset)
+        foreach (self::INBOX_SORTS[$filters['sort'] ?? ''] ?? self::INBOX_SORTS['triage_score_desc'] as [$column, $direction]) {
+            $builder->orderBy($column, $direction);
+        }
+
+        $rows = $builder->limit($perPage, $offset)
             ->get()
             ->getResultArray();
 

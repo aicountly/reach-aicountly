@@ -23,7 +23,7 @@ export default function CommunityModerationQueuePage() {
 
   function load() {
     setLoading(true);
-    api.get('v1/community/moderation/queue', { page })
+    api.getPage('v1/community/moderation/queue', { page })
       .then(r => {
         setFindings(normalizeCommunityList(r));
         setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
@@ -91,7 +91,7 @@ export default function CommunityModerationQueuePage() {
               </td>
               <td>{f.severity ?? '—'}</td>
               <td>{f.answer_version_id ?? '—'} {f.version_number ? `(v${f.version_number})` : ''}</td>
-              <td className="td--truncate">{f.detail ?? '—'}</td>
+              <td className="td--truncate">{f.details ?? '—'}</td>
               <td>{f.created_at ? formatDate(f.created_at) : '—'}</td>
               <td>
                 <button className="btn btn--sm btn--success mr-1" onClick={() => handleResolve(f.id)}>Resolve</button>

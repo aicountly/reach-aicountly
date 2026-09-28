@@ -16,7 +16,8 @@ function generateRequestId() {
   return `reach-web:${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
 }
 
-async function request(path, options = {}) {
+async function request(path, requestOptions = {}) {
+  const { envelope = false, ...options } = requestOptions;
   const token = localStorage.getItem('reach_token');
   const requestId = options.requestId || generateRequestId();
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
@@ -66,11 +67,14 @@ async function request(path, options = {}) {
     }
     throw err;
   }
-  return json?.data ?? json;
+  return envelope ? json : (json?.data ?? json);
 }
 
 export const api = {
   get:    (path, params) => request(withQuery(path, params)),
+  // Paginated lists answer { data, meta }; get() keeps only data, so a pager
+  // built on it never learns there is a second page.
+  getPage: (path, params) => request(withQuery(path, params), { envelope: true }),
   post:   (path, body)   => request(path, { method: 'POST', body: body ? JSON.stringify(body) : null }),
   put:    (path, body)   => request(path, { method: 'PUT',  body: body ? JSON.stringify(body) : null }),
   patch:  (path, body)   => request(path, { method: 'PATCH', body: body ? JSON.stringify(body) : null }),

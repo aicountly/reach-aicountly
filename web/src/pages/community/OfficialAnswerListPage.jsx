@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 import { formatDate } from '../../utils/formatDate';
@@ -9,6 +9,8 @@ import { formatDate } from '../../utils/formatDate';
 // so most filters returned nothing.
 const STATUS_OPTS = [
   { value: '', label: 'All' },
+  // Not a status: both review queues, which is what "Pending approval" counts.
+  { value: 'awaiting_approval', label: 'Awaiting approval' },
   { value: 'draft_requested', label: 'Draft requested' },
   { value: 'generating', label: 'Generating' },
   { value: 'draft_generated', label: 'Draft generated' },
@@ -38,16 +40,23 @@ const STATUS_CLASS = {
 };
 
 export default function OfficialAnswerListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The filter lives in the URL so the Overview tiles can link to it.
+  const status = searchParams.get('status') ?? '';
   const [answers, setAnswers]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
-  const [status, setStatus]       = useState('');
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  function changeStatus(value) {
+    setSearchParams(value ? { status: value } : {}, { replace: true });
+    setPage(1);
+  }
+
   useEffect(() => {
     setLoading(true);
-    api.get('v1/community/answers', { status: status || undefined, page })
+    api.getPage('v1/community/answers', { status: status || undefined, page })
       .then(r => {
         setAnswers(normalizeCommunityList(r));
         setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
@@ -65,7 +74,7 @@ export default function OfficialAnswerListPage() {
       <div className="toolbar mb-3">
         <label className="toolbar__label">
           Status
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="form-select form-select--sm">
+          <select value={status} onChange={e => changeStatus(e.target.value)} className="form-select form-select--sm">
             {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
           </select>
         </label>

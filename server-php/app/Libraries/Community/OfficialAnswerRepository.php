@@ -137,8 +137,20 @@ class OfficialAnswerRepository
         ]);
     }
 
-    /** Newest first; narrowed to one question's answers when its UUID is given. */
-    public function listByStatus(?string $status, int $limit = 100, ?string $questionUuid = null): array
+    /**
+     * Filter value for every answer waiting on an approver — what the
+     * Pending approval tiles count — since that spans two statuses.
+     */
+    public const AWAITING_APPROVAL = 'awaiting_approval';
+
+    /**
+     * One page of answers, newest first, and how many the filters match.
+     * $status is an answer status or AWAITING_APPROVAL; a question UUID
+     * narrows it to that question's answers.
+     *
+     * @return array{data: list<array>, total: int}
+     */
+    public function paginate(?string $status, int $page, int $perPage, ?string $questionUuid = null): array
     {
         // Resolved before the shared model builder is touched, so an unknown
         // question cannot leave half-built query state behind on it.
@@ -146,20 +158,24 @@ class OfficialAnswerRepository
         if ($questionUuid !== null && $questionUuid !== '') {
             $question = $this->questionModel->findByUuid($questionUuid);
             if ($question === null) {
-                return [];
+                return ['data' => [], 'total' => 0];
             }
             $questionId = (int) $question['id'];
         }
 
-        $builder = $this->answerModel->orderBy('id', 'DESC')->limit($limit);
-        if ($status !== null && $status !== '') {
-            $builder = $builder->where('status', $status);
+        if ($status === self::AWAITING_APPROVAL) {
+            $this->answerModel->whereIn('status', array_column(CommunityAnswerStatus::awaitingApproval(), 'value'));
+        } elseif ($status !== null && $status !== '') {
+            $this->answerModel->where('status', $status);
         }
         if ($questionId !== null) {
-            $builder = $builder->where('question_id', $questionId);
+            $this->answerModel->where('question_id', $questionId);
         }
 
-        return $builder->findAll();
+        $total = $this->answerModel->countAllResults(false);
+        $rows  = $this->answerModel->orderBy('id', 'DESC')->findAll($perPage, max(0, ($page - 1) * $perPage));
+
+        return ['data' => $rows, 'total' => $total];
     }
 
     public function countByStatus(): array

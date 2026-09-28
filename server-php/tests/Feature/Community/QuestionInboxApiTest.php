@@ -184,6 +184,41 @@ final class QuestionInboxApiTest extends ApiTestCase
         $this->assertSame('Checked against the GST desk backlog.', $metadata['note']);
     }
 
+    /** The controller passed the space filter as spaceId; the model reads space_id. */
+    public function testListFiltersBySpace(): void
+    {
+        $inSpace  = $this->intake('Question filed under the GST space', $this->space('gst-filter'));
+        $outside  = $this->intake('Question filed under no space');
+        $headers  = $this->authAs('reach_admin');
+        $response = $this->withHeaders($headers)->call('GET', 'v1/community/questions?space_id=' . $inSpace['space_id']);
+        $uuids    = array_column(json_decode((string) $response->getJSON(), true)['data'], 'uuid');
+
+        $this->assertSame([$inSpace['uuid']], $uuids);
+        $this->assertNotContains($outside['uuid'], $uuids);
+    }
+
+    /** The inbox sent sort=newest/oldest and the endpoint ignored it. */
+    public function testListSortsByIntakeTimeWhenAsked(): void
+    {
+        $uuids = [];
+        foreach (['2026-01-02 09:00:00+00', '2026-01-03 09:00:00+00', '2026-01-01 09:00:00+00'] as $n => $received) {
+            $question = $this->intake("Sort fixture question {$n}");
+            Database::connect()->table('reach_community_questions')
+                ->where('id', $question['id'])
+                ->update(['intake_timestamp' => $received]);
+            $uuids[$received] = $question['uuid'];
+        }
+        ksort($uuids);
+        $oldestFirst = array_values($uuids);
+        $headers     = $this->authAs('reach_admin');
+
+        foreach (['oldest' => $oldestFirst, 'newest' => array_reverse($oldestFirst)] as $sort => $expected) {
+            $response = $this->withHeaders($headers)->call('GET', "v1/community/questions?sort={$sort}");
+            $listed   = array_column(json_decode((string) $response->getJSON(), true)['data'], 'uuid');
+            $this->assertSame($expected, $listed, "sort={$sort}");
+        }
+    }
+
     private function intake(string $title, ?int $spaceId = null, string $sourceType = 'manual'): array
     {
         return (new CommunityQuestionIntakeService())->intake([

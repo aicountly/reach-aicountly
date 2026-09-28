@@ -39,12 +39,17 @@ class OfficialAnswerController extends BaseApiController
     {
         $status       = (string) ($this->request->getGet('status') ?? '');
         $questionUuid = (string) ($this->request->getGet('question_uuid') ?? '');
-        $perPage      = min((int) ($this->request->getGet('per_page') ?? 100), 100);
+        $page         = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage      = max(1, min((int) ($this->request->getGet('per_page') ?? 25), 100));
+        $empty        = [
+            'data' => [],
+            'meta' => ['current_page' => $page, 'per_page' => $perPage, 'total' => 0, 'last_page' => 0],
+        ];
 
         try {
             $db = db_connect();
             if (! SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
-                return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
+                return $this->response->setJSON($empty);
             }
 
             // Empty status = "All" in the UI — list everything. The old
@@ -52,19 +57,27 @@ class OfficialAnswerController extends BaseApiController
             // single status and hide failed/generated drafts entirely.
             // question_uuid scopes the list to one question (its workspace);
             // ignoring it listed every answer there as that question's own.
-            $items = $this->repo->listByStatus(
+            // The pager reads total and last_page: page used to be ignored
+            // and total was the size of the one page returned.
+            $result = $this->repo->paginate(
                 $status !== '' ? $status : null,
+                $page,
                 $perPage,
                 $questionUuid !== '' ? $questionUuid : null,
             );
 
             return $this->response->setJSON([
-                'data' => is_array($items) ? $items : [],
-                'meta' => ['total' => is_array($items) ? count($items) : 0],
+                'data' => $result['data'],
+                'meta' => [
+                    'current_page' => $page,
+                    'per_page'     => $perPage,
+                    'total'        => $result['total'],
+                    'last_page'    => (int) ceil($result['total'] / $perPage),
+                ],
             ]);
         } catch (\Throwable $e) {
             log_message('error', 'OfficialAnswerController::index: ' . $e->getMessage());
-            return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0]]);
+            return $this->response->setJSON($empty);
         }
     }
 

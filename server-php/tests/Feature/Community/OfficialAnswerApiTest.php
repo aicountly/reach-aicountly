@@ -187,6 +187,43 @@ final class OfficialAnswerApiTest extends ApiTestCase
     }
 
     /** The created answer; fails with the error body unless the POST returned 201. */
+    /** page was ignored and total was the size of the page returned, so the pager never knew there was more. */
+    public function testListAnswersPagesWithTheFilteredTotal(): void
+    {
+        foreach (range(1, 3) as $n) {
+            $this->createAnswer(['question_uuid' => $this->intake("Paging fixture question {$n}")['uuid']]);
+        }
+
+        $response = $this->withHeaders($this->authAs('reach_admin'))
+            ->call('GET', 'v1/community/answers?per_page=2&page=2');
+        $body = json_decode((string) $response->getJSON(), true);
+
+        $this->assertCount(1, $body['data']);
+        $this->assertSame(['current_page' => 2, 'per_page' => 2, 'total' => 3, 'last_page' => 2], $body['meta']);
+    }
+
+    /** What the Overview's Pending approval tile links to: both review queues. */
+    public function testAwaitingApprovalListsBothReviewQueues(): void
+    {
+        $queued = [];
+        foreach (['editorial_review', 'professional_review', 'approved', 'draft_generated'] as $n => $status) {
+            $answer = $this->createAnswer(['question_uuid' => $this->intake("Review fixture question {$n}")['uuid']]);
+            \Config\Database::connect()->table('reach_community_official_answers')
+                ->where('uuid', $answer['uuid'])
+                ->update(['status' => $status]);
+            if (in_array($status, ['editorial_review', 'professional_review'], true)) {
+                $queued[] = $answer['uuid'];
+            }
+        }
+
+        $response = $this->withHeaders($this->authAs('reach_admin'))
+            ->call('GET', 'v1/community/answers?status=awaiting_approval');
+        $body = json_decode((string) $response->getJSON(), true);
+
+        $this->assertEqualsCanonicalizing($queued, array_column($body['data'], 'uuid'));
+        $this->assertSame(2, $body['meta']['total']);
+    }
+
     private function createAnswer(array $body): array
     {
         $response = $this->withHeaders($this->authAs('reach_admin'))

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 import { formatDate } from '../../utils/formatDate';
@@ -31,17 +31,24 @@ const STATUS_CLASS = {
 };
 
 export default function QuestionInboxPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The filter lives in the URL so the Overview tiles can link to it.
+  const status = searchParams.get('status') ?? '';
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
-  const [status, setStatus]       = useState('');
   const [sort, setSort]           = useState('triage_score_desc');
   const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  function changeStatus(value) {
+    setSearchParams(value ? { status: value } : {}, { replace: true });
+    setPage(1);
+  }
+
   function load() {
     setLoading(true);
-    api.get('v1/community/questions', { status: status || undefined, sort, page })
+    api.getPage('v1/community/questions', { status: status || undefined, sort, page })
       .then(r => {
         setQuestions(normalizeCommunityList(r));
         setTotalPages(normalizeCommunityMeta(r).last_page ?? 1);
@@ -61,13 +68,13 @@ export default function QuestionInboxPage() {
       <div className="toolbar mb-3">
         <label className="toolbar__label">
           Status
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="form-select form-select--sm">
+          <select value={status} onChange={e => changeStatus(e.target.value)} className="form-select form-select--sm">
             {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
           </select>
         </label>
         <label className="toolbar__label">
           Sort
-          <select value={sort} onChange={e => setSort(e.target.value)} className="form-select form-select--sm">
+          <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }} className="form-select form-select--sm">
             {SORT_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
