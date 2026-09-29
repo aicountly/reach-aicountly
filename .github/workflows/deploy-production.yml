@@ -196,7 +196,8 @@ jobs:
             "cd '${REMOTE_ROOT}/api' && \
              sed -i 's/\r$//' cpanel-post-deploy-api.sh && \
              chmod +x cpanel-post-deploy-api.sh && \
-             bash ./cpanel-post-deploy-api.sh ."
+             bash ./cpanel-post-deploy-api.sh . && \
+             rm -f cpanel-post-deploy-api.sh"
 
       - name: Verify files on remote server
         working-directory: .
