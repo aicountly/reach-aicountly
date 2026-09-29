@@ -24,3 +24,11 @@ P writable/cache/***
 P writable/logs/***
 P writable/session/***
 P writable/uploads/***
+
+# Never ship test code or PHPUnit config to the server: under api/ they are
+# web-reachable, and a request for a .php file runs it against the live .env.
+# H (hide) acts on the sender only, so --delete also removes the copy an
+# earlier deploy left in api/ (a "-" exclude would protect it forever).
+H /tests/
+H /phpunit.xml.dist
+H /phpunit.xml
