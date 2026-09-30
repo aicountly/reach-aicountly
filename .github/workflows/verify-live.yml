@@ -1,0 +1,86 @@
+# ---------------------------------------------------------------------------
+# Verify the live app, WITHOUT deploying anything
+#
+# MANUAL ONLY (workflow_dispatch). Runs the checks the deploy workflow runs
+# after a deploy, scripts/ci/post-deploy-checks.sh, against whatever is live
+# now. Nothing is built, uploaded or changed.
+#
+# The host's anti-bot page answers some requests from GitHub's runners with a
+# 200 of its own; the checks see through it by asking again from the server
+# itself over SSH, which is why this job loads the deploy key. With no deploy
+# there is no build to compare, so the web app is recognised by its <title>
+# rather than by the hashed entry asset of a build.
+# ---------------------------------------------------------------------------
+name: Verify live app
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which deployment to check (Reach has production only)
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+
+permissions:
+  contents: read
+
+env:
+  PROD_SFTP_HOST: ${{ secrets.PROD_SFTP_HOST }}
+  PROD_SFTP_PORT: ${{ secrets.PROD_SFTP_PORT || '22' }}
+  PROD_SFTP_USER: ${{ secrets.PROD_SFTP_USER }}
+  SSH_OPTS: -T -o BatchMode=yes -o LogLevel=ERROR -o RequestTTY=no
+
+jobs:
+  verify:
+    name: Verify ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The same key and host pinning as the deploy workflow; only the checks'
+      # retry from the server uses them.
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          if [ -z "${PROD_SFTP_HOST:-}" ] || [ -z "${PROD_SFTP_USER:-}" ]; then
+            echo "::error::Set PROD_SFTP_HOST and PROD_SFTP_USER in GitHub secrets."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if ! ssh-keyscan -T 15 -p "$PROD_SFTP_PORT" "$PROD_SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+            printf 'Host %s\n Port %s\n StrictHostKeyChecking accept-new\n' "$PROD_SFTP_HOST" "$PROD_SFTP_PORT" >> ~/.ssh/config
+            chmod 600 ~/.ssh/config
+          fi
+
+      # The checks ask the server itself only when the runner is shown the
+      # anti-bot page, which may not happen on this run. Prove the fallback
+      # works anyway: the key is accepted and the server has curl.
+      - name: Verify the server can retry a check
+        run: |
+          read -r -a ssh_opts <<< "$SSH_OPTS"
+          if ! ssh -p "$PROD_SFTP_PORT" "${ssh_opts[@]}" -o ConnectTimeout=20 "${PROD_SFTP_USER}@${PROD_SFTP_HOST}" 'command -v curl' > /tmp/ssh.out 2> /tmp/ssh.err; then
+            echo "::error::SSH to the server failed, or the server has no curl: when the runner is shown the anti-bot page, the checks could not ask the server instead."
+            sed 's/^/    /' /tmp/ssh.err
+            exit 1
+          fi
+          echo "SSH works; the server's curl is $(cat /tmp/ssh.out)."
+
+      - name: Run the post-deploy checks
+        env:
+          TARGET: ${{ inputs.environment }}
+          # Nothing was deployed, so there is no build to compare with.
+          EXPECTED_ENTRY: ''
+        run: |
+          export VERIFY_SSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS} -o ConnectTimeout=20 ${PROD_SFTP_USER}@${PROD_SFTP_HOST}"
+          bash scripts/ci/post-deploy-checks.sh "$TARGET"
