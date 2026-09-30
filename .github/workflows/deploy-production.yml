@@ -214,18 +214,23 @@ jobs:
             test -f '${REMOTE_ROOT}/api/.env' && echo 'OK: api/.env exists' || echo 'MISSING: api/.env'
           "
 
-      - name: Verify site and API over HTTP
+      # Is the live site really this build, and is its API answering? The host's anti-bot page
+      # ("One moment, please...") answers some runner requests with a 200 of its own, which a grep
+      # for "<html" accepts and a grep of the API's answer rejects. The checks accept only the app's
+      # real answer, ask again from the server itself over SSH when the runner is shown that page,
+      # and fail the deploy when neither gets it. What they assert (web entry; the API answers as
+      # Reach, "misconfigured" warns only): scripts/ci/post-deploy-checks.sh.
+      - name: Verify the live app
         working-directory: .
         run: |
           set -euo pipefail
-          SITE="https://reach.aicountly.org"
-          curl -sS "${SITE}/" | grep -qi '<html'
-          echo "Homepage OK"
-          BODY=$(curl -sS "${SITE}/api/health")
-          echo "$BODY" | head -c 400
-          echo ""
-          echo "$BODY" | grep -q 'aicountly-reach-api' || {
-            echo "::error::/api/health did not return Reach API JSON"
-            exit 1
-          }
-          echo "API health OK"
+          # The entry script's hash is unique to this build: finding it in the live index.html
+          # proves the new web build is the one being served.
+          EXPECTED_ENTRY="$(grep -o 'assets/index-[^"]*\.js' web/dist/index.html | head -n 1 || true)"
+          if [ -z "$EXPECTED_ENTRY" ]; then
+            echo "::warning::No assets/index-*.js in web/dist/index.html; the live page is checked for its <title> instead."
+          fi
+          export EXPECTED_ENTRY
+          # The same ssh as the steps above (agent key, known_hosts), for the retry from the server.
+          export VERIFY_SSH="ssh -p ${PROD_SFTP_PORT} ${SSH_OPTS} -o ConnectTimeout=20 ${PROD_SFTP_USER}@${PROD_SFTP_HOST}"
+          bash scripts/ci/post-deploy-checks.sh production
