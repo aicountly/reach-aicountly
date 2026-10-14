@@ -3,7 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
-use App\Models\RoleModel;
+use App\Libraries\ConsoleRoleSync;
 use App\Models\SessionModel;
 use App\Models\UserModel;
 use App\Services\ConsoleIdentityService;
@@ -13,8 +13,11 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Reach portal auth. Superadmin-only — only users with role_slug='super_admin'
- * may sign in. Console SSO is the sole sign-in path (no local credentials).
+ * Reach portal auth. Console SSO is the sole sign-in path (no local
+ * credentials). The staff role comes from Console → Roles & Access
+ * (super_admin, reach_admin, marketing_manager, content_reviewer) and is
+ * mirrored into reach_users.role_id; every authenticated route is then gated
+ * by its permission:* filter. See StaffAccessService.
  */
 class AuthController extends BaseApiController
 {
@@ -28,11 +31,19 @@ class AuthController extends BaseApiController
         );
     }
 
+    /**
+     * POST /v1/auth/refresh {token} — re-issue a token after re-checking the
+     * caller's role with Console (see StaffAccessService::refresh).
+     */
     public function refresh()
     {
-        $body    = $this->input();
-        $token   = (string) ($body['token'] ?? '');
-        $payload = Services::jwt()->decode($token);
+        $body  = $this->input();
+        $token = (string) ($body['token'] ?? '');
+        try {
+            $payload = Services::jwt()->decode($token);
+        } catch (RuntimeException $e) {
+            return $this->fail($e->getMessage(), 503);
+        }
         if (! $payload) {
             return $this->fail('Invalid token.', 401);
         }
@@ -42,20 +53,37 @@ class AuthController extends BaseApiController
             return $this->fail('Invalid token subject.', 401);
         }
 
+        // A token whose session was revoked (logout, or Console revoking
+        // access) cannot be refreshed back to life.
+        if (! (new SessionModel())->findActiveByTokenHash(hash('sha256', $token))) {
+            return $this->fail('Session is no longer active. Please sign in again.', 401);
+        }
+
         $user = (new UserModel())->find($userId);
-        if (! $user || ($user['is_active'] ?? true) === false) {
+        if (! $user) {
             return $this->fail('User is inactive.', 403);
         }
 
-        $role = (new RoleModel())->find((int) ($user['role_id'] ?? 0));
-        if (($role['slug'] ?? '') !== 'super_admin') {
-            return $this->fail('Reach is restricted to superadmin users.', 403);
+        $result = Services::staffAccess()->refresh($user);
+        if (! $result['ok']) {
+            if ((int) $result['status'] === 403) {
+                Services::auditLogger()->log(
+                    userId:     $userId,
+                    action:     'auth.console_access_revoked',
+                    entityType: 'user',
+                    entityId:   $userId,
+                    extra:      ['reason' => $result['error']],
+                );
+            }
+
+            return $this->fail((string) $result['error'], (int) $result['status']);
         }
 
+        $roleSlug = (string) $result['role_slug'];
         $newToken = Services::jwt()->issue(
             (int) $user['id'],
             (string) $user['email'],
-            'super_admin',
+            $roleSlug,
             (string) ($user['name'] ?? ''),
         );
         (new SessionModel())->createFromToken(
@@ -67,8 +95,10 @@ class AuthController extends BaseApiController
         );
 
         return $this->ok([
-            'token'      => $newToken,
-            'expires_in' => Services::jwt()->ttlSeconds(),
+            'token'       => $newToken,
+            'expires_in'  => Services::jwt()->ttlSeconds(),
+            'role'        => $roleSlug,
+            'permissions' => Services::permissionService()->resolveEffective((int) $user['id']),
         ]);
     }
 
@@ -97,7 +127,7 @@ class AuthController extends BaseApiController
         if (! $row) {
             return $this->fail('User no longer exists.', 401);
         }
-        $roleSlug = (string) ($row['role_slug'] ?? 'super_admin');
+        $roleSlug = (string) ($row['role_slug'] ?? '');
         $permissions = Services::permissionService()->resolveEffective((int) $row['id']);
 
         return $this->ok([
@@ -106,8 +136,11 @@ class AuthController extends BaseApiController
             'name'            => (string) $row['name'],
             'role'            => $roleSlug,
             'role_slug'       => $roleSlug,
+            'role_name'       => (string) ($row['role_name'] ?? ''),
             'permissions'     => $permissions,
             'actor_type'      => (string) ($row['actor_type'] ?? 'human'),
+            'roles_synced_at' => $row['roles_synced_at'] ?? null,
+            'roles_managed_by'=> 'console',
             'controller_apps' => $this->controllerAppsForRequest(),
         ]);
     }
@@ -182,14 +215,12 @@ class AuthController extends BaseApiController
             $session = $this->buildSessionFromConsoleIdentity($identity, 'auth.controller_sso_callback');
             if ($session instanceof ResponseInterface) {
                 $message = 'You do not have access to the Reach controller app.';
-                if (method_exists($session, 'getJSON')) {
-                    $json = $session->getJSON(true);
-                    if (is_array($json) && ! empty($json['error'])) {
-                        $message = (string) $json['error'];
-                    }
+                $json    = json_decode((string) $session->getBody(), true);
+                if (is_array($json) && is_string($json['error'] ?? null) && $json['error'] !== '') {
+                    $message = $json['error'];
                 }
 
-                return $this->ssoCallbackHtml($message, 403);
+                return $this->ssoCallbackHtml($message, $session->getStatusCode() >= 400 ? $session->getStatusCode() : 403);
             }
 
             return $this->completeSsoInBrowser((string) $session['token']);
@@ -287,42 +318,52 @@ class AuthController extends BaseApiController
             return $this->fail('Console identity did not return a user email.', 502);
         }
 
-        $superAdminRoleId = $this->superAdminRoleId();
-        if ($superAdminRoleId === null) {
-            return $this->fail('Reach super_admin role is not configured.', 503);
+        // The role comes from Console. Decide before provisioning anything so
+        // a staff member without a Reach role never gets a local row.
+        $decision = ConsoleRoleSync::fromIdentity($identity);
+        if ($decision['status'] === 'deny') {
+            return $this->fail((string) $decision['message'], 403);
         }
 
         $users = new UserModel();
         $user  = $users->findByEmail($email);
 
+        if ($user && (! $this->truthy($user['is_active'] ?? true) || $this->truthy($user['is_login_disabled'] ?? false))) {
+            return $this->fail('Reach user account is inactive.', 403);
+        }
+
+        $access   = Services::staffAccess();
+        $resolved = $access->resolveLoginRole($user, $decision);
+        if (! $resolved['ok']) {
+            return $this->fail((string) $resolved['error'], (int) $resolved['status']);
+        }
+        $sync     = $access->syncColumns($decision, $resolved);
+        $roleSlug = (string) $resolved['role_slug'];
+
         if (! $user) {
-            $userId = $users->insert([
+            $userId = $users->insert(array_merge([
                 'email'         => $email,
                 'name'          => $name !== '' ? $name : $email,
                 'password_hash' => password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT),
-                'role_id'       => $superAdminRoleId,
                 'is_active'     => true,
-            ]);
+            ], $sync));
 
             if (! $userId) {
                 return $this->fail('Could not provision Reach user from Console identity.', 500);
             }
 
             $user = $users->find((int) $userId);
-        } elseif (($user['is_active'] ?? true) === false) {
-            return $this->fail('Reach user account is inactive.', 403);
         } else {
-            $role = (new RoleModel())->find((int) ($user['role_id'] ?? 0));
-            if (($role['slug'] ?? '') !== 'super_admin') {
-                return $this->fail('Reach is restricted to superadmin users.', 403);
-            }
+            $users->update((int) $user['id'], $sync);
+            $user = $users->find((int) $user['id']);
         }
+        Services::permissionService()->invalidate((int) $user['id']);
 
         try {
             $reachToken = Services::jwt()->issue(
                 (int) $user['id'],
                 (string) $user['email'],
-                'super_admin',
+                $roleSlug,
                 (string) ($user['name'] ?? ''),
             );
         } catch (RuntimeException $e) {
@@ -349,8 +390,10 @@ class AuthController extends BaseApiController
             entityType: 'user',
             entityId:   (int) $user['id'],
             extra:      [
-                'role'              => 'super_admin',
-                'console_user_id'   => (int) ($consoleUser['id'] ?? 0),
+                'role'              => $roleSlug,
+                'roles_source'      => $decision['status'] === 'grant' ? 'console' : 'local_legacy',
+                'console_user_id'   => (int) ($decision['console_user_id'] ?? ($consoleUser['id'] ?? 0)),
+                'authz_version'     => $decision['authz_version'] ?? null,
                 'global_superadmin' => $global,
             ],
         );
@@ -364,8 +407,8 @@ class AuthController extends BaseApiController
                 'id'              => (int) $user['id'],
                 'email'           => (string) $user['email'],
                 'name'            => (string) $user['name'],
-                'role'            => 'super_admin',
-                'role_slug'       => 'super_admin',
+                'role'            => $roleSlug,
+                'role_slug'       => $roleSlug,
                 'permissions'     => $permissions,
                 'actor_type'      => 'human',
                 'controller_apps' => $this->normalizeLauncherApps(
@@ -488,10 +531,13 @@ HTML;
         return null;
     }
 
-    private function superAdminRoleId(): ?int
+    /** Postgres booleans may arrive as 't' / 'f' strings. */
+    private function truthy(mixed $v): bool
     {
-        $role = (new RoleModel())->findBySlug('super_admin');
+        if (is_string($v)) {
+            return in_array(strtolower($v), ['t', 'true', '1'], true);
+        }
 
-        return $role ? (int) $role['id'] : null;
+        return (bool) $v;
     }
 }

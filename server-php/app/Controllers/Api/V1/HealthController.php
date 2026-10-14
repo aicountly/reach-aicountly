@@ -18,6 +18,9 @@ class HealthController extends BaseApiController
         $checks['database']          = $this->probeDb();
         $checks['console_configured']= (string) env('CONSOLE_API_BASE_URL', '') !== ''
                                     && (string) env('CONSOLE_API_TOKEN', '') !== '';
+        // Token refresh re-checks staff roles with Console (required in production).
+        $checks['console_role_sync_configured'] = (string) env('CONSOLE_API_URL', '') !== ''
+                                    && (string) env('CONSOLE_API_TOKEN', '') !== '';
         $checks['engage_configured'] = (string) env('ENGAGE_API_BASE_URL', '') !== ''
                                     && (string) env('ENGAGE_INBOUND_TOKEN', '') !== '';
         $checks['worker_configured'] = (string) env('WORKER_BASE_URL', '') !== ''

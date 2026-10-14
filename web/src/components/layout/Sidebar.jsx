@@ -4,10 +4,22 @@ import { BotModeBadge } from '../bot/BotModeBadge';
 import { ReachLogo } from '../brand/ReachLogo';
 import { useReachCounts } from '../../context/ReachCountsContext';
 import { usePermission } from '../../hooks/usePermission';
+import { useAuth } from '../../context/AuthContext';
+import { ROLES_MANAGED_TEXT } from '../auth/RolesManagedNote';
+
+const ROLE_LABELS = {
+  super_admin: 'Superadmin',
+  reach_admin: 'Reach Admin',
+  marketing_manager: 'Marketing Manager',
+  content_reviewer: 'Content Reviewer',
+};
 
 export function Sidebar() {
   const counts = useReachCounts();
   const { has } = usePermission();
+  const { user } = useAuth();
+  const role = user?.role_slug || user?.role || '';
+  const roleLabel = user?.role_name || ROLE_LABELS[role] || role.replace(/_/g, ' ');
   const visibleSections = buildNavSections()
     .map((section) => ({
       ...section,
@@ -18,7 +30,7 @@ export function Sidebar() {
     <aside className="reach-sidebar" aria-label="Primary">
       <div className="reach-sidebar__brand">
         <ReachLogo height={32} />
-        <div className="text-xs text-muted mt-1">Superadmin</div>
+        <div className="text-xs text-muted mt-1" title={ROLES_MANAGED_TEXT} data-testid="sidebar-role">{roleLabel}</div>
         <div className="mt-2"><BotModeBadge /></div>
       </div>
 

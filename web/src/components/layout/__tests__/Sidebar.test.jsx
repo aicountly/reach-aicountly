@@ -74,4 +74,29 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Marketing Bot')).not.toBeInTheDocument();
     expect(screen.queryByText('Administration')).not.toBeInTheDocument();
   });
+
+  it('shows a Console-assigned content_reviewer only what that role may use', () => {
+    // Subset of the canonical content_reviewer permissions (RolesAndPermissionsSeeder).
+    renderWithAuth(<Sidebar />, {
+      auth: {
+        user: { id: 6, email: 'reviewer@aicountly.org', role: 'content_reviewer', role_slug: 'content_reviewer' },
+        permissions: [
+          'dashboard.view', 'blog.view', 'blog.approve', 'campaign.view', 'approval.view',
+          'approval.decide', 'lead.view', 'bot.view', 'content.view', 'content.review',
+          'daily_pack.view', 'publishing.view', 'seo.view', 'knowledge.view', 'community.view',
+        ],
+      },
+    });
+    expect(screen.getByTestId('sidebar-role')).toHaveTextContent('Content Reviewer');
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Console Approvals')).toBeInTheDocument();
+    expect(screen.getByText('Blog Command Centre')).toBeInTheDocument();
+    expect(screen.queryByText('New Content')).not.toBeInTheDocument();
+    expect(screen.queryByText('AI Control Centre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bot Mode')).not.toBeInTheDocument();
+    expect(screen.queryByText('Audit Logs')).not.toBeInTheDocument();
+    expect(screen.queryByText('Job Monitor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
+  });
 });

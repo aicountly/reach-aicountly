@@ -11,7 +11,12 @@ modes and superadmin approval gates.
 - Frontend: React 19 + Vite in [`web/`](web) with the Flow-style green/white
   compact admin UI (plain CSS variables, no Tailwind).
 - Backend: CodeIgniter 4.6 API in [`server-php/`](server-php), served under
-  `reach.aicountly.org/api/v1` with an independent superadmin-only JWT.
+  `reach.aicountly.org/api/v1` with its own JWT, issued after Console SSO.
+  Staff roles (`super_admin`, `reach_admin`, `marketing_manager`,
+  `content_reviewer`) are **assigned in Console → Roles & Access** and mirrored
+  at sign-in / token refresh; every route is permission-gated. See
+  [`docs/architecture/REACH_RBAC.md`](docs/architecture/REACH_RBAC.md#roles-come-from-console).
+  Production must set `CONSOLE_API_URL` + `CONSOLE_API_TOKEN` (`staff.roles`).
 - Database: PostgreSQL with `reach_*` prefix. DB name/user/password read from
   `.env` only — never hardcoded.
 - Integrations:

@@ -83,6 +83,10 @@ fi
 
 validate_dotenv_format
 
+if ! grep -qE '^CONSOLE_API_TOKEN=.+' .env || ! grep -qE '^CONSOLE_API_URL=.+' .env; then
+  echo "WARNING: CONSOLE_API_URL / CONSOLE_API_TOKEN not set — token refresh cannot re-check staff roles with Console (required in production)."
+fi
+
 mkdir -p writable/cache writable/session writable/logs writable/uploads
 chmod -R 775 writable/cache writable/session writable/logs writable/uploads 2>/dev/null || \
   chmod -R 777 writable/cache writable/session writable/logs writable/uploads
