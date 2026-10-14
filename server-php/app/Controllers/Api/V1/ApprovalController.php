@@ -78,28 +78,17 @@ class ApprovalController extends BaseApiController
             $auditPayload['override'] = true;
             $auditPayload['reason']   = $reason;
         }
-        $this->audit('approval.decided', 'approval', $id, $row, $auditPayload, $reason);
+        // One approval.decided per decision: this audit event is also Console's (central audit,
+        // keyed by the reach_audit_logs row; actor, IP and reason included). Reach used to send a
+        // second reach.approval.decided straight to Console as well, so Console got two rows.
+        $subject = ['subject_type' => $row['subject_type'] ?? null, 'subject_id' => isset($row['subject_id']) ? (int) $row['subject_id'] : null];
+        $sent = $this->audit('approval.decided', 'approval', $id, $row, $auditPayload, $subject, $reason);
         if ($override) {
-            $this->audit('approval.overridden', 'approval', $id, $row, $auditPayload, $reason);
+            $this->audit('approval.overridden', 'approval', $id, $row, $auditPayload, $subject, $reason);
         }
-
-        try {
-            $sent = Services::consoleAudit()->event('reach.approval.decided', [
-                'approval_id'  => $id,
-                'entity_type'  => 'approval',
-                'entity_id'    => $id,
-                'subject_type' => $row['subject_type'],
-                'subject_id'   => (int) $row['subject_id'],
-                'decision'     => $decision,
-                'decided_by'   => $this->userId(),
-                'override'     => $override,
-            ]);
-            // Only when Console has it; a queued event is retried by reach:console-audit-deliver.
-            if ($sent === 'delivered') {
-                $m->update($id, ['console_synced_at' => date('Y-m-d H:i:s')]);
-            }
-        } catch (\Throwable $e) {
-            log_message('error', 'Approval console sync failed: ' . $e->getMessage());
+        // Only when Console has it; a queued event is retried by reach:console-audit-deliver.
+        if ($sent === 'delivered') {
+            $m->update($id, ['console_synced_at' => date('Y-m-d H:i:s')]);
         }
         return $this->ok($m->find($id));
     }
