@@ -84,15 +84,20 @@ class ApprovalController extends BaseApiController
         }
 
         try {
-            Services::consoleAudit()->event('reach.approval.decided', [
+            $sent = Services::consoleAudit()->event('reach.approval.decided', [
                 'approval_id'  => $id,
+                'entity_type'  => 'approval',
+                'entity_id'    => $id,
                 'subject_type' => $row['subject_type'],
                 'subject_id'   => (int) $row['subject_id'],
                 'decision'     => $decision,
                 'decided_by'   => $this->userId(),
                 'override'     => $override,
             ]);
-            $m->update($id, ['console_synced_at' => date('Y-m-d H:i:s')]);
+            // Only when Console has it; a queued event is retried by reach:console-audit-deliver.
+            if ($sent === 'delivered') {
+                $m->update($id, ['console_synced_at' => date('Y-m-d H:i:s')]);
+            }
         } catch (\Throwable $e) {
             log_message('error', 'Approval console sync failed: ' . $e->getMessage());
         }

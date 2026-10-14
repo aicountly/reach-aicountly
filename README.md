@@ -20,8 +20,15 @@ modes and superadmin approval gates.
 - Database: PostgreSQL with `reach_*` prefix. DB name/user/password read from
   `.env` only — never hardcoded.
 - Integrations:
-  - **Console** — audit/approval/report/mode/health/lead events fanned out via
-    `POST {CONSOLE_API_BASE_URL}/audit` (mirrors Flow's `ConsoleAuditClient`).
+  - **Console** — audit/approval/bot-report events go to Console's central audit,
+    `POST {CONSOLE_API_URL}/portal/audit` with Reach's own key (`CONSOLE_API_TOKEN`,
+    capability `audit.write`; console-react-app AUTH_INTEGRATION.md "Central audit").
+    Each event is queued in `reach_console_sync_logs` (the outbox), sent at once, and
+    retried until Console has it by cron every 5 minutes:
+    `0,5,10,15,20,25,30,35,40,45,50,55 * * * * cd /path/to/api && php spark reach:console-audit-deliver >> writable/logs/console_audit.log 2>&1`.
+    Console de-duplicates on `external_id` (`reach:audit_logs:<id>`), so a retry never
+    doubles an event; failures are logged as `[ConsoleAuditClient] …` and shown on the
+    Console Sync Status page.
   - **Engage** — lead push via `POST {ENGAGE_API_BASE_URL}/internal/reach/leads`
     with header `X-Portal-Token: {ENGAGE_INBOUND_TOKEN}` (matches Engage's
     `ReachController::ingest`). Duplicate detection is inferred locally.

@@ -68,13 +68,15 @@ class MarketingBotReporter
         // Fan out to Console — no PII in payload; just summary keys.
         try {
             Services::consoleAudit()->event('reach.bot.' . $row['action'], [
+                'entity_type'       => 'bot_report',
+                'entity_id'         => $id,
                 'report_id'         => $id,
                 'queue_id'          => $row['queue_id'],
                 'approval_status'   => $row['approval_status'],
                 'publishing_status' => $row['publishing_status'],
                 'mode'              => $row['mode'],
                 'action_taken'      => $row['action_taken'],
-            ]);
+            ], 'reach:bot_report:' . $id);
         } catch (\Throwable $e) {
             log_message('error', 'ConsoleAudit event failed: ' . $e->getMessage());
         }
