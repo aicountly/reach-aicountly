@@ -3,6 +3,7 @@
 namespace App\Filters;
 
 use App\Models\SessionModel;
+use App\Models\UserModel;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -54,13 +55,34 @@ class JwtFilter implements FilterInterface
                 ->setJSON(['ok' => false, 'error' => 'Session is no longer active. Please sign in again.']);
         }
 
+        // The role comes from the database, not the token: roles are assigned
+        // in Console and re-synced on sign-in and refresh, so a demoted or
+        // deactivated user must lose super_admin-only routes immediately rather
+        // than when their token expires.
+        $row = (new UserModel())->withRole($userId);
+        if (! $row || ! self::truthy($row['is_active'] ?? false) || self::truthy($row['is_login_disabled'] ?? false)) {
+            return service('response')
+                ->setStatusCode(401)
+                ->setJSON(['ok' => false, 'error' => 'Session is no longer active. Please sign in again.']);
+        }
+
         $request->reachUser = [
             'id'    => $userId,
-            'email' => (string) ($payload['email'] ?? ''),
-            'name'  => (string) ($payload['name'] ?? ''),
-            'role'  => (string) ($payload['role'] ?? ''),
+            'email' => (string) ($row['email'] ?? $payload['email'] ?? ''),
+            'name'  => (string) ($row['name'] ?? $payload['name'] ?? ''),
+            'role'  => (string) ($row['role_slug'] ?? ''),
         ];
         $request->reachSession = $session;
+    }
+
+    /** PostgreSQL booleans come back as 't'/'f' strings through the CI4 driver. */
+    private static function truthy(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return in_array(strtolower(trim((string) $value)), ['1', 't', 'true', 'yes', 'on'], true);
     }
 
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
