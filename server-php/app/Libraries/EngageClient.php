@@ -231,9 +231,9 @@ class EngageClient
         $row = [
             'lead_id'         => $leadId,
             'attempt_number'  => $attempt,
-            'request_body'    => json_encode($body, JSON_UNESCAPED_SLASHES),
+            'request_body'    => $body,
             'response_status' => $status,
-            'response_body'   => $response !== null ? json_encode($response, JSON_UNESCAPED_SLASHES) : null,
+            'response_body'   => $response,
             'error_message'   => $error,
             'ok'              => $ok,
             'attempted_at'    => date('Y-m-d H:i:s'),

@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class ConsoleSyncLogModel extends Model
+class ConsoleSyncLogModel extends ReachModel
 {
     protected $table         = 'reach_console_sync_logs';
     protected $primaryKey    = 'id';

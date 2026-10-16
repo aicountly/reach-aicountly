@@ -42,9 +42,6 @@ class LandingPageController extends BaseApiController
         if (isset($row['body'])) {
             $row['body'] = $sanitizer->purify((string) $row['body']);
         }
-        if (isset($row['meta']) && is_array($row['meta'])) {
-            $row['meta'] = json_encode($row['meta']);
-        }
         $row['status']     ??= 'draft';
         $row['created_by']   = $this->userId();
         $row['slug']         = $this->uniqueSlug($m, (string) ($row['slug'] ?? ($row['title'] ?? 'landing')));
@@ -69,9 +66,6 @@ class LandingPageController extends BaseApiController
         }
         if (isset($update['body'])) {
             $update['body'] = $sanitizer->purify((string) $update['body']);
-        }
-        if (isset($update['meta']) && is_array($update['meta'])) {
-            $update['meta'] = json_encode($update['meta']);
         }
         if (isset($update['slug'])) {
             $update['slug'] = $this->uniqueSlug($m, (string) $update['slug'], $id);

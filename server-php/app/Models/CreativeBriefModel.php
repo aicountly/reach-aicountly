@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class CreativeBriefModel extends Model
+class CreativeBriefModel extends ReachModel
 {
     protected $table         = 'reach_creative_briefs';
     protected $primaryKey    = 'id';
@@ -19,5 +17,5 @@ class CreativeBriefModel extends Model
         'status', 'bot_generated', 'created_by',
     ];
 
-    protected array $casts = ['deliverables' => 'json-array'];
+    protected array $casts = ['deliverables' => '?json-array'];
 }

@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class MarketingBotQueueModel extends Model
+class MarketingBotQueueModel extends ReachModel
 {
     protected $table         = 'reach_marketing_bot_queue';
     protected $primaryKey    = 'id';

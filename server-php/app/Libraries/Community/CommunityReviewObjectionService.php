@@ -90,11 +90,11 @@ class CommunityReviewObjectionService
             'question_id'       => $finding['question_id'] ?? null,
             'finding_type'      => $finding['finding_type'],
             'severity'          => $finding['severity'],
-            'details'           => json_encode([
+            'details'           => [
                 'detail'    => $finding['detail'],
                 'raised_by' => $identity['slug'],
                 'role'      => 'review_objection_desk',
-            ]),
+            ],
             'status'            => 'open',
             'created_at'        => date('Y-m-d H:i:s'),
         ], true);

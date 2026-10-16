@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentLandingDetailModel extends Model
+class ContentLandingDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_landing_details';
     protected $primaryKey    = 'id';
@@ -21,7 +21,7 @@ class ContentLandingDetailModel extends Model
     ];
 
     protected array $casts = [
-        'sections' => 'json-array',
+        'sections' => '?json-array',
     ];
 
     public function forItem(int $contentItemId): ?array

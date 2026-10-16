@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class CommunityModerationFindingModel extends Model
+class CommunityModerationFindingModel extends ReachModel
 {
     protected $table         = 'reach_community_moderation_findings';
     protected $primaryKey    = 'id';

@@ -243,7 +243,7 @@ class OfficialAnswerModerationService
             'answer_version_id' => $versionId,
             'finding_type'      => $finding['type'],
             'severity'          => $finding['severity'],
-            'details'           => json_encode(['detail' => $finding['detail']]),
+            'details'           => ['detail' => $finding['detail']],
             'auto_action'       => $finding['severity'] === 'critical' ? 'blocked' : 'flagged',
             'status'            => 'open',
             'created_at'        => date('Y-m-d H:i:s'),

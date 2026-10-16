@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Video;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class VideoSegmentModel extends Model
+class VideoSegmentModel extends ReachModel
 {
     protected $table         = 'reach_video_segments';
     protected $primaryKey    = 'id';

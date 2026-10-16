@@ -208,18 +208,18 @@ class MarketingBotService
                 'summary'      => sprintf('Marketing Bot: %s', $action),
                 'requested_by' => $userId,
                 'decision'     => 'pending',
-                'metadata'     => json_encode(['action' => $action, 'payload' => $payload], JSON_UNESCAPED_SLASHES),
+                'metadata'     => ['action' => $action, 'payload' => $payload],
             ], true);
         }
 
         $this->queue->update($queueId, [
             'status'         => $requiresApproval ? 'completed' : 'completed',
-            'result_summary' => json_encode([
+            'result_summary' => [
                 'report_id'         => $reportId,
                 'approval_id'       => $approvalId,
                 'requires_approval' => $requiresApproval,
                 'artifacts'         => $persisted['artifacts'] ?? [],
-            ], JSON_UNESCAPED_SLASHES),
+            ],
             'finished_at'    => date('Y-m-d H:i:s'),
         ]);
 
@@ -524,7 +524,7 @@ class MarketingBotService
                 'excerpt'         => $c['excerpt']         ?? null,
                 'content'         => $c['body']            ?? '',
                 'category'        => $c['category']        ?? null,
-                'tags'            => isset($c['tags']) ? json_encode($c['tags']) : null,
+                'tags'            => $c['tags'] ?? null,
                 'seo_title'       => $c['seo_title']       ?? null,
                 'seo_description' => $c['seo_description'] ?? null,
                 'focus_keyword'   => $c['focus_keyword']   ?? null,
@@ -574,7 +574,7 @@ class MarketingBotService
             $seo->insert([
                 'title'              => 'SEO Brief: ' . ($c['focus_keyword'] ?? 'brief'),
                 'focus_keyword'      => (string) ($c['focus_keyword'] ?? ''),
-                'secondary_keywords' => json_encode($c['secondary_keywords'] ?? []),
+                'secondary_keywords' => $c['secondary_keywords'] ?? [],
                 'brief'              => json_encode($c),
                 'status'             => 'draft',
                 'bot_generated'      => true,
@@ -591,7 +591,7 @@ class MarketingBotService
                 'title'         => 'Creative Brief',
                 'brief'         => json_encode($c),
                 'audience'      => $c['audience'] ?? null,
-                'deliverables'  => json_encode($c['deliverables'] ?? []),
+                'deliverables'  => $c['deliverables'] ?? [],
                 'status'        => 'draft',
                 'bot_generated' => true,
                 'created_by'    => $userId,
@@ -624,7 +624,7 @@ class MarketingBotService
     {
         $this->queue->insert([
             'action'       => $action,
-            'payload'      => json_encode($payload, JSON_UNESCAPED_SLASHES),
+            'payload'      => $payload,
             'status'       => 'running',
             'requested_by' => $userId,
             'started_at'   => date('Y-m-d H:i:s'),

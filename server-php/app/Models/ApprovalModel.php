@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class ApprovalModel extends Model
+class ApprovalModel extends ReachModel
 {
     protected $table         = 'reach_approvals';
     protected $primaryKey    = 'id';

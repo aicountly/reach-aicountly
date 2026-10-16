@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class NotificationModel extends Model
+class NotificationModel extends ReachModel
 {
     protected $table         = 'reach_notifications';
     protected $primaryKey    = 'id';
@@ -18,7 +16,7 @@ class NotificationModel extends Model
     ];
 
     protected array $casts = [
-        'data' => 'json-array',
+        'data' => '?json-array',
     ];
 
     public function unreadForUser(int $userId): array

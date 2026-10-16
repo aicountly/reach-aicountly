@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class SocialPostModel extends Model
+class SocialPostModel extends ReachModel
 {
     protected $table         = 'reach_social_posts';
     protected $primaryKey    = 'id';
@@ -22,7 +20,7 @@ class SocialPostModel extends Model
     ];
 
     protected array $casts = [
-        'media_refs' => 'json-array',
-        'hashtags'   => 'json-array',
+        'media_refs' => '?json-array',
+        'hashtags'   => '?json-array',
     ];
 }

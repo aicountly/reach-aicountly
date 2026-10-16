@@ -58,7 +58,7 @@ class ContentVersionService
             'body_html'          => $body['body_html'] ?? null,
             'body_markdown'      => $body['body_markdown'] ?? null,
             'body_plain_text'    => $body['body_plain_text'] ?? null,
-            'structured_payload' => isset($body['structured_payload']) ? json_encode($body['structured_payload']) : null,
+            'structured_payload' => $body['structured_payload'] ?? null,
             'change_summary'     => $changeSummary,
             'is_current'         => true,
             'created_actor_type' => $actor['type'] ?? 'human',

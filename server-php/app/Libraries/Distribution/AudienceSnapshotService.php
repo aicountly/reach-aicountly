@@ -25,7 +25,7 @@ class AudienceSnapshotService
             'campaign_version_id' => $versionId,
             'tenant_id'           => $tenantId,
             'channel'             => $channel,
-            'snapshot_criteria'   => $criteria ? json_encode($criteria) : null,
+            'snapshot_criteria'   => $criteria ?: null,
         ]);
 
         $this->audit->record(AuditLogger::DISTRIBUTION_SNAPSHOT_CREATED, [

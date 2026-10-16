@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class BotSettingModel extends Model
+class BotSettingModel extends ReachModel
 {
     protected $table         = 'reach_bot_settings';
     protected $primaryKey    = 'id';
@@ -15,7 +13,7 @@ class BotSettingModel extends Model
     protected $updatedField  = 'updated_at';
 
     protected $allowedFields = ['mode', 'allowed_auto_actions', 'updated_by'];
-    protected array $casts   = ['allowed_auto_actions' => 'json-array'];
+    protected array $casts   = ['allowed_auto_actions' => '?json-array'];
 
     /**
      * DB row is authoritative; env is only a fallback if the row is somehow missing.
@@ -51,14 +49,14 @@ class BotSettingModel extends Model
         if ($row) {
             $this->update($row['id'], [
                 'mode'                 => $mode,
-                'allowed_auto_actions' => json_encode(array_values($allowedAutoActions)),
+                'allowed_auto_actions' => array_values($allowedAutoActions),
                 'updated_by'           => $userId,
             ]);
             return $this->find($row['id']);
         }
         $this->insert([
             'mode'                 => $mode,
-            'allowed_auto_actions' => json_encode(array_values($allowedAutoActions)),
+            'allowed_auto_actions' => array_values($allowedAutoActions),
             'updated_by'           => $userId,
         ]);
         return $this->find((int) $this->db->insertID());

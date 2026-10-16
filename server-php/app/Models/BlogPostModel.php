@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class BlogPostModel extends Model
+class BlogPostModel extends ReachModel
 {
     protected $table         = 'reach_blog_posts';
     protected $primaryKey    = 'id';
@@ -23,7 +21,7 @@ class BlogPostModel extends Model
         'created_by', 'approved_by', 'approved_at',
     ];
 
-    protected array $casts = ['tags' => 'json-array'];
+    protected array $casts = ['tags' => '?json-array'];
 
     public function findBySlug(string $slug): ?array
     {

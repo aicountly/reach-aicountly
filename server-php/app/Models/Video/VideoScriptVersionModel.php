@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Video;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class VideoScriptVersionModel extends Model
+class VideoScriptVersionModel extends ReachModel
 {
     protected $table         = 'reach_video_script_versions';
     protected $primaryKey    = 'id';

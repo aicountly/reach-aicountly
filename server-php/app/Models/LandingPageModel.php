@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class LandingPageModel extends Model
+class LandingPageModel extends ReachModel
 {
     protected $table         = 'reach_landing_pages';
     protected $primaryKey    = 'id';
@@ -18,5 +16,5 @@ class LandingPageModel extends Model
         'campaign_id', 'slug', 'title', 'meta', 'body', 'status', 'published_at', 'created_by',
     ];
 
-    protected array $casts = ['meta' => 'json-array'];
+    protected array $casts = ['meta' => '?json-array'];
 }

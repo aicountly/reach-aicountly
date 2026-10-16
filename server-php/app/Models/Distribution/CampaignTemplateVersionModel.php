@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Distribution;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class CampaignTemplateVersionModel extends Model
+class CampaignTemplateVersionModel extends ReachModel
 {
     protected $table      = 'reach_campaign_template_versions';
     protected $primaryKey = 'id';

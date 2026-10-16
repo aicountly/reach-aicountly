@@ -210,7 +210,8 @@ class ContentItemService
             'body_html'          => $body['body_html'] ?? null,
             'body_markdown'      => $body['body_markdown'] ?? null,
             'body_plain_text'    => $body['body_plain_text'] ?? null,
-            'structured_payload' => isset($body['structured_payload']) ? (is_array($body['structured_payload']) ? json_encode($body['structured_payload']) : $body['structured_payload']) : null,
+            // The model's JSON cast encodes an array; a pre-encoded string is stored as its document.
+            'structured_payload' => $body['structured_payload'] ?? null,
             'change_summary'     => $summary,
             'is_current'         => true,
             'created_actor_type' => $actor['type'] ?? 'human',

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Distribution;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class AudienceSnapshotModel extends Model
+class AudienceSnapshotModel extends ReachModel
 {
     protected $table      = 'reach_campaign_audience_snapshots';
     protected $primaryKey = 'id';

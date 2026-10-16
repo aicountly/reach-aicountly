@@ -19,6 +19,10 @@ modes and superadmin approval gates.
   Production must set `CONSOLE_API_URL` + `CONSOLE_API_TOKEN` (`staff.roles`).
 - Database: PostgreSQL with `reach_*` prefix. DB name/user/password read from
   `.env` only — never hardcoded.
+- JSON columns: every model with a JSON cast extends `ReachModel` (`TolerantJsonCast`; `text[]`
+  columns use `pg-text-array`). Pass arrays to those fields, never `json_encode()` output. Rows an
+  older release stored double-encoded still read; run `php spark reach:repair-json` (dry run) and
+  `--apply` once after deploying.
 - Integrations:
   - **Console** — audit/approval/bot-report events go to Console's central audit,
     `POST {CONSOLE_API_URL}/portal/audit` with Reach's own key (`CONSOLE_API_TOKEN`,

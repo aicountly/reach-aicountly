@@ -132,7 +132,7 @@ class CommunityStewardService
             'question_id'       => $context['question_id'] ?? null,
             'finding_type'      => $findingType,
             'severity'          => $context['severity'] ?? 'info',
-            'details'           => json_encode(['detail' => $detail, 'raised_by' => $identity['slug'], 'role' => 'community_steward']),
+            'details'           => ['detail' => $detail, 'raised_by' => $identity['slug'], 'role' => 'community_steward'],
             'status'            => 'open',
             'created_at'        => date('Y-m-d H:i:s'),
         ], true);

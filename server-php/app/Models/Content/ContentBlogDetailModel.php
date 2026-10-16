@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentBlogDetailModel extends Model
+class ContentBlogDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_blog_details';
     protected $primaryKey    = 'id';
@@ -21,7 +21,7 @@ class ContentBlogDetailModel extends Model
     ];
 
     protected array $casts = [
-        'schema_markup'           => 'json-array',
+        'schema_markup'           => '?json-array',
         'has_table_of_contents'   => 'boolean',
     ];
 

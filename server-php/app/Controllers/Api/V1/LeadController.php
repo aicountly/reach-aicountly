@@ -88,7 +88,7 @@ class LeadController extends BaseApiController
             return $this->fail('name is required.', 422);
         }
         $row = $this->normalize($body);
-        $row['raw_payload'] = json_encode($body, JSON_UNESCAPED_SLASHES);
+        $row['raw_payload'] = $body;
         $m = new LeadModel();
         $m->insert($row);
         $id = (int) $m->db->insertID();

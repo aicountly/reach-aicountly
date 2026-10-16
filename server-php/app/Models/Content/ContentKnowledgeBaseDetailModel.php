@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentKnowledgeBaseDetailModel extends Model
+class ContentKnowledgeBaseDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_knowledge_base_details';
     protected $primaryKey    = 'id';
@@ -20,8 +20,8 @@ class ContentKnowledgeBaseDetailModel extends Model
     ];
 
     protected array $casts = [
-        'related_article_ids'  => 'json-array',
-        'applies_to_versions'  => 'json-array',
+        'related_article_ids'  => '?json-array',
+        'applies_to_versions'  => '?json-array',
     ];
 
     public function forItem(int $contentItemId): ?array
