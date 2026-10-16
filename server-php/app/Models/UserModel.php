@@ -18,6 +18,8 @@ class UserModel extends Model
         'email', 'name', 'password_hash', 'role_id', 'is_active',
         'is_login_disabled', 'actor_type',
         'last_login_at', 'last_login_ip', 'failed_attempts',
+        // Console role sync (migration 2026-10-14-100001).
+        'console_user_id', 'roles_synced_at', 'authz_version',
     ];
 
     public function findByEmail(string $email): ?array

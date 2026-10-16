@@ -24,7 +24,7 @@ See `server-php/.env.example`. In short:
 | Database | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` |
 | Auth | `JWT_SECRET`, `ALLOWED_ORIGINS`, `SUPER_ADMIN_*` |
 | Identity | `REACH_APP_URL`, `AICOUNTLY_SITE_URL` |
-| Console | `CONSOLE_API_URL`, `CONSOLE_API_BASE_URL`, `CONSOLE_API_TOKEN`, `CONSOLE_INBOUND_TOKEN` |
+| Console | `CONSOLE_API_URL`, `CONSOLE_API_BASE_URL`, `CONSOLE_API_TOKEN`, `CONSOLE_INBOUND_TOKEN` — `CONSOLE_API_URL` + `CONSOLE_API_TOKEN` (capability `staff.roles`, app `reach`) are also what token refresh uses to re-check staff roles; see `docs/architecture/REACH_RBAC.md` § "Roles come from Console" |
 | Engage / Worker | `ENGAGE_*`, `WORKER_*` |
 | Publishing | `AICOUNTLY_PUBLIC_SITE_BASE_URL`, `_SERVICE_TOKEN`, `_SIGNING_KEY` |
 | Reach tokens | `MEDIA_SIGNING_KEY`, `PUBLIC_LEAD_CAPTURE_TOKEN`, `REACH_AUTOMATION_TOKEN` |

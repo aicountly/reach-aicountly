@@ -66,9 +66,6 @@ class CreativeBriefController extends BaseApiController
         $out = array_intersect_key($body, array_flip([
             'campaign_id', 'title', 'brief', 'audience', 'deliverables', 'status', 'bot_generated',
         ]));
-        if (isset($out['deliverables']) && is_array($out['deliverables'])) {
-            $out['deliverables'] = json_encode($out['deliverables']);
-        }
         if (! $partial) {
             $out['title'] ??= 'Untitled brief';
             $out['brief'] ??= '';

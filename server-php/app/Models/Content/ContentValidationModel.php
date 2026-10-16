@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentValidationModel extends Model
+class ContentValidationModel extends ReachModel
 {
     protected $table         = 'reach_content_validations';
     protected $primaryKey    = 'id';

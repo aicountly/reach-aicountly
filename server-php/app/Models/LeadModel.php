@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class LeadModel extends Model
+class LeadModel extends ReachModel
 {
     protected $table         = 'reach_leads';
     protected $primaryKey    = 'id';
@@ -22,7 +20,7 @@ class LeadModel extends Model
         'last_push_at', 'last_push_error', 'created_by',
     ];
 
-    protected array $casts = ['raw_payload' => 'json-array'];
+    protected array $casts = ['raw_payload' => '?json-array'];
 
     public function isRecentDuplicate(string $email, int $windowSeconds = 86400): bool
     {

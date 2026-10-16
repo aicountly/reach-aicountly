@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class DailyMarketingPackModel extends Model
+class DailyMarketingPackModel extends ReachModel
 {
     protected $table         = 'reach_daily_marketing_packs';
     protected $primaryKey    = 'id';

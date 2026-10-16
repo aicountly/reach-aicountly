@@ -27,7 +27,7 @@ class CampaignChannelVariantService
         $id = $this->model->insert([
             'campaign_version_id' => $versionId,
             'channel'             => $channel,
-            'content_json'        => json_encode($contentJson),
+            'content_json'        => $contentJson,
             'validation_status'   => 'pending',
             'created_by'          => $actorId,
             'created_at'          => date('Y-m-d H:i:s'),
@@ -57,7 +57,7 @@ class CampaignChannelVariantService
 
         $this->model->update($variantId, [
             'validation_status'   => $status,
-            'validation_findings' => json_encode($findings),
+            'validation_findings' => $findings,
         ]);
 
         $event = $status === 'valid'

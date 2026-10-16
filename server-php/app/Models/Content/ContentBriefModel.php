@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentBriefModel extends Model
+class ContentBriefModel extends ReachModel
 {
     protected $table         = 'reach_content_briefs';
     protected $primaryKey    = 'id';

@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class AnalyticsSnapshotModel extends Model
+class AnalyticsSnapshotModel extends ReachModel
 {
     protected $table         = 'reach_analytics_snapshots';
     protected $primaryKey    = 'id';

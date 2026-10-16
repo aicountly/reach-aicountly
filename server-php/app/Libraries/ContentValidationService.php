@@ -45,7 +45,7 @@ class ContentValidationService
             'validation_status' => $status,
             'score'             => $options['score'] ?? null,
             'message'           => $options['message'] ?? null,
-            'details'           => isset($options['details']) ? json_encode($options['details']) : null,
+            'details'           => $options['details'] ?? null,
             'run_by'            => $actor['id'] ?? null,
             'run_at'            => date('Y-m-d H:i:s'),
         ];

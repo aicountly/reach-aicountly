@@ -18,9 +18,11 @@ use Config\Services;
  */
 class AuditLogger
 {
-    /** Event action prefixes that also get pushed to Console via /audit. */
+    /** Event action prefixes that also go to Console's central audit (POST /portal/audit, via the outbox). */
     private const CONSOLE_FANOUT_PREFIXES = [
-        'auth.login', 'auth.logout',
+        // Every auth.* event: sign-ins are auth.controller_sso_login / auth.controller_sso_callback /
+        // auth.console_session_login (never plain auth.login), plus logout and Console revocations.
+        'auth.',
         'bot.', 'approval.', 'blog.', 'campaign.',
         'social.', 'email.', 'whatsapp.', 'lead.',
         'engage_push.', 'settings.', 'publish.', 'permission.',
@@ -476,6 +478,9 @@ class AuditLogger
      * @param ?string $reason       Free-form justification (approval override, cancel note).
      * @param ?string $requestId    Correlation id from the originating request/job.
      * @param ?int    $jobId        reach_jobs.id when the event is job-driven.
+     *
+     * Returns the Console central-audit outcome of the fan-out ('delivered', 'pending', …;
+     * ConsoleAuditClient::event()), or null when the action is not fanned out.
      */
     public function log(
         ?int $userId,
@@ -490,7 +495,9 @@ class AuditLogger
         ?string $reason = null,
         ?string $requestId = null,
         ?int $jobId = null,
-    ): void {
+    ): ?string {
+        $auditId = null;
+        $row     = [];
         try {
             $req       = service('request');
             $redactor  = Services::secretRedactor();
@@ -521,29 +528,36 @@ class AuditLogger
                     ? substr((string) $req->getUserAgent(), 0, 510)
                     : 'cli',
             ];
-            (new AuditLogModel())->insert($row);
+            $auditId = (new AuditLogModel())->insert($row);
         } catch (\Throwable $e) {
             log_message('error', 'AuditLogger::log failed: ' . $e->getMessage());
         }
 
-        if ($this->shouldFanOut($action)) {
-            try {
-                $redactor = Services::secretRedactor();
-                Services::consoleAudit()->event('reach.' . $action, [
-                    'user_id'       => $userId,
-                    'actor_type'    => $actorType,
-                    'actor_service' => $actorService,
-                    'entity_type'   => $entityType,
-                    'entity_id'     => $entityId,
-                    'new_value'     => $newValue !== null ? $redactor->redact($newValue) : null,
-                    'metadata'      => $extra !== null ? $redactor->redact($extra) : null,
-                    'reason'        => $reason,
-                    'request_id'    => $requestId,
-                    'job_id'        => $jobId,
-                ]);
-            } catch (\Throwable $e) {
-                log_message('error', 'AuditLogger console fanout failed: ' . $e->getMessage());
-            }
+        if (! $this->shouldFanOut($action)) {
+            return null;
+        }
+
+        try {
+            $redactor = Services::secretRedactor();
+            return Services::consoleAudit()->event('reach.' . $action, [
+                'user_id'       => $userId,
+                'actor_type'    => $actorType,
+                'actor_service' => $actorService,
+                'entity_type'   => $entityType,
+                'entity_id'     => $entityId,
+                'new_value'     => $newValue !== null ? $redactor->redact($newValue) : null,
+                'metadata'      => $extra !== null ? $redactor->redact($extra) : null,
+                'reason'        => $reason,
+                'request_id'    => $requestId,
+                'job_id'        => $jobId,
+                'ip'            => $row['ip_address'] ?? null,
+                'user_agent'    => $row['user_agent'] ?? null,
+            // external_id = this reach_audit_logs row: Console stores it once however often it is resent.
+            ], $auditId ? 'reach:audit_logs:' . $auditId : null);
+        } catch (\Throwable $e) {
+            log_message('error', 'AuditLogger console fanout failed: ' . $e->getMessage());
+
+            return 'error';
         }
     }
 

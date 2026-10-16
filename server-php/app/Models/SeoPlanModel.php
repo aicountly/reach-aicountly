@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class SeoPlanModel extends Model
+class SeoPlanModel extends ReachModel
 {
     protected $table         = 'reach_seo_plans';
     protected $primaryKey    = 'id';
@@ -19,5 +17,5 @@ class SeoPlanModel extends Model
         'status', 'bot_generated', 'created_by',
     ];
 
-    protected array $casts = ['secondary_keywords' => 'json-array'];
+    protected array $casts = ['secondary_keywords' => '?json-array'];
 }

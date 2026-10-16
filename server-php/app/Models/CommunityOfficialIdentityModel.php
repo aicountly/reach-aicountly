@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class CommunityOfficialIdentityModel extends Model
+class CommunityOfficialIdentityModel extends ReachModel
 {
     protected $table         = 'reach_community_official_identities';
     protected $primaryKey    = 'id';
@@ -24,7 +22,7 @@ class CommunityOfficialIdentityModel extends Model
     ];
 
     protected array $casts = [
-        'authorised_scopes'    => 'json-array',
+        'authorised_scopes'    => 'pg-text-array', // a text[] column, not JSON
         'approval_requirements' => 'json-array',
         'is_active'            => 'boolean',
     ];

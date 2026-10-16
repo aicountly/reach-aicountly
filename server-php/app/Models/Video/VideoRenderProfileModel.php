@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Video;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class VideoRenderProfileModel extends Model
+class VideoRenderProfileModel extends ReachModel
 {
     protected $table         = 'reach_video_render_profiles';
     protected $primaryKey    = 'id';

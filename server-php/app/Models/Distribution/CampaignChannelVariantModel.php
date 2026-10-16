@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Distribution;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class CampaignChannelVariantModel extends Model
+class CampaignChannelVariantModel extends ReachModel
 {
     protected $table      = 'reach_campaign_channel_variants';
     protected $primaryKey = 'id';

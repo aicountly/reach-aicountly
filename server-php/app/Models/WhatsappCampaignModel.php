@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class WhatsappCampaignModel extends Model
+class WhatsappCampaignModel extends ReachModel
 {
     protected $table         = 'reach_whatsapp_campaigns';
     protected $primaryKey    = 'id';
@@ -20,8 +18,8 @@ class WhatsappCampaignModel extends Model
     ];
 
     protected array $casts = [
-        'template_params' => 'json-array',
-        'audience_filter' => 'json-array',
-        'stats'           => 'json-array',
+        'template_params' => '?json-array',
+        'audience_filter' => '?json-array',
+        'stats'           => '?json-array',
     ];
 }

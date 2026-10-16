@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class EmailCampaignModel extends Model
+class EmailCampaignModel extends ReachModel
 {
     protected $table         = 'reach_email_campaigns';
     protected $primaryKey    = 'id';
@@ -21,7 +19,7 @@ class EmailCampaignModel extends Model
     ];
 
     protected array $casts = [
-        'audience_filter' => 'json-array',
-        'stats'           => 'json-array',
+        'audience_filter' => '?json-array',
+        'stats'           => '?json-array',
     ];
 }

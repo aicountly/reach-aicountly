@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentSocialDetailModel extends Model
+class ContentSocialDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_social_details';
     protected $primaryKey    = 'id';
@@ -20,8 +20,8 @@ class ContentSocialDetailModel extends Model
     ];
 
     protected array $casts = [
-        'hashtags'       => 'json-array',
-        'media_urls'     => 'json-array',
+        'hashtags'       => '?json-array',
+        'media_urls'     => '?json-array',
         'is_thread_root' => 'boolean',
     ];
 

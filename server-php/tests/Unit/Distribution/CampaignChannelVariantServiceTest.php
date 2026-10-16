@@ -41,7 +41,7 @@ final class CampaignChannelVariantServiceTest extends CIUnitTestCase
         });
         $service = new CampaignChannelVariantService($model, new AuditLogger());
         $service->validate(1, null);
-        $findings = json_decode($captured['validation_findings'], true);
+        $findings = $captured['validation_findings']; // an array: the model's JSON cast encodes it
         $this->assertContains('SUBJECT_MISSING', array_column($findings, 'code'));
     }
 
@@ -58,7 +58,7 @@ final class CampaignChannelVariantServiceTest extends CIUnitTestCase
         });
         $service = new CampaignChannelVariantService($model, new AuditLogger());
         $service->validate(1, null);
-        $findings = json_decode($captured['validation_findings'], true);
+        $findings = $captured['validation_findings']; // an array: the model's JSON cast encodes it
         $this->assertContains('BODY_TOO_LONG', array_column($findings, 'code'));
     }
 
@@ -74,7 +74,7 @@ final class CampaignChannelVariantServiceTest extends CIUnitTestCase
         });
         $service = new CampaignChannelVariantService($model, new AuditLogger());
         $service->validate(1, null);
-        $findings = json_decode($captured['validation_findings'], true);
+        $findings = $captured['validation_findings']; // an array: the model's JSON cast encodes it
         $this->assertContains('TEMPLATE_REQUIRED', array_column($findings, 'code'));
     }
 

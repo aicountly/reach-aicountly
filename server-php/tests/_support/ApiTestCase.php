@@ -55,10 +55,6 @@ abstract class ApiTestCase extends DatabaseTestCase
     protected function ensureRole(string $slug): int
     {
         $db = \Config\Database::connect();
-        $row = $db->table('reach_roles')->where('slug', $slug)->get()->getRowArray();
-        if ($row) {
-            return (int) $row['id'];
-        }
 
         // Assign realistic permissions so tests are not blocked by the
         // permission filter. Roles that need to be denied specific actions
@@ -77,6 +73,19 @@ abstract class ApiTestCase extends DatabaseTestCase
             'knowledge_viewer' => ['knowledge.view', 'product.view'],
         ];
         $permissions = $permissionMap[$slug] ?? [];
+
+        $row = $db->table('reach_roles')->where('slug', $slug)->get()->getRowArray();
+        if ($row) {
+            // The Console role-sync migration pre-creates the Console-assignable
+            // roles with their production permissions. Tests keep the fixture
+            // permissions above for the roles they name.
+            if (isset($permissionMap[$slug])) {
+                $db->table('reach_roles')->where('id', $row['id'])
+                    ->update(['permissions' => json_encode($permissions)]);
+            }
+
+            return (int) $row['id'];
+        }
 
         $db->table('reach_roles')->insert([
             'slug'        => $slug,

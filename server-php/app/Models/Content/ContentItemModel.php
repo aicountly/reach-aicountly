@@ -2,10 +2,11 @@
 
 namespace App\Models\Content;
 
-use App\Libraries\Content\SlugBuilder;
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentItemModel extends Model
+use App\Libraries\Content\SlugBuilder;
+
+class ContentItemModel extends ReachModel
 {
     protected $table         = 'reach_content_items';
     protected $primaryKey    = 'id';

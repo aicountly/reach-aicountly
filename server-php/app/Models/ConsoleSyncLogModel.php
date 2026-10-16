@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class ConsoleSyncLogModel extends Model
+class ConsoleSyncLogModel extends ReachModel
 {
     protected $table         = 'reach_console_sync_logs';
     protected $primaryKey    = 'id';
@@ -14,10 +12,13 @@ class ConsoleSyncLogModel extends Model
     protected $allowedFields = [
         'event_type', 'payload', 'response_status', 'response_body',
         'ok', 'error_message', 'attempted_at',
+        // Central-audit outbox (migration 2026-10-14-100002), written by ConsoleAuditClient.
+        'external_id', 'status', 'attempts', 'next_attempt_at', 'event', 'console_audit_id',
     ];
 
     protected array $casts = [
-        'payload'       => 'json-array',
-        'response_body' => 'json-array',
+        'payload'       => '?json-array',
+        'response_body' => '?json-array',
+        'event'         => '?json-array',
     ];
 }

@@ -58,9 +58,10 @@ abstract class BaseApiController extends Controller
         ?array $newValue = null,
         ?array $extra = null,
         ?string $reason = null,
-    ): void {
+    ): ?string {
         $user = $this->user();
-        Services::auditLogger()->log(
+
+        return Services::auditLogger()->log(
             userId:       $this->userId(),
             action:       $action,
             entityType:   $entityType,

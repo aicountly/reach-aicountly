@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class MarketingBotReportModel extends Model
+class MarketingBotReportModel extends ReachModel
 {
     protected $table         = 'reach_marketing_bot_reports';
     protected $primaryKey    = 'id';
@@ -22,9 +20,9 @@ class MarketingBotReportModel extends Model
     ];
 
     protected array $casts = [
-        'data_accessed'     => 'json-array',
-        'content_generated' => 'json-array',
-        'evidence'          => 'json-array',
-        'errors'            => 'json-array',
+        'data_accessed'     => '?json-array',
+        'content_generated' => '?json-array',
+        'evidence'          => '?json-array',
+        'errors'            => '?json-array',
     ];
 }

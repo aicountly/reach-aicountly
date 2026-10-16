@@ -23,6 +23,7 @@ const HINTS = {
   jwt_secret:               'Must be at least 32 chars in api/.env.',
   database:                 'PostgreSQL connection using DB_* env vars.',
   console_configured:       'CONSOLE_API_BASE_URL + CONSOLE_API_TOKEN.',
+  console_role_sync_configured: 'CONSOLE_API_URL + CONSOLE_API_TOKEN (staff.roles) — token refresh re-checks roles with Console. Required in production.',
   engage_configured:        'ENGAGE_API_BASE_URL + ENGAGE_INBOUND_TOKEN.',
   worker_configured:        'WORKER_BASE_URL + WORKER_API_TOKEN.',
   site_publisher_configured:'AICOUNTLY_SITE_API_BASE_URL + AICOUNTLY_SITE_API_TOKEN.',

@@ -12,6 +12,20 @@ export const GATE_ERROR = 'error';
 
 const TOKEN_KEY = 'reach_token';
 
+// Re-check the Console role on load once the token is this old (seconds).
+// Each refresh mints a new session row, so not on every page load.
+const ROLE_RECHECK_AFTER_SECONDS = 10 * 60;
+
+function tokenAgeSeconds(token) {
+  try {
+    const part = String(token).split('.')[1] || '';
+    const json = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.iat === 'number' ? Math.floor(Date.now() / 1000) - json.iat : Infinity;
+  } catch {
+    return Infinity;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +59,32 @@ export function AuthProvider({ children }) {
       localStorage.removeItem(TOKEN_KEY);
       setUser(null);
       return false;
+    }
+  }, []);
+
+  /**
+   * Re-check the role with Console via POST /v1/auth/refresh and swap in the
+   * re-issued token. Returns 'denied' when Console no longer grants access
+   * (the gate is shown); any other failure keeps the stored token (the API
+   * still enforces permissions on every request).
+   */
+  const refreshToken = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return 'none';
+    if (tokenAgeSeconds(token) < ROLE_RECHECK_AFTER_SECONDS) return 'fresh';
+    try {
+      const data = await authService.refresh(token);
+      if (data?.token) localStorage.setItem(TOKEN_KEY, data.token);
+      return 'ok';
+    } catch (e) {
+      if (e?.status === 403) {
+        localStorage.removeItem(TOKEN_KEY);
+        setUser(null);
+        setGateReason(GATE_NO_ACCESS);
+        setGateMessage(e?.message || 'Access not assigned. Ask a Console superadmin to assign you a role.');
+        return 'denied';
+      }
+      return 'skipped';
     }
   }, []);
 
@@ -86,6 +126,7 @@ export function AuthProvider({ children }) {
       }
 
       if (localStorage.getItem(TOKEN_KEY)) {
+        if ((await refreshToken()) === 'denied') return;
         const ok = await refresh();
         if (ok) return;
       }
@@ -111,7 +152,7 @@ export function AuthProvider({ children }) {
     } finally {
       finish();
     }
-  }, [loginWithConsoleSession, loginWithControllerSso, refresh]);
+  }, [loginWithConsoleSession, loginWithControllerSso, refresh, refreshToken]);
 
   useEffect(() => {
     bootstrap();

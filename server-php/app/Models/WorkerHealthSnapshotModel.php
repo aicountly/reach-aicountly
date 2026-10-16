@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class WorkerHealthSnapshotModel extends Model
+class WorkerHealthSnapshotModel extends ReachModel
 {
     protected $table         = 'reach_worker_health_snapshots';
     protected $primaryKey    = 'id';
@@ -16,5 +14,5 @@ class WorkerHealthSnapshotModel extends Model
         'response', 'error_message', 'created_at',
     ];
 
-    protected array $casts = ['response' => 'json-array'];
+    protected array $casts = ['response' => '?json-array'];
 }

@@ -50,16 +50,16 @@ class MarketingBotReporter
             'queue_id'                => $report['queue_id']                ?? null,
             'action'                  => (string) $report['action'],
             'understanding'           => $report['understanding']           ?? null,
-            'data_accessed'           => isset($report['data_accessed'])    ? json_encode($report['data_accessed'], JSON_UNESCAPED_SLASHES) : null,
-            'content_generated'       => isset($report['content_generated'])? json_encode($report['content_generated'], JSON_UNESCAPED_SLASHES) : null,
+            'data_accessed'           => $report['data_accessed'] ?? null,
+            'content_generated'       => $report['content_generated'] ?? null,
             'recommended_action'      => $report['recommended_action']      ?? null,
             'action_taken'            => $report['action_taken']            ?? null,
             'approval_status'         => $report['approval_status']         ?? 'not_required',
             'publishing_status'       => $report['publishing_status']       ?? 'none',
             'next_recommended_action' => $report['next_recommended_action'] ?? null,
             'mode'                    => in_array($report['mode'] ?? 'confirm', ['auto', 'confirm'], true) ? $report['mode'] : 'confirm',
-            'evidence'                => isset($report['evidence'])         ? json_encode($report['evidence'], JSON_UNESCAPED_SLASHES) : null,
-            'errors'                  => isset($report['errors'])           ? json_encode($report['errors'], JSON_UNESCAPED_SLASHES) : null,
+            'evidence'                => $report['evidence'] ?? null,
+            'errors'                  => $report['errors'] ?? null,
             'created_by'              => $report['created_by']              ?? null,
         ];
         $this->reports->insert($row);
@@ -68,13 +68,15 @@ class MarketingBotReporter
         // Fan out to Console — no PII in payload; just summary keys.
         try {
             Services::consoleAudit()->event('reach.bot.' . $row['action'], [
+                'entity_type'       => 'bot_report',
+                'entity_id'         => $id,
                 'report_id'         => $id,
                 'queue_id'          => $row['queue_id'],
                 'approval_status'   => $row['approval_status'],
                 'publishing_status' => $row['publishing_status'],
                 'mode'              => $row['mode'],
                 'action_taken'      => $row['action_taken'],
-            ]);
+            ], 'reach:bot_report:' . $id);
         } catch (\Throwable $e) {
             log_message('error', 'ConsoleAudit event failed: ' . $e->getMessage());
         }

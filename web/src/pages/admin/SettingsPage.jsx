@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
+import { RolesManagedNote } from '../../components/auth/RolesManagedNote';
 
 export function SettingsPage() {
   const [rows, setRows] = useState([]);
@@ -70,6 +71,7 @@ export function SettingsPage() {
         </div>
       </div>
 
+      <RolesManagedNote />
       {error && <Alert variant="danger">{error}</Alert>}
       {saved && <Alert variant="success">Settings saved.</Alert>}
 

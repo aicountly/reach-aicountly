@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Distribution;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class SmsCampaignModel extends Model
+class SmsCampaignModel extends ReachModel
 {
     protected $table      = 'reach_sms_campaigns';
     protected $primaryKey = 'id';

@@ -61,6 +61,53 @@ Per-user grants/denials live in `reach_user_permissions`
 role permissions in `PermissionService::resolveEffective(int $userId)`; denies
 win.
 
+## Roles come from Console
+
+_Added 2026-10 (branch `claude/optimistic-knuth-u20tyq`)._ Reach no longer
+decides who is a staff member or which role they hold. Console
+(`console.aicountly.org` → **Roles & Access**, app_code `reach`) assigns one or
+more of `super_admin`, `reach_admin`, `marketing_manager`, `content_reviewer`;
+Reach mirrors it into `reach_users.role_id`. Reach is single-role, so the
+highest ranked wins: **super_admin > reach_admin > marketing_manager >
+content_reviewer**. Per-user grants/denies in `reach_user_permissions` are
+portal-local and are never touched by a sync. There is no role editing in
+Reach; the Settings page and the sidebar role label say "Roles are assigned in
+Console → Roles & Access".
+
+The old rule that only `super_admin` may sign in is gone — every role signs in
+and sees what its permissions allow (the routes and the sidebar were already
+permission-driven).
+
+**Sign-in** (`POST v1/auth/controller-sso`, `GET v1/auth/sso-callback`,
+`POST v1/auth/console-session`) reads the Console SSO exchange / introspect payload:
+
+| Payload | Result |
+|---|---|
+| `app_roles` non-empty, or `app_superadmin: true` | `role_id` set to the highest ranked role (unknown slugs ignored; app superadmin ⇒ `super_admin`); `console_user_id`, `roles_synced_at`, `authz_version` stored |
+| `app_roles: []` and not `app_superadmin` | **403** "Access not assigned. Ask a Console superadmin to assign you a role." — no local user is provisioned |
+| no `app_roles` key (older Console) | existing users keep their local role; a new user is provisioned `super_admin` only when Console says `global_superadmin`, otherwise refused (as before). Never an automatic `super_admin` for anyone else |
+
+**Token refresh** (`POST v1/auth/refresh {token}`; the SPA calls it on load
+when its stored token is more than 10 minutes old — each refresh adds a session row). The presented token must still have a live
+`reach_sessions` row. When `CONSOLE_API_URL` and `CONSOLE_API_TOKEN` are set,
+Reach calls `GET {CONSOLE_API_URL}/portal/controller-apps/user-access?app_code=reach&console_user_id=…`
+(`&email=…` before the first sync) with `Authorization: Bearer {CONSOLE_API_TOKEN}`:
+
+| Console answer | Result |
+|---|---|
+| not `exists` / not `active` / no `app_access` / no roles | **403** and every `reach_sessions` row of the user is revoked (JwtFilter rejects them at once) |
+| access with roles | role re-synced, new token minted with it |
+| unreachable / error | allowed only when `roles_synced_at` is under 12 h old, otherwise **503** (sessions are not revoked) |
+| env not set | warning logged, token re-issued with the local role (previous behaviour) — **production must set both** (`GET v1/admin/api-health` → `checks.console_role_sync_configured`) |
+
+Code: `App\Libraries\ConsoleRoleSync` (pure rules), `App\Services\StaffAccessService`
+(DB), `ConsoleIdentityService::fetchUserAccess()`. Migration
+`2026-10-14-100001_AddConsoleRoleSyncToReachUsers` adds the three
+`reach_users` columns and inserts any of the four Console-assignable roles that
+are missing (canonical permissions from `RolesAndPermissionsSeeder`; existing
+rows untouched). Tests: `tests/Unit/Auth/ConsoleRoleSyncTest.php`,
+`tests/Feature/Auth/ConsoleRoleSyncAuthTest.php`.
+
 ## Resolution flow
 
 ```

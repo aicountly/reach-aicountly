@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class EngagePushAttemptModel extends Model
+class EngagePushAttemptModel extends ReachModel
 {
     protected $table         = 'reach_engage_push_attempts';
     protected $primaryKey    = 'id';
@@ -17,7 +15,7 @@ class EngagePushAttemptModel extends Model
     ];
 
     protected array $casts = [
-        'request_body'  => 'json-array',
-        'response_body' => 'json-array',
+        'request_body'  => '?json-array',
+        'response_body' => '?json-array',
     ];
 }

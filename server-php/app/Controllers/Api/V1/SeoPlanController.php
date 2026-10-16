@@ -70,9 +70,6 @@ class SeoPlanController extends BaseApiController
         $out = array_intersect_key($body, array_flip([
             'title', 'focus_keyword', 'secondary_keywords', 'brief', 'target_url', 'status', 'bot_generated',
         ]));
-        if (isset($out['secondary_keywords']) && is_array($out['secondary_keywords'])) {
-            $out['secondary_keywords'] = json_encode($out['secondary_keywords']);
-        }
         if (! $partial) {
             $out['title']         ??= 'Untitled SEO plan';
             $out['focus_keyword'] ??= '';

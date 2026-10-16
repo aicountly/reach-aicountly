@@ -25,6 +25,9 @@ $routes->get('health', static function () {
     } catch (\Throwable) {
         $db = false;
     }
+    // Token refresh re-checks staff roles with Console (required in production). Reported, not
+    // part of "ok": configuration, not the deploy (live verification fails on it instead).
+    $roleSync = (string) env('CONSOLE_API_URL', '') !== '' && (string) env('CONSOLE_API_TOKEN', '') !== '';
     return service('response')->setJSON([
         'ok'        => $jwtOk && $db,
         'service'   => 'aicountly-reach-api',
@@ -33,6 +36,7 @@ $routes->get('health', static function () {
         'checks'    => [
             'jwt_secret' => $jwtOk ? 'ok' : 'missing or too short (need 32+ chars in api/.env)',
             'database'   => $db    ? 'ok' : 'unreachable',
+            'console_role_sync' => $roleSync ? 'ok' : 'CONSOLE_API_URL / CONSOLE_API_TOKEN not set — token refresh cannot re-check roles with Console (required in production)',
         ],
     ]);
 });

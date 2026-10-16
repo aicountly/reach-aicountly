@@ -50,7 +50,7 @@ class VideoPublicationService
             'platform'       => 'youtube',
             'title'          => $metadata['yt_title'] ?? '',
             'description'    => $metadata['yt_description'] ?? '',
-            'tags'           => json_encode($metadata['yt_tags'] ?? []),
+            'tags'           => $metadata['yt_tags'] ?? [],
             'category'       => $metadata['yt_category'] ?? '',
             'privacy_status' => $metadata['yt_privacy'] ?? 'private',
             'created_by'     => $actorId,

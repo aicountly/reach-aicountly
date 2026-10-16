@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentEmailDetailModel extends Model
+class ContentEmailDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_email_details';
     protected $primaryKey    = 'id';
@@ -21,8 +21,8 @@ class ContentEmailDetailModel extends Model
     ];
 
     protected array $casts = [
-        'segment_ids'             => 'json-array',
-        'personalization_tokens'  => 'json-array',
+        'segment_ids'             => '?json-array',
+        'personalization_tokens'  => '?json-array',
     ];
 
     public function forItem(int $contentItemId): ?array

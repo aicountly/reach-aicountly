@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentVideoDetailModel extends Model
+class ContentVideoDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_video_details';
     protected $primaryKey    = 'id';
@@ -21,8 +21,8 @@ class ContentVideoDetailModel extends Model
     ];
 
     protected array $casts = [
-        'speaker_ids'          => 'json-array',
-        'chapters'             => 'json-array',
+        'speaker_ids'          => '?json-array',
+        'chapters'             => '?json-array',
         'transcript_available' => 'boolean',
     ];
 

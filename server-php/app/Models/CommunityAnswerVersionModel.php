@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class CommunityAnswerVersionModel extends Model
+class CommunityAnswerVersionModel extends ReachModel
 {
     protected $table         = 'reach_community_answer_versions';
     protected $primaryKey    = 'id';

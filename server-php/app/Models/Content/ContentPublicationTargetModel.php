@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentPublicationTargetModel extends Model
+class ContentPublicationTargetModel extends ReachModel
 {
     protected $table         = 'reach_content_publication_targets';
     protected $primaryKey    = 'id';

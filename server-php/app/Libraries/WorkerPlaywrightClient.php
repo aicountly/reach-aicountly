@@ -65,7 +65,7 @@ class WorkerPlaywrightClient
                 'ok'            => $res['ok'],
                 'http_status'   => $res['status'],
                 'latency_ms'    => $res['latency_ms'],
-                'response'      => $res['data'] !== null ? json_encode($res['data'], JSON_UNESCAPED_SLASHES) : null,
+                'response'      => $res['data'],
                 'error_message' => $res['error'],
                 'created_at'    => date('Y-m-d H:i:s'),
             ]);

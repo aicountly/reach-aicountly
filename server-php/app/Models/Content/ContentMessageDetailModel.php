@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentMessageDetailModel extends Model
+class ContentMessageDetailModel extends ReachModel
 {
     protected $table         = 'reach_content_message_details';
     protected $primaryKey    = 'id';
@@ -20,7 +20,7 @@ class ContentMessageDetailModel extends Model
     ];
 
     protected array $casts = [
-        'buttons'   => 'json-array',
+        'buttons'   => '?json-array',
         'has_media' => 'boolean',
     ];
 

@@ -2,9 +2,9 @@
 
 namespace App\Models\Content;
 
-use CodeIgniter\Model;
+use App\Models\ReachModel;
 
-class ContentPublicationAttemptModel extends Model
+class ContentPublicationAttemptModel extends ReachModel
 {
     protected $table         = 'reach_content_publication_attempts';
     protected $primaryKey    = 'id';
@@ -21,7 +21,7 @@ class ContentPublicationAttemptModel extends Model
     ];
 
     protected array $casts = [
-        'metadata' => 'json-array',
+        'metadata' => '?json-array',
     ];
 
     public function forItem(int $contentItemId): array

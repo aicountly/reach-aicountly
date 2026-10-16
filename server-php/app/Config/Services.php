@@ -7,6 +7,7 @@ use App\Libraries\ApprovalPolicy;
 use App\Libraries\AuditLogger;
 use App\Libraries\ConsoleAuditClient;
 use App\Services\ConsoleIdentityService;
+use App\Services\StaffAccessService;
 use App\Libraries\EngageClient;
 use App\Libraries\HtmlSanitizer;
 use App\Libraries\JobHandlerRegistry;
@@ -157,5 +158,13 @@ class Services extends BaseService
             return static::getSharedInstance('requestValidator') ?? static::requestValidator(false);
         }
         return new RequestValidator();
+    }
+
+    public static function staffAccess(bool $getShared = true): StaffAccessService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('staffAccess') ?? static::staffAccess(false);
+        }
+        return new StaffAccessService();
     }
 }

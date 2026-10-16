@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use CodeIgniter\Model;
-
-class CommunitySpaceModel extends Model
+class CommunitySpaceModel extends ReachModel
 {
     protected $table         = 'reach_community_spaces';
     protected $primaryKey    = 'id';
@@ -20,7 +18,7 @@ class CommunitySpaceModel extends Model
         'indexing_policy', 'status',
     ];
 
-    protected array $casts = ['allowed_content_types' => 'json-array'];
+    protected array $casts = ['allowed_content_types' => 'pg-text-array']; // a text[] column, not JSON
 
     public function findBySlug(string $slug): ?array
     {
