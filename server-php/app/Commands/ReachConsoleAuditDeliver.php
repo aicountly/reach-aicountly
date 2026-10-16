@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\CronHeartbeat;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Services;
@@ -36,6 +37,11 @@ class ReachConsoleAuditDeliver extends BaseCommand
             'Console audit: %d delivered, %d rejected, %d to retry, %d dead (%d batch%s).',
             $r['delivered'], $r['rejected'], $r['retry'], $r['dead'], $r['batches'], $r['batches'] === 1 ? '' : 'es'
         ));
+
+        // Console's Cron Job Monitor (reach.console_audit_deliver; CONSOLE_CRON_MONITOR_KEY in .env, console-react-app
+        // docs/CRON_MONITORS.md): a delivery run reports ok with its counts. Inert without a key; a failed
+        // report never fails this command.
+        CronHeartbeat::send('reach.console_audit_deliver', 'ok', '', array_map('intval', array_intersect_key($r, array_flip(['delivered', 'rejected', 'retry', 'dead', 'batches']))));
 
         return EXIT_SUCCESS;
     }

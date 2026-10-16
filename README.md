@@ -29,7 +29,7 @@ modes and superadmin approval gates.
     capability `audit.write`; console-react-app AUTH_INTEGRATION.md "Central audit").
     Each event is queued in `reach_console_sync_logs` (the outbox), sent at once, and
     retried until Console has it by cron every 5 minutes:
-    `0,5,10,15,20,25,30,35,40,45,50,55 * * * * cd /path/to/api && php spark reach:console-audit-deliver >> writable/logs/console_audit.log 2>&1`.
+    `0,5,10,15,20,25,30,35,40,45,50,55 * * * * cd /path/to/api && php spark reach:console-audit-deliver >> writable/logs/console_audit.log 2>&1`. The command reports each delivery run to Console's Cron Job Monitor as `reach.console_audit_deliver` (`app/Libraries/CronHeartbeat.php`; `CONSOLE_CRON_MONITOR_KEY` in `.env`, console-react-app `docs/CRON_MONITORS.md`); without the key nothing is reported, and a failed report never fails the command.
     Console de-duplicates on `external_id` (`reach:audit_logs:<id>`), so a retry never
     doubles an event; failures are logged as `[ConsoleAuditClient] …` and shown on the
     Console Sync Status page.
