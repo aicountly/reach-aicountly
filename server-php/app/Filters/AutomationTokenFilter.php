@@ -8,7 +8,9 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 /**
  * Inbound guard for the Claude Code routine → Reach `v1/automation/*`
- * endpoints. The routine includes `X-Automation-Token: <REACH_AUTOMATION_TOKEN>`.
+ * endpoints. The token is accepted as `X-Automation-Token: <REACH_AUTOMATION_TOKEN>`
+ * or as `Authorization: Bearer <REACH_AUTOMATION_TOKEN>` — the Claude Code
+ * environment's network secrets can only inject Basic/Bearer/Digest headers.
  * Deliberately NOT the console JWT: routines are headless, long-lived and
  * scoped to exactly these endpoints.
  */
@@ -27,10 +29,13 @@ class AutomationTokenFilter implements FilterInterface
         }
 
         $provided = (string) $request->getHeaderLine('X-Automation-Token');
+        if ($provided === '' && preg_match('/^Bearer\s+(\S+)$/i', trim($request->getHeaderLine('Authorization')), $m)) {
+            $provided = $m[1];
+        }
         if ($provided === '' || ! hash_equals($expected, $provided)) {
             return service('response')
                 ->setStatusCode(401)
-                ->setJSON(['ok' => false, 'error' => 'Invalid X-Automation-Token.']);
+                ->setJSON(['ok' => false, 'error' => 'Invalid automation token (X-Automation-Token or Authorization: Bearer).']);
         }
     }
 
