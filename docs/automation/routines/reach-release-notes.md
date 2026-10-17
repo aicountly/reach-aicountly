@@ -6,8 +6,8 @@
 | **Model** | Claude Sonnet |
 | **Schedule** | daily 21:00 IST — cron `30 15 * * *` (UTC) |
 | **Session** | fresh session per fire, in the cloud environment that has `aicountly/reach-aicountly` and the product repositories (others are attached with `add_repo`) |
-| **Environment variables** | `REACH_API_BASE=https://reach.aicountly.org/api`, `REACH_AUTOMATION_TOKEN=<same 32+ char token as the Reach server .env>` |
-| **Endpoints** | `GET $REACH_API_BASE/v1/automation/release-plan`, `POST $REACH_API_BASE/v1/automation/release-notes` (header `X-Automation-Token: $REACH_AUTOMATION_TOKEN`) |
+| **Environment** | network access to `reach.aicountly.org` + the Reach network secret (see `../CLAUDE_ROUTINES.md`) — no environment variables needed |
+| **Endpoints** | `GET https://reach.aicountly.org/api/v1/automation/release-plan`, `POST https://reach.aicountly.org/api/v1/automation/release-notes` |
 
 What happens after the POST: Reach checks the note against aicountly.com's format rules and the version
 rule, Gemini vets it (release-note rubric: legal vet, simplification, no technical internals, formatting),
@@ -27,10 +27,9 @@ code changes into ONE customer-friendly "What's new" note on aicountly.com,
 through Reach. You never invent anything: every line of a note must come from a
 change you can see in the product's git history or code.
 
-All Reach calls use the header  X-Automation-Token: $REACH_AUTOMATION_TOKEN
-and the base URL $REACH_API_BASE.
+All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
-1. GET $REACH_API_BASE/v1/automation/release-plan
+1. GET https://reach.aicountly.org/api/v1/automation/release-plan
    - If data.enabled is false, stop and report "release-note automation is off".
    - data.products is in priority order: the launch apps first (books, notes,
      billing, inventory, docs = Drive, manage), then the Beta products. Work
@@ -92,7 +91,7 @@ and the base URL $REACH_API_BASE.
         - No customer, partner, employee or team names; no personal data.
         - Plain text only — no Markdown, no HTML, no emoji.
         - Do not exaggerate: describe exactly what changed.
-   h. POST $REACH_API_BASE/v1/automation/release-notes with JSON:
+   h. POST https://reach.aicountly.org/api/v1/automation/release-notes with JSON:
         {
           "product_slug": "<product_slug>",
           "version": "<version>",

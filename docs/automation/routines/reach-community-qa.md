@@ -8,17 +8,17 @@
 | **Cron (IST)** | every 2 hours, 08:00 – 20:00 IST (7 runs a day) |
 | **Session** | fresh session per fire |
 | **Repos in the environment** | `aicountly/reach-aicountly`, `aicountly/aicountly-com`; attach product repos with `add_repo` when a question needs them: `aicountly/books-react-app` (Smart Books), `aicountly/billing-aicountly` (Billing), `aicountly/Inventory-aicountly` (Inventory), `aicountly/notes-aicountly` (Notes), `aicountly/drive-react-app` (Drive) |
-| **Environment variables** | `REACH_API_BASE=https://reach.aicountly.org/api`, `REACH_AUTOMATION_TOKEN=<same 32+ char token as the Reach server .env>` |
+| **Environment** | network access to `reach.aicountly.org` + the Reach network secret (see `../CLAUDE_ROUTINES.md`) — no environment variables needed |
 
 ## Endpoints used
 
-All calls send the header `X-Automation-Token: $REACH_AUTOMATION_TOKEN`.
+All calls: no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET  $REACH_API_BASE/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
-| `POST $REACH_API_BASE/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
-| `POST $REACH_API_BASE/v1/automation/community-qa` | a new frequently-asked question with the desk's answer: `{external_key, question_title, question_body, category_slug, product_slug?, answer_html, short_answer?, source_references?, provenance}` |
+| `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
+| `POST https://reach.aicountly.org/api/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
+| `POST https://reach.aicountly.org/api/v1/automation/community-qa` | a new frequently-asked question with the desk's answer: `{external_key, question_title, question_body, category_slug, product_slug?, answer_html, short_answer?, source_references?, provenance}` |
 
 `provenance` is `{"generated_by_model": "claude-sonnet", "routine_run_id": "<this session id>"}`.
 `source_references` is a list of `{"title": "...", "url": "https://..."}` (official sources: gst.gov.in,
@@ -47,7 +47,7 @@ India actually ask. Reach checks everything you send with its own vetting model 
 anything is published, and nothing you send is attributed to a member of the public:
 your questions are posted as the AICOUNTLY desk's own FAQ.
 
-Every call: header X-Automation-Token: $REACH_AUTOMATION_TOKEN, base $REACH_API_BASE.
+Every call goes to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
 1. GET /v1/automation/community-plan. If enabled is false or max_this_run is 0, report
    that and stop. Keep: max_this_run (never send more than this many submissions this

@@ -5,6 +5,12 @@ import { renderWithAuth } from '../../../test/renderWithAuth';
 vi.mock('../../../services/api', () => ({
   default: { get: vi.fn() },
 }));
+vi.mock('../../../services/routineSubmissionService', () => ({
+  routineSubmissionService: {
+    list: vi.fn().mockResolvedValue({ items: [], quota: {}, flags: {} }),
+    retry: vi.fn(),
+  },
+}));
 import api from '../../../services/api';
 import KbPublishingListPage from '../KbPublishingListPage';
 
@@ -60,5 +66,12 @@ describe('KbPublishingListPage', () => {
     api.get.mockRejectedValueOnce(new Error('KB API error'));
     renderWithAuth(<KbPublishingListPage />, ctx);
     await waitFor(() => expect(screen.getByText(/KB API error/i)).toBeInTheDocument());
+  });
+
+  it('shows the Gemini-vetted routine articles below the deployments', async () => {
+    api.get.mockResolvedValueOnce([]);
+    renderWithAuth(<KbPublishingListPage />, ctx);
+    expect(await screen.findByText('Routine help articles (Gemini-vetted)')).toBeInTheDocument();
+    expect(await screen.findByText(/No routine submissions/)).toBeInTheDocument();
   });
 });

@@ -4,33 +4,42 @@ declare(strict_types=1);
 
 namespace App\Libraries\Publishing\KnowledgeBase;
 
+use App\Libraries\Automation\Routine\KbSteps;
+use App\Libraries\Automation\Routine\LaunchApps;
+use App\Libraries\Automation\Routine\RoutineSubmissions;
 use App\Libraries\ContentVersionService;
 use App\Libraries\HtmlSanitizer;
-use App\Libraries\Publishing\Jobs\PublicationDeploymentService;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
 /**
- * Claude-routine Knowledge Base ingestion. KB articles are generated ONLY by
- * the routine (Opus writes, a different model verifies — same two-model rule
- * as blogs). KB items bypass the blog state machine entirely: with
- * KB_AUTO_APPROVE=true a valid draft is approved (audited) and a publication
- * deployment is enqueued straight away.
+ * Claude-routine Knowledge Base ingestion. KB articles are written ONLY by the
+ * routine (Sonnet, from the product's own code). A valid draft is stored as a
+ * pending KB item plus a routine submission; RoutineContentPipeline then has
+ * Gemini vet it (knowledge_base rubric — the run is the verification of
+ * record), approves it under the SystemApprover and publishes it to
+ * aicountly.com/help. KB items bypass the blog state machine entirely.
+ * KB_AUTO_APPROVE is no longer consulted for routine items.
  */
 class KnowledgeBaseDraftIngestService
 {
     private const ARTICLE_TYPES = ['concept', 'how_to', 'troubleshooting', 'faq', 'release_guide', 'configuration', 'integration', 'reference', 'best_practice'];
 
     private BaseConnection $db;
+    private RoutineSubmissions $submissions;
 
-    public function __construct(?BaseConnection $db = null)
+    public function __construct(?BaseConnection $db = null, ?RoutineSubmissions $submissions = null)
     {
-        $this->db = $db ?? Database::connect();
+        $this->db          = $db ?? Database::connect();
+        $this->submissions = $submissions ?? new RoutineSubmissions($this->db);
     }
 
     /**
-     * Today's writing plan for the routine: per-product remaining quota plus
+     * Today's writing plan for the routine: the overall quota, then per
+     * product (launch apps first) the remaining per-product cadence and the
      * un-ingested topic seeds from content-base/knowledge-base/index.json.
+     * Seeds are suggestions — the routine may propose its own topic for real
+     * functionality it finds in the product's code, with its own content key.
      *
      * @return array<string,mixed>
      */
@@ -41,28 +50,39 @@ class KnowledgeBaseDraftIngestService
             ->orderBy('daily_quota', 'DESC')
             ->get()->getResultArray();
 
-        $index    = (new \App\Libraries\Blog\ContentBaseService($this->db))->knowledgeBaseIndex();
+        $index     = (new \App\Libraries\Blog\ContentBaseService($this->db))->knowledgeBaseIndex();
         $byProduct = [];
         foreach ((array) ($index['products'] ?? []) as $productEntry) {
             $byProduct[(string) ($productEntry['product_slug'] ?? '')] = (array) ($productEntry['topics'] ?? []);
         }
 
-        $plan = [];
+        $todayByProduct = [];
+        foreach ($this->db->query(
+            "SELECT pr.slug, COUNT(*) AS c
+             FROM reach_routine_submissions s
+             JOIN reach_kb_publication_profiles p ON p.content_item_id = s.content_item_id
+             JOIN reach_products pr ON pr.id = p.product_id
+             WHERE s.content_type = 'knowledge_base' AND s.status <> 'rejected' AND s.created_at >= ?
+             GROUP BY pr.slug",
+            [RoutineSubmissions::istMidnight()]
+        )->getResultArray() as $row) {
+            $todayByProduct[(string) $row['slug']] = (int) $row['c'];
+        }
+
+        $launch = LaunchApps::slugs();
+        usort($cadences, static function (array $a, array $b) use ($launch): int {
+            $ia = array_search($a['product_slug'], $launch, true);
+            $ib = array_search($b['product_slug'], $launch, true);
+
+            return [$ia === false ? 99 : $ia, -(int) $a['daily_quota']] <=> [$ib === false ? 99 : $ib, -(int) $b['daily_quota']];
+        });
+
+        $repos = array_column(LaunchApps::APPS, 'repo', 'product_slug');
+        $plan  = [];
         foreach ($cadences as $cadence) {
             $slug  = (string) $cadence['product_slug'];
             $quota = (int) $cadence['daily_quota'];
-
-            $publishedToday = (int) ($this->db->query(
-                "SELECT COUNT(*) AS c
-                 FROM reach_content_items i
-                 JOIN reach_kb_publication_profiles p ON p.content_item_id = i.id
-                 JOIN reach_products pr ON pr.id = p.product_id
-                 WHERE i.content_type = 'knowledge_base'
-                   AND i.created_by_service = 'reach:automation_ingest_kb'
-                   AND i.created_at >= ?
-                   AND pr.slug = ?",
-                [date('Y-m-d 00:00:00'), $slug]
-            )->getRowArray()['c'] ?? 0);
+            $done  = $todayByProduct[$slug] ?? 0;
 
             $topics = [];
             foreach ($byProduct[$slug] ?? [] as $topic) {
@@ -70,35 +90,48 @@ class KnowledgeBaseDraftIngestService
                 if ($key === '' || strtolower((string) ($topic['status'] ?? 'planned')) === 'retired') {
                     continue;
                 }
-                $ingested = $this->db->table('reach_content_items')
-                    ->where('content_base_key', $key)
-                    ->countAllResults() > 0;
-                if (! $ingested) {
+                if ($this->db->table('reach_content_items')->where('content_base_key', $key)->countAllResults() === 0) {
                     $topics[] = $topic;
                 }
             }
 
             $plan[] = [
                 'product_slug'    => $slug,
+                'product_name'    => LaunchApps::nameFor($slug) ?? ucwords(str_replace('-', ' ', $slug)),
+                'is_launch_app'   => in_array($slug, $launch, true),
+                'repo'            => $repos[$slug] ?? null,
                 'tier'            => $cadence['tier'],
                 'daily_quota'     => $quota,
-                'published_today' => $publishedToday,
-                'remaining_today' => max(0, $quota - $publishedToday),
+                'published_today' => $done,
+                'remaining_today' => max(0, $quota - $done),
                 'pending_topics'  => $topics,
             ];
         }
 
+        $existing = $this->db->table('reach_content_items')
+            ->select('title, slug, content_base_key')
+            ->where('content_type', 'knowledge_base')
+            ->where('deleted_at IS NULL', null, false)
+            ->whereNotIn('workflow_status', ['rejected', 'archived'])
+            ->orderBy('id', 'DESC')->limit(300)
+            ->get()->getResultArray();
+
         return [
-            'date'     => date('Y-m-d'),
-            'products' => $plan,
-            'notes'    => (string) ($index['notes'] ?? ''),
+            'date'              => (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Kolkata')))->format('Y-m-d'),
+            'enabled'           => \App\Libraries\Automation\Routine\RoutineFlags::enabled('knowledge_base.enabled'),
+            'quota'             => $this->submissions->quota('knowledge_base'),
+            'launch_apps'       => LaunchApps::forRoutine(rtrim((string) env('AICOUNTLY_PUBLIC_SITE_BASE_URL', 'https://aicountly.com'), '/')),
+            'products'          => $plan,
+            'existing_articles' => $existing,
+            'notes'             => (string) ($index['notes'] ?? ''),
         ];
     }
 
     /**
      * @param array<string,mixed> $payload
-     * @return array{status:string, content_item_id:int, content_version_id:int, slug:string, deployment_id?:int, existing?:bool}
+     * @return array{status:string, submission_id:int, content_item_id:int, content_version_id:int, slug:string, existing?:bool, quota?:array<string,int>}
      * @throws \InvalidArgumentException
+     * @throws \App\Libraries\Automation\Routine\RoutineIntakeRefused switched off (403) or quota used (429)
      */
     public function ingestKbDraft(array $payload): array
     {
@@ -129,37 +162,37 @@ class KnowledgeBaseDraftIngestService
             throw new \InvalidArgumentException('body too short: need at least 150 words');
         }
 
-        $this->assertVerificationReport($payload);
-
         $articleType = strtolower(trim((string) ($payload['article_type'] ?? 'concept')));
         $articleType = match ($articleType) {
             'getting_started', 'getting-started' => 'how_to',
             default => in_array($articleType, self::ARTICLE_TYPES, true) ? $articleType : 'concept',
         };
 
-        $steps = array_values((array) ($payload['steps'] ?? []));
+        $steps = KbSteps::normalize((array) ($payload['steps'] ?? []));
         if ($articleType === 'how_to' && $steps === []) {
-            throw new \InvalidArgumentException('how_to articles require steps[]');
+            throw new \InvalidArgumentException('how_to articles require steps[] (each {title, text})');
         }
 
-        $contentBaseKey = trim((string) ($payload['content_base_key'] ?? ''));
-        if ($contentBaseKey !== '') {
-            $existing = $this->db->table('reach_content_items')
-                ->select('id, slug, current_version_id')
-                ->where('content_base_key', $contentBaseKey)
-                ->get()->getRowArray();
-            if ($existing) {
-                return [
-                    'status'             => 'already_ingested',
-                    'content_item_id'    => (int) $existing['id'],
-                    'content_version_id' => (int) ($existing['current_version_id'] ?? 0),
-                    'slug'               => (string) $existing['slug'],
-                    'existing'           => true,
-                ];
-            }
+        $contentBaseKey = strtolower(trim((string) ($payload['content_base_key'] ?? $payload['content_key'] ?? '')));
+        if ($contentBaseKey === '' || preg_match('/^[a-z0-9][a-z0-9._-]{2,119}$/', $contentBaseKey) !== 1) {
+            throw new \InvalidArgumentException('content_base_key is required: 3-120 chars of a-z, 0-9, ".", "_" or "-" (e.g. kb-billing-create-invoice)');
+        }
+        $existing = $this->db->table('reach_content_items')
+            ->select('id, slug, current_version_id')
+            ->where('content_base_key', $contentBaseKey)
+            ->get()->getRowArray();
+        if ($existing) {
+            return [
+                'status'             => 'already_ingested',
+                'submission_id'      => (int) ($this->submissions->findByItem((int) $existing['id'])['id'] ?? 0),
+                'content_item_id'    => (int) $existing['id'],
+                'content_version_id' => (int) ($existing['current_version_id'] ?? 0),
+                'slug'               => (string) $existing['slug'],
+                'existing'           => true,
+            ];
         }
 
-        $autoApprove = filter_var(env('KB_AUTO_APPROVE', 'false'), FILTER_VALIDATE_BOOL);
+        $quota       = $this->submissions->assertAccepting('knowledge_base');
         $productId   = $this->ensureProduct($productSlug);
         $slug        = $this->uniqueSlug(trim((string) ($payload['seo']['slug'] ?? $payload['slug_hint'] ?? '')) ?: $title);
         $now         = date('Y-m-d H:i:s');
@@ -172,9 +205,9 @@ class KnowledgeBaseDraftIngestService
             'content_type'       => 'knowledge_base',
             'title'              => mb_substr($title, 0, 300),
             'slug'               => $slug,
-            'content_base_key'   => $contentBaseKey !== '' ? $contentBaseKey : null,
-            'workflow_status'    => $autoApprove ? 'approved' : 'draft',
-            'approval_status'    => $autoApprove ? 'approved' : 'pending',
+            'content_base_key'   => $contentBaseKey,
+            'workflow_status'    => 'draft',
+            'approval_status'    => 'pending',
             'created_actor_type' => 'system',
             'created_by_service' => 'reach:automation_ingest_kb',
             'created_at'         => $now,
@@ -199,8 +232,8 @@ class KnowledgeBaseDraftIngestService
             'body_plain_text' => $plain,
         ], [
             'type'    => 'bot',
-            'service' => 'reach:automation_ingest_kb:' . (string) ($provenance['generated_by_model'] ?? 'claude'),
-        ], 'Claude routine KB draft (verified by ' . (string) ($payload['verification_report']['model'] ?? 'reviewer') . ')');
+            'service' => 'reach:automation_ingest_kb:' . mb_substr((string) ($provenance['generated_by_model'] ?? 'claude'), 0, 40),
+        ], 'Claude routine KB draft (awaiting Gemini vetting)');
         $versionId = (int) $version['id'];
 
         $this->db->table('reach_kb_publication_profiles')->insert([
@@ -219,71 +252,48 @@ class KnowledgeBaseDraftIngestService
 
         $seo = (array) ($payload['seo'] ?? []);
         $this->db->table('reach_content_seo_profiles')->insert([
-            'content_item_id'    => $contentItemId,
-            'content_version_id' => $versionId,
-            'primary_keyword'    => mb_substr((string) ($seo['primary_keyword'] ?? $title), 0, 255),
-            'meta_title'         => mb_substr((string) ($seo['meta_title'] ?? $title), 0, 200),
-            'meta_description'   => mb_substr((string) ($seo['meta_description'] ?? $payload['summary'] ?? $title), 0, 320),
-            'slug'               => $slug,
-            'seo_status'         => 'ready',
-            'created_at'         => $now,
-            'updated_at'         => $now,
+            'content_item_id'      => $contentItemId,
+            'content_version_id'   => $versionId,
+            'primary_keyword'      => mb_substr((string) ($seo['primary_keyword'] ?? $title), 0, 255),
+            'meta_title'           => mb_substr((string) ($seo['meta_title'] ?? $title), 0, 200),
+            'meta_description'     => mb_substr((string) ($seo['meta_description'] ?? $payload['summary'] ?? $title), 0, 320),
+            'slug'                 => $slug,
+            'canonical_preference' => 'self_canonical',
+            'seo_status'           => 'ready',
+            'created_at'           => $now,
+            'updated_at'           => $now,
         ]);
+
+        $submissionId = $this->submissions->create('knowledge_base', $contentItemId, $contentBaseKey, array_filter([
+            'product_slug'   => $productSlug,
+            'product_facts'  => array_values(array_filter(array_map('strval', (array) ($payload['product_facts'] ?? [])))),
+            'sources'        => array_values(array_filter(array_map('strval', (array) ($payload['sources'] ?? [])))),
+            'provenance'     => $provenance,
+            'routine_run_id' => $provenance['routine_run_id'] ?? null,
+            'verification_report' => is_array($payload['verification_report'] ?? null) ? $payload['verification_report'] : null,
+        ], static fn ($v) => $v !== null && $v !== []));
 
         $this->db->transComplete();
         if ($this->db->transStatus() === false) {
             throw new \RuntimeException('kb ingest transaction failed');
         }
 
-        \App\Libraries\AuditLogger::record(
-            $autoApprove ? 'kb.auto_approved_routine' : 'kb.ingested_pending_approval',
-            [
-                'content_item_id' => $contentItemId,
-                'product_slug'    => $productSlug,
-                'article_type'    => $articleType,
-                'generated_by'    => $provenance['generated_by_model'] ?? null,
-                'reviewed_by'     => $payload['verification_report']['model'] ?? null,
-            ]
-        );
+        \App\Libraries\AuditLogger::record('kb.ingested_pending_vetting', [
+            'content_item_id' => $contentItemId,
+            'submission_id'   => $submissionId,
+            'product_slug'    => $productSlug,
+            'article_type'    => $articleType,
+            'generated_by'    => $provenance['generated_by_model'] ?? null,
+        ]);
 
-        $result = [
+        return [
             'status'             => 'ingested',
+            'submission_id'      => $submissionId,
             'content_item_id'    => $contentItemId,
             'content_version_id' => $versionId,
             'slug'               => $slug,
+            'quota'              => ['daily_limit' => $quota['daily_limit'], 'used_today' => $quota['used_today'] + 1, 'remaining_today' => max(0, $quota['remaining_today'] - 1)],
         ];
-
-        if ($autoApprove) {
-            $deploymentId = (new PublicationDeploymentService())->enqueuePublication(
-                $contentItemId,
-                $versionId,
-                (string) env('AICOUNTLY_PUBLICATION_CONNECTION_KEY', 'aicountly_com'),
-                'publish',
-            );
-            $result['deployment_id'] = $deploymentId;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<string,mixed> $payload
-     */
-    private function assertVerificationReport(array $payload): void
-    {
-        $report    = $payload['verification_report'] ?? null;
-        $reviewer  = is_array($report) ? strtolower(trim((string) ($report['model'] ?? ''))) : '';
-        $generator = strtolower(trim((string) ($payload['provenance']['generated_by_model'] ?? '')));
-
-        if (! is_array($report) || $report === [] || $reviewer === '') {
-            throw new \InvalidArgumentException('verification_report with model is required');
-        }
-        if ($generator === '') {
-            throw new \InvalidArgumentException('provenance.generated_by_model is required');
-        }
-        if ($reviewer === $generator) {
-            throw new \InvalidArgumentException('verification_report.model must differ from provenance.generated_by_model (two-model rule)');
-        }
     }
 
     private function ensureProduct(string $slug): int
@@ -298,7 +308,7 @@ class KnowledgeBaseDraftIngestService
 
         $this->db->table('reach_products')->insert([
             'slug'               => $slug,
-            'name'               => ucwords(str_replace('-', ' ', $slug)),
+            'name'               => LaunchApps::nameFor($slug) ?? ucwords(str_replace('-', ' ', $slug)),
             'status'             => 'approved',
             'created_actor_type' => 'system',
             'created_by_service' => 'reach:automation_ingest_kb',

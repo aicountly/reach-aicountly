@@ -129,6 +129,8 @@ $routes->group('v1', static function ($routes) {
         $routes->get('workflow-plan',    'Api\\V1\\Automation\\StructuredContentController::workflowPlan');
         $routes->post('release-notes',   'Api\\V1\\Automation\\StructuredContentController::storeReleaseNote');
         $routes->post('workflow-guides', 'Api\\V1\\Automation\\StructuredContentController::storeWorkflowGuide');
+        // ── Stream C: blog + KB routines (Gemini-vetted, auto-published) ──
+        $routes->get('blog-plan',       'Api\\V1\\Content\\AutomationIngestController::blogPlan');
     });
 
     // ---------------------------------------------------------------------
@@ -574,6 +576,10 @@ $routes->group('v1', static function ($routes) {
         // --- Phase 3: AI Generation ---
         $routes->post('ai/generate',                                        'Api\\V1\\Ai\\AiGenerationController::generate',               ['filter' => 'permission:ai.generate']);
         $routes->get('ai/vetting-runs',                                     'Api\\V1\\Ai\\AiVettingRunController::index',                  ['filter' => 'permission:ai.view']);
+
+        // ── Stream C: Claude-routine blog/KB submissions (vetting decision, cover, retry) ──
+        $routes->get('routine-submissions',                                 'Api\\V1\\Content\\RoutineSubmissionController::index',      ['filter' => 'permission:content.view']);
+        $routes->post('routine-submissions/(:num)/retry',                   'Api\\V1\\Content\\RoutineSubmissionController::retry/$1',   ['filter' => 'permission:publishing.publish']);
         $routes->get('ai/generations',                                      'Api\\V1\\Ai\\AiGenerationController::index',                  ['filter' => 'permission:ai.view']);
         $routes->get('ai/generations/(:segment)',                           'Api\\V1\\Ai\\AiGenerationController::show/$1',                ['filter' => 'permission:ai.view']);
         $routes->post('ai/generations/(:segment)/cancel',                   'Api\\V1\\Ai\\AiGenerationController::cancel/$1',              ['filter' => 'permission:ai.generate']);

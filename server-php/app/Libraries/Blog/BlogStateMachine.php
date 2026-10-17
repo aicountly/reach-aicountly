@@ -286,6 +286,13 @@ class BlogStateMachine
             return null;
         }
 
+        // A caller that has already done the successor's job (the routine
+        // pipeline enqueues its own deployment) says so, rather than leaving a
+        // duplicate block for the dispatcher to run later.
+        if (! empty($meta['skip_successor_work_block'])) {
+            return null;
+        }
+
         $blockType = self::NEXT_WORK_BLOCK[$toState] ?? null;
         if ($blockType === null) {
             return null;

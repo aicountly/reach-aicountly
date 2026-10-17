@@ -90,6 +90,19 @@ final class ReachConfig
             'automation.workflow_guide.daily_limit' => ['group' => 'Automation', 'label' => 'Workflow guides per day', 'type' => 'int', 'default' => 40,
                 'help' => 'Submissions accepted per day across all launch apps; further ones get HTTP 429.'],
 
+            // ── Blog & Knowledge Base routines (stream C) ───────────────────
+            // An explicit `false` in the server .env for the named variable is a
+            // hard kill-switch that these settings cannot override (RoutineFlags).
+            'automation.blog.auto_publish' => ['group' => 'Blog & KB routines', 'label' => 'Auto-publish Gemini-approved blogs', 'type' => 'bool', 'default' => true,
+                'help' => 'Off = approved blogs wait for someone to press Publish. BLOG_AUTO_PUBLISH_ENABLED=false or BLOG_PUBLIC_PUBLISHER_ENABLED=false in .env also turns it off.'],
+            'automation.blog.ai_cover' => ['group' => 'Blog & KB routines', 'label' => 'Generate a DALL·E cover for each routine blog', 'type' => 'bool', 'default' => true,
+                'help' => 'Falls back to the cover gallery when generation fails. BLOG_IMAGE_GENERATION_ENABLED=false in .env also turns it off.'],
+            'automation.blog.author_name' => ['group' => 'Blog & KB routines', 'label' => 'Author shown on routine blogs', 'type' => 'string', 'default' => 'AICOUNTLY Editorial Team'],
+            'automation.knowledge_base.auto_publish' => ['group' => 'Blog & KB routines', 'label' => 'Auto-publish Gemini-approved help articles', 'type' => 'bool', 'default' => true,
+                'help' => 'KB_AUTO_PUBLISH_ENABLED=false in .env also turns it off.'],
+            'automation.vetting.min_compliance_score' => ['group' => 'Blog & KB routines', 'label' => 'Hold for a person below this compliance score (1–10)', 'type' => 'int', 'default' => 5,
+                'help' => 'Gemini scores compliance 1–10. An approved article scored below this — or one Gemini flags HIGH_RISK — is held as high risk instead of auto-publishing. 0 = never hold.'],
+
             // ── Reports ─────────────────────────────────────────────────────
             'reports.daily.recipients' => ['group' => 'Reports', 'label' => 'Daily analytics report recipients', 'type' => 'email_list', 'default' => 'pno@aicountly.com',
                 'help' => 'Comma-separated. Sent every morning at 08:00 IST.'],

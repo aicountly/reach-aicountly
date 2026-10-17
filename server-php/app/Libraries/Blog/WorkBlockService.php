@@ -1516,6 +1516,10 @@ class WorkBlockService
      */
     private function executeCrossReview(int $id, array $block): array
     {
+        if ($this->supersededByRoutineVetting($id, (int) ($block['content_item_id'] ?? 0))) {
+            return ['superseded' => true, 'reason' => 'routine_vetting_is_the_review_of_record'];
+        }
+
         if (! $this->flags->isEnabled('ai_generation')) {
             return $this->blockOnFlag($id, self::TYPE_CROSS_REVIEW, 'ai_generation_disabled');
         }
@@ -1706,6 +1710,10 @@ class WorkBlockService
     {
         $contentItemId    = (int) ($block['content_item_id'] ?? 0);
         $contentVersionId = (int) ($block['content_version_id'] ?? 0);
+
+        if ($this->supersededByRoutineVetting($id, $contentItemId)) {
+            return ['superseded' => true, 'reason' => 'routine_vetting_is_the_review_of_record'];
+        }
 
         if ($contentItemId > 0) {
             $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish(
@@ -2239,6 +2247,30 @@ class WorkBlockService
     // -------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------
+
+    /**
+     * Claude-routine items that went through Gemini vetting
+     * (App\Libraries\Automation\Routine\RoutineContentPipeline) already have
+     * their review of record and a system approval bound to the vetted text.
+     * A CROSS_REVIEW or HUMAN_REVIEW_GATE block reaching one of them (an old
+     * chain, a manual re-queue) completes as superseded instead of parking or
+     * re-approving it.
+     */
+    private function supersededByRoutineVetting(int $id, int $contentItemId): bool
+    {
+        if ($contentItemId <= 0 || ! SchemaGuard::hasTable($this->db, 'reach_routine_submissions')) {
+            return false;
+        }
+        $vetted = $this->db->table('reach_routine_submissions')
+            ->where('content_item_id', $contentItemId)
+            ->where('vetting_run_id IS NOT NULL', null, false)
+            ->countAllResults() > 0;
+        if ($vetted) {
+            $this->markCompleted($id, ['superseded' => true, 'reason' => 'routine_vetting_is_the_review_of_record']);
+        }
+
+        return $vetted;
+    }
 
     public function buildUniqueSlug(string $title): string
     {

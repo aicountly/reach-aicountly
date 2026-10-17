@@ -88,6 +88,8 @@ class JobHandlerRegistry
         $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();
         // Release notes + workflow guides: retry pending vetting / failed publishes
         $this->handlers['reach.structured_content_sweep']            = new \App\Jobs\StructuredContentSweepJob();
+        // Stream C: Claude-routine blog/KB pipeline (vet → approve → cover → publish → verify)
+        $this->handlers['reach.routine_content_sweep']               = new \App\Jobs\RoutineContentSweepJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

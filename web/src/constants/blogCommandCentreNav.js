@@ -60,6 +60,7 @@ export const BCC_SECTIONS = [
         path: ROUTES.BCC_VERIFICATION,
         treatment: 'NEW',
       },
+      { label: 'Routine Articles', path: ROUTES.BCC_VERIFICATION_ROUTINE, treatment: 'NEW' },
       { label: 'Unsupported Claims', path: ROUTES.BCC_VERIFICATION_CLAIMS, treatment: 'SCAFFOLD' },
       { label: 'Source Review', path: ROUTES.BCC_VERIFICATION_SOURCES, treatment: 'SCAFFOLD' },
       { label: 'Risk Review', path: ROUTES.BCC_VERIFICATION_RISK, treatment: 'SCAFFOLD' },

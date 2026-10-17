@@ -6,8 +6,8 @@
 | **Model** | Claude Sonnet |
 | **Schedule** | weekly, Monday 06:00 IST — cron `30 0 * * 1` (UTC, Monday 00:30) |
 | **Session** | fresh session per fire, in the cloud environment that has `aicountly/reach-aicountly`, `aicountly/aicountly-com` and the launch-app repositories (others are attached with `add_repo`) |
-| **Environment variables** | `REACH_API_BASE=https://reach.aicountly.org/api`, `REACH_AUTOMATION_TOKEN=<same 32+ char token as the Reach server .env>` |
-| **Endpoints** | `GET $REACH_API_BASE/v1/automation/workflow-plan`, `POST $REACH_API_BASE/v1/automation/workflow-guides` (header `X-Automation-Token: $REACH_AUTOMATION_TOKEN`) |
+| **Environment** | network access to `reach.aicountly.org` + the Reach network secret (see `../CLAUDE_ROUTINES.md`) — no environment variables needed |
+| **Endpoints** | `GET https://reach.aicountly.org/api/v1/automation/workflow-plan`, `POST https://reach.aicountly.org/api/v1/automation/workflow-guides` |
 
 What happens after the POST: Reach checks the guide against aicountly.com's format rules, Gemini vets it
 (workflow-guide rubric: plain language for a non-technical user, concrete ordered steps, no internals),
@@ -29,10 +29,9 @@ Guides are for non-technical small-business users. You only describe screens,
 menus, buttons and flows you can see in the product's code — never invent a
 feature, a label or a step.
 
-All Reach calls use the header  X-Automation-Token: $REACH_AUTOMATION_TOKEN
-and the base URL $REACH_API_BASE.
+All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
-1. GET $REACH_API_BASE/v1/automation/workflow-plan
+1. GET https://reach.aicountly.org/api/v1/automation/workflow-plan
    - If data.enabled is false, stop and report "workflow-guide automation is off".
    - data.products lists the launch apps in order (books = Smart Books, notes,
      billing, inventory, docs = Drive, manage). For each: repo, guide_hub_url,
@@ -89,7 +88,7 @@ and the base URL $REACH_API_BASE.
           environment terms; no developer-only settings.
         - No promises or guarantees, no future features, no customer names.
         - Prerequisites, steps and FAQs must agree with each other.
-   f. POST $REACH_API_BASE/v1/automation/workflow-guides with JSON:
+   f. POST https://reach.aicountly.org/api/v1/automation/workflow-guides with JSON:
         { <the fields above>,
           "source": {"repo": "<repo>", "ref": "<full SHA of origin/<branch> HEAD>"},
           "external_key": "<product_slug>:<slug>:<ISO year>-W<ISO week>" }

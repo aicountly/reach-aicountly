@@ -32,7 +32,7 @@ See `server-php/.env.example`. In short:
 | AI keys | `AI_OPENAI_API_KEY`, `AI_GEMINI_API_KEY`, `AI_PERPLEXITY_API_KEY` — fallbacks; the keys can instead be saved (encrypted) in Settings → AI & Automation, which takes precedence. `REACH_SETTINGS_KEY` (optional, else `JWT_SECRET`) encrypts them. See `docs/automation/AI_VETTING.md`. |
 | Channels | social tokens, `EMAIL_API_KEY`, `SMS_*`, `WHATSAPP_*` |
 | Analytics | `GA4_*`, `SEARCH_CONSOLE_*`, `CONTENT_ANALYTICS_*`, `INDEXNOW_*` |
-| Switches | `BLOG_*_ENABLED`, `KB_AUTO_APPROVE`, `BLOG_GALLERY_ALERT_EMAIL` |
+| Switches | `BLOG_*_ENABLED`, `KB_AUTO_PUBLISH_ENABLED`, `BLOG_GALLERY_ALERT_EMAIL` — for Claude-routine blogs/KB the switches live in Settings → AI & Automation; an explicit `BLOG_AUTO_PUBLISH_ENABLED`, `BLOG_PUBLIC_PUBLISHER_ENABLED`, `BLOG_IMAGE_GENERATION_ENABLED` or `KB_AUTO_PUBLISH_ENABLED` = `false` is a hard kill-switch (see `docs/automation/CLAUDE_ROUTINES.md`). `KB_AUTO_APPROVE` is no longer read for routine items. |
 
 ---
 

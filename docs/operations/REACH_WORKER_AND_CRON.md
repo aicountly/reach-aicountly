@@ -142,6 +142,15 @@ php spark reach:daily-report --date=2026-10-17 --send --to=you@aicountly.com
 ```
 
 Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
+Daily jobs handled by `reach:schedule` (no extra cron lines needed):
+05:00 SEO rank/backlink snapshots · 06:00 content-base sync ·
+09:00 cover-gallery deficit email.
+Every 5 minutes `reach:schedule` also enqueues `reach.routine_content_sweep`
+(default queue), which carries Claude-routine blog/KB submissions forward —
+re-vetting with Gemini after an outage, hourly cover retries, publishing and
+verification. Run it by hand with `php spark reach:routine-sweep` (or
+`--id=N` for one submission). It does not depend on the `reach:blog-dispatch`
+window: routine articles publish during the day.
 
 After every deploy (with AI keys already in `.env`):
 

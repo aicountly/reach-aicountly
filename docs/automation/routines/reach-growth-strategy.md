@@ -8,7 +8,7 @@
 | **Cron (IST)** | Sunday 18:00 IST, weekly |
 | **Session** | fresh session per fire |
 | **Repos in the environment** | `aicountly/reach-aicountly`, `aicountly/aicountly-com`; attach product repos with `add_repo` as needed: `aicountly/books-react-app` (Smart Books), `aicountly/billing-aicountly` (Billing), `aicountly/Inventory-aicountly` (Inventory), `aicountly/notes-aicountly` (Notes), `aicountly/drive-react-app` (Drive) |
-| **Environment variables** | `REACH_API_BASE=https://reach.aicountly.org/api`, `REACH_AUTOMATION_TOKEN=<same 32+ char token as the Reach server .env>` |
+| **Environment** | network access to `reach.aicountly.org` + the Reach network secret (see `../CLAUDE_ROUTINES.md`) — no environment variables needed |
 
 Runs 90 minutes after Reach's own weekly AI Insights report (Sunday 16:00 IST, `reach:schedule`), so the
 digest it reads is fresh. The memo is internal: Reach stores it and shows it on **Intelligence → AI
@@ -16,12 +16,12 @@ Insights**; nothing is published.
 
 ## Endpoints used
 
-All calls send the header `X-Automation-Token: $REACH_AUTOMATION_TOKEN`.
+All calls: no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET  $REACH_API_BASE/v1/automation/insights-digest` | the latest AI Insights report (with the data digest it was written from and the list of figures Reach could not trace to that digest), AI-visibility summaries for 28 and 7 days (mention rate, share of voice, rank, gaps, markets, cited domains, skipped assistants), open actions and recent memos |
-| `POST $REACH_API_BASE/v1/automation/strategy-memos` | store the memo: `{title, body_markdown, period_start, period_end, routine_run_id, model, sources[]}` |
+| `GET  https://reach.aicountly.org/api/v1/automation/insights-digest` | the latest AI Insights report (with the data digest it was written from and the list of figures Reach could not trace to that digest), AI-visibility summaries for 28 and 7 days (mention rate, share of voice, rank, gaps, markets, cited domains, skipped assistants), open actions and recent memos |
+| `POST https://reach.aicountly.org/api/v1/automation/strategy-memos` | store the memo: `{title, body_markdown, period_start, period_end, routine_run_id, model, sources[]}` |
 
 Responses: `GET` → `200 {data: …}`, or `503` when the feature is not migrated (stop and report).
 `POST` → `201 {id, title, view_url}`; `200 {duplicate: true}` when this `routine_run_id` was already
@@ -37,8 +37,7 @@ AICOUNTLY's products for relevant buyer questions; within 3 months AICOUNTLY is 
 international investors (e.g. Japanese, Chinese, SE Asian, Middle Eastern funds) and to test markets
 outside India.
 
-1. GET $REACH_API_BASE/v1/automation/insights-digest with header
-   X-Automation-Token: $REACH_AUTOMATION_TOKEN. If it is not 200, stop and report the status and
+1. GET https://reach.aicountly.org/api/v1/automation/insights-digest. If it is not 200, stop and report the status and
    message. Read every section. `insights_report.unverified_numbers` lists figures Reach could not
    trace to its data — never repeat them as facts.
 2. Find out what the products actually do today. In this environment, and with add_repo for the
@@ -74,7 +73,7 @@ outside India.
 4. Rules: use only numbers from the digest (quote them as given) or from the repos you read
    (cite the file). Anything else is an assumption — write "Assumption:" in front of it and give no
    invented figures. No hype, no claims of human review, no promised rankings or funding outcomes.
-5. POST $REACH_API_BASE/v1/automation/strategy-memos with JSON:
+5. POST https://reach.aicountly.org/api/v1/automation/strategy-memos with JSON:
    {"title": "Growth strategy — week of <YYYY-MM-DD of the Monday>",
     "body_markdown": "<the memo>",
     "period_start": "<insights_report.period.start>", "period_end": "<insights_report.period.end>",
