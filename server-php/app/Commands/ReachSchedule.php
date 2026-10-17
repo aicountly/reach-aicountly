@@ -124,6 +124,15 @@ class ReachSchedule extends BaseCommand
         // landed at 09:15. Idempotent per article per day.
         $svc->enqueue('reach.blog_cover_sweep', ['limit' => 25], ['queue' => 'blog']);
 
+        // Stream C — every 5 minutes: carry Claude-routine blog/KB submissions
+        // forward (re-vet with backoff, hourly cover retry, publish, verify).
+        if ((int) date('i') % 5 === 0) {
+            $svc->enqueue('reach.routine_content_sweep', ['limit' => 10], [
+                'queue'           => 'default',
+                'idempotency_key' => 'routine-content-sweep-' . date('YmdHi'),
+            ]);
+        }
+
         // Every hour: due-date reminders, overdue escalation, schedule readiness
         $svc->enqueue('reach.content_due_date_reminder',  [], ['queue' => 'notifications']);
         $svc->enqueue('reach.content_overdue_escalation', [], ['queue' => 'notifications']);

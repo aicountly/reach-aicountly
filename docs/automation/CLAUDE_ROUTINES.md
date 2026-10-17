@@ -1,12 +1,29 @@
 # Claude Code Routines — blog, knowledge base and base revision
 
 The Claude route runs as **cloud Routines** (Claude Code on the web →
-Routines). Each firing starts a fresh session in the environment that has
-`aicountly/reach-aicountly` and `aicountly/aicountly-com` connected. Cloud
-Routines fire at most **hourly** — the requested every-30-minutes cadence is
-not possible, so the blog routine writes N blogs per hourly run
-(superadmin decision 2026-08-05: start with 1/run ≈ 12/day and ramp via the
-`BLOGS_PER_RUN` number inside the prompt).
+Routines), all on **Claude Sonnet**. Each firing starts a fresh session in the
+environment that has `aicountly/reach-aicountly` and `aicountly/aicountly-com`
+connected; product repositories are attached with `add_repo` when an article
+needs them. Cloud Routines fire at most **hourly**.
+
+The routines only **write**. Reach decides: every submission is vetted by
+**Gemini** (Settings → AI & Automation picks the model; its decision is final,
+no human review), approved under the login-disabled *Reach System Bot*, given
+a DALL·E cover (blogs) and published to aicountly.com. The old two-model rule
+(Opus writes, a Sonnet subagent fact-checks, Reach requires a
+`verification_report` from a different model) is retired: a
+`verification_report` is still accepted and stored if a routine sends one, but
+the Gemini vetting run is the verification of record.
+
+| Routine | Prompt file | Cron (UTC) | IST | Volume |
+|---|---|---|---|---|
+| `reach-blog` | [`routines/reach-blog.md`](routines/reach-blog.md) | `30 3-14 * * *` | hourly 09:00–20:00 | 1 per run, stops at `automation.blog.daily_limit` (6/day) |
+| `reach-kb` | [`routines/reach-kb.md`](routines/reach-kb.md) | `30 4,10 * * *` | 10:00 and 16:00 | up to 5 per run → `automation.knowledge_base.daily_limit` (10/day) |
+| `reach-base-revision` | below | `30 2 * * *` | 08:00 | optional — topic supply no longer depends on it |
+
+To install a routine, open a session bound to the environment and ask Claude to
+"Create a Routine named `<name>` with cron `<cron>`, fresh session per fire,
+model Sonnet, with the prompt in `docs/automation/routines/<name>.md`".
 
 ## Environment prerequisites (one-time)
 
@@ -25,88 +42,82 @@ Endpoints the routines use:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET  $REACH_API_BASE/v1/automation/content-base` | strategy base + upcoming blog index |
-| `GET  $REACH_API_BASE/v1/automation/gallery/status` | cover deficit + per-entry prompts |
+| `GET  $REACH_API_BASE/v1/automation/blog-plan` | blog quota left today (`stop`), last 200 titles/slugs for de-duplication, priority topics (launch apps; Indian compliance calendar for the next 30 days), internal links |
+| `GET  $REACH_API_BASE/v1/automation/kb-plan` | KB quota, per-product cadence (launch apps first), topic seeds, existing articles |
 | `GET  $REACH_API_BASE/v1/automation/link-registry` | linkable URLs for internal links |
-| `GET  $REACH_API_BASE/v1/automation/kb-plan` | today's per-product KB quotas |
-| `POST $REACH_API_BASE/v1/automation/blog-drafts` | submit a verified blog draft |
-| `POST $REACH_API_BASE/v1/automation/kb-drafts` | submit a verified KB draft |
+| `GET  $REACH_API_BASE/v1/automation/content-base` | strategy base + legacy blog index (optional) |
+| `GET  $REACH_API_BASE/v1/automation/gallery/status` | cover-gallery deficit (informational) |
+| `POST $REACH_API_BASE/v1/automation/blog-drafts` | submit a blog draft |
+| `POST $REACH_API_BASE/v1/automation/kb-drafts` | submit a KB draft |
 
-## Routine 1 — hourly marketing blog (~12/day)
+Responses the routines act on: **201** stored (and usually vetted already —
+see `pipeline.status`), **200** `already_ingested` (content key reused),
+**409** duplicate topic, **422** invalid draft, **429** today's quota is used
+(stop), **403** automation switched off (stop).
 
-Ask Claude (in a session bound to the environment):
+## What Reach does with a submission
 
-> Create a Routine named `reach-blog-hourly` with cron `30 3-14 * * *`
-> (UTC = 09:00–20:00 IST hourly), fresh session per fire, with this prompt:
+`App\Libraries\Automation\Routine\RoutineContentPipeline`, state in
+`reach_routine_submissions`:
 
-```
-You are the AICOUNTLY blog routine. Generate exactly 1 marketing blog
-(BLOGS_PER_RUN=1) this run.
+1. **Ingest** — validate, idempotency by `content_base_key`, duplicate-title
+   check, daily quota (IST day; rejected drafts do not count).
+2. **Vet** — `ContentVettingService` with the `blog` / `knowledge_base` rubric.
+   `revise` is re-vetted exactly once; publish only on `approve`. A second
+   `revise` or a `reject` retires the draft with Gemini's reasons. Gemini
+   unavailable → the draft stays `pending_vetting` and is retried with backoff
+   (5 min doubling to 6 h); unvetted content is never published.
+3. **Approve** — under `SystemApprover`, bound to the checksum of the FINAL
+   (possibly corrected) text; blog approval rows carry `vetting_run_id`. This
+   replaces CROSS_REVIEW and HUMAN_REVIEW_GATE for routine items.
+4. **Profiles** — SEO profile, publication profile with author
+   `automation.blog.author_name` ("AICOUNTLY Editorial Team").
+5. **Cover (blogs)** — a fresh DALL·E image (`ai.image.model`, prompt from
+   `CoverPromptBuilder`: title, summary, category, the routine's
+   `cover_prompt`; no text in the image) with alt text; the gallery only if
+   generation fails. With neither, the article waits (`awaiting_cover`) and is
+   retried hourly; it publishes coverless only when the readiness gate allows
+   it (cover rule off, or an operator waived the `cover_image` validation).
+   KB articles get no image: the aicountly.com KB receiver
+   (`syncKnowledgeBaseArticle`, `help-article.php`) has no image field and its
+   sanitizer strips `<img>`.
+6. **Publish** — `PublicationDeploymentService` (the normal publisher path and
+   readiness gate), then **verify** the public copy's checksum and mark it
+   live.
 
-1. GET $REACH_API_BASE/v1/automation/content-base with header
-   X-Automation-Token: $REACH_AUTOMATION_TOKEN. Pick the first index entry
-   with status "planned" whose key you have not already submitted (a
-   submission for an existing content_base_key returns already_ingested —
-   then take the next entry). If none remain, stop and report.
-2. GET .../v1/automation/link-registry and pick 2-4 relevant internal URLs.
-3. Write the article yourself (Claude Opus): follow the entry's
-   brief_prompt and the strategy rules in base_markdown; 900-1800 words;
-   clean HTML (h2/h3/p/ul/ol/table only); weave the internal links in
-   naturally; every factual claim must be verifiable against current Indian
-   law/authority sources.
-4. Verification (two-model rule): spawn a Sonnet subagent with the draft and
-   instruction "Adversarially fact-check every claim; return JSON
-   {claims:[{claim,verdict,reason}], pass_rate, corrections}". Apply its
-   corrections, re-run it once if pass_rate < 0.95. Do not submit below 0.95.
-5. GET .../v1/automation/gallery/status — note the cover prompt for your
-   entry (covers are assigned server-side from the gallery; nothing to
-   upload here). Covers are matched to the article by relevance, so send
-   accurate `category` and `tags` in step 6 — they drive the match, and an
-   article with no relevant gallery cover generates its own instead.
-6. POST .../v1/automation/blog-drafts with JSON:
-   {title, slug_hint, body_html, body_markdown, summary,
-    seo:{slug, meta_title, meta_description}, category, tags,
-    portfolio_stream, funnel_stage, content_base_key,
-    verification_report:{model:"claude-sonnet", claims, pass_rate},
-    provenance:{generated_by_model:"claude-opus", reviewed_by_model:
-    "claude-sonnet", routine_run_id:"<session id>"}}
-7. Report the API response (content_item_id, slug) in one line.
-Never invent facts, never submit without the verification report, and stop
-after BLOGS_PER_RUN successful submissions.
-```
+The scheduled sweep (`reach.routine_content_sweep`, enqueued by
+`reach:schedule` every 5 minutes; `php spark reach:routine-sweep` by hand)
+carries every stage forward. The Blog Command Centre → Verification →
+**Routine Articles** and Publishing → **Knowledge Bases** pages show each
+submission's decision, reasons, scores, cover and status, with **Retry**.
 
-## Routine 2 — knowledge base (twice daily, ~23 articles/day)
+### High-risk content — the decision of record
 
-> Create a Routine named `reach-kb-daily` with cron `30 4,10 * * *`
-> (UTC = 10:00 & 16:00 IST), fresh session per fire, with this prompt:
+Gemini's approval is final. The old "high/critical risk never auto-publishes"
+ban is kept only where the vetting model itself says the content is risky: an
+approved article with a compliance score below
+`automation.vetting.min_compliance_score` (1–10 scale, default 5; 0 disables)
+or a reason starting `HIGH_RISK:` is **held** (`held_high_risk`, item
+`risk_level=high`, blog in the Verification Queue) for a person to approve or
+reject. Reach's own heuristics do not override a Gemini approval; routine
+items default to LOW risk.
 
-```
-You are the AICOUNTLY knowledge-base routine (Claude-only route; no
-third-party AI is permitted for KB content).
+### Switches (Settings → AI & Automation, group "Blog & KB routines")
 
-1. GET $REACH_API_BASE/v1/automation/kb-plan with header
-   X-Automation-Token: $REACH_AUTOMATION_TOKEN.
-2. For each product with remaining_today > 0, take up to remaining_today
-   pending_topics (work products in the listed order). For each topic:
-   read the product's actual repository (it is available in this
-   environment or via add_repo) to describe the REAL current functionality
-   — menus, flows, validations. Never describe features you cannot see in
-   the code.
-3. Write the article (Opus): getting_started/how_to structure with
-   prerequisites[], steps[] (each step an object {text}), troubleshooting[];
-   400-900 words of body_html; plain, second-person instructions.
-4. Verify with a Sonnet subagent (same two-model rule as blogs): it must
-   check every instruction against the product code. Fix findings.
-5. POST .../v1/automation/kb-drafts with JSON:
-   {title, product_slug, article_type, content_base_key, body_html, summary,
-    seo:{slug, meta_title, meta_description}, prerequisites, steps,
-    troubleshooting, difficulty_level,
-    verification_report:{model:"claude-sonnet", claims:[], pass_rate:1},
-    provenance:{generated_by_model:"claude-opus",
-    reviewed_by_model:"claude-sonnet"}}
-6. Stop when every product's remaining_today is 0 or pending topics run out.
-   Report a per-product summary table.
-```
+| Setting | Default | Hard kill-switch (explicit `false` in `.env`) |
+|---|---|---|
+| `automation.blog.enabled` / `automation.knowledge_base.enabled` | on | — |
+| `automation.blog.daily_limit` / `automation.knowledge_base.daily_limit` | 6 / 10 | — |
+| `automation.blog.auto_publish` | on | `BLOG_AUTO_PUBLISH_ENABLED`, `BLOG_PUBLIC_PUBLISHER_ENABLED` |
+| `automation.blog.ai_cover` | on | `BLOG_IMAGE_GENERATION_ENABLED` |
+| `automation.knowledge_base.auto_publish` | on | `KB_AUTO_PUBLISH_ENABLED` |
+| `automation.blog.author_name` | AICOUNTLY Editorial Team | — |
+| `automation.vetting.min_compliance_score` | 5 | — |
+
+An env variable that is unset (or `true`) defers to the setting. Older
+`.env` files copied from `.env.example` contain
+`BLOG_AUTO_PUBLISH_ENABLED=false` etc. — delete those lines for routine
+content to publish. `KB_AUTO_APPROVE` is no longer read for routine items.
 
 ## Routine 3 — daily base revision (the "how is daily revision possible" answer)
 
@@ -122,8 +133,9 @@ add_repo when needed.
    knowledge-base index, community question seeds).
 2. Mark entries whose content was published (check
    GET $REACH_API_BASE/v1/automation/content-base sync states) as
-   status:"published". Keep the blog index topped up to at least 8
-   planned entries with target dates over the next 4 days: derive new
+   status:"published". Optionally keep the blog index topped up with
+   planned entries (the blog routine proposes its own topics, so this is a
+   source of suggestions, not a dependency) with target dates over the next 4 days: derive new
    topics from the strategy in base.md, seasonal Indian compliance
    deadlines, and CHANGES in the product repos since yesterday (git log).
    Each new entry needs key, title, slug_hint, portfolio_stream,
@@ -140,8 +152,8 @@ Never delete published entries; retire outdated ones with status:"retired".
 
 ## Volume ramp
 
-Raise `BLOGS_PER_RUN` in Routine 1's prompt (2 → ~24/day, 4 → ~48/day) only
-after Search Console shows the current volume being indexed and gaining
+Raise `automation.blog.daily_limit` (and, past 12/day, the articles per run in
+`routines/reach-blog.md`) only after Search Console shows the current volume being indexed and gaining
 impressions — Google's scaled-content-abuse policy is the constraint, not
 the pipeline.
 

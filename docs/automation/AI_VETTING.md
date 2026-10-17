@@ -50,3 +50,13 @@ values: `ReachConfig::get()` for plain values, `ReachConfig::secret()` for keys,
 
 Note: if `REACH_SETTINGS_KEY` (or `JWT_SECRET`, when it is the key source) changes, saved keys
 can no longer be decrypted; they read as unset and fall back to `.env`. Re-enter them.
+
+## Blogs and knowledge base (Claude routines)
+
+Routine blog and KB drafts go through `App\Libraries\Automation\Routine\RoutineContentPipeline`:
+vet → (revise → re-vet once) → approve under the SystemApprover → cover (blogs, DALL·E) →
+publish → verify. The vetting run id is stored on the submission and on the blog approval row.
+An approved draft that the vetting model itself scores below
+`automation.vetting.min_compliance_score` for compliance, or flags with a reason starting
+`HIGH_RISK:`, is held for a person instead of publishing. See
+[`CLAUDE_ROUTINES.md`](CLAUDE_ROUTINES.md).

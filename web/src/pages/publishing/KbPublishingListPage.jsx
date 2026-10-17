@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { formatDate } from '../../utils/formatDate';
+import { RoutineSubmissionsPanel } from '../../components/automation/RoutineSubmissionsPanel';
 
 const STATUS_BADGES = {
   draft: 'badge--neutral',
@@ -80,6 +81,8 @@ export default function KbPublishingListPage() {
           </table>
         </div>
       )}
+
+      <RoutineSubmissionsPanel contentType="knowledge_base" title="Routine help articles (Gemini-vetted)" />
     </div>
   );
 }

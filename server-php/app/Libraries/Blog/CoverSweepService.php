@@ -105,6 +105,12 @@ class CoverSweepService
     private function parkedItems(int $limit): array
     {
         $terminal = "'" . implode("','", self::TERMINAL) . "'";
+        // Vetted Claude-routine blogs retry their own cover hourly through
+        // RoutineContentPipeline (fresh DALL·E first, then the gallery), and a
+        // GENERATE_IMAGE block would walk them back into the review chain.
+        $routine = \App\Libraries\Database\SchemaGuard::hasTable($this->db, 'reach_routine_submissions')
+            ? 'AND NOT EXISTS (SELECT 1 FROM reach_routine_submissions rs WHERE rs.content_item_id = i.id)'
+            : '';
 
         return $this->db->query(
             "SELECT i.id, i.current_version_id
@@ -119,6 +125,7 @@ class CoverSweepService
                AND i.deleted_at IS NULL
                AND i.workflow_status NOT IN ({$terminal})
                AND COALESCE(p.featured_image_reference, '') = ''
+               {$routine}
              ORDER BY i.id ASC
              LIMIT ?",
             [$limit]

@@ -122,6 +122,7 @@ export const ROUTES = {
   BCC_VERIFICATION_SOURCES: '/blog-command-centre/verification/source-review',
   BCC_VERIFICATION_RISK: '/blog-command-centre/verification/risk-review',
   BCC_VERIFICATION_MEDIA: '/blog-command-centre/verification/media',
+  BCC_VERIFICATION_ROUTINE: '/blog-command-centre/verification/routine',
   BCC_APPROVALS: '/blog-command-centre/approvals',
   BCC_APPROVALS_HISTORY: '/blog-command-centre/approvals/history',
   BCC_PUBLISHING: '/blog-command-centre/publishing',

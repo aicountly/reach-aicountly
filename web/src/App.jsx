@@ -200,6 +200,7 @@ import { ReadyToPublishPage } from './pages/blog-command-centre/ReadyToPublishPa
 import { EmergencyUnpublishPage } from './pages/blog-command-centre/EmergencyUnpublishPage.jsx';
 import { PortfolioPerformancePage } from './pages/blog-command-centre/PortfolioPerformancePage.jsx';
 import { BlogReviewQueuePage } from './pages/blog-command-centre/BlogReviewQueuePage.jsx';
+import { RoutineArticlesPage } from './pages/blog-command-centre/RoutineArticlesPage.jsx';
 import { BlogReviewDetailPage } from './pages/blog-command-centre/BlogReviewDetailPage.jsx';
 import { BlogPublishedManagePage } from './pages/blog-command-centre/BlogPublishedManagePage.jsx';
 import { BlogPortfolioSettingsPage } from './pages/blog-command-centre/settings/BlogPortfolioSettingsPage.jsx';
@@ -288,6 +289,7 @@ export default function App() {
 
           <Route path="verification" element={<BlogReviewQueuePage />} />
           <Route path="verification/review/:id" element={<BlogReviewDetailPage />} />
+          <Route path="verification/routine" element={<RoutineArticlesPage />} />
           <Route path="verification/unsupported-claims" element={<BlogScaffoldPage />} />
           <Route path="verification/source-review" element={<BlogScaffoldPage />} />
           <Route path="verification/risk-review" element={<BlogScaffoldPage />} />
