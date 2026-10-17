@@ -4,6 +4,8 @@ import { Globe } from 'lucide-react';
 const navItems = [
   { to: '/publishing/blogs', label: 'Blogs' },
   { to: '/publishing/knowledge-bases', label: 'Knowledge Base' },
+  { to: '/publishing/release-notes', label: 'Release notes' },
+  { to: '/publishing/workflow-guides', label: 'Workflow guides' },
   { to: '/publishing/calendar', label: 'Calendar' },
   { to: '/publishing/deployments', label: 'Deployments', deployments: true },
   { to: '/publishing/verifications', label: 'Verifications' },
@@ -25,7 +27,7 @@ export default function PublishingLayout() {
           <span className="badge badge-primary">Phase 4</span>
         </div>
         <p className="page-layout__subtitle">
-          Blog and knowledge-base deployments, verifications, and site connections.
+          Blog, knowledge-base, release-note and workflow-guide deployments, verifications, and site connections.
         </p>
       </div>
 

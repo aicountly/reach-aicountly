@@ -129,6 +129,15 @@ class ReachSchedule extends BaseCommand
         $svc->enqueue('reach.content_overdue_escalation', [], ['queue' => 'notifications']);
         $svc->enqueue('reach.content_schedule_readiness', []);
 
+        // Every 15 minutes: release notes / workflow guides waiting on vetting
+        // (Gemini unavailable) or on a publish that has not gone live yet.
+        if ((int) date('i') % 15 === 0) {
+            $svc->enqueue('reach.structured_content_sweep', ['limit' => 20], [
+                'queue'           => 'publishing',
+                'idempotency_key' => 'structured-content-sweep-' . date('YmdHi'),
+            ]);
+        }
+
         // 03:00 — refresh detection
         if ($hour === 3) {
             $svc->enqueue('reach.content_refresh_detection', []);

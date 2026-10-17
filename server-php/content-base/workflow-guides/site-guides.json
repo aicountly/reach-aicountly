@@ -1,0 +1,411 @@
+{
+    "snapshot_date": "2026-10-17",
+    "source": "aicountly-com includes/guides-content/*.php (hand-written guides; a Reach-published guide with the same product_slug + slug replaces one of these)",
+    "products": {
+        "books": {
+            "guide_hub": "smart-books",
+            "guides": [
+                {
+                    "slug": "set-up-your-company",
+                    "title": "Set up your company in Smart Books",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-your-accounts",
+                    "title": "Add your customers, suppliers and accounts",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "enter-opening-balances",
+                    "title": "Enter your opening balances",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "bring-data-from-tally-or-busy",
+                    "title": "Bring your data from Tally or Busy",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "give-your-team-access",
+                    "title": "Give your team or accountant access to Smart Books",
+                    "goal": "team"
+                },
+                {
+                    "slug": "record-a-sales-invoice",
+                    "title": "Record a sales invoice with GST",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "record-a-purchase-bill",
+                    "title": "Record a purchase bill",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "record-money-received-and-paid",
+                    "title": "Record money received and money paid",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "raise-a-credit-or-debit-note",
+                    "title": "Handle a return or price change with a credit or debit note",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "reconcile-your-bank",
+                    "title": "Match your bank statement with your books",
+                    "goal": "month-end"
+                },
+                {
+                    "slug": "prepare-your-gst-returns",
+                    "title": "Prepare and upload your GST returns",
+                    "goal": "month-end"
+                },
+                {
+                    "slug": "prepare-your-tds-returns",
+                    "title": "Keep track of TDS and prepare TDS returns",
+                    "goal": "month-end"
+                },
+                {
+                    "slug": "close-the-financial-year",
+                    "title": "Close the year and carry balances forward",
+                    "goal": "month-end"
+                },
+                {
+                    "slug": "check-your-reports",
+                    "title": "See how your business is doing: dashboard and reports",
+                    "goal": "reports"
+                }
+            ]
+        },
+        "notes": {
+            "guide_hub": "notes",
+            "guides": [
+                {
+                    "slug": "write-your-first-note",
+                    "title": "Write your first note",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "organise-notes-into-notebooks",
+                    "title": "Organise notes into notebooks",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "find-notes-with-tags-and-smart-folders",
+                    "title": "Find notes fast with tags and smart folders",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "start-from-a-template",
+                    "title": "Start a note from a template",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "keep-a-checklist-and-action-items",
+                    "title": "Keep a to-do list with checklists and action items",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "set-a-reminder",
+                    "title": "Set a reminder on a note",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "take-meeting-notes",
+                    "title": "Take meeting notes and voice notes",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "attach-files-to-a-note",
+                    "title": "Attach files and photos to a note",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "search-your-notes",
+                    "title": "Search your notes",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "share-a-note",
+                    "title": "Share a note and work on it together",
+                    "goal": "team"
+                },
+                {
+                    "slug": "archive-delete-and-restore",
+                    "title": "Archive, delete and get notes back",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "import-and-export-notes",
+                    "title": "Bring notes in and take a copy out",
+                    "goal": "daily"
+                }
+            ]
+        },
+        "billing": {
+            "guide_hub": "billing",
+            "guides": [
+                {
+                    "slug": "get-started-with-billing",
+                    "title": "Get started: answer five quick questions",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-customers-and-suppliers",
+                    "title": "Add and find your customers and suppliers",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "check-your-items-and-prices",
+                    "title": "Check your items, prices and stock",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "decide-who-can-do-what",
+                    "title": "Decide who can do what in Billing",
+                    "goal": "team"
+                },
+                {
+                    "slug": "make-a-sales-bill",
+                    "title": "Make a sales bill with GST",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "print-or-share-a-bill",
+                    "title": "Print, download or share a bill",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "e-invoice-and-e-way-bill",
+                    "title": "Generate an e-Invoice and e-Way Bill",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "record-money-received",
+                    "title": "Record money you received from a customer",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "record-a-purchase-or-expense",
+                    "title": "Record a purchase bill or an expense",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "give-a-credit-note",
+                    "title": "Give a credit note for a return or price change",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "move-cash-and-bank",
+                    "title": "Deposit cash, withdraw cash or move money between banks",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "follow-up-on-money-owed",
+                    "title": "Follow up on money customers owe you",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "check-dashboards-and-reports",
+                    "title": "Close your day with dashboards and reports",
+                    "goal": "reports"
+                }
+            ]
+        },
+        "inventory": {
+            "guide_hub": "inventory",
+            "guides": [
+                {
+                    "slug": "set-up-your-warehouses",
+                    "title": "Set up your warehouses and storage places",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-an-item",
+                    "title": "Add an item",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "enter-opening-stock",
+                    "title": "Enter your opening stock",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "update-many-items-at-once",
+                    "title": "Update many items at once",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "receive-goods-from-a-supplier",
+                    "title": "Receive goods from a supplier",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "send-goods-to-a-customer",
+                    "title": "Send goods to a customer",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "move-stock-between-warehouses",
+                    "title": "Move stock between warehouses",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "adjust-damaged-or-found-stock",
+                    "title": "Write off damaged stock or add found stock",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "count-your-stock",
+                    "title": "Count your stock and fix differences",
+                    "goal": "month-end"
+                },
+                {
+                    "slug": "make-finished-goods",
+                    "title": "Make finished goods from raw material",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "check-stock-against-smart-books",
+                    "title": "Check that stock agrees with Smart Books",
+                    "goal": "month-end"
+                },
+                {
+                    "slug": "see-what-is-running-low",
+                    "title": "See what is running low and what to reorder",
+                    "goal": "reports"
+                },
+                {
+                    "slug": "see-stock-balances-and-value",
+                    "title": "See stock balances, movements and value",
+                    "goal": "reports"
+                }
+            ]
+        },
+        "docs": {
+            "guide_hub": "docs",
+            "guides": [
+                {
+                    "slug": "find-your-way-around-drive",
+                    "title": "Find your way around Drive",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "upload-documents",
+                    "title": "Upload documents",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "organise-with-folders",
+                    "title": "Create folders and move files into them",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "find-a-document",
+                    "title": "Find a document quickly",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "tag-your-documents",
+                    "title": "Tag your documents, with AI suggestions",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "preview-download-and-update",
+                    "title": "Preview, download or update a document",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "share-a-document",
+                    "title": "Share a document with your team",
+                    "goal": "team"
+                },
+                {
+                    "slug": "see-what-others-shared-with-you",
+                    "title": "See what others shared with you",
+                    "goal": "team"
+                },
+                {
+                    "slug": "archive-trash-and-restore",
+                    "title": "Archive, delete and restore documents",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "see-who-has-access-and-what-changed",
+                    "title": "See who has access and what changed",
+                    "goal": "reports"
+                }
+            ]
+        },
+        "manage": {
+            "guide_hub": "manage",
+            "guides": [
+                {
+                    "slug": "find-your-way-around-manage",
+                    "title": "Find your way around Manage",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "create-your-business-id",
+                    "title": "Create your Business ID",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-a-company",
+                    "title": "Add your company",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-branches",
+                    "title": "Add branches and set your head office",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-a-financial-year",
+                    "title": "Add a new financial year",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-key-persons",
+                    "title": "Record your directors, partners and signatories",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "add-print-assets",
+                    "title": "Upload your signature, stamp and UPI QR for invoices",
+                    "goal": "setup"
+                },
+                {
+                    "slug": "invite-your-team",
+                    "title": "Invite a teammate or your accountant to your company",
+                    "goal": "team"
+                },
+                {
+                    "slug": "accept-an-invitation",
+                    "title": "Accept an invitation to a company",
+                    "goal": "team"
+                },
+                {
+                    "slug": "handle-access-requests",
+                    "title": "Approve or ask for access to a company",
+                    "goal": "team"
+                },
+                {
+                    "slug": "get-help",
+                    "title": "Get help: read an answer or raise a support ticket",
+                    "goal": "daily"
+                },
+                {
+                    "slug": "check-your-usage-and-ai-credits",
+                    "title": "Check your usage and AI credits",
+                    "goal": "reports"
+                },
+                {
+                    "slug": "see-who-changed-what",
+                    "title": "See who changed what in your company",
+                    "goal": "reports"
+                }
+            ]
+        }
+    }
+}

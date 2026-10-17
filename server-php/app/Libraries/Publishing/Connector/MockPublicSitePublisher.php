@@ -32,6 +32,24 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
      */
     private array $checksumsById = [];
 
+    /**
+     * Structured items (release_note / workflow_guide) by mocked id: their
+     * canonical URL as the receiver would build it, and whether a publish
+     * has made them live. Verification reports `live` and
+     * `read_model_status` for these, like the real receiver.
+     *
+     * @var array<int, array{url: string, live: bool}>
+     */
+    private array $structuredById = [];
+
+    /** Simulate a receiver that accepts the publish but does not serve the page. */
+    private bool $forceNotLive = false;
+
+    public function forceNotLive(bool $notLive = true): void
+    {
+        $this->forceNotLive = $notLive;
+    }
+
     public function forceError(?string $category): void
     {
         $this->forceErrorCategory = $category;
@@ -48,6 +66,8 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         $this->nextId = 1;
         $this->forceErrorCategory = null;
         $this->checksumsById = [];
+        $this->structuredById = [];
+        $this->forceNotLive = false;
     }
 
     public function createDraft(array $envelope): array
@@ -61,6 +81,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         $id   = $this->nextId++;
         $uuid = 'mock-' . $id . '-' . substr(md5($id), 0, 8);
         $this->checksumsById[$id] = (string) ($envelope['payload_checksum'] ?? 'mock-checksum');
+        $this->trackStructured($id, $envelope);
 
         return [
             'success'                 => true,
@@ -86,6 +107,7 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
         if (isset($envelope['payload_checksum'])) {
             $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
         }
+        $this->trackStructured($publicContentId, $envelope);
 
         return [
             'success'          => true,
@@ -107,12 +129,16 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
             $this->checksumsById[$publicContentId] = (string) $envelope['payload_checksum'];
         }
 
+        if (isset($this->structuredById[$publicContentId])) {
+            $this->structuredById[$publicContentId]['live'] = ! $this->forceNotLive;
+        }
+
         return [
             'success'          => true,
             'operation'        => 'publish',
             'public_content_id'=> $publicContentId,
             'public_status'    => 'published',
-            'canonical_url'    => 'https://aicountly.com/blog/mock-' . $publicContentId,
+            'canonical_url'    => $this->structuredById[$publicContentId]['url'] ?? ('https://aicountly.com/blog/mock-' . $publicContentId),
             'public_version'   => 1,
             'published_at'     => date('Y-m-d\TH:i:s\Z'),
             'sitemap_status'   => 'included',
@@ -180,6 +206,22 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
     {
         $this->record('getVerification', ['public_content_id' => $publicContentId]);
 
+        if (isset($this->structuredById[$publicContentId])) {
+            $live = $this->structuredById[$publicContentId]['live'];
+
+            return [
+                'success'           => true,
+                'operation'         => 'verify',
+                'public_content_id' => $publicContentId,
+                'public_status'     => $live ? 'published' : 'draft',
+                'canonical_url'     => $this->structuredById[$publicContentId]['url'],
+                'payload_checksum'  => $this->checksumsById[$publicContentId] ?? 'mock-checksum',
+                'body_hash'         => 'mock-body-hash',
+                'read_model_status' => $live ? 'published' : 'draft',
+                'live'              => $live,
+            ];
+        }
+
         return [
             'success'              => true,
             'operation'            => 'verify',
@@ -207,6 +249,23 @@ class MockPublicSitePublisher implements PublicSitePublisherInterface
     {
         $this->record('healthCheck', []);
         return true;
+    }
+
+    /** Canonical URL the receiver would give a structured item (docs §4–§5). */
+    private function trackStructured(int $id, array $envelope): void
+    {
+        $type    = (string) ($envelope['content_type'] ?? '');
+        $payload = (array) ($envelope['payload'] ?? []);
+        if ($type === 'release_note') {
+            $url = 'https://aicountly.com/releases/' . rawurlencode((string) ($payload['slug'] ?? ''));
+        } elseif ($type === 'workflow_guide') {
+            $product = (string) ($payload['product_slug'] ?? '');
+            $hub     = $product === 'books' ? 'smart-books' : $product;
+            $url     = 'https://aicountly.com/guides/' . $hub . '/' . rawurlencode((string) ($payload['slug'] ?? ''));
+        } else {
+            return;
+        }
+        $this->structuredById[$id] = ['url' => $url, 'live' => $this->structuredById[$id]['live'] ?? false];
     }
 
     private function record(string $method, array $args): void

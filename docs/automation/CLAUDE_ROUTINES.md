@@ -31,6 +31,15 @@ Endpoints the routines use:
 | `GET  $REACH_API_BASE/v1/automation/kb-plan` | today's per-product KB quotas |
 | `POST $REACH_API_BASE/v1/automation/blog-drafts` | submit a verified blog draft |
 | `POST $REACH_API_BASE/v1/automation/kb-drafts` | submit a verified KB draft |
+| `GET  $REACH_API_BASE/v1/automation/release-plan` | per product: repo, last published version + git ref, next versions |
+| `POST $REACH_API_BASE/v1/automation/release-notes` | submit a release note (Gemini-vetted, auto-published) |
+| `GET  $REACH_API_BASE/v1/automation/workflow-plan` | per launch app: published guides + last-updated dates |
+| `POST $REACH_API_BASE/v1/automation/workflow-guides` | submit a workflow guide (Gemini-vetted, auto-published) |
+
+The release-notes and workflow-guides routines have their own files:
+[`routines/reach-release-notes.md`](routines/reach-release-notes.md) and
+[`routines/reach-workflow-guides.md`](routines/reach-workflow-guides.md)
+(pipeline and versioning rule: [`RELEASE_NOTES_AND_GUIDES.md`](RELEASE_NOTES_AND_GUIDES.md)).
 
 ## Routine 1 — hourly marketing blog (~12/day)
 

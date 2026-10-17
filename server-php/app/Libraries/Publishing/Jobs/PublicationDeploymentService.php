@@ -9,14 +9,17 @@ use App\Libraries\JobService;
 use App\Libraries\Publishing\Blog\BlogPublicationPayloadBuilder;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
 use App\Libraries\Publishing\Connector\PublishingErrorClassifier;
+use App\Libraries\Publishing\Connector\PublicSitePublisherInterface;
 use App\Libraries\Publishing\Seo\PublicationReadinessAggregator;
+use App\Libraries\Publishing\Structured\StructuredPublicationPayloadBuilder;
 
 /**
  * Phase 4 — Publication deployment service.
  *
  * Orchestrates the creation and progression of publication deployments.
  * Uses the Phase 0 job queue for async operations.
- * Human approval is mandatory; this service never approves content.
+ * Approval is mandatory (by a person, or by the system approver after AI vetting
+ * for the automated types); this service never approves content.
  */
 class PublicationDeploymentService
 {
@@ -213,9 +216,11 @@ class PublicationDeploymentService
                 ->select('content_type')
                 ->where('id', $deployment['content_item_id'])
                 ->get()->getRowArray()['content_type'] ?? 'blog');
-            $builder = $itemType === 'knowledge_base'
-                ? new \App\Libraries\Publishing\KnowledgeBase\KnowledgeBasePublicationPayloadBuilder()
-                : new BlogPublicationPayloadBuilder();
+            $builder = match (true) {
+                $itemType === 'knowledge_base' => new \App\Libraries\Publishing\KnowledgeBase\KnowledgeBasePublicationPayloadBuilder(),
+                StructuredPublicationPayloadBuilder::handles($itemType) => new StructuredPublicationPayloadBuilder(),
+                default => new BlogPublicationPayloadBuilder(),
+            };
             $payload  = $builder->build((int) $deployment['content_item_id'], (int) $deployment['content_version_id']);
             $checksum = $builder->checksum($payload);
 
@@ -226,11 +231,17 @@ class PublicationDeploymentService
                 : $publisher->createDraft($this->buildEnvelope($deployment, $payload, $checksum, 'create_draft'));
 
             if (!($response['success'] ?? false)) {
-                $this->onFailure($deploymentId, $attemptId, $response['error_category'] ?? 'unknown_error', $response['safe_error_message'] ?? '');
+                $this->onFailure($deploymentId, $attemptId, $response['error_category'] ?? 'unknown_error', $this->failureMessage($response));
                 return;
             }
 
             $publicContentId = (int) ($response['public_content_id'] ?? $existingPublicId ?? 0);
+            if ($publicContentId > 0 && $publicContentId !== (int) $existingPublicId) {
+                // Remember the public id as soon as the draft exists, so a retry
+                // after a failed publish updates this draft instead of creating
+                // a second one (the receiver refuses a duplicate slug).
+                $this->updateDeploymentStatus($deploymentId, 'sending', ['public_content_id' => $publicContentId]);
+            }
 
             if ($deployment['operation'] === 'publish' && $publicContentId > 0) {
                 $response = $publisher->publish($publicContentId, $this->buildEnvelope($deployment, $payload, $checksum, 'publish'));
@@ -242,6 +253,18 @@ class PublicationDeploymentService
                 );
             }
 
+            if (($response['success'] ?? false)
+                && $deployment['operation'] === 'publish'
+                && StructuredPublicationPayloadBuilder::handles($itemType)
+            ) {
+                // Release notes and workflow guides count as published only
+                // when the receiver's verification says the page is served
+                // (`live`), not when the publish call merely returned 200.
+                $response = $publicContentId > 0
+                    ? $this->confirmLive($publisher, $publicContentId, $response)
+                    : ['success' => false, 'error_category' => 'unknown_error', 'safe_error_message' => 'The public site returned no content id for the draft.'];
+            }
+
             if ($response['success'] ?? false) {
                 // Always persist the Reach-computed checksum; mock/public
                 // responses may omit it on schedule/publish follow-on calls.
@@ -250,12 +273,155 @@ class PublicationDeploymentService
                 }
                 $this->onSuccess($deploymentId, $attemptId, $response, $deployment);
             } else {
-                $this->onFailure($deploymentId, $attemptId, $response['error_category'] ?? 'unknown_error', $response['safe_error_message'] ?? '');
+                $this->onFailure($deploymentId, $attemptId, $response['error_category'] ?? 'unknown_error', $this->failureMessage($response));
             }
         } catch (\Throwable $e) {
             $category = $this->classifier->classifyException($e);
             $this->onFailure($deploymentId, $attemptId, $category, 'Exception during publishing');
         }
+    }
+
+    /**
+     * Create a publish deployment for a release note or workflow guide and
+     * return its id, without enqueueing a job: the caller
+     * (StructuredSubmissionService) runs processDeployment() itself so it can
+     * report the live URL to the routine in the same request.
+     *
+     * These types skip the blog/KB readiness aggregator (SEO/AEO profiles do
+     * not apply to them); their gate is StructuredPayloadValidator — the
+     * receiver's own rules — plus vetting, and the item must be approved.
+     *
+     * @throws \RuntimeException when the item is not an approved structured item
+     */
+    public function createStructuredDeployment(int $contentItemId, int $contentVersionId, ?int $createdBy = null, ?string $connectionKey = null): int
+    {
+        $item = $this->db->table('reach_content_items')
+            ->where('id', $contentItemId)->get()->getRowArray();
+
+        if (! $item || ! StructuredPublicationPayloadBuilder::handles((string) $item['content_type'])) {
+            throw new \RuntimeException("Content item {$contentItemId} is not a release note or workflow guide");
+        }
+        if ($item['approval_status'] !== 'approved') {
+            throw new \RuntimeException('Content must be approved before publishing');
+        }
+
+        $connectionKey = (new \App\Libraries\Publishing\PublicationConnectionService())
+            ->resolveBlogConnectionKey($connectionKey);
+        $connection = $this->db->table('reach_publication_connections')
+            ->where('connection_key', $connectionKey)
+            ->where('enabled', true)
+            ->get()->getRowArray();
+        if (! $connection) {
+            throw new \RuntimeException("Publication connection '{$connectionKey}' not found or disabled");
+        }
+
+        $existing = $this->db->table('reach_publication_deployments')
+            ->where('content_item_id', $contentItemId)
+            ->where('content_version_id', $contentVersionId)
+            ->where('connection_id', $connection['id'])
+            ->where('operation', 'publish')
+            ->whereIn('status', ['queued', 'sending'])
+            ->orderBy('id', 'DESC')
+            ->limit(1)
+            ->get()->getRowArray();
+        if ($existing) {
+            return (int) $existing['id'];
+        }
+
+        $now            = date('Y-m-d H:i:s');
+        $idempotencyKey = "reach-{$contentItemId}-v{$contentVersionId}-publish-" . time() . '-' . bin2hex(random_bytes(4));
+        $this->db->table('reach_publication_deployments')->insert([
+            'content_item_id'    => $contentItemId,
+            'content_version_id' => $contentVersionId,
+            'connection_id'      => $connection['id'],
+            'operation'          => 'publish',
+            'status'             => 'queued',
+            'idempotency_key'    => $idempotencyKey,
+            'created_by'         => $createdBy,
+            'created_at'         => $now,
+            'updated_at'         => $now,
+        ]);
+        $deploymentId = (int) $this->db->insertID();
+
+        AuditLogger::record('publishing.queued', [
+            'content_item_id' => $contentItemId,
+            'deployment_id'   => $deploymentId,
+            'operation'       => 'publish',
+            'content_type'    => $item['content_type'],
+        ], $createdBy);
+
+        return $deploymentId;
+    }
+
+    /**
+     * Ask the receiver whether the page is actually served. Success only when
+     * verification reports `live: true`; anything else is a failure the
+     * caller can retry (category `not_live`), never a publish.
+     *
+     * @param array<string, mixed> $publishResponse
+     * @return array<string, mixed>
+     */
+    private function confirmLive(PublicSitePublisherInterface $publisher, int $publicContentId, array $publishResponse): array
+    {
+        $verification = $publisher->getVerification($publicContentId);
+        if (! ($verification['success'] ?? false)) {
+            return [
+                'success'            => false,
+                'error_category'     => $verification['error_category'] ?? 'not_live',
+                'safe_error_message' => 'Published, but the live check could not be completed: '
+                    . ($verification['safe_error_message'] ?? 'no answer from the verification call') . '.',
+            ];
+        }
+        if (($verification['live'] ?? false) !== true) {
+            return [
+                'success'            => false,
+                'error_category'     => 'not_live',
+                'safe_error_message' => 'The public site accepted the publish but does not serve the page yet (live=false, read_model_status='
+                    . (string) ($verification['read_model_status'] ?? 'null') . ').',
+            ];
+        }
+
+        return array_merge($publishResponse, [
+            'success'           => true,
+            'public_content_id' => $publishResponse['public_content_id'] ?? $publicContentId,
+            'canonical_url'     => $verification['canonical_url'] ?? ($publishResponse['canonical_url'] ?? null),
+            'live'              => true,
+        ]);
+    }
+
+    /**
+     * The receiver's safe message, plus its field-level validation errors
+     * when it sent them (they name fields, never secrets).
+     *
+     * @param array<string, mixed> $response
+     */
+    private function failureMessage(array $response): string
+    {
+        $message = (string) ($response['safe_error_message'] ?? '');
+        $errors  = array_slice(array_map('strval', (array) ($response['validation_errors'] ?? [])), 0, 10);
+
+        return $errors === [] ? $message : trim($message . ' ' . implode(' ', $errors));
+    }
+
+    /** @param array<string, mixed> $response */
+    private function recordGuideLink(array $response, string $title, int $contentItemId): void
+    {
+        $path = (string) (parse_url((string) ($response['canonical_url'] ?? ''), PHP_URL_PATH) ?? '');
+        if ($path === '') {
+            return;
+        }
+        $product = null;
+        $version = $this->db->table('reach_content_items i')
+            ->select('v.structured_payload')
+            ->join('reach_content_versions v', 'v.id = i.current_version_id')
+            ->where('i.id', $contentItemId)
+            ->get()->getRowArray();
+        if ($version) {
+            $payload = is_string($version['structured_payload']) ? json_decode($version['structured_payload'], true) : $version['structured_payload'];
+            $product = is_array($payload) ? ($payload['product_slug'] ?? null) : null;
+        }
+        (new \App\Libraries\Publishing\LinkRegistryService($this->db))
+            ->recordPublished($path, $title, 'guide', $product, null, $contentItemId);
     }
 
     /**
@@ -310,7 +476,11 @@ class PublicationDeploymentService
                     ->where('id', $deployment['content_item_id'])
                     ->get()->getRowArray() ?? [];
                 $slug = (string) ($item['slug'] ?? '');
-                if ($slug !== '') {
+                if (($item['content_type'] ?? '') === 'workflow_guide') {
+                    $this->recordGuideLink($response, (string) ($item['title'] ?? $slug), (int) $deployment['content_item_id']);
+                } elseif (StructuredPublicationPayloadBuilder::handles((string) ($item['content_type'] ?? ''))) {
+                    // Release notes are not offered as internal-link targets.
+                } elseif ($slug !== '') {
                     $isKb = ($item['content_type'] ?? 'blog') === 'knowledge_base';
                     (new \App\Libraries\Publishing\LinkRegistryService($this->db))->recordPublished(
                         ($isKb ? '/help/' : '/blogs/') . rawurlencode($slug),
@@ -453,7 +623,10 @@ class PublicationDeploymentService
             ->select('uuid, content_type')
             ->where('id', $deployment['content_item_id'])
             ->get()->getRowArray() ?? [];
-        $contentType = ($item['content_type'] ?? 'blog') === 'knowledge_base' ? 'knowledge_base' : 'blog';
+        $contentType = (string) ($item['content_type'] ?? 'blog');
+        if ($contentType !== 'knowledge_base' && ! StructuredPublicationPayloadBuilder::handles($contentType)) {
+            $contentType = 'blog';
+        }
 
         $requestId = (string) ($deployment['request_id'] ?? '');
         if ($requestId === '') {
@@ -473,7 +646,12 @@ class PublicationDeploymentService
             'timestamp'                    => time(),
             'nonce'                        => bin2hex(random_bytes(16)),
             'payload_checksum'             => $checksum,
-            'publication_target'           => $contentType === 'knowledge_base' ? 'aicountly_com_help' : 'aicountly_com_blog',
+            'publication_target'           => match ($contentType) {
+                'knowledge_base' => 'aicountly_com_help',
+                'release_note'   => 'aicountly_com_release_notes',
+                'workflow_guide' => 'aicountly_com_workflow_guides',
+                default          => 'aicountly_com_blog',
+            },
             'payload'                      => $payload,
         ];
     }

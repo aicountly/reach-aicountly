@@ -107,6 +107,8 @@ import CommunityAnalyticsPage       from './pages/community/CommunityAnalyticsPa
 import CommunitySettingsPage        from './pages/community/CommunitySettingsPage.jsx';
 import BlogPublishingListPage   from './pages/publishing/BlogPublishingListPage.jsx';
 import KbPublishingListPage     from './pages/publishing/KbPublishingListPage.jsx';
+import ReleaseNotesPublishingPage   from './pages/publishing/ReleaseNotesPublishingPage.jsx';
+import WorkflowGuidesPublishingPage from './pages/publishing/WorkflowGuidesPublishingPage.jsx';
 import PublishingCalendarPage   from './pages/publishing/PublishingCalendarPage.jsx';
 import DeploymentListPage       from './pages/publishing/DeploymentListPage.jsx';
 import DeploymentDetailPage     from './pages/publishing/DeploymentDetailPage.jsx';
@@ -404,6 +406,8 @@ export default function App() {
           <Route index element={<Navigate to="deployments" replace />} />
           <Route path="blogs" element={<BlogPublishingListPage />} />
           <Route path="knowledge-bases" element={<KbPublishingListPage />} />
+          <Route path="release-notes" element={<ReleaseNotesPublishingPage />} />
+          <Route path="workflow-guides" element={<WorkflowGuidesPublishingPage />} />
           <Route path="calendar" element={<PublishingCalendarPage />} />
           <Route path="deployments" element={<DeploymentListPage />} />
           <Route path="deployments/:id" element={<DeploymentDetailPage />} />

@@ -69,6 +69,8 @@ class JobHandlerRegistry
         $this->handlers['reach.search_console_ingest']               = new \App\Jobs\SearchConsoleIngestJob();
         // SEO Command Centre daily snapshots
         $this->handlers['reach.seo_snapshot']                        = new \App\Jobs\SeoSnapshotJob();
+        // Release notes + workflow guides: retry pending vetting / failed publishes
+        $this->handlers['reach.structured_content_sweep']            = new \App\Jobs\StructuredContentSweepJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void
