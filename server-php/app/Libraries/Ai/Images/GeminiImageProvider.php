@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Ai\Images;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Ai\AiErrorClassifier;
 use App\Libraries\Ai\AiProviderError;
 use App\Libraries\Ai\AiProviderException;
@@ -13,7 +14,7 @@ use App\Libraries\Ai\Providers\GeminiProvider;
 /**
  * Google Gemini image generation adapter ("Nano Banana" flash image model).
  *
- * Reads AI_GEMINI_API_KEY from environment.
+ * API key: Settings → AI & Automation, falling back to AI_GEMINI_API_KEY.
  * Model resolution: input modelKey, then AI_GEMINI_IMAGE_MODEL env,
  * then gemini-2.5-flash-image.
  */
@@ -37,7 +38,7 @@ class GeminiImageProvider implements ImageProviderInterface
 
     public function isConfigured(): bool
     {
-        $key = $_ENV['AI_GEMINI_API_KEY'] ?? '';
+        $key = ReachConfig::secret('ai.gemini.api_key') ?? '';
         return is_string($key) && strlen(trim($key)) > 0;
     }
 
@@ -137,7 +138,7 @@ class GeminiImageProvider implements ImageProviderInterface
 
     private function apiKeyQuery(): string
     {
-        return '?key=' . rawurlencode(trim((string) ($_ENV['AI_GEMINI_API_KEY'] ?? '')));
+        return '?key=' . rawurlencode((string) ReachConfig::secret('ai.gemini.api_key'));
     }
 
     /**

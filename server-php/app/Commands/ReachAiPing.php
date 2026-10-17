@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\AiProviderRegistry;
@@ -36,8 +37,8 @@ class ReachAiPing extends BaseCommand
             'ts'       => gmdate('c'),
             'provider' => $providerKey,
             'env'      => [
-                'openai_key_set' => $this->envSet('AI_OPENAI_API_KEY'),
-                'gemini_key_set' => $this->envSet('AI_GEMINI_API_KEY'),
+                'openai_key_set' => (ReachConfig::secret('ai.openai.api_key') !== null),
+                'gemini_key_set' => (ReachConfig::secret('ai.gemini.api_key') !== null),
                 'mock'           => (($_ENV['REACH_AI_MOCK'] ?? getenv('REACH_AI_MOCK') ?: 'false') === 'true'),
             ],
         ];

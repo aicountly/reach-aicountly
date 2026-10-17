@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Ai;
 
+use App\Libraries\Ai\Images\ImageGenerationInput;
 use App\Libraries\Ai\Images\OpenAiImageProvider;
+use App\Libraries\Settings\ReachConfig;
 use CodeIgniter\Test\CIUnitTestCase;
 
 /**
@@ -22,6 +24,7 @@ class OpenAiImageProviderTest extends CIUnitTestCase
             'AI_OPENAI_API_KEY'      => $_ENV['AI_OPENAI_API_KEY'] ?? null,
             'AI_OPENAI_IMAGE_MODEL'  => $_ENV['AI_OPENAI_IMAGE_MODEL'] ?? null,
         ];
+        ReachConfig::flush();
     }
 
     protected function tearDown(): void
@@ -59,15 +62,33 @@ class OpenAiImageProviderTest extends CIUnitTestCase
         $this->assertSame('1536x1024', $provider->formatSize(1536, 1024));
     }
 
-    public function testResolveModelKeyPrefersInputThenEnvThenDefault(): void
+    public function testResolveModelKeyPrefersInputThenSettingThenDallE3(): void
     {
         unset($_ENV['AI_OPENAI_IMAGE_MODEL']);
         $provider = new OpenAiImageProvider();
-        $this->assertSame('gpt-image-1', $provider->resolveModelKey(''));
-
-        $_ENV['AI_OPENAI_IMAGE_MODEL'] = 'dall-e-3';
-        $provider = new OpenAiImageProvider();
         $this->assertSame('dall-e-3', $provider->resolveModelKey(''));
+
+        $_ENV['AI_OPENAI_IMAGE_MODEL'] = 'gpt-image-1';
+        $provider = new OpenAiImageProvider();
+        $this->assertSame('gpt-image-1', $provider->resolveModelKey(''));
         $this->assertSame('custom', $provider->resolveModelKey('custom'));
+    }
+
+    public function testDallE3BodyIsSingleHdBase64AtASupportedSize(): void
+    {
+        $body = (new OpenAiImageProvider())->requestBody('dall-e-3', new ImageGenerationInput(prompt: 'A ledger', width: 1536, height: 1024, count: 3));
+
+        $this->assertSame(1, $body['n']);
+        $this->assertSame('1792x1024', $body['size'], 'a 3:2 request snaps to the landscape size');
+        $this->assertSame('b64_json', $body['response_format']);
+        $this->assertSame('hd', $body['quality']);
+    }
+
+    public function testGptImageBodyHasNoResponseFormat(): void
+    {
+        $body = (new OpenAiImageProvider())->requestBody('gpt-image-1', new ImageGenerationInput(prompt: 'A ledger', width: 1792, height: 1024));
+
+        $this->assertArrayNotHasKey('response_format', $body);
+        $this->assertSame('1536x1024', $body['size']);
     }
 }

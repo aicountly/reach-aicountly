@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Ai\Providers;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Ai\AiErrorClassifier;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\AiGenerationResult;
@@ -15,7 +16,7 @@ use App\Libraries\Ai\AiProviderInterface;
 /**
  * Phase 3 — OpenAI provider adapter.
  *
- * Reads AI_OPENAI_API_KEY from environment (never from database).
+ * API key: Settings → AI & Automation (encrypted), falling back to AI_OPENAI_API_KEY in the environment.
  * Adapter is completely inactive (isConfigured() = false) when the key is absent.
  * Uses native cURL — no external SDK dependency.
  *
@@ -250,7 +251,7 @@ class OpenAiProvider implements AiProviderInterface
 
     private function apiKey(): string
     {
-        return $this->envValue('AI_OPENAI_API_KEY');
+        return (string) ReachConfig::secret('ai.openai.api_key');
     }
 
     private function envValue(string $key): string

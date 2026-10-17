@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Blog\BlogFeatureFlags;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -63,9 +64,9 @@ class ReachBlogDiagnose extends BaseCommand
             'database'         => $this->databaseSnapshot(),
             'recent_failures'  => $this->recentFailures(),
             'ai_keys'          => [
-                'openai'     => $this->envSet('AI_OPENAI_API_KEY'),
-                'gemini'     => $this->envSet('AI_GEMINI_API_KEY'),
-                'perplexity' => $this->envSet('AI_PERPLEXITY_API_KEY'),
+                'openai'     => (ReachConfig::secret('ai.openai.api_key') !== null),
+                'gemini'     => (ReachConfig::secret('ai.gemini.api_key') !== null),
+                'perplexity' => (ReachConfig::secret('ai.perplexity.api_key') !== null),
             ],
             'verdict'          => [],
             'next_actions'     => [],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Ai\Providers;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Ai\AiErrorClassifier;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\AiGenerationResult;
@@ -15,7 +16,7 @@ use App\Libraries\Ai\AiProviderInterface;
 /**
  * Phase 3 — Perplexity provider adapter (OpenAI-compatible chat completions).
  *
- * Reads AI_PERPLEXITY_API_KEY from environment (never from database).
+ * API key: Settings → AI & Automation (encrypted), falling back to AI_PERPLEXITY_API_KEY in the environment.
  * Uses native cURL — no external SDK dependency.
  *
  * Citations:
@@ -51,8 +52,7 @@ class PerplexityProvider implements AiProviderInterface
 
     public function isConfigured(): bool
     {
-        $key = $_ENV['AI_PERPLEXITY_API_KEY'] ?? '';
-        return is_string($key) && strlen(trim($key)) > 0;
+        return ReachConfig::secret('ai.perplexity.api_key') !== null;
     }
 
     public function healthCheck(): AiProviderHealthResult
@@ -221,7 +221,7 @@ class PerplexityProvider implements AiProviderInterface
             CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
-                'Authorization: Bearer ' . ($_ENV['AI_PERPLEXITY_API_KEY'] ?? ''),
+                'Authorization: Bearer ' . (ReachConfig::secret('ai.perplexity.api_key') ?? ''),
             ],
             CURLOPT_SSL_VERIFYPEER => true,
         ]);

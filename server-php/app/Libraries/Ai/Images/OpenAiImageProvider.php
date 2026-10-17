@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Ai\Images;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Ai\AiErrorClassifier;
 use App\Libraries\Ai\AiProviderError;
 use App\Libraries\Ai\AiProviderException;
@@ -13,8 +14,11 @@ use App\Libraries\Ai\Providers\OpenAiProvider;
 /**
  * OpenAI image generation adapter.
  *
- * Reuses AI_OPENAI_API_KEY. Model resolution: input modelKey, then
- * AI_OPENAI_IMAGE_MODEL env, then gpt-image-1.
+ * Reuses the OpenAI key (Settings → AI & Automation, else AI_OPENAI_API_KEY).
+ * Model resolution: input modelKey, then the `ai.image.model` setting
+ * (AI_OPENAI_IMAGE_MODEL env fallback), then dall-e-3. DALL·E and the
+ * gpt-image family take different sizes and response options; requestBody()
+ * shapes the call for whichever is configured.
  */
 class OpenAiImageProvider implements ImageProviderInterface
 {
@@ -39,8 +43,7 @@ class OpenAiImageProvider implements ImageProviderInterface
 
     public function isConfigured(): bool
     {
-        $key = $_ENV['AI_OPENAI_API_KEY'] ?? '';
-        return is_string($key) && strlen(trim($key)) > 0;
+        return ReachConfig::secret('ai.openai.api_key') !== null;
     }
 
     public function healthCheck(): AiProviderHealthResult
@@ -60,12 +63,7 @@ class OpenAiImageProvider implements ImageProviderInterface
         $start    = hrtime(true);
         $modelKey = $this->resolveModelKey($input->modelKey);
 
-        $body = [
-            'model'  => $modelKey,
-            'prompt' => $input->prompt,
-            'size'   => $this->formatSize($input->width, $input->height),
-            'n'      => $input->count,
-        ];
+        $body = $this->requestBody($modelKey, $input);
 
         try {
             $response = $this->curlRequest(
@@ -120,12 +118,74 @@ class OpenAiImageProvider implements ImageProviderInterface
             return $inputModelKey;
         }
 
-        $envModel = $_ENV['AI_OPENAI_IMAGE_MODEL'] ?? '';
-        if (is_string($envModel) && trim($envModel) !== '') {
-            return trim($envModel);
+        $configured = trim((string) ReachConfig::get('ai.image.model', ''));
+
+        return $configured !== '' ? $configured : 'dall-e-3';
+    }
+
+    /**
+     * The generations payload for the model family. dall-e-3 accepts one image
+     * per call and only 1024x1024 / 1792x1024 / 1024x1792, so the requested
+     * size is snapped to the nearest aspect; dall-e-2 only squares. Both are
+     * asked for base64 so the image is stored by us, not hot-linked from a URL
+     * that expires. gpt-image-* returns base64 already and rejects
+     * response_format.
+     *
+     * @return array<string, mixed>
+     */
+    public function requestBody(string $modelKey, ImageGenerationInput $input): array
+    {
+        $configuredSize = trim((string) ReachConfig::get('ai.image.size', ''));
+        $size           = preg_match('/^\d{3,4}x\d{3,4}$/', $configuredSize) ? $configuredSize : $this->formatSize($input->width, $input->height);
+        $model          = strtolower($modelKey);
+
+        if (str_starts_with($model, 'dall-e-3')) {
+            return [
+                'model'           => $modelKey,
+                'prompt'          => $input->prompt,
+                'size'            => $this->snapSize($size, ['1024x1024', '1792x1024', '1024x1792']),
+                'n'               => 1,
+                'quality'         => 'hd',
+                'response_format' => 'b64_json',
+            ];
+        }
+        if (str_starts_with($model, 'dall-e-2')) {
+            return [
+                'model'           => $modelKey,
+                'prompt'          => $input->prompt,
+                'size'            => $this->snapSize($size, ['256x256', '512x512', '1024x1024']),
+                'n'               => max(1, $input->count),
+                'response_format' => 'b64_json',
+            ];
         }
 
-        return 'gpt-image-1';
+        return [
+            'model'  => $modelKey,
+            'prompt' => $input->prompt,
+            'size'   => $this->snapSize($size, ['1024x1024', '1536x1024', '1024x1536']),
+            'n'      => max(1, $input->count),
+        ];
+    }
+
+    /** @param list<string> $allowed */
+    private function snapSize(string $size, array $allowed): string
+    {
+        if (in_array($size, $allowed, true)) {
+            return $size;
+        }
+        [$w, $h] = array_map('intval', explode('x', $size) + [1, 1]);
+        $want    = $h > 0 ? $w / $h : 1.0;
+        $best    = $allowed[0];
+        $bestGap = INF;
+        foreach ($allowed as $candidate) {
+            [$cw, $ch] = array_map('intval', explode('x', $candidate));
+            $gap       = abs(($cw / $ch) - $want);
+            if ($gap < $bestGap) {
+                $best    = $candidate;
+                $bestGap = $gap;
+            }
+        }
+        return $best;
     }
 
     private function mimeForFormat(string $format): string
@@ -150,7 +210,7 @@ class OpenAiImageProvider implements ImageProviderInterface
             CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
-                'Authorization: Bearer ' . ($_ENV['AI_OPENAI_API_KEY'] ?? ''),
+                'Authorization: Bearer ' . (ReachConfig::secret('ai.openai.api_key') ?? ''),
             ],
             CURLOPT_SSL_VERIFYPEER => true,
         ]);

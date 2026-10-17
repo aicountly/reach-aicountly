@@ -275,6 +275,11 @@ $routes->group('v1', static function ($routes) {
         // Admin
         $routes->get('settings',                  'Api\\V1\\SettingsController::index',                ['filter' => 'permission:settings.view']);
         $routes->put('settings',                  'Api\\V1\\SettingsController::update',               ['filter' => 'permission:settings.manage']);
+        // Settings → AI & Automation (AI keys, vetting models, volumes, report recipients).
+        $routes->get('settings/automation',               'Api\\V1\\AutomationSettingsController::index',        ['filter' => 'permission:settings.view']);
+        $routes->put('settings/automation',               'Api\\V1\\AutomationSettingsController::update',       ['filter' => 'permission:settings.manage']);
+        $routes->post('settings/automation/test',         'Api\\V1\\AutomationSettingsController::test',         ['filter' => 'permission:settings.manage']);
+        $routes->get('settings/automation/gemini-models', 'Api\\V1\\AutomationSettingsController::geminiModels', ['filter' => 'permission:settings.view']);
 
         $routes->get('audit-logs',                'Api\\V1\\AuditLogController::index',                ['filter' => 'permission:audit.view']);
 

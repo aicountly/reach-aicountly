@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Ai\Providers;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Ai\AiErrorClassifier;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\AiGenerationResult;
@@ -15,7 +16,7 @@ use App\Libraries\Ai\AiProviderInterface;
 /**
  * Phase 3 — Google Gemini provider adapter.
  *
- * Reads AI_GEMINI_API_KEY from environment (never from database).
+ * API key: Settings → AI & Automation (encrypted), falling back to AI_GEMINI_API_KEY in the environment.
  * Uses native cURL — no external SDK dependency.
  *
  * Security:
@@ -174,7 +175,7 @@ class GeminiProvider implements AiProviderInterface
 
     private function apiKey(): string
     {
-        return $this->envValue('AI_GEMINI_API_KEY');
+        return (string) ReachConfig::secret('ai.gemini.api_key');
     }
 
     private function envValue(string $key): string

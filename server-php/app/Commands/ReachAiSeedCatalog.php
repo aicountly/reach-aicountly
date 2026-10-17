@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\Settings\ReachConfig;
 use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Ai\Providers\GeminiProvider;
 use App\Libraries\Ai\Providers\OpenAiProvider;
@@ -18,7 +19,7 @@ use App\Libraries\Database\SchemaGuard;
  * Idempotently seeds reach_ai_providers / reach_ai_models / reach_ai_model_routes
  * so blog automation can route draft_generation / brief_generation / editorial_review.
  *
- * Env keys must already be set (AI_OPENAI_API_KEY, etc.). Secrets are never written to DB.
+ * Keys come from Settings → AI & Automation (encrypted) or the env fallback (AI_OPENAI_API_KEY, etc.).
  */
 class ReachAiSeedCatalog extends BaseCommand
 {
@@ -51,7 +52,7 @@ class ReachAiSeedCatalog extends BaseCommand
                 'display_name'         => 'OpenAI',
                 'adapter_class'        => OpenAiProvider::class,
                 'secret_env_reference' => 'AI_OPENAI_API_KEY',
-                'configured'           => $this->envSet('AI_OPENAI_API_KEY'),
+                'configured'           => (ReachConfig::secret('ai.openai.api_key') !== null),
             ], $now, $created);
 
             $geminiId = $this->upsertProvider($db, [
@@ -59,7 +60,7 @@ class ReachAiSeedCatalog extends BaseCommand
                 'display_name'         => 'Google Gemini',
                 'adapter_class'        => GeminiProvider::class,
                 'secret_env_reference' => 'AI_GEMINI_API_KEY',
-                'configured'           => $this->envSet('AI_GEMINI_API_KEY'),
+                'configured'           => (ReachConfig::secret('ai.gemini.api_key') !== null),
             ], $now, $created);
 
             $this->upsertProvider($db, [
@@ -67,7 +68,7 @@ class ReachAiSeedCatalog extends BaseCommand
                 'display_name'         => 'Perplexity',
                 'adapter_class'        => PerplexityProvider::class,
                 'secret_env_reference' => 'AI_PERPLEXITY_API_KEY',
-                'configured'           => $this->envSet('AI_PERPLEXITY_API_KEY'),
+                'configured'           => (ReachConfig::secret('ai.perplexity.api_key') !== null),
             ], $now, $created);
 
             // Text models are env-driven so upgrades never require a code change.

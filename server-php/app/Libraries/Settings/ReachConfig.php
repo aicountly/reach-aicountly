@@ -251,6 +251,9 @@ final class ReachConfig
     private static function env(string $name): string
     {
         $v = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
+        if (($v === false || $v === null) && function_exists('env')) {
+            $v = env($name);
+        }
         return is_string($v) ? trim($v) : '';
     }
 

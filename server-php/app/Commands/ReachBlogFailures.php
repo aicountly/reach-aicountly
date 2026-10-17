@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\Settings\ReachConfig;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -93,9 +94,9 @@ class ReachBlogFailures extends BaseCommand
             }
 
             $aiConfig = [
-                'openai_key_set'     => $this->envSet('AI_OPENAI_API_KEY'),
-                'gemini_key_set'     => $this->envSet('AI_GEMINI_API_KEY'),
-                'perplexity_key_set' => $this->envSet('AI_PERPLEXITY_API_KEY'),
+                'openai_key_set'     => (ReachConfig::secret('ai.openai.api_key') !== null),
+                'gemini_key_set'     => (ReachConfig::secret('ai.gemini.api_key') !== null),
+                'perplexity_key_set' => (ReachConfig::secret('ai.perplexity.api_key') !== null),
                 'routes'             => [],
             ];
             if (SchemaGuard::hasTable($db, 'reach_ai_model_routes')) {
