@@ -76,6 +76,21 @@ final class ReachConfig
             // ── Social ──────────────────────────────────────────────────────
             'social.socialapi.api_key' => ['group' => 'Social', 'label' => 'socialapi.ai API key', 'type' => 'secret', 'env' => 'SOCIALAPI_API_KEY'],
             'social.socialapi.base_url' => ['group' => 'Social', 'label' => 'socialapi.ai API base URL', 'type' => 'string', 'env' => 'SOCIALAPI_BASE_URL'],
+
+            // ── Stream F: SEO tracker + daily report (keep this block contiguous) ──
+            'seo.tracker.enabled' => ['group' => 'SEO data', 'label' => 'SEO Tracker daily SERP checks', 'type' => 'bool', 'default' => true,
+                'help' => 'Checks each enabled tracked keyword once a day via DataForSEO. Needs the DataForSEO login/password.'],
+            'seo.tracker.max_keywords_per_day' => ['group' => 'SEO data', 'label' => 'SEO Tracker: max keywords checked per day', 'type' => 'int', 'default' => 35,
+                'help' => 'Cost cap — one DataForSEO Live SERP call per keyword. Keywords not reached today are checked first tomorrow.'],
+            'seo.tracker.location_code' => ['group' => 'SEO data', 'label' => 'SEO Tracker: DataForSEO location code', 'type' => 'int', 'default' => 2356,
+                'help' => '2356 = India.'],
+            'seo.tracker.language_code' => ['group' => 'SEO data', 'label' => 'SEO Tracker: language code', 'type' => 'string', 'default' => 'en'],
+            'seo.tracker.depth' => ['group' => 'SEO data', 'label' => 'SEO Tracker: SERP depth', 'type' => 'int', 'default' => 100,
+                'help' => 'Results read per keyword (10–100). Deeper costs more on DataForSEO.'],
+            'seo.tracker.our_domain' => ['group' => 'SEO data', 'label' => 'SEO Tracker: our domain', 'type' => 'string', 'default' => 'aicountly.com'],
+            'reports.daily.enabled' => ['group' => 'Reports', 'label' => 'Send the daily analytics report', 'type' => 'bool', 'default' => true,
+                'help' => 'Off = the 08:00 IST report is still generated and stored under Reports, but not emailed.'],
+            // ── end Stream F ──
         ];
     }
 

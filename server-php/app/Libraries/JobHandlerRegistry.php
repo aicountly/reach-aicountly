@@ -69,6 +69,9 @@ class JobHandlerRegistry
         $this->handlers['reach.search_console_ingest']               = new \App\Jobs\SearchConsoleIngestJob();
         // SEO Command Centre daily snapshots
         $this->handlers['reach.seo_snapshot']                        = new \App\Jobs\SeoSnapshotJob();
+        // Stream F: SEO Tracker (DataForSEO SERP checks) + daily analytics report
+        $this->handlers['reach.seo_tracker']                         = new \App\Jobs\SeoTrackerJob();
+        $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

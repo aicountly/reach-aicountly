@@ -227,7 +227,7 @@ cd web && npm ci && npm run build
 # A worker started with only "--queue=default" (as originally shipped) NEVER
 # processes those jobs — they sit "queued" forever. --queue accepts a
 # comma-separated list so one worker cron line drains all three (+ community):
-* * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --queue=default,blog,publishing,community --once --limit=20 >> writable/logs/worker.log 2>&1
+* * * * * cd /path/to/server-php && /usr/bin/php spark reach:work --queue=default,blog,publishing,community,notifications --once --limit=20 >> writable/logs/worker.log 2>&1
 * * * * * cd /path/to/server-php && /usr/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 */5 * * * * cd /path/to/server-php && /usr/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
 ```

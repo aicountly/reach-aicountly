@@ -36,8 +36,10 @@ class SearchConsoleService
         private IngestionCursorService          $cursorService,
         private AuditLogger                     $auditLogger,
         private ?ContentIdentitySyncService     $identitySync = null,
+        private ?SearchSiteFactStore            $siteStore = null,
     ) {
         $this->identitySync ??= new ContentIdentitySyncService();
+        $this->siteStore    ??= new SearchSiteFactStore();
     }
 
     /**
@@ -281,6 +283,10 @@ class SearchConsoleService
         $pages       = 0;
         $warnings    = [];
         $cursorState = null;
+        $siteRows    = 0;
+        $dailyRows   = 0;
+        $siteStore   = $this->siteStore->isAvailable() ? $this->siteStore : null;
+        $property    = $connector->siteProperty();
 
         try {
             do {
@@ -298,6 +304,12 @@ class SearchConsoleService
 
                 if ($batch->warningMessage !== null) {
                     $warnings[] = $batch->warningMessage;
+                }
+
+                // Site-wide copy first: every row, whether or not a Reach
+                // content identity claims its page.
+                if ($siteStore !== null && $batch->rows !== []) {
+                    $siteRows += $siteStore->upsertFacts($connectionId, $property, $runId, $batch->rows);
                 }
 
                 foreach ($batch->rows as $row) {
@@ -337,9 +349,23 @@ class SearchConsoleService
             // to pages Reach does not own (marketing, guides, pricing). Say so,
             // rather than letting a high skip count read as a failure.
             if ($skipped > 0 && $ingested === 0) {
-                $warnings[] = 'All ' . $skipped . ' row(s) were for URLs no Reach content claims. '
-                    . 'Run `reach:search-console unmapped` to see them — if they are marketing or guide '
-                    . 'pages this is correct, and it means the tracked posts have no search traffic yet.';
+                $warnings[] = 'All ' . $skipped . ' row(s) were for URLs no Reach content claims, so none '
+                    . 'were attached to a blog. They are still kept in the site-wide view. Run '
+                    . '`reach:search-console unmapped` to see them — if they are marketing or guide pages '
+                    . 'this is correct, and it means the tracked posts have no search traffic yet.';
+            }
+
+            // Property-level daily totals. Requested without page/query so
+            // Google aggregates by property and includes anonymised queries —
+            // the only figures that match the Search Console UI.
+            if ($siteStore !== null) {
+                try {
+                    $dailyRows = $this->ingestDailyTotals($connector, $connectionId, $property, $runId, $dateFrom, $dateTo, $runType);
+                } catch (\Throwable $e) {
+                    $warnings[] = 'Daily totals were not refreshed: ' . $e->getMessage();
+                }
+            } else {
+                $warnings[] = 'Site-wide search tables are not migrated; only blog-mapped facts were stored.';
             }
 
             if ($advanceCursor) {
@@ -362,6 +388,8 @@ class SearchConsoleService
                 'ingested'      => $ingested,
                 'skipped'       => $skipped,
                 'failed'        => $failed,
+                'site_rows'     => $siteRows,
+                'daily_rows'    => $dailyRows,
                 'truncated'     => $truncated,
                 'warnings'      => $warnings,
             ];
@@ -371,6 +399,43 @@ class SearchConsoleService
                 null, null, ['error' => $e->getMessage()], 'system');
             throw $e;
         }
+    }
+
+    /**
+     * Fetch date × device totals for the window and store them in
+     * reach_search_site_daily.
+     */
+    private function ingestDailyTotals(
+        SearchConsoleConnectorInterface $connector,
+        int $connectionId,
+        string $property,
+        int $runId,
+        string $dateFrom,
+        string $dateTo,
+        string $runType,
+    ): int {
+        $written     = 0;
+        $pages       = 0;
+        $cursorState = null;
+
+        do {
+            $batch = $connector->fetchSearchMetrics(new IngestionRequest(
+                connectionId: $connectionId,
+                streamType: 'search_metrics',
+                dateFrom: $dateFrom,
+                dateTo: $dateTo,
+                dimensions: ['date', 'device'],
+                cursorState: $cursorState,
+                isBackfill: $runType === 'backfill',
+            ));
+            $pages++;
+            if ($batch->rows !== []) {
+                $written += $this->siteStore->upsertDaily($connectionId, $property, $runId, $batch->rows);
+            }
+            $cursorState = $batch->nextCursorState;
+        } while ($cursorState !== null && ! $batch->isComplete && $pages < self::MAX_PAGES);
+
+        return $written;
     }
 
     /**

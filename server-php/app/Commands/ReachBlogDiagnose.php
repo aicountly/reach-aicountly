@@ -487,7 +487,7 @@ class ReachBlogDiagnose extends BaseCommand
         $codes = array_column($report['verdict'] ?? [], 'code');
 
         if (in_array('no_cron_log_files', $codes, true) || in_array('optimizer_stale', $codes, true)) {
-            $actions[] = 'Install/fix cPanel cron lines from docs/blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md (must include reach:blog-dispatch + reach:work --queue=default,blog,publishing + reach:blog-optimize-roadmap + reach:schedule).';
+            $actions[] = 'Install/fix cPanel cron lines from docs/blog-automation/WHM_CPANEL_DEPLOYMENT_RUNBOOK.md (must include reach:blog-dispatch + reach:work --queue=default,blog,publishing,community,notifications + reach:blog-optimize-roadmap + reach:schedule).';
             $actions[] = 'Confirm cron cd path is the real server-php directory that contains this WRITEPATH.';
             $actions[] = 'Confirm PHP binary with: which php; ls -la $(which php)';
         }
