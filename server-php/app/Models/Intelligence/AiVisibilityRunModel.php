@@ -17,7 +17,7 @@ class AiVisibilityRunModel extends Model
     protected $allowedFields = [
         'uuid', 'tenant_id', 'prompt_version_id', 'run_type', 'ai_route', 'ai_model',
         'ai_provider', 'status', 'execution_budget_cents', 'actual_cost_cents',
-        'tokens_used', 'job_id', 'queued_at', 'started_at', 'completed_at', 'error_message',
+        'tokens_used', 'job_id', 'queued_at', 'started_at', 'completed_at', 'error_message', 'batch_id',
     ];
 
     public function findByUuid(string $uuid): ?array

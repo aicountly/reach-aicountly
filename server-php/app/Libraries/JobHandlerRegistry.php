@@ -48,6 +48,10 @@ class JobHandlerRegistry
         $this->handlers['reach.content_schedule_readiness']      = new ContentScheduleReadinessJob();
         // Phase 3 AI generation
         $this->handlers['reach.ai_generation']                   = new AiGenerationJob();
+        // Stream H: AI visibility (GEO) passes and AI Insights reports
+        $this->handlers['reach.ai_visibility_daily']                 = new \App\Jobs\AiVisibilityDailyJob();
+        $this->handlers['intelligence.visibility.execute']           = new \App\Jobs\AiVisibilityRunJob();
+        $this->handlers['reach.ai_insights_run']                     = new \App\Jobs\AiInsightsJob();
         // Phase 5 Community Q&A
         $this->handlers['reach.community_question_intake']           = new CommunityQuestionIntakeJob();
         $this->handlers['reach.community_answer_generation']         = new CommunityAnswerGenerationJob();

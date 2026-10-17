@@ -38,6 +38,7 @@ class ReachSchedule extends BaseCommand
 
         // Dispatch scheduled Phase 2 jobs once per day (idempotent)
         $this->dispatchDailyJobs($svc);
+        $this->dispatchGrowthIntelJobs($svc);
 
         $aiSeeded = $this->ensureAiCatalogSeeded();
 
@@ -51,6 +52,19 @@ class ReachSchedule extends BaseCommand
         ], JSON_UNESCAPED_SLASHES);
         CLI::write($out);
         return 0;
+    }
+
+    /**
+     * Stream H: daily AI-visibility pass and weekly AI Insights
+     * (App\Libraries\Intelligence\GrowthIntelSchedule has the timetable).
+     */
+    private function dispatchGrowthIntelJobs(mixed $svc): void
+    {
+        try {
+            \App\Libraries\Intelligence\GrowthIntelSchedule::dispatch($svc, Database::connect());
+        } catch (\Throwable $e) {
+            log_message('error', 'reach:schedule growth-intel dispatch failed: ' . $e->getMessage());
+        }
     }
 
     /**
