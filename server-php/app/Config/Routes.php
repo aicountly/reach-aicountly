@@ -120,6 +120,10 @@ $routes->group('v1', static function ($routes) {
         $routes->get('insights-digest',  'Api\\V1\\Intelligence\\InsightsAutomationController::insightsDigest');
         $routes->post('strategy-memos',  'Api\\V1\\Intelligence\\InsightsAutomationController::storeStrategyMemo');
         // end Stream H
+        // Stream B — Community Q&A routine (reach-community-qa): vet → approve → publish.
+        $routes->get('community-plan',     'Api\\V1\\Community\\CommunityAutomationController::plan');
+        $routes->post('community-qa',      'Api\\V1\\Community\\CommunityAutomationController::storeQa');
+        $routes->post('community-answers', 'Api\\V1\\Community\\CommunityAutomationController::storeAnswer');
     });
 
     // ---------------------------------------------------------------------
@@ -676,6 +680,10 @@ $routes->group('v1', static function ($routes) {
         $routes->post('community/agents/dispatch',                          'Api\\V1\\Community\\CommunityAgentDispatchController::dispatch',          ['filter' => 'permission:community_agent.dispatch']);
         $routes->get('community/agents/runs',                               'Api\\V1\\Community\\CommunityAgentDispatchController::runs',               ['filter' => 'permission:community.view']);
         $routes->get('community/agents/status',                             'Api\\V1\\Community\\CommunityAgentDispatchController::status',             ['filter' => 'permission:community.view']);
+
+        // Stream B — routine submissions (Community → Automated feed)
+        $routes->get('community/automation/feed',                           'Api\\V1\\Community\\CommunityAutomationController::feed',              ['filter' => 'permission:community.view']);
+        $routes->post('community/automation/submissions/(:num)/retry',      'Api\\V1\\Community\\CommunityAutomationController::retry/$1',          ['filter' => 'permission:community_answer.publish']);
 
         // Analytics
         $routes->get('community/analytics/overview',                         'Api\\V1\\Community\\CommunityAnalyticsController::overview',              ['filter' => 'permission:community_analytics.view']);

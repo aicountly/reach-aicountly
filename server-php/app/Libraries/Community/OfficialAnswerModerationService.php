@@ -164,10 +164,10 @@ class OfficialAnswerModerationService
 
     private function detectMaliciousHtml(string $content): array
     {
-        $findings  = [];
-        $sanitiser = new HtmlSanitizer();
-        $sanitised = $sanitiser->purify($content);
-        if ($sanitised !== $content) {
+        $findings = [];
+        // What the sanitiser would remove, not whether it re-spells the markup
+        // (see HtmlSanitizer::wouldStripContent()).
+        if ((new HtmlSanitizer())->wouldStripContent($content)) {
             $findings[] = [
                 'type'     => CommunityModerationFindingType::MaliciousHtml->value,
                 'severity' => 'critical',

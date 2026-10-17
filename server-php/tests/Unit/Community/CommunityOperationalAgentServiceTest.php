@@ -105,6 +105,29 @@ final class CommunityOperationalAgentServiceTest extends TestCase
             ['payroll-hr', 'aicountly-payroll-desk'],
             ['product-guides', 'aicountly-smart-books-guide'],
             ['books', 'aicountly-smart-books-guide'],
+            // public-site slugs, which the community-qa routine files under
+            ['audit-accounting', 'aicountly-accounting-guide'],
+            ['payroll', 'aicountly-payroll-desk'],
+            ['saas-product-help', 'aicountly-smart-books-guide'],
+        ];
+    }
+
+    /** @dataProvider productDeskProvider */
+    public function testProductQuestionsGoToTheDeskForThatApp(string $category, ?string $product, string $desk): void
+    {
+        $this->assertSame($desk, CommunityOperationalAgentService::deskFor($category, $product));
+    }
+
+    public static function productDeskProvider(): array
+    {
+        return [
+            'smart books how-to'        => ['saas-product-help', 'smart_books', 'aicountly-smart-books-guide'],
+            'books alias'               => ['saas-product-help', 'books', 'aicountly-smart-books-guide'],
+            'inventory how-to'          => ['saas-product-help', 'inventory', 'aicountly-product-guide'],
+            'notes how-to'              => ['saas-product-help', 'notes', 'aicountly-product-guide'],
+            'gst topic in billing app'  => ['gst', 'billing', 'aicountly-gst-guide'],
+            'no product'                => ['income-tax', null, 'aicountly-income-tax-desk'],
+            'product help, no product'  => ['saas-product-help', null, 'aicountly-smart-books-guide'],
         ];
     }
 
@@ -135,6 +158,7 @@ final class CommunityOperationalAgentServiceTest extends TestCase
             'aicountly-payroll-desk',
             'aicountly-smart-books-guide',
             'aicountly-compliance-desk',
+            'aicountly-product-guide',
         ], CommunityOperationalAgentService::answerDesks());
     }
 }

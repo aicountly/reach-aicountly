@@ -56,11 +56,12 @@ class OfficialAnswerValidationService
                 'detail' => 'Version checksum does not match stored content'];
         }
 
-        // HTML safety check
+        // HTML safety check. Compared on what the sanitiser removes, not on
+        // whether it re-spells the markup: HTMLPurifier adds rel="nofollow" to
+        // links and rewrites <br>/entities, which a byte comparison reported
+        // as unsafe for nearly every real answer.
         if (!empty($version['content'])) {
-            $sanitiser = new HtmlSanitizer();
-            $sanitised = $sanitiser->purify($version['content']);
-            if ($sanitised !== $version['content']) {
+            if ((new HtmlSanitizer())->wouldStripContent($version['content'])) {
                 $findings[] = ['type' => 'unsafe_html', 'severity' => 'error',
                     'detail' => 'Content contains unsafe HTML that was stripped by sanitiser'];
             }

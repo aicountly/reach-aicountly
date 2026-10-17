@@ -100,11 +100,13 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 # Every minute — recover expired leases, prune old jobs, self-heal empty AI routes.
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 
-# Every 5 minutes — Community Q&A housekeeping (scheduled publish + retries).
+# Every 5 minutes — Community Q&A housekeeping (scheduled publish, deployment
+# retries, re-vetting routine submissions left pending by unavailable vetting).
 */5 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
 
-# Every 30 minutes — community agent work selection (disclosed identities;
-# window 09:00–19:00 IST and daily caps enforced inside the service).
+# Every 30 minutes — community intake housekeeping: seed curation, intake
+# screening, categorisation. It no longer drafts answers — the
+# reach-community-qa Claude Routine writes them (docs/automation/routines/).
 */30 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:agents-run >> writable/logs/community-agents.log 2>&1
 ```
 
@@ -222,13 +224,13 @@ weekly cron:
 7. **Bot dispatch surge:** the `bot.dispatch` route is IP+user throttled
    (30/min/user); if you need higher throughput, add a dedicated `bots`
    queue and start a second worker slot for it.
-8. **Community answers stuck in `validation_failed`:** `community:agents-run`
-   retries a first draft whose generation failed, on its owning desk, up to
-   6 attempts (waits double from 30 min to a 12 h cap). Its JSON line reports
-   questions past that budget as `answered.exhausted`; the error for each
-   attempt is in the Agent Operations run history. After fixing the cause
-   (usually a missing AI route — run `reach:ai-seed-catalog`), regenerate
-   those from the Official Answer editor.
+8. **Community answers stuck before publication** (`draft_requested`,
+   `validation_failed`, `draft_generated`, review queues): these are left over
+   from the old in-Reach drafting, which `community:agents-run` no longer does.
+   `php spark community:legacy-drafts` lists them; `--clear --confirm`
+   archives them so their questions appear in the routine's
+   `community-plan` open questions again. Routine submissions themselves are
+   tracked in Community → Automated feed.
 9. **Daily report `failed`:** open Reach → Reports; the row's error says why
    (usually `EMAIL_API_KEY is not configured`). Fix the env, then "Send now"
    (super admin) or `php spark reach:daily-report --send`.

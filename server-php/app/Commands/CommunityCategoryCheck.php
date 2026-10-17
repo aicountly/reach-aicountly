@@ -43,7 +43,7 @@ class CommunityCategoryCheck extends BaseCommand
      * command reports a category you know exists publicly, this list is what
      * went stale.
      */
-    private const PUBLIC_SLUGS = [
+    public const PUBLIC_SLUGS = [
         'gst',
         'income-tax',
         'tds-tcs',

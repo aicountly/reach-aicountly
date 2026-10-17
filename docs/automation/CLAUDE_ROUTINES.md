@@ -31,6 +31,12 @@ Endpoints the routines use:
 | `GET  $REACH_API_BASE/v1/automation/kb-plan` | today's per-product KB quotas |
 | `POST $REACH_API_BASE/v1/automation/blog-drafts` | submit a verified blog draft |
 | `POST $REACH_API_BASE/v1/automation/kb-drafts` | submit a verified KB draft |
+| `GET  $REACH_API_BASE/v1/automation/community-plan` | community quota, open questions, recent titles, topic mix |
+| `POST $REACH_API_BASE/v1/automation/community-qa` | submit a desk FAQ (question + answer) for vetting and publishing |
+| `POST $REACH_API_BASE/v1/automation/community-answers` | submit the desk's answer to an open member question |
+
+The community routine (`reach-community-qa`, every 2 hours 08:00–20:00 IST) has its own prompt
+file: [`routines/reach-community-qa.md`](routines/reach-community-qa.md).
 
 ## Routine 1 — hourly marketing blog (~12/day)
 

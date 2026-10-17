@@ -5,6 +5,7 @@ namespace App\Libraries\Community;
 use App\Enums\CommunityAnswerStatus;
 use App\Enums\CommunityRiskTier;
 use App\Libraries\AuditLogger;
+use App\Libraries\Support\PgBoolean;
 use App\Models\CommunityAnswerApprovalModel;
 use App\Models\CommunityDeploymentModel;
 
@@ -424,11 +425,15 @@ class OfficialAnswerPublishingService
             'official_identity_slug'      => $answer['identity_slug'] ?? '',
             'idempotency_key'             => $idempotency,
             'payload_checksum'            => $answer['approved_version_checksum'],
+            // Postgres returns booleans as 't'/'f' and (bool) 'f' is true, so
+            // these flags used to claim AI assistance and human review for
+            // every answer. human_reviewed is false for automatic approvals.
             'payload' => [
                 'body'             => $content,
                 'excerpt'          => $version['excerpt'] ?? '',
-                'ai_assisted'      => (bool) $answer['ai_assisted'],
-                'human_reviewed'   => (bool) $answer['human_reviewed'],
+                'ai_assisted'      => PgBoolean::isTrue($answer['ai_assisted'] ?? false),
+                'human_reviewed'   => PgBoolean::isTrue($answer['human_reviewed'] ?? false),
+                'ai_disclosure'    => CommunityPublicRecordProvisioner::DESK_DISCLOSURE,
                 'approved_at'      => $version['approval_timestamp'] ?? date('c'),
                 'answer_version'   => $answer['approved_version'],
                 'robots_directive' => 'index,follow',

@@ -32,13 +32,15 @@ class OfficialAnswerApprovalService
      * @param int    $approverId       The user performing approval.
      * @param string $approvalType     'standard' | 'professional_review' | 'compliance_review'
      * @param string $reason           Mandatory reason for audit.
+     * @param int|null $vettingRunId   The reach_ai_vetting_runs row an automatic approval rests on.
      */
     public function approve(
         int    $answerId,
         int    $versionNumber,
         int    $approverId,
         string $approvalType = 'standard',
-        string $reason       = ''
+        string $reason       = '',
+        ?int   $vettingRunId = null
     ): array {
         $answer  = $this->answerRepo->findById($answerId);
         if ($answer === null) {
@@ -97,7 +99,7 @@ class OfficialAnswerApprovalService
             'outcome'               => 'approved',
             'reason'                => $reason,
             'created_at'            => date('Y-m-d H:i:s'),
-        ]);
+        ] + ($vettingRunId !== null ? ['vetting_run_id' => $vettingRunId] : []));
 
         // Lock approval on the answer record
         $this->answerRepo->markApproved($answerId, $versionNumber, $version['checksum']);
@@ -111,10 +113,12 @@ class OfficialAnswerApprovalService
                 'approval_timestamp' => date('Y-m-d H:i:s'),
             ]);
 
-        // Update answer with human_reviewed flag
+        // human_reviewed says whether a person signed off. An approval by a
+        // system account (SystemApprover, after automated vetting) is not one,
+        // and the public envelope must not claim otherwise.
         $this->answerRepo->save([
             'id'             => $answerId,
-            'human_reviewed' => true,
+            'human_reviewed' => ! $this->isSystemAccount($approverId),
             'status'         => CommunityAnswerStatus::Approved->value,
         ]);
 
@@ -203,6 +207,18 @@ class OfficialAnswerApprovalService
             ]);
         }
         return $valid;
+    }
+
+    /** A login-disabled system account such as SystemApprover's "Reach System Bot". */
+    private function isSystemAccount(int $userId): bool
+    {
+        $row = db_connect()->table('reach_users')
+            ->select('actor_type')
+            ->where('id', $userId)
+            ->get()
+            ->getRowArray();
+
+        return ($row['actor_type'] ?? null) === 'system';
     }
 
     private function getLastEditorId(int $answerId, int $versionNumber): ?int

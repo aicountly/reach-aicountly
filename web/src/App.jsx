@@ -107,6 +107,7 @@ import CommunityModerationQueuePage from './pages/community/CommunityModerationQ
 import CommunityPublishingMonitorPage from './pages/community/CommunityPublishingMonitorPage.jsx';
 import CommunityAnalyticsPage       from './pages/community/CommunityAnalyticsPage.jsx';
 import CommunitySettingsPage        from './pages/community/CommunitySettingsPage.jsx';
+import CommunityAutomatedFeedPage   from './pages/community/CommunityAutomatedFeedPage.jsx';
 import BlogPublishingListPage   from './pages/publishing/BlogPublishingListPage.jsx';
 import KbPublishingListPage     from './pages/publishing/KbPublishingListPage.jsx';
 import PublishingCalendarPage   from './pages/publishing/PublishingCalendarPage.jsx';
@@ -426,6 +427,7 @@ export default function App() {
           <Route path="questions/:uuid" element={<QuestionWorkspacePage />} />
           <Route path="answers" element={<OfficialAnswerListPage />} />
           <Route path="answers/:uuid" element={<OfficialAnswerEditorPage />} />
+          <Route path="automated" element={<CommunityAutomatedFeedPage />} />
           <Route path="identities" element={<OfficialIdentitiesPage />} />
           <Route path="agents" element={<AgentOperationsPage />} />
           <Route path="moderation" element={<CommunityModerationQueuePage />} />

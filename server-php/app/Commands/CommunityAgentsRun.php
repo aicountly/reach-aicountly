@@ -23,11 +23,15 @@ use Config\Database;
  *                          that failed part-way, or a source not processed
  *                          inline) get classification, triage and the
  *                          duplicate check, so none reaches a desk unscreened.
- *   3. draft_answer      — screened questions with no official answer,
- *                          routed to the matching expert desk by category,
- *                          plus first drafts whose generation failed, retried
- *                          by their owning desk on a backoff schedule.
- *   4. categorize_question — questions still missing a category.
+ *   3. categorize_question — questions still missing a category.
+ *
+ * Answer drafting is no longer done here. Reach does not write community
+ * answers with an LLM any more: the reach-community-qa Claude Routine writes
+ * them (docs/automation/routines/reach-community-qa.md) and submits them to
+ * v1/automation/community-qa / community-answers, where they are vetted,
+ * approved and published. Its draft step only ever stopped at
+ * draft_generated, with nothing to take an answer further. Drafts it left
+ * behind are listed and cleared with `community:legacy-drafts`.
  *
  * Every dispatch (success/blocked/failed) is audited to
  * reach_community_agent_runs. No engagement actions exist to dispatch.
@@ -65,7 +69,7 @@ class CommunityAgentsRun extends BaseCommand
             $results  = [
                 'curated'     => $this->curateSeeds($agent, min(2, $limit)),
                 'processed'   => $this->completeIntakeProcessing($selector, $limit),
-                'answered'    => $this->draftAnswers($agent, $selector, min(3, $limit)),
+                'answered'    => ['disabled' => 'answers come from the reach-community-qa routine (v1/automation/community-qa, community-answers)'],
                 'categorized' => $this->categorizeQuestions($agent, min(3, $limit)),
             ];
 
@@ -154,41 +158,6 @@ class CommunityAgentsRun extends BaseCommand
         }
 
         return ['completed' => $completed, 'outcomes' => $outcomes];
-    }
-
-    /**
-     * @return array<string,mixed>
-     */
-    private function draftAnswers(CommunityOperationalAgentService $agent, CommunityAgentWorkSelector $selector, int $limit): array
-    {
-        $work = $selector->draftCandidates($limit);
-
-        $dispatched = 0;
-        $outcomes   = [];
-        foreach ($work['candidates'] as $candidate) {
-            // A retry goes to the desk that owns the answer; a first draft to the category's desk.
-            $desk = $candidate['owner_slug'] ?? CommunityOperationalAgentService::deskForCategory($candidate['category']);
-            $base = [
-                'question_id' => $candidate['question_id'],
-                'desk'        => $desk,
-                'attempt'     => $candidate['attempt'],
-            ];
-
-            try {
-                $result = $agent->dispatch($desk, 'draft_answer', [
-                    'question_uuid' => $candidate['question_uuid'],
-                    'attempt'       => $candidate['attempt'],
-                ]);
-                $outcomes[] = $base + self::outcomeOf($result);
-                if (empty($result['blocked'])) {
-                    $dispatched++;
-                }
-            } catch (\Throwable $e) {
-                $outcomes[] = $base + ['status' => 'failed', 'error' => substr($e->getMessage(), 0, 120)];
-            }
-        }
-
-        return ['dispatched' => $dispatched, 'exhausted' => $work['exhausted'], 'outcomes' => $outcomes];
     }
 
     /**
