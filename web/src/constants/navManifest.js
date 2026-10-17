@@ -98,6 +98,7 @@ export function buildNavSections() {
       items: [
         { label: 'Console Approvals', path: ROUTES.APPROVALS,         icon: ShieldCheck, countKey: 'approvals', requires: 'approval.view' },
         { label: 'Settings',          path: ROUTES.SETTINGS,          icon: Settings,    requires: 'settings.view' },
+        { label: 'AI & Automation',   path: ROUTES.AUTOMATION_SETTINGS, icon: BrainCircuit, requires: 'settings.view' },
         { label: 'Bot Mode',          path: ROUTES.BOT_SETTINGS,      icon: Wrench,      requires: 'bot.configure' },
         { label: 'Audit Logs',        path: ROUTES.AUDIT_LOGS,        icon: ListChecks,  requires: 'audit.view' },
         { label: 'API Health',        path: ROUTES.API_HEALTH,        icon: Activity,    requires: 'settings.view' },

@@ -44,6 +44,7 @@ export const ROUTES = {
   APPROVALS: '/approvals',
 
   SETTINGS:    '/admin/settings',
+  AUTOMATION_SETTINGS: '/admin/ai-automation',
   BOT_SETTINGS:'/admin/bot-mode',
   AUDIT_LOGS:  '/admin/audit-logs',
   API_HEALTH:  '/admin/api-health',

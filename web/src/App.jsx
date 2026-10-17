@@ -53,6 +53,7 @@ import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx'
 import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
 import { SeoSuggestionsPage } from './pages/seo-centre/SeoSuggestionsPage.jsx';
 import { SettingsPage } from './pages/admin/SettingsPage';
+import { AutomationSettingsPage } from './pages/admin/AutomationSettingsPage';
 import { BotSettingsPage } from './pages/admin/BotSettingsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { ApiHealthPage } from './pages/admin/ApiHealthPage';
@@ -541,6 +542,7 @@ export default function App() {
         </Route>
 
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
+        <Route path={ROUTES.AUTOMATION_SETTINGS} element={<AutomationSettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />
         <Route path={ROUTES.AUDIT_LOGS}        element={<AuditLogsPage />} />
         <Route path={ROUTES.API_HEALTH}        element={<ApiHealthPage />} />
