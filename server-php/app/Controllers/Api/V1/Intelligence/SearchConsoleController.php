@@ -360,6 +360,75 @@ class SearchConsoleController extends BaseApiController
         }
     }
 
+    // ── Site-wide view (every row Google returns, not only blog-mapped) ──
+
+    /** Totals per day plus window totals. ?from&to (default 28 days ending at the freshest day). */
+    public function siteDaily(): ResponseInterface
+    {
+        return $this->siteResponse(static fn (\App\Libraries\Intelligence\SearchSiteAnalyticsService $s, string $from, string $to): array => [
+            'days'   => $s->daily($from, $to),
+            'totals' => $s->totals($from, $to),
+        ]);
+    }
+
+    public function siteQueries(): ResponseInterface
+    {
+        $limit = (int) ($this->request->getGet('limit') ?? 25);
+
+        return $this->siteResponse(static fn ($s, string $from, string $to): array => ['rows' => $s->topQueries($from, $to, $limit)]);
+    }
+
+    public function sitePages(): ResponseInterface
+    {
+        $limit = (int) ($this->request->getGet('limit') ?? 25);
+
+        return $this->siteResponse(static fn ($s, string $from, string $to): array => ['rows' => $s->topPages($from, $to, $limit)]);
+    }
+
+    public function sitePositions(): ResponseInterface
+    {
+        return $this->siteResponse(static fn ($s, string $from, string $to): array => ['buckets' => $s->positionBuckets($from, $to)]);
+    }
+
+    /**
+     * @param callable(\App\Libraries\Intelligence\SearchSiteAnalyticsService, string, string): array<string, mixed> $build
+     */
+    private function siteResponse(callable $build): ResponseInterface
+    {
+        try {
+            $connectionId = (int) ($this->request->getGet('connection_id') ?? 0);
+            $service      = new \App\Libraries\Intelligence\SearchSiteAnalyticsService(null, $connectionId > 0 ? $connectionId : null);
+
+            if (! $service->isAvailable()) {
+                return $this->response->setJSON(['data' => [
+                    'available' => false,
+                    'message'   => 'Site-wide search storage is not migrated yet. Run: php spark migrate',
+                ]]);
+            }
+
+            $latest = $service->latestDate();
+            $anchor = $latest ?? date('Y-m-d');
+            $to     = $this->validDate($this->request->getGet('to'), $anchor);
+            $from   = $this->validDate($this->request->getGet('from'), date('Y-m-d', strtotime($to . ' -27 days')));
+            if ($from > $to) {
+                return $this->response->setStatusCode(422)->setJSON(['error' => '`from` must not be after `to`.']);
+            }
+
+            return $this->response->setJSON(['data' => [
+                'available'   => $latest !== null,
+                'latest_date' => $latest,
+                'period'      => ['from' => $from, 'to' => $to],
+                'message'     => $latest === null
+                    ? 'No site-wide Search Console rows have been ingested yet.'
+                    : null,
+            ] + $build($service, $from, $to)]);
+        } catch (\Throwable $e) {
+            log_message('error', 'SearchConsoleController::site: ' . $e->getMessage());
+
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'Unable to read site-wide search metrics']);
+        }
+    }
+
     private function validDate(mixed $value, string $fallback): string
     {
         $value = trim((string) $value);

@@ -79,6 +79,9 @@ class JobHandlerRegistry
         $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL] = new \App\Jobs\DistributionSocialDispatchJob();
         $this->handlers[DistributionJobTypes::CAMPAIGN_SCHEDULE]        = new \App\Jobs\DistributionCampaignScheduleJob();
         $this->handlers[DistributionJobTypes::CAMPAIGN_RECONCILE]       = new \App\Jobs\DistributionReconcileJob();
+        // Stream F: SEO Tracker (DataForSEO SERP checks) + daily analytics report
+        $this->handlers['reach.seo_tracker']                         = new \App\Jobs\SeoTrackerJob();
+        $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

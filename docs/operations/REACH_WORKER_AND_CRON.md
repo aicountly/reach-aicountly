@@ -14,21 +14,30 @@ Search Console), also see
 - **Worker (loop):**
   ```
   php /home/<cpanel-user>/reach-aicountly/server-php/spark reach:work \
-      --queue=default,blog,publishing --sleep=2 --lease=300 --worker-id=w1
+      --queue=default,blog,publishing,community,notifications,distribution --sleep=2 --lease=300 --worker-id=w1
   ```
   Runs until either `writable/stop-reach-worker` exists or the process is
   killed. Emits structured JSON to stdout suitable for log rotation.
 
 - **Worker (single pass, cron-friendly):**
   ```
-  php spark reach:work --queue=default,blog,publishing --once --limit=20 --worker-id=cron
+  php spark reach:work --queue=default,blog,publishing,community,notifications,distribution --once --limit=20 --worker-id=cron
   ```
   Reserves and executes at most N jobs, then exits. Combined with a
   1-minute cron, this drains the job queues without a long-lived process.
 
   **CRITICAL:** Blog automation enqueues on the `blog` queue (and
-  publishing on `publishing`). A worker started with only
-  `--queue=default` will **never** process those jobs.
+  publishing on `publishing`, Community Q&A on `community`, and every
+  email/notification job — the 08:00 IST daily analytics report, the
+  approval digest, due-date reminders, the cover-gallery alert — on
+  `notifications`). A worker that does not list a queue **never** processes
+  its jobs; they sit `pending` with nothing reporting it. Until 2026-10 the
+  documented cron line omitted `notifications`, so none of those emails ever
+  went out.
+
+  > Note: the distribution stream may add a `distribution` queue. If it
+  > does, append it to every `--queue=` list in this file
+  > (`…,community,notifications,distribution`).
 
 - **Blog dispatch (enqueue eligible work blocks):**
   ```
@@ -84,8 +93,9 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 # If the server clock is UTC, use: 0 19 * * *  (19:00 UTC = 00:30 IST).
 30 0 * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:blog-optimize-roadmap >> writable/logs/blog-optimizer.log 2>&1
 
-# Every minute — drain default + blog + publishing + community queues.
-* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing,community --once --limit=20 --worker-id=cron >> writable/logs/worker.log 2>&1
+# Every minute — drain default + blog + publishing + community + notifications queues.
+# (Append ,distribution here if/when that queue exists.)
+* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing,community,notifications,distribution --once --limit=20 --worker-id=cron >> writable/logs/worker.log 2>&1
 
 # Every minute — recover expired leases, prune old jobs, self-heal empty AI routes.
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
@@ -98,9 +108,38 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 */30 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:agents-run >> writable/logs/community-agents.log 2>&1
 ```
 
-Daily jobs handled by `reach:schedule` (no extra cron lines needed):
-05:00 SEO rank/backlink snapshots · 06:00 content-base sync ·
-09:00 cover-gallery deficit email.
+Jobs enqueued by `reach:schedule` (no extra cron lines needed). Hours are
+the server clock (UTC) unless marked IST. Every entry carries an idempotency
+key scoped to its day or hour, and `reach:schedule` skips a key that already
+has a job in any state — so the every-minute tick enqueues each job once per
+period, not sixty times.
+
+| When | Job | Queue | Key |
+|------|-----|-------|-----|
+| every hour | `reach.blog_cover_sweep` | blog | `blog-cover-sweep-<Y-m-d-H>` |
+| every hour | `reach.content_due_date_reminder`, `reach.content_overdue_escalation` | notifications | `<type>-<Y-m-d-H>` |
+| every hour | `reach.content_schedule_readiness` | default | `content-schedule-readiness-<Y-m-d-H>` |
+| 03:00 | `reach.content_refresh_detection` | default | per day |
+| **04:00** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
+| 05:00 | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |
+| 06:00 | `reach.content_base_sync` | default | per day |
+| 07:00 | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
+| 08:00 | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
+| 09:00 | `reach.gallery_deficit_alert` | notifications | per day |
+| 06:00 IST (00:30 UTC) | `reach.seo_tracker` — DataForSEO SERP checks, capped by `seo.tracker.max_keywords_per_day`; a no-op without credentials | default | `seo-tracker-<IST date>` |
+| 08:00 IST (02:30 UTC) | `reach.daily_analytics_report` — email to `reports.daily.recipients`; never re-sent for a date already sent | notifications | `daily-report-<IST date>` |
+
+Run or re-run by hand:
+
+```bash
+php spark reach:search-console ingest            # GSC incremental window now
+php spark reach:search-console backfill --days=90 # then let the 04:00 job walk it (14 days/run)
+php spark reach:daily-report                     # build + store today's report (no email)
+php spark reach:daily-report --send              # build + email to reports.daily.recipients
+php spark reach:daily-report --date=2026-10-17 --send --to=you@aicountly.com
+```
+
+Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
 
 After every deploy (with AI keys already in `.env`):
 
@@ -119,7 +158,7 @@ the minute by using two entries; cron's minimum granularity is one minute
 so add a `sleep` to stagger:
 
 ```cron
-* * * * * (sleep 20; cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing --once --limit=5 --worker-id=cron2 >> writable/logs/worker.log 2>&1)
+* * * * * (sleep 20; cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing,community,notifications,distribution --once --limit=5 --worker-id=cron2 >> writable/logs/worker.log 2>&1)
 ```
 
 ## Required `.env` flags for blogs to be saved
@@ -167,8 +206,11 @@ weekly cron:
 2. **All jobs stuck in `processing`:** likely a worker crash mid-job.
    Wait for `reach:schedule` to recover leases (runs every minute), or
    run `php spark reach:schedule` manually.
-3. **Blog jobs stuck `pending` forever:** worker is probably still on
-   `--queue=default` only. Switch to `--queue=default,blog,publishing`.
+3. **Jobs stuck `pending` forever (blog, publishing, emails):** the worker
+   does not list that queue. Use
+   `--queue=default,blog,publishing,community,notifications,distribution`. The Job Monitor
+   shows each job's queue; the daily report's *Pipeline health* section
+   counts jobs pending for over an hour.
 4. **Work blocks stay `eligible`:** `reach:blog-dispatch` cron is missing
    or outside the IST window (use `--force` for a manual smoke).
 5. **Handler always fails:** inspect `error_message` and `attempts` in
@@ -187,6 +229,9 @@ weekly cron:
    attempt is in the Agent Operations run history. After fixing the cause
    (usually a missing AI route — run `reach:ai-seed-catalog`), regenerate
    those from the Official Answer editor.
+9. **Daily report `failed`:** open Reach → Reports; the row's error says why
+   (usually `EMAIL_API_KEY is not configured`). Fix the env, then "Send now"
+   (super admin) or `php spark reach:daily-report --send`.
 
 ## Monitoring
 

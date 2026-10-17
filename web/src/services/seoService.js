@@ -10,4 +10,9 @@ export const seoService = {
   createKeyword:(body)   => api.post('v1/seo/keywords', body),
   updateKeyword:(id, b)  => api.put(`v1/seo/keywords/${id}`, b),
   archiveKeyword:(id)    => api.delete(`v1/seo/keywords/${id}`),
+  // SEO Tracker (DataForSEO SERP positions vs competitors)
+  getTracker:          (params) => api.get('v1/seo/tracker', params),
+  runTracker:          (body)   => api.post('v1/seo/tracker/run', body),
+  createTrackedKeyword:(body)   => api.post('v1/seo/tracker/keywords', body),
+  updateTrackedKeyword:(id, b)  => api.put(`v1/seo/tracker/keywords/${id}`, b),
 };

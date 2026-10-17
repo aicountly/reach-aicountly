@@ -97,71 +97,130 @@ class ReachSchedule extends BaseCommand
     }
 
     /**
-     * Enqueue Phase 2 scheduled jobs. Each job class is idempotent so
-     * duplicate enqueues within the same day are safe but wasteful; a
-     * lightweight dedup uses the job `queue_key` column when available.
+     * Enqueue the scheduled jobs for this tick.
+     *
+     * reach:schedule runs every minute, so anything gated only on the hour
+     * fires sixty times in that hour. JobService's idempotency key alone does
+     * not stop that either: it only de-duplicates while the first job is still
+     * in flight — once it completes, the next enqueue retires the key and
+     * queues a fresh copy. Every planned job therefore carries a key scoped to
+     * its period (day or hour) and enqueueOnce() skips it when any job with
+     * that key — live, finished or retired — already exists.
      */
     private function dispatchDailyJobs(mixed $svc): void
     {
-        $today = date('Y-m-d');
-        $hour  = (int) date('H');
+        foreach (self::plannedJobs(new \DateTimeImmutable('now', new \DateTimeZone('UTC'))) as $job) {
+            try {
+                $this->enqueueOnce($svc, $job['type'], $job['payload'], $job['opts']);
+            } catch (\Throwable $e) {
+                log_message('error', 'reach:schedule could not enqueue ' . $job['type'] . ': ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * What this tick should enqueue. Pure, so the timetable is unit-tested.
+     * Hours are UTC (the server clock, App::$appTimezone) unless marked IST.
+     *
+     * @return list<array{type:string, payload:array<string, mixed>, opts:array<string, mixed>}>
+     */
+    public static function plannedJobs(\DateTimeImmutable $now): array
+    {
+        $utc      = $now->setTimezone(new \DateTimeZone('UTC'));
+        $today    = $utc->format('Y-m-d');
+        $hour     = (int) $utc->format('H');
+        $hourKey  = $utc->format('Y-m-d-H');
+        $ist      = $now->setTimezone(new \DateTimeZone('Asia/Kolkata'));
+        $istDate  = $ist->format('Y-m-d');
+        $istHour  = (int) $ist->format('H');
+
+        $jobs = [];
+        $add  = static function (string $type, array $payload, string $key, array $opts = []) use (&$jobs): void {
+            $jobs[] = ['type' => $type, 'payload' => $payload, 'opts' => $opts + ['idempotency_key' => $key]];
+        };
 
         // 08:00 — daily approval digest
         if ($hour === 8) {
-            $svc->enqueue('reach.daily_approval_digest', ['date' => $today], ['queue' => 'notifications']);
+            $add('reach.daily_approval_digest', ['date' => $today], "approval-digest-{$today}", ['queue' => 'notifications']);
         }
 
         // 07:00 — generate tomorrow's marketing pack
         if ($hour === 7) {
-            $svc->enqueue('reach.daily_marketing_pack', [
-                'date' => date('Y-m-d', strtotime('+1 day')),
-            ]);
+            $tomorrow = $utc->modify('+1 day')->format('Y-m-d');
+            $add('reach.daily_marketing_pack', ['date' => $tomorrow], "marketing-pack-{$tomorrow}");
         }
 
         // Every hour: release articles parked for want of a cover. Covers
         // arrive when an operator uploads them, not on a schedule, so an
         // article parked at 09:10 should not wait a day because its cover
         // landed at 09:15. Idempotent per article per day.
-        $svc->enqueue('reach.blog_cover_sweep', ['limit' => 25], ['queue' => 'blog']);
+        $add('reach.blog_cover_sweep', ['limit' => 25], "blog-cover-sweep-{$hourKey}", ['queue' => 'blog']);
 
         // Every hour: due-date reminders, overdue escalation, schedule readiness
-        $svc->enqueue('reach.content_due_date_reminder',  [], ['queue' => 'notifications']);
-        $svc->enqueue('reach.content_overdue_escalation', [], ['queue' => 'notifications']);
-        $svc->enqueue('reach.content_schedule_readiness', []);
+        $add('reach.content_due_date_reminder', [], "content-due-date-reminder-{$hourKey}", ['queue' => 'notifications']);
+        $add('reach.content_overdue_escalation', [], "content-overdue-escalation-{$hourKey}", ['queue' => 'notifications']);
+        $add('reach.content_schedule_readiness', [], "content-schedule-readiness-{$hourKey}");
 
         // 03:00 — refresh detection
         if ($hour === 3) {
-            $svc->enqueue('reach.content_refresh_detection', []);
+            $add('reach.content_refresh_detection', [], "content-refresh-detection-{$today}");
         }
 
         // 06:00 — sync repo content-base into topic candidates (idempotent per day)
         if ($hour === 6) {
-            $svc->enqueue('reach.content_base_sync', ['date' => $today], [
-                'idempotency_key' => "content-base-sync-{$today}",
-            ]);
+            $add('reach.content_base_sync', ['date' => $today], "content-base-sync-{$today}");
         }
 
         // 09:00 — superadmin cover-gallery deficit reminder (skips when no deficit)
         if ($hour === 9) {
-            $svc->enqueue('reach.gallery_deficit_alert', ['date' => $today], [
-                'queue'           => 'notifications',
-                'idempotency_key' => "gallery-deficit-{$today}",
-            ]);
+            $add('reach.gallery_deficit_alert', ['date' => $today], "gallery-deficit-{$today}", ['queue' => 'notifications']);
         }
 
         // 04:00 — pull Search Console facts. Must run before the SEO snapshot at
         // 05:00, which aggregates exactly the rows this job writes.
         if ($hour === 4) {
-            $svc->enqueue('reach.search_console_ingest', ['tenant_id' => 1], [
-                'idempotency_key' => "search-console-ingest-{$today}",
-            ]);
+            $add('reach.search_console_ingest', ['tenant_id' => 1], "search-console-ingest-{$today}");
         }
 
-        // 05:00 — SEO rank + backlink snapshots (GSC data lags ~2 days)
+        // 05:00 — SEO rank + backlink snapshots of the freshest ingested day
+        // (Search Console publishes with a ~3 day lag).
         if ($hour === 5) {
-            $svc->enqueue('reach.seo_snapshot', ['date' => null], [
-                'idempotency_key' => "seo-snapshot-{$today}",
-            ]);
+            $add('reach.seo_snapshot', ['date' => null], "seo-snapshot-{$today}");
         }
+
+        // 06:00 IST — SEO Tracker SERP checks (DataForSEO; no-op without credentials).
+        if ($istHour === 6) {
+            $add('reach.seo_tracker', ['date' => $istDate], "seo-tracker-{$istDate}");
+        }
+
+        // 08:00 IST — daily analytics report email (idempotent per IST date).
+        if ($istHour === 8) {
+            $add('reach.daily_analytics_report', ['date' => $istDate], "daily-report-{$istDate}", ['queue' => 'notifications']);
+        }
+
+        return $jobs;
+    }
+
+    /**
+     * Enqueue unless a job with this key already exists in any state,
+     * including one whose key JobService retired (":retired:<id>" suffix).
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $opts must carry idempotency_key
+     */
+    private function enqueueOnce(mixed $svc, string $type, array $payload, array $opts): ?int
+    {
+        $key = (string) $opts['idempotency_key'];
+        $db  = Database::connect();
+
+        $exists = $db->query(
+            'SELECT 1 FROM reach_jobs WHERE idempotency_key = ? OR LEFT(idempotency_key, ?) = ? LIMIT 1',
+            [$key, strlen($key) + 9, $key . ':retired:']
+        )->getRowArray();
+        if ($exists) {
+            return null;
+        }
+
+        return $svc->enqueue($type, $payload, $opts);
     }
 }

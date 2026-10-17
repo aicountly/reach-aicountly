@@ -90,6 +90,20 @@ final class ReachConfig
                 'help' => 'Required before any campaign email is sent. Printed in every campaign email footer.'],
             'distribution.email.unsubscribe_base_url' => ['group' => 'Distribution', 'label' => 'Public Reach URL for unsubscribe links', 'type' => 'string', 'env' => 'REACH_PUBLIC_BASE_URL',
                 'help' => 'Base of the public one-click unsubscribe link (…/api/v1/public/unsubscribe). Blank = REACH_APP_URL.'],
+            // ── Stream F: SEO tracker + daily report (keep this block contiguous) ──
+            'seo.tracker.enabled' => ['group' => 'SEO data', 'label' => 'SEO Tracker daily SERP checks', 'type' => 'bool', 'default' => true,
+                'help' => 'Checks each enabled tracked keyword once a day via DataForSEO. Needs the DataForSEO login/password.'],
+            'seo.tracker.max_keywords_per_day' => ['group' => 'SEO data', 'label' => 'SEO Tracker: max keywords checked per day', 'type' => 'int', 'default' => 35,
+                'help' => 'Cost cap — one DataForSEO Live SERP call per keyword. Keywords not reached today are checked first tomorrow.'],
+            'seo.tracker.location_code' => ['group' => 'SEO data', 'label' => 'SEO Tracker: DataForSEO location code', 'type' => 'int', 'default' => 2356,
+                'help' => '2356 = India.'],
+            'seo.tracker.language_code' => ['group' => 'SEO data', 'label' => 'SEO Tracker: language code', 'type' => 'string', 'default' => 'en'],
+            'seo.tracker.depth' => ['group' => 'SEO data', 'label' => 'SEO Tracker: SERP depth', 'type' => 'int', 'default' => 100,
+                'help' => 'Results read per keyword (10–100). Deeper costs more on DataForSEO.'],
+            'seo.tracker.our_domain' => ['group' => 'SEO data', 'label' => 'SEO Tracker: our domain', 'type' => 'string', 'default' => 'aicountly.com'],
+            'reports.daily.enabled' => ['group' => 'Reports', 'label' => 'Send the daily analytics report', 'type' => 'bool', 'default' => true,
+                'help' => 'Off = the 08:00 IST report is still generated and stored under Reports, but not emailed.'],
+            // ── end Stream F ──
         ];
     }
 

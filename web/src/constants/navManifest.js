@@ -13,7 +13,7 @@ import {
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
   BookOpen, PenTool, Package, BrainCircuit,
   Globe, Send, MessagesSquare, Search, NotebookPen, ListOrdered,
-  Image, HelpCircle, FileSearch,
+  Image, HelpCircle, FileSearch, FileBarChart,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 import { isBlogCommandCentreEnabled } from './blogFeatureFlags';
@@ -28,6 +28,7 @@ export function buildNavSections() {
         { label: 'Landing Pages',    path: ROUTES.LANDING_LIST,            icon: MonitorSmartphone, requires: 'campaign.view' },
         { label: 'Creative Briefs',  path: ROUTES.CREATIVE_BRIEFS,         icon: Paintbrush,      requires: 'campaign.view' },
         { label: 'Analytics',        path: ROUTES.ANALYTICS,               icon: BarChart3,       requires: 'analytics.view' },
+        { label: 'Daily Reports',    path: ROUTES.REPORTS,                 icon: FileBarChart,    requires: 'analytics.view' },
         { label: 'Lead Capture',     path: ROUTES.LEADS,                   icon: Users,           requires: 'lead.view' },
         { label: 'Engage Lead Push', path: ROUTES.ENGAGE_PUSH,             icon: ArrowRightCircle, countKey: 'leads_pending_push', requires: 'lead.view' },
       ],

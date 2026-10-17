@@ -26,6 +26,8 @@ use CodeIgniter\CLI\CLI;
  *   sync-identities     map live blog URLs so ingested rows can attach
  *   ingest [id]         run the incremental window now
  *   backfill [id] [--days=90]   queue historical backfill
+ *   backfill-run [id]   process every remaining backfill slice now (instead
+ *                       of one 14-day slice per 04:00 ingest job)
  *   status [id]         cursor, last run and health
  *   unmapped            URLs Google reports that no content claims, beside the
  *                       canonical URLs Reach holds — the two lists side by side
@@ -38,7 +40,7 @@ class ReachSearchConsole extends BaseCommand
     protected $group       = 'Reach';
     protected $name        = 'reach:search-console';
     protected $description = 'Diagnose, register and run the Google Search Console connector.';
-    protected $usage       = 'reach:search-console <doctor|properties|register|health|sync-identities|ingest|backfill|status> [connection_id] [--days=90] [--tenant=1]';
+    protected $usage       = 'reach:search-console <doctor|properties|register|health|sync-identities|ingest|backfill|backfill-run|status|unmapped> [connection_id] [--days=90] [--tenant=1]';
 
     public function run(array $params): int
     {
@@ -58,6 +60,7 @@ class ReachSearchConsole extends BaseCommand
                     $this->resolveConnection($argument, $tenantId),
                     (int) ($this->sparkOption('days', $params, '90') ?? '90'),
                 ),
+                'backfill-run'    => $this->backfillRun($this->resolveConnection($argument, $tenantId)),
                 'status'          => SearchConsoleService::make()->connectionStatus($this->resolveConnection($argument, $tenantId)),
                 'unmapped'        => $this->unmapped($tenantId),
                 default           => throw new \InvalidArgumentException("Unknown action '{$action}'. See: {$this->usage}"),
@@ -95,6 +98,15 @@ class ReachSearchConsole extends BaseCommand
         } else {
             $report['status'] = 'mock';
             $report['detail'] = 'SEARCH_CONSOLE_USE_MOCK is true — figures would not be real.';
+        }
+
+        // What has actually landed, so "is it working?" needs no SQL.
+        try {
+            $site = new \App\Libraries\Intelligence\SearchSiteAnalyticsService();
+            $report['site_wide_tables']      = $site->isAvailable() ? 'present' : 'missing (run php spark migrate)';
+            $report['site_wide_latest_date'] = $site->latestDate();
+        } catch (\Throwable $e) {
+            $report['site_wide_tables'] = 'unreadable: ' . $e->getMessage();
         }
 
         $report['next_step'] = match (true) {
@@ -242,6 +254,38 @@ class ReachSearchConsole extends BaseCommand
                     . 'compare it against canonical_urls_on_file. slug_known means a post with that '
                     . 'final segment exists at a different path, which points at a stale canonical URL.',
         ];
+    }
+
+    /**
+     * Drain an active backfill now. Each slice is a separate Search Console
+     * call, so this is bounded (40 slices ≈ 560 days) rather than open-ended.
+     *
+     * @return array<string, mixed>
+     */
+    private function backfillRun(int $connectionId): array
+    {
+        $service = SearchConsoleService::make();
+        $slices  = [];
+        for ($i = 0; $i < 40; $i++) {
+            $chunk = $service->runBackfillChunk($connectionId);
+            if (($chunk['status'] ?? '') === 'inactive') {
+                break;
+            }
+            $slices[] = [
+                'from'      => $chunk['chunk_from'] ?? null,
+                'to'        => $chunk['chunk_to'] ?? null,
+                'site_rows' => $chunk['site_rows'] ?? 0,
+                'ingested'  => $chunk['ingested'] ?? 0,
+                'warnings'  => $chunk['warnings'] ?? [],
+            ];
+            CLI::write('slice ' . ($i + 1) . ': ' . ($chunk['chunk_from'] ?? '?') . '..' . ($chunk['chunk_to'] ?? '?')
+                . ' site_rows=' . ($chunk['site_rows'] ?? 0) . ' status=' . ($chunk['status'] ?? '?'));
+            if (($chunk['status'] ?? '') === 'completed') {
+                break;
+            }
+        }
+
+        return ['connection_id' => $connectionId, 'slices' => count($slices), 'detail' => $slices];
     }
 
     private function resolveConnection(int $connectionId, int $tenantId): int

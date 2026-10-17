@@ -9,6 +9,10 @@ use App\Libraries\NotificationService;
 /**
  * Escalates overdue content items: notifies admin owners.
  *
+ * The owner column is reach_content_items.created_by_user_id; this job read a
+ * non-existent `created_by` and failed every run, which went unnoticed while
+ * the worker cron did not drain the `notifications` queue.
+ *
  * Payload: {}
  */
 class ContentOverdueEscalationJob implements JobHandlerInterface
@@ -24,14 +28,14 @@ class ContentOverdueEscalationJob implements JobHandlerInterface
             ->where('b.due_date IS NOT NULL')
             ->where('b.due_date <', date('Y-m-d'))
             ->where('ci.deleted_at IS NULL')
-            ->select('ci.id, ci.title, ci.created_by, b.due_date')
+            ->select('ci.id, ci.title, ci.created_by_user_id AS created_by, b.due_date')
             ->get()
             ->getResultArray();
 
         $escalated = 0;
         foreach ($overdueItems as $item) {
             // Notify the content creator/owner
-            if ($item['created_by']) {
+            if ($item['created_by'] && ! self::notifiedToday($db, (int) $item['created_by'], NotificationService::TYPE_REVIEW_OVERDUE, (int) $item['id'])) {
                 $notifSvc->dispatch(
                     (int) $item['created_by'],
                     NotificationService::TYPE_REVIEW_OVERDUE,
@@ -52,5 +56,20 @@ class ContentOverdueEscalationJob implements JobHandlerInterface
         }
 
         return ['ok' => true, 'escalated' => $escalated];
+    }
+
+    /**
+     * This job is enqueued every hour; without this check the same person got
+     * the same reminder for the same item up to 24 times a day.
+     */
+    private static function notifiedToday(\CodeIgniter\Database\BaseConnection $db, int $recipientId, string $type, int $itemId): bool
+    {
+        return $db->table('reach_notifications')
+            ->where('recipient_id', $recipientId)
+            ->where('notification_type', $type)
+            ->where('entity_type', 'content_item')
+            ->where('entity_id', $itemId)
+            ->where('created_at >=', date('Y-m-d 00:00:00'))
+            ->countAllResults() > 0;
     }
 }

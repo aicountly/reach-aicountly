@@ -861,6 +861,21 @@ $routes->group('v1', static function ($routes) {
         $routes->get('intelligence/search/unmapped',                         'Api\\V1\\Intelligence\\SearchConsoleController::unmapped',            ['filter' => 'permission:search.read']);
         $routes->post('intelligence/search/sync-identities',                 'Api\\V1\\Intelligence\\SearchConsoleController::syncIdentities',      ['filter' => 'permission:search.reconcile']);
 
+        // ── Stream F: site-wide search, SEO Tracker, daily report ─────────
+        $routes->get('intelligence/search/site/daily',     'Api\\V1\\Intelligence\\SearchConsoleController::siteDaily',     ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/site/queries',   'Api\\V1\\Intelligence\\SearchConsoleController::siteQueries',   ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/site/pages',     'Api\\V1\\Intelligence\\SearchConsoleController::sitePages',     ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/site/positions', 'Api\\V1\\Intelligence\\SearchConsoleController::sitePositions', ['filter' => 'permission:search.read']);
+        $routes->get('seo/tracker',                        'Api\\V1\\Intelligence\\SeoTrackerController::index',            ['filter' => 'permission:seo.view']);
+        $routes->post('seo/tracker/run',                   'Api\\V1\\Intelligence\\SeoTrackerController::run',              ['filter' => 'permission:seo.manage']);
+        $routes->post('seo/tracker/keywords',              'Api\\V1\\Intelligence\\SeoTrackerController::createKeyword',    ['filter' => 'permission:seo.manage']);
+        $routes->put('seo/tracker/keywords/(:num)',        'Api\\V1\\Intelligence\\SeoTrackerController::updateKeyword/$1', ['filter' => 'permission:seo.manage']);
+        $routes->get('reports/daily',                      'Api\\V1\\DailyReportController::index',                          ['filter' => 'permission:analytics.view']);
+        $routes->get('reports/daily/preview',              'Api\\V1\\DailyReportController::preview',                        ['filter' => 'permission:analytics.view']);
+        $routes->get('reports/daily/(:num)',               'Api\\V1\\DailyReportController::show/$1',                        ['filter' => 'permission:analytics.view']);
+        $routes->post('reports/daily/send',                'Api\\V1\\DailyReportController::send',                           ['filter' => 'permission:analytics.view']);
+        // ── end Stream F ──
+
         // Phase 8: Content Analytics
         $routes->get('intelligence/content/connections',                     'Api\\V1\\Intelligence\\ContentAnalyticsController::connections',      ['filter' => 'permission:analytics.read']);
         $routes->post('intelligence/content/connections',                    'Api\\V1\\Intelligence\\ContentAnalyticsController::createConnection', ['filter' => 'permission:analytics.connect']);
