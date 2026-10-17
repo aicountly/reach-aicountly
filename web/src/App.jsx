@@ -37,6 +37,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 
 import { LeadsPage } from './pages/leads/LeadsPage';
 import { EngagePushPage } from './pages/leads/EngagePushPage';
+import { LeadOutcomesPage } from './pages/leads/LeadOutcomesPage';
 
 import { BotQueuePage } from './pages/bot/BotQueuePage';
 import { BotReportsPage } from './pages/bot/BotReportsPage';
@@ -367,6 +368,7 @@ export default function App() {
 
         <Route path={ROUTES.LEADS}       element={<LeadsPage />} />
         <Route path={ROUTES.ENGAGE_PUSH} element={<EngagePushPage />} />
+        <Route path={ROUTES.LEAD_OUTCOMES} element={<LeadOutcomesPage />} />
 
         <Route path={ROUTES.BOT_QUEUE}          element={<BotQueuePage />} />
         <Route path={ROUTES.BOT_REPORTS}        element={<BotReportsPage />} />

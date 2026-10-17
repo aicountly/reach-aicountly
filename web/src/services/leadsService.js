@@ -9,4 +9,6 @@ export const leadsService = {
   pushHistory:(params) => api.get('v1/engage-push', params),
   push:       (id)     => api.post(`v1/engage-push/${id}`),
   retry:      (id)     => api.post(`v1/engage-push/${id}/retry`),
+  outcomes:   (params) => api.get('v1/leads/outcomes', params),
+  outcomeSummary: (params) => api.get('v1/leads/outcomes/summary', params),
 };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { analyticsService } from '../services/analyticsService';
 import { TrafficAnalyticsSection } from '../components/analytics/TrafficAnalyticsSection';
+import { OutcomesAnalyticsSection } from '../components/outcomes/OutcomesAnalyticsSection';
 import { Card } from '../components/common/Card';
 import { Loader } from '../components/common/Loader';
 import { Alert } from '../components/common/Alert';
@@ -51,6 +52,8 @@ export function AnalyticsPage() {
           <Tile label="Engagement imported"    value={summary.engagement_imported} />
         </div>
       </Card>
+
+      <OutcomesAnalyticsSection />
 
       <TrafficAnalyticsSection />
     </div>

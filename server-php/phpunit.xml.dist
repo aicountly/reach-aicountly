@@ -52,6 +52,7 @@
         <env name="JWT_TTL_MINUTES" value="60"/>
         <env name="CONSOLE_INBOUND_TOKEN" value="test-console-inbound-token"/>
         <env name="PUBLIC_LEAD_CAPTURE_TOKEN" value="test-public-capture-token"/>
+        <env name="REACH_INBOUND_ENGAGE_TOKEN" value="test-engage-outcomes-token-0123456789abcdef"/>
         <env name="REACH_TEST_MODE" value="1"/>
     </php>
 </phpunit>

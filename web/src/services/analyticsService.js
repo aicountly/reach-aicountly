@@ -14,4 +14,5 @@ export const analyticsService = {
   trafficLeads: (params) => api.get(withQuery('v1/analytics/traffic/leads', params)),
   trafficConfigStatus: () => api.get('v1/analytics/traffic/config-status'),
   providers: () => api.get('v1/analytics/providers'),
+  outcomes: (params) => api.get(withQuery('v1/analytics/outcomes', params)),
 };
