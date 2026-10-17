@@ -189,6 +189,14 @@ final class DailyReportTest extends ApiTestCase
 
         $this->withHeaders($admin)->post('v1/seo/tracker/run')->assertStatus(409);
 
+        $created = $this->withHeaders($admin)->withBodyFormat('json')->post('v1/seo/tracker/keywords', ['keyword' => 'GST reconciliation software', 'product' => 'billing']);
+        $created->assertStatus(201);
+        $newId = (int) json_decode($created->getJSON(), true)['data']['id'];
+        $this->withHeaders($admin)->withBodyFormat('json')->post('v1/seo/tracker/keywords', ['keyword' => 'gst reconciliation SOFTWARE'])->assertStatus(409);
+        $this->withHeaders($admin)->withBodyFormat('json')->put('v1/seo/tracker/keywords/' . $newId, ['enabled' => false])->assertStatus(200);
+        $this->assertFalse(in_array(Database::connect()->table('reach_seo_tracked_keywords')->where('id', $newId)->get()->getRowArray()['enabled'], [true, 't'], true));
+        $this->withHeaders($this->authAs('analyst'))->withBodyFormat('json')->post('v1/seo/tracker/keywords', ['keyword' => 'x'])->assertStatus(403);
+
         $site = $this->withHeaders($admin)->get('v1/intelligence/search/site/daily');
         $site->assertStatus(200);
         $siteBody = json_decode($site->getJSON(), true)['data'];

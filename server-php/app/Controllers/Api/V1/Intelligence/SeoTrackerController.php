@@ -69,6 +69,11 @@ class SeoTrackerController extends BaseApiController
             return $this->error('priority must be low, medium or high.', 422);
         }
 
+        $product = trim((string) ($body['product'] ?? ''));
+        if (mb_strlen($product) > 40) {
+            return $this->error('product must be at most 40 characters.', 422);
+        }
+
         $db = db_connect();
         if (! SchemaGuard::hasTable($db, 'reach_seo_tracked_keywords')) {
             return $this->error('SEO Tracker tables are missing. Run migrations.', 503);
@@ -80,7 +85,7 @@ class SeoTrackerController extends BaseApiController
 
         $row = $db->query(
             'INSERT INTO reach_seo_tracked_keywords (keyword, product, priority, enabled, notes) VALUES (?, ?, ?, TRUE, ?) RETURNING id',
-            [$keyword, ($body['product'] ?? null) ?: null, $priority, ($body['notes'] ?? null) ?: null]
+            [$keyword, $product !== '' ? $product : null, $priority, ($body['notes'] ?? null) ?: null]
         )->getRowArray();
 
         $this->audit('seo.tracker.keyword_created', 'seo_tracked_keyword', (int) $row['id'], null, ['keyword' => $keyword]);
@@ -108,7 +113,11 @@ class SeoTrackerController extends BaseApiController
             $set['priority'] = $body['priority'];
         }
         if (array_key_exists('product', $body)) {
-            $set['product'] = ($body['product'] ?? null) ?: null;
+            $product = trim((string) ($body['product'] ?? ''));
+            if (mb_strlen($product) > 40) {
+                return $this->error('product must be at most 40 characters.', 422);
+            }
+            $set['product'] = $product !== '' ? $product : null;
         }
         if ($set === []) {
             return $this->error('Nothing to update (enabled, priority, product).', 422);
