@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Blog;
 
+use App\Libraries\Automation\SystemApprover;
 use App\Libraries\AuditLogger;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
@@ -217,45 +218,13 @@ class BlogAutoPublishService
         ];
     }
 
+    /**
+     * The system bot's reach_actors id (blog content approvals reference
+     * reach_actors). See SystemApprover.
+     */
     public function ensureSystemBotUserId(): int
     {
-        $email = 'system-bot@reach.local';
-        $row   = $this->db->table('reach_users')->where('email', $email)->get()->getRowArray();
-        if (! $row) {
-            $roleId = (int) ($this->db->table('reach_roles')->where('slug', 'super_admin')->get()->getRowArray()['id'] ?? 0);
-            if ($roleId <= 0) {
-                $roleId = (int) ($this->db->table('reach_roles')->orderBy('id', 'ASC')->limit(1)->get()->getRowArray()['id'] ?? 0);
-            }
-            if ($roleId <= 0) {
-                throw new \RuntimeException('Cannot auto-publish: no role available to seed system-bot user.');
-            }
-
-            $now = date('Y-m-d H:i:s');
-            $this->db->table('reach_users')->insert([
-                'email'             => $email,
-                'name'              => 'Reach System Bot',
-                'password_hash'     => '',
-                'role_id'           => $roleId,
-                'is_active'         => false,
-                'is_login_disabled' => true,
-                'actor_type'        => 'system',
-                'created_at'        => $now,
-                'updated_at'        => $now,
-            ]);
-            $userId = (int) $this->db->insertID();
-        } else {
-            $userId = (int) $row['id'];
-        }
-
-        // reach_blog_content_approvals.approved_by FK → reach_actors, not reach_users.
-        $actorId = \App\Libraries\ActorRegistry::idForUser($userId);
-        if ($actorId === null || $actorId <= 0) {
-            throw new \RuntimeException(
-                "Cannot auto-publish: system bot user #{$userId} could not be registered in reach_actors."
-            );
-        }
-
-        return $actorId;
+        return SystemApprover::actorId();
     }
 
     /**

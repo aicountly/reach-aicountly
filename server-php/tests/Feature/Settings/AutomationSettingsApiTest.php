@@ -90,4 +90,25 @@ final class AutomationSettingsApiTest extends ApiTestCase
 
         $this->withHeaders($h)->withBodyFormat('json')->call('PUT', 'v1/settings', ['ai.gemini.api_key' => 'x'])->assertStatus(422);
     }
+
+    public function testVettingRunsAreListedNewestFirst(): void
+    {
+        \App\Libraries\Ai\Vetting\ContentVettingService::record(['content_type' => 'blog', 'model' => 'm', 'decision' => 'approve', 'reasons_json' => '["ok"]', 'scores_json' => '{}', 'input_sha256' => str_repeat('a', 64)]);
+        \App\Libraries\Ai\Vetting\ContentVettingService::record(['content_type' => 'community', 'model' => 'm', 'decision' => 'reject', 'reasons_json' => '["abusive"]', 'scores_json' => '{}', 'input_sha256' => str_repeat('b', 64)]);
+
+        $h    = $this->authAs('super_admin');
+        $data = $this->json($this->withHeaders($h)->call('GET', 'v1/ai/vetting-runs', ['decision' => 'reject']));
+        $this->assertSame(1, $data['total']);
+        $this->assertSame(['abusive'], $data['items'][0]['reasons_json']);
+    }
+
+    public function testSystemApproverIsALoginDisabledAccount(): void
+    {
+        $id  = \App\Libraries\Automation\SystemApprover::userId();
+        $row = \Config\Database::connect()->table('reach_users')->where('id', $id)->get()->getRowArray();
+        $this->assertSame(\App\Libraries\Automation\SystemApprover::EMAIL, $row['email']);
+        $this->assertFalse((bool) ($row['is_active'] === 't' || $row['is_active'] === true));
+        $this->assertSame($id, \App\Libraries\Automation\SystemApprover::userId(), 'idempotent');
+        $this->assertGreaterThan(0, \App\Libraries\Automation\SystemApprover::actorId());
+    }
 }

@@ -552,6 +552,7 @@ $routes->group('v1', static function ($routes) {
 
         // --- Phase 3: AI Generation ---
         $routes->post('ai/generate',                                        'Api\\V1\\Ai\\AiGenerationController::generate',               ['filter' => 'permission:ai.generate']);
+        $routes->get('ai/vetting-runs',                                     'Api\\V1\\Ai\\AiVettingRunController::index',                  ['filter' => 'permission:ai.view']);
         $routes->get('ai/generations',                                      'Api\\V1\\Ai\\AiGenerationController::index',                  ['filter' => 'permission:ai.view']);
         $routes->get('ai/generations/(:segment)',                           'Api\\V1\\Ai\\AiGenerationController::show/$1',                ['filter' => 'permission:ai.view']);
         $routes->post('ai/generations/(:segment)/cancel',                   'Api\\V1\\Ai\\AiGenerationController::cancel/$1',              ['filter' => 'permission:ai.generate']);
