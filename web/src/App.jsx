@@ -162,6 +162,7 @@ import VisibilityOverviewPage           from './pages/intelligence/VisibilityOve
 import VisibilityPromptLibraryPage      from './pages/intelligence/VisibilityPromptLibraryPage.jsx';
 import VisibilityRunHistoryPage         from './pages/intelligence/VisibilityRunHistoryPage.jsx';
 import VisibilityObservationsPage       from './pages/intelligence/VisibilityObservationsPage.jsx';
+import AiInsightsPage                   from './pages/intelligence/AiInsightsPage.jsx';
 import CompetitorListPage               from './pages/intelligence/CompetitorListPage.jsx';
 import ConnectorConfigPage              from './pages/intelligence/ConnectorConfigPage.jsx';
 import IntelligenceOperationsPage       from './pages/intelligence/IntelligenceOperationsPage.jsx';
@@ -483,6 +484,7 @@ export default function App() {
           <Route path="visibility/prompts" element={<VisibilityPromptLibraryPage />} />
           <Route path="visibility/runs" element={<VisibilityRunHistoryPage />} />
           <Route path="visibility/observations" element={<VisibilityObservationsPage />} />
+          <Route path="insights" element={<AiInsightsPage />} />
           <Route path="competitors" element={<CompetitorListPage />} />
           <Route path="connectors" element={<ConnectorConfigPage />} />
           <Route path="operations" element={<IntelligenceOperationsPage />} />
