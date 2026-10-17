@@ -144,6 +144,7 @@ import DistributionCampaignListPage     from './pages/distribution/CampaignListP
 import CampaignWorkspacePage            from './pages/distribution/CampaignWorkspacePage.jsx';
 import DispatchOrchestrationPage        from './pages/distribution/DispatchOrchestrationPage.jsx';
 import DistributionAnalyticsPage        from './pages/distribution/DistributionAnalyticsPage.jsx';
+import CampaignReadinessPage            from './pages/distribution/CampaignReadinessPage.jsx';
 
 import IntelligenceLayout                from './pages/intelligence/IntelligenceLayout.jsx';
 import IntelligenceOverviewPage          from './pages/intelligence/IntelligenceOverviewPage.jsx';
@@ -463,6 +464,7 @@ export default function App() {
           <Route path="sms/dispatch" element={<SmsDispatchPage />} />
           <Route path="orchestration" element={<DispatchOrchestrationPage />} />
           <Route path="analytics" element={<DistributionAnalyticsPage />} />
+          <Route path="readiness" element={<CampaignReadinessPage />} />
         </Route>
 
         {/* Phase 8 — Intelligence Control Centre */}
