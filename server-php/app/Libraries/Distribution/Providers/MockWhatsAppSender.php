@@ -8,6 +8,7 @@ class MockWhatsAppSender implements WhatsAppSenderInterface
 {
     public function send(ChannelMessage $message): ProviderReceipt
     {
+        ProviderGuard::refuseMockInProduction('WhatsApp', 'set WHATSAPP_API_KEY and WHATSAPP_WABA_ID (Infobip)');
         $scenario = $this->scenario($message->idempotencyKey);
         if ($scenario === 'rate_limit')    throw new \RuntimeException('MOCK: rate limit', 429);
         if ($scenario === 'transient_fail') throw new \RuntimeException('MOCK: transient failure', 503);
@@ -21,6 +22,9 @@ class MockWhatsAppSender implements WhatsAppSenderInterface
 
     public function getTemplates(): array
     {
+        if (ProviderGuard::isProduction()) {
+            return []; // no fake "approved" templates in production
+        }
         return [
             ['id' => 'mock_template_1', 'name' => 'hello_world', 'status' => 'approved', 'language' => 'en'],
         ];
@@ -41,7 +45,8 @@ class MockWhatsAppSender implements WhatsAppSenderInterface
         return ['template_required' => true, 'messaging_window' => 24, 'media_types' => ['image', 'document', 'video']];
     }
 
-    public function isEnabled(): bool { return true; }
+    /** Never "enabled" in production: the mock refuses to send there. */
+    public function isEnabled(): bool { return !ProviderGuard::isProduction(); }
 
     public function verifyCallback(array $headers, string $rawBody): bool { return true; }
 

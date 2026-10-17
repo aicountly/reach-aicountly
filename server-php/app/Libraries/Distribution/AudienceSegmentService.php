@@ -95,11 +95,17 @@ class AudienceSegmentService
             throw new \RuntimeException('Segment not found.', 404);
         }
 
-        // Preview is a stub — count is not computed from real CRM in Phase 7
-        $count = rand(10, 500);
+        // Leads the segment's rules select in reach_leads (before per-channel
+        // consent and suppression, which the send-time snapshot applies).
+        $count = (new AudienceResolverService())->countCandidates(['segment_id' => $segmentId], $tenantId);
         $this->segmentModel->update($segmentId, ['estimated_count' => $count]);
 
-        return ['segment_id' => $segmentId, 'estimated_count' => $count, 'computed_at' => date('c')];
+        return [
+            'segment_id'      => $segmentId,
+            'estimated_count' => $count,
+            'basis'           => 'reach_leads matching the segment rules, before consent and suppression',
+            'computed_at'     => date('c'),
+        ];
     }
 
     private function addRule(int $segmentId, array $rule): void

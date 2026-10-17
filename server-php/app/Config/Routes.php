@@ -50,6 +50,13 @@ $routes->get('health', static function () {
 $routes->get('v1/public/media/(:segment)', 'Api\\V1\\Content\\MediaAssetController::serve/$1');
 
 /*
+ * Public one-click unsubscribe for campaign email. HMAC-signed per address
+ * (UnsubscribeLinks); outside the jwt group because recipients have no login.
+ */
+$routes->get('v1/public/unsubscribe',  'Api\\V1\\Distribution\\UnsubscribeController::unsubscribe');
+$routes->post('v1/public/unsubscribe', 'Api\\V1\\Distribution\\UnsubscribeController::unsubscribe');
+
+/*
  * -----------------------------------------------------------------------------
  * Legacy path aliases (pre-/v1 distribution UI).
  * Keep until production frontend is fully on /api/v1/... paths.
@@ -790,6 +797,12 @@ $routes->group('v1', static function ($routes) {
         $routes->get('distribution/dispatches',                              'Api\\V1\\Distribution\\DispatchController::index',                    ['filter' => 'permission:distribution.read']);
         $routes->get('distribution/dispatches/(:num)',                       'Api\\V1\\Distribution\\DispatchController::show/$1',                  ['filter' => 'permission:distribution.read']);
         $routes->post('distribution/dispatches/(:num)/reconcile',            'Api\\V1\\Distribution\\DispatchController::reconcile/$1',             ['filter' => 'permission:distribution.retry']);
+        $routes->post('distribution/campaigns/(:num)/dispatch',              'Api\\V1\\Distribution\\DispatchController::dispatchCampaign/$1',      ['filter' => 'permission:distribution.dispatch']);
+        $routes->post('distribution/campaigns/(:num)/schedule',              'Api\\V1\\Distribution\\DispatchController::schedule/$1',              ['filter' => 'permission:distribution.dispatch']);
+        $routes->post('distribution/campaigns/(:num)/cancel',                'Api\\V1\\Distribution\\DispatchController::cancel/$1',                ['filter' => 'permission:distribution.dispatch']);
+
+        // Campaign readiness — live per-channel status (no secret values)
+        $routes->get('distribution/readiness',                               'Api\\V1\\Distribution\\ReadinessController::index',                   ['filter' => 'permission:distribution.read']);
 
         // Analytics
         $routes->get('distribution/analytics',                               'Api\\V1\\Distribution\\AnalyticsController::index',                   ['filter' => 'permission:distribution.read']);

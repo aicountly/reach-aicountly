@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Distribution\Providers\ChannelProviderFactory;
 use App\Models\ApprovalModel;
 use App\Models\SocialPostModel;
 
@@ -75,17 +76,13 @@ class SocialPostController extends BaseApiController
         if (! $row) {
             return $this->fail('Social post not found.', 404);
         }
-        // If no provider token is configured for that channel, route to manual_queue.
-        $envKey = match ($row['channel'] ?? '') {
-            'linkedin'        => 'LINKEDIN_API_TOKEN',
-            'twitter'         => 'TWITTER_API_TOKEN',
-            'facebook'        => 'FACEBOOK_API_TOKEN',
-            'instagram'       => 'INSTAGRAM_API_TOKEN',
-            'youtube'         => 'YOUTUBE_API_TOKEN',
-            'whatsapp_channel'=> 'WHATSAPP_CHANNEL_API_TOKEN',
-            default           => '',
-        };
-        $status = $envKey !== '' && env($envKey, '') !== '' ? 'approved' : 'manual_queue';
+        // `approved` (auto-dispatchable) only when a real publisher would post
+        // it. The old *_API_TOKEN env checks were never used by any publisher,
+        // so a set token sent posts nowhere. Until the socialapi.ai adapter is
+        // implemented every approved post goes to the manual queue.
+        $status = ChannelProviderFactory::socialPublisherReadyFor((string) ($row['channel'] ?? ''))
+            ? 'approved'
+            : 'manual_queue';
         $m->update($id, [
             'status'          => $status,
             'approval_status' => 'approved',

@@ -17,8 +17,9 @@ class SuppressionService
 
     public function suppress(int $tenantId, string $channel, string $address, SuppressionReason $reason, string $source, ?int $actorId, ?\DateTime $expiresAt = null): array
     {
-        $hash   = ChannelSuppressionModel::hashAddress($tenantId, $channel, $address);
-        $masked = ChannelSuppressionModel::maskAddress($address);
+        $address = self::canonical($channel, $address);
+        $hash    = ChannelSuppressionModel::hashAddress($tenantId, $channel, $address);
+        $masked  = ChannelSuppressionModel::maskAddress($address);
 
         // Upsert pattern — if already suppressed, return existing
         $existing = $this->model->where('tenant_id', $tenantId)->where('channel', $channel)->where('address_hash', $hash)->first();
@@ -66,7 +67,26 @@ class SuppressionService
 
     public function isSuppressed(int $tenantId, string $channel, string $address): bool
     {
-        return $this->model->isSuppressed($tenantId, $channel, ChannelSuppressionModel::hashAddress($tenantId, $channel, $address));
+        foreach (AudienceResolverService::addressVariants($channel, self::canonical($channel, $address)) as $variant) {
+            if ($this->model->isSuppressed($tenantId, $channel, ChannelSuppressionModel::hashAddress($tenantId, $channel, $variant))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Phone numbers are stored in the same normalised form audience snapshots
+     * use (country code + digits), so "+91 98765 43210" and "9876543210" are
+     * one suppression. Email is lower-cased by hashAddress().
+     */
+    public static function canonical(string $channel, string $address): string
+    {
+        if (in_array($channel, ['sms', 'whatsapp'], true)) {
+            $phone = AudienceResolverService::normalisePhone($address);
+            return $phone !== '' ? $phone : trim($address);
+        }
+        return trim($address);
     }
 
     public function list(int $tenantId, int $page = 1, int $perPage = 25): array

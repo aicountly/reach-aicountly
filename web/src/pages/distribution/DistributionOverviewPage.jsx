@@ -28,6 +28,7 @@ export default function DistributionOverviewPage() {
     { title: 'SMS',                description: 'SMS campaigns with DLT compliance.',                  to: '/distribution/sms', icon: '📱' },
     { title: 'Orchestration',      description: 'Fan-out, reconcile, and monitor dispatches.',        to: '/distribution/orchestration', icon: '⚙️' },
     { title: 'Analytics',          description: 'Campaign delivery and engagement metrics.',           to: '/distribution/analytics', icon: '📊' },
+    { title: 'Campaign readiness', description: 'Live status of every channel: configured, test mode, or why not.', to: '/distribution/readiness', icon: '✅' },
   ];
 
   return (

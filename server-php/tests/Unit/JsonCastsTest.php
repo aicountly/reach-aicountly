@@ -24,7 +24,9 @@ final class JsonCastsTest extends CIUnitTestCase
         'Libraries/Community/CommunityPublicationReconciliationService.php' => ['details'],            // query builder
         'Libraries/Community/CommunityPublicationVerificationService.php'   => ['details'],            // query builder
         'Libraries/ConsoleAuditClient.php'                                  => ['payload'],            // query builder
-        'Libraries/Distribution/EmailSenderService.php'                     => ['stats'],              // query builder
+        'Libraries/Distribution/AudienceResolverService.php'                => ['snapshot_criteria'],  // query builder
+        'Libraries/Distribution/ChannelDispatchService.php'                 => ['channels'],           // query builder
+        'Libraries/Distribution/DistributionAuditService.php'               => ['stats'],              // query builder
         'Libraries/AuditLogger.php'                                         => ['metadata'],           // AuditLogModel has no JSON cast
         'Libraries/Community/CommunityOperationalAgentService.php'          => ['metadata'],           // CommunityAgentRunModel has no JSON cast
     ];

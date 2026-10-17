@@ -14,6 +14,7 @@ const navItems = [
   { to: '/distribution/sms',               label: 'SMS' },
   { to: '/distribution/orchestration',     label: 'Orchestration' },
   { to: '/distribution/analytics',         label: 'Analytics' },
+  { to: '/distribution/readiness',         label: 'Readiness' },
 ];
 
 export default function DistributionLayout() {

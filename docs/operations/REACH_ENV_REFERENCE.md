@@ -121,7 +121,13 @@ surface, not the environment.
 | `SMS_COUNTRY_CODE` | `91` |
 | `WHATSAPP_PROVIDER` | empty → gateway sender |
 | `WHATSAPP_API_URL` | Infobip text endpoint |
-| `CAMPAIGN_DISPATCH_TEST_EMAIL` / `_PHONE` | empty — fallback recipient when an audience is unresolved |
+| `WHATSAPP_TEMPLATE_API_URL` | `https://api.infobip.com/whatsapp/1/message/template` — campaign template sends (set the account's own base URL) |
+| `SMS_SKIP_SEND` / `WHATSAPP_SKIP_SEND` | `true` — campaign sends are recorded `skipped`, never `sent` |
+| `DISTRIBUTION_POSTAL_ADDRESS` | empty — required before campaign email is sent (or setting `distribution.email.postal_address`) |
+| `CAMPAIGN_DISPATCH_TEST_EMAIL` | empty — default `to` for `POST v1/distribution/email/test/:id` only; never a fallback recipient for campaign sends |
+| `SOCIAL_PROVIDER` | empty → `socialapi` when `social.socialapi.api_key` is set (fail-closed until implemented), else dev mock |
+
+See `CAMPAIGN_READINESS.md` for the per-channel requirements.
 
 ### Connectors and misc
 

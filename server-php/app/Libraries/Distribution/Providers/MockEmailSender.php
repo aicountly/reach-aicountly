@@ -8,6 +8,7 @@ class MockEmailSender implements EmailSenderInterface
 {
     public function send(ChannelMessage $message): ProviderReceipt
     {
+        ProviderGuard::refuseMockInProduction('Email', 'set EMAIL_API_KEY (Itwalk) and SENDER_EMAIL');
         $scenario = $this->scenario($message->idempotencyKey);
         if ($scenario === 'rate_limit')    throw new \RuntimeException('MOCK: rate limit', 429);
         if ($scenario === 'transient_fail') throw new \RuntimeException('MOCK: transient failure', 503);
@@ -34,7 +35,8 @@ class MockEmailSender implements EmailSenderInterface
         return ['batch_size' => 1000, 'rate_limit' => 100, 'features' => ['tracking', 'unsubscribe_header']];
     }
 
-    public function isEnabled(): bool { return true; }
+    /** Never "enabled" in production: the mock refuses to send there. */
+    public function isEnabled(): bool { return !ProviderGuard::isProduction(); }
 
     public function verifyCallback(array $headers, string $rawBody): bool { return true; }
 
