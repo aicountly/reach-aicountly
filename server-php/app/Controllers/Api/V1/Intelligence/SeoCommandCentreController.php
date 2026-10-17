@@ -33,6 +33,23 @@ class SeoCommandCentreController extends BaseApiController
             [$since]
         )->getRowArray(), ['clicks' => 0, 'impressions' => 0, 'avg_position' => null]);
 
+        // Prefer the whole-property figures; the blog-mapped table only holds
+        // rows a Reach post claims, which understates the site.
+        $searchScope = 'blog';
+        $site = $safe(static function () use ($since) {
+            $svc = new \App\Libraries\Intelligence\SearchSiteAnalyticsService();
+            if ($svc->latestDate() === null) {
+                return null;
+            }
+            $t = $svc->totals($since, date('Y-m-d'));
+
+            return ['clicks' => $t['clicks'], 'impressions' => $t['impressions'], 'avg_position' => $t['avg_position']];
+        });
+        if (is_array($site)) {
+            $search      = $site;
+            $searchScope = 'site';
+        }
+
         $indexing = $safe(static fn () => $db->query(
             'SELECT indexing_status, COUNT(*) AS c FROM reach_blog_publication_profiles GROUP BY indexing_status'
         )->getResultArray(), []);
@@ -63,6 +80,7 @@ class SeoCommandCentreController extends BaseApiController
 
         return $this->ok([
             'search_28d'      => $search,
+            'search_scope'    => $searchScope,
             'indexing_status' => $indexing,
             'indexnow_status' => $indexnow,
             'latest_sitemap'  => $latestSitemap,

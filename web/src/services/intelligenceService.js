@@ -129,6 +129,25 @@ export function syncContentIdentities(body = {}) {
   return api.post('v1/intelligence/search/sync-identities', body);
 }
 
+// Site-wide Search Console view — every row Google returns, not only the
+// pages a Reach blog claims. ?from&to default to the 28 days ending at the
+// freshest ingested day.
+export function getSiteSearchDaily(params = {}) {
+  return api.get('v1/intelligence/search/site/daily', params);
+}
+
+export function listSiteSearchQueries(params = {}) {
+  return api.get('v1/intelligence/search/site/queries', params);
+}
+
+export function listSiteSearchPages(params = {}) {
+  return api.get('v1/intelligence/search/site/pages', params);
+}
+
+export function getSiteSearchPositions(params = {}) {
+  return api.get('v1/intelligence/search/site/positions', params);
+}
+
 export function listContentMetrics(params = {}) {
   return api.get('v1/intelligence/content/metrics', params);
 }

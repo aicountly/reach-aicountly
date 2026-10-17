@@ -54,7 +54,7 @@ export function TrackedKeywordsPage() {
           <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Adding…' : 'Track'}</button>
         </form>
         <p className="text-muted text-sm" style={{ marginTop: '0.5rem' }}>
-          Positions come from ingested Search Console data (daily 05:00 snapshot, ~2-day lag). No SERP scraping.
+          Positions come from ingested Search Console data (daily 05:00 UTC snapshot of the freshest day Google has published, ~3-day lag). For live Google positions against competitors see SEO Tracker.
         </p>
       </Card>
 

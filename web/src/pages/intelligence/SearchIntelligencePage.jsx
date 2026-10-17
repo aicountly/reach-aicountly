@@ -12,6 +12,7 @@ import {
   syncContentIdentities,
 } from '../../services/intelligenceService.js';
 import { formatTime } from '../../utils/formatDate';
+import SiteWideSearchPanel from './SiteWideSearchPanel.jsx';
 
 const DEFAULT_BACKFILL_DAYS = 90;
 
@@ -57,6 +58,9 @@ export default function SearchIntelligencePage() {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  // Site-wide (the whole property) is the default; blog-mapped is the subset
+  // of rows a Reach-published post claims.
+  const [view, setView] = useState('site');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -114,7 +118,7 @@ export default function SearchIntelligencePage() {
           <div>
             <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>Search Console Intelligence</h1>
             <p className="text-sm text-muted" style={{ margin: '0.15rem 0 0' }}>
-              Live Google Search Console performance, ingested into Reach
+              Live Google Search Console performance for the whole site, ingested into Reach
             </p>
           </div>
         </div>
@@ -235,7 +239,32 @@ export default function SearchIntelligencePage() {
         </div>
       </div>
 
-      {/* Totals over the ingested facts */}
+      <div role="tablist" aria-label="Search view" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        {[
+          { key: 'site', label: 'Site-wide' },
+          { key: 'blog', label: 'Blog-mapped' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={view === tab.key}
+            className={`btn btn-sm ${view === tab.key ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setView(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'site' && <SiteWideSearchPanel configured={configured} />}
+
+      {view === 'blog' && (
+      <>
+      {/* Totals over the blog-mapped facts */}
+      <p className="text-sm text-muted" style={{ margin: '0 0 0.75rem' }}>
+        Only rows whose page is a Reach-published blog post (28 days).
+      </p>
       <div className="grid grid-3" style={{ marginBottom: '1.25rem' }}>
         {[
           { label: 'Clicks (28d)', value: num(totals?.clicks) },
@@ -295,6 +324,9 @@ export default function SearchIntelligencePage() {
         </div>
       )}
 
+      </>
+      )}
+
       {runs.length > 0 && (
         <div className="card" style={{ marginBottom: '1.25rem' }}>
           <div className="card-body">
@@ -337,8 +369,9 @@ export default function SearchIntelligencePage() {
           <div className="card-body">
             <h2 style={{ fontSize: '1rem', fontWeight: 650, margin: '0 0 0.35rem' }}>Unmapped URLs</h2>
             <p className="text-sm text-muted" style={{ margin: '0 0 0.75rem' }}>
-              Search Console reports on these URLs but no Reach content claims them, so their figures are not stored.
-              Sync content identities above, or check that the published canonical URL matches the live page.
+              Search Console reports on these URLs but no Reach blog claims them, so they appear only in the site-wide view.
+              That is correct for marketing, pricing and guide pages; for a blog post, sync content identities above or
+              check that the published canonical URL matches the live page.
             </p>
             <ul className="text-sm" style={{ margin: 0, paddingLeft: '1.1rem' }}>
               {unmapped.slice(0, 25).map((finding) => (

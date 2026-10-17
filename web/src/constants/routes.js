@@ -33,6 +33,7 @@ export const ROUTES = {
   CREATIVE_BRIEFS: '/creative-briefs',
 
   ANALYTICS: '/analytics',
+  REPORTS: '/reports',
 
   LEADS:        '/leads',
   ENGAGE_PUSH:  '/leads/engage-push',

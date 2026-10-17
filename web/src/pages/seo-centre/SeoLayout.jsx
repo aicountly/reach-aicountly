@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 
 const navItems = [
   { to: '/seo-centre/overview', label: 'Overview' },
+  { to: '/seo-centre/tracker', label: 'SEO Tracker' },
   { to: '/seo-centre/keywords', label: 'Tracked Keywords' },
   { to: '/seo-centre/backlinks', label: 'Backlinks' },
   { to: '/seo-centre/suggestions', label: 'Suggestions' },

@@ -41,6 +41,9 @@ class ContentDueDateReminderJob implements JobHandlerInterface
                 ->getResultArray();
 
             foreach ($assignments as $a) {
+                if (self::notifiedToday($db, (int) $a['user_id'], NotificationService::TYPE_REVIEW_DUE, (int) $item['id'])) {
+                    continue;
+                }
                 $notifSvc->dispatch(
                     (int) $a['user_id'],
                     NotificationService::TYPE_REVIEW_DUE,
@@ -61,5 +64,20 @@ class ContentDueDateReminderJob implements JobHandlerInterface
         }
 
         return ['ok' => true, 'reminders_sent' => $sent];
+    }
+
+    /**
+     * This job is enqueued every hour; without this check the same person got
+     * the same reminder for the same item up to 24 times a day.
+     */
+    private static function notifiedToday(\CodeIgniter\Database\BaseConnection $db, int $recipientId, string $type, int $itemId): bool
+    {
+        return $db->table('reach_notifications')
+            ->where('recipient_id', $recipientId)
+            ->where('notification_type', $type)
+            ->where('entity_type', 'content_item')
+            ->where('entity_id', $itemId)
+            ->where('created_at >=', date('Y-m-d 00:00:00'))
+            ->countAllResults() > 0;
     }
 }

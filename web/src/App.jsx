@@ -52,6 +52,8 @@ import { SeoOverviewPage } from './pages/seo-centre/SeoOverviewPage.jsx';
 import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx';
 import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
 import { SeoSuggestionsPage } from './pages/seo-centre/SeoSuggestionsPage.jsx';
+import { SeoTrackerPage } from './pages/seo-centre/SeoTrackerPage.jsx';
+import { DailyReportsPage } from './pages/reports/DailyReportsPage.jsx';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { BotSettingsPage } from './pages/admin/BotSettingsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
@@ -356,6 +358,7 @@ export default function App() {
         <Route path={ROUTES.CREATIVE_BRIEFS} element={<CreativeBriefsPage />} />
 
         <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
+        <Route path={ROUTES.REPORTS} element={<DailyReportsPage />} />
 
         <Route path={ROUTES.LEADS}       element={<LeadsPage />} />
         <Route path={ROUTES.ENGAGE_PUSH} element={<EngagePushPage />} />
@@ -519,6 +522,7 @@ export default function App() {
         <Route path="/seo-centre" element={<SeoLayout />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<SeoOverviewPage />} />
+          <Route path="tracker" element={<SeoTrackerPage />} />
           <Route path="keywords" element={<TrackedKeywordsPage />} />
           <Route path="backlinks" element={<BacklinksPage />} />
           <Route path="suggestions" element={<SeoSuggestionsPage />} />
