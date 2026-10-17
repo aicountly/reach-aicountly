@@ -29,13 +29,24 @@ class AutomationTokenFilter implements FilterInterface
         }
 
         $provided = (string) $request->getHeaderLine('X-Automation-Token');
-        if ($provided === '' && preg_match('/^Bearer\s+(\S+)$/i', trim($request->getHeaderLine('Authorization')), $m)) {
+        $via      = $provided !== '' ? 'x-automation-token' : 'none';
+        $auth     = trim($request->getHeaderLine('Authorization'));
+        if ($provided === '' && preg_match('/^Bearer\s+(\S+)$/i', $auth, $m)) {
             $provided = $m[1];
+            $via      = 'bearer';
+        } elseif ($provided === '' && $auth !== '') {
+            $via = 'authorization-not-bearer';
         }
         if ($provided === '' || ! hash_equals($expected, $provided)) {
+            // Says how a token arrived and its length — never any part of it —
+            // so a mismatched secret can be told apart from a missing header.
             return service('response')
                 ->setStatusCode(401)
-                ->setJSON(['ok' => false, 'error' => 'Invalid automation token (X-Automation-Token or Authorization: Bearer).']);
+                ->setJSON([
+                    'ok'       => false,
+                    'error'    => 'Invalid automation token (X-Automation-Token or Authorization: Bearer).',
+                    'received' => ['via' => $via, 'length' => strlen($provided), 'expected_length' => strlen($expected)],
+                ]);
         }
     }
 
