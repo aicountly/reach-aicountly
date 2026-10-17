@@ -128,6 +128,15 @@ $routes->group('v1', static function ($routes) {
     });
 
     // ---------------------------------------------------------------------
+    // Inbound from Engage (X-Engage-Token / REACH_INBOUND_ENGAGE_TOKEN).
+    // Lead stage / payment outcomes; idempotent by event_id.
+    // docs/integrations/ENGAGE_OUTCOMES.md
+    // ---------------------------------------------------------------------
+    $routes->group('inbound/engage', ['filter' => 'engage-token'], static function ($routes) {
+        $routes->post('lead-outcomes', 'Api\\V1\\Inbound\\EngageLeadOutcomeController::store');
+    });
+
+    // ---------------------------------------------------------------------
     // Authenticated V1 API — every route is permission-gated individually.
     // ---------------------------------------------------------------------
     $routes->group('', ['filter' => 'jwt'], static function ($routes) {
@@ -253,6 +262,9 @@ $routes->group('v1', static function ($routes) {
         $routes->get('analytics/providers',             'Api\\V1\\AnalyticsController::providers',          ['filter' => 'permission:analytics.view']);
 
         // Leads
+        $routes->get('leads/outcomes',         'Api\\V1\\LeadOutcomeController::index',   ['filter' => 'permission:lead.view']);
+        $routes->get('leads/outcomes/summary', 'Api\\V1\\LeadOutcomeController::summary', ['filter' => 'permission:lead.view']);
+        $routes->get('analytics/outcomes',     'Api\\V1\\LeadOutcomeController::summary', ['filter' => 'permission:analytics.view']);
         $routes->get('leads',           'Api\\V1\\LeadController::index',      ['filter' => 'permission:lead.view']);
         $routes->post('leads',          'Api\\V1\\LeadController::store',      ['filter' => 'permission:lead.manage']);
         $routes->get('leads/(:num)',    'Api\\V1\\LeadController::show/$1',    ['filter' => 'permission:lead.view']);

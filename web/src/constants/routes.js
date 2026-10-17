@@ -36,6 +36,7 @@ export const ROUTES = {
 
   LEADS:        '/leads',
   ENGAGE_PUSH:  '/leads/engage-push',
+  LEAD_OUTCOMES: '/leads/outcomes',
 
   BOT_QUEUE:    '/bot/queue',
   BOT_REPORTS:  '/bot/reports',

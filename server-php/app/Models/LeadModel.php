@@ -18,6 +18,11 @@ class LeadModel extends ReachModel
         'priority', 'notes', 'raw_payload',
         'engage_push_status', 'engage_lead_code', 'engage_push_attempts',
         'last_push_at', 'last_push_error', 'created_by',
+        // Seller referral + UTM / landing capture (2026-10-17-800001)
+        'ref_code', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+        'landing_url', 'referrer_url',
+        // Latest Engage outcome (written by LeadOutcomeIngestService)
+        'engage_stage', 'engage_sales_status', 'engage_stage_at',
     ];
 
     protected array $casts = ['raw_payload' => '?json-array'];

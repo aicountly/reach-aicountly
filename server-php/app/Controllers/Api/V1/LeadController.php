@@ -115,10 +115,61 @@ class LeadController extends BaseApiController
         if (isset($out['email'])) {
             $out['email'] = strtolower(trim((string) $out['email']));
         }
+        $out += self::attributionFields($body);
         if (! $partial) {
             $out['name']     ??= '';
             $out['priority'] ??= 'normal';
         }
+        return $out;
+    }
+
+    /**
+     * Seller referral code and UTM / landing data from a capture body.
+     *
+     * Accepts flat `ref`, `utm_source` … `utm_term`, `landing_url`, `referrer` (or
+     * `referrer_url`), and a nested `utm: {source, medium, campaign, content, term}`.
+     * Values that do not fit are dropped rather than failing the capture: a lead is
+     * never lost over a malformed tracking parameter.
+     *
+     * @return array<string,string>
+     */
+    public static function attributionFields(array $body): array
+    {
+        $out = [];
+        $ref = $body['ref'] ?? $body['ref_code'] ?? null;
+        if (is_string($ref)) {
+            $ref = strtoupper(trim($ref));
+            if (preg_match('/\A[A-Z0-9][A-Z0-9_-]{0,31}\z/', $ref) === 1) {
+                $out['ref_code'] = $ref;
+            }
+        }
+
+        $utm = is_array($body['utm'] ?? null) ? $body['utm'] : [];
+        foreach (['source' => 120, 'medium' => 120, 'campaign' => 240, 'content' => 240, 'term' => 240] as $k => $max) {
+            $v = $body['utm_' . $k] ?? $utm[$k] ?? null;
+            if (is_string($v) || is_int($v)) {
+                $v = trim(preg_replace('/[\x00-\x1F\x7F]+/', ' ', (string) $v) ?? '');
+                if ($v !== '') {
+                    $out['utm_' . $k] = mb_substr($v, 0, $max);
+                }
+            }
+        }
+
+        foreach (['landing_url' => ['landing_url', 'page_url'], 'referrer_url' => ['referrer', 'referrer_url']] as $col => $keys) {
+            foreach ($keys as $key) {
+                $v = $body[$key] ?? null;
+                if (is_string($v)) {
+                    $v = trim($v);
+                    $scheme = strtolower((string) parse_url($v, PHP_URL_SCHEME));
+                    if ($v !== '' && strlen($v) <= 2000 && in_array($scheme, ['http', 'https'], true)
+                        && filter_var($v, FILTER_VALIDATE_URL) !== false) {
+                        $out[$col] = $v;
+                        break;
+                    }
+                }
+            }
+        }
+
         return $out;
     }
 

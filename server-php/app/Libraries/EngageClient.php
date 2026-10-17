@@ -196,8 +196,16 @@ class EngageClient
         }
     }
 
-    private function buildBody(array $lead): array
+    /**
+     * The JSON body sent to Engage. `ref` (the seller referral code, e.g. SLR-000123) is
+     * sent at the top level and in reach_meta, with the UTM / landing / referrer data,
+     * so Engage can set lead.seller_id and keep the marketing source. Empty values are
+     * left out.
+     */
+    public function buildBody(array $lead): array
     {
+        $ref = isset($lead['ref_code']) && $lead['ref_code'] !== '' ? (string) $lead['ref_code'] : null;
+
         return array_filter([
             'source_portal'      => 'reach.aicountly.org',
             'name'               => $lead['name']            ?? '',
@@ -211,11 +219,20 @@ class EngageClient
             'interested_product' => $lead['product_interest']?? null,
             'notes'              => $lead['notes']           ?? null,
             'priority'           => $lead['priority']        ?? 'normal',
+            'ref'                => $ref,
             'reach_meta'         => array_filter([
                 'reach_lead_id'   => (int) ($lead['id'] ?? 0),
                 'source_kind'     => $lead['source_kind']     ?? null,
                 'landing_page_id' => $lead['landing_page_id'] ?? null,
-            ]),
+                'ref'             => $ref,
+                'utm_source'      => $lead['utm_source']      ?? null,
+                'utm_medium'      => $lead['utm_medium']      ?? null,
+                'utm_campaign'    => $lead['utm_campaign']    ?? null,
+                'utm_content'     => $lead['utm_content']     ?? null,
+                'utm_term'        => $lead['utm_term']        ?? null,
+                'landing_url'     => $lead['landing_url']     ?? null,
+                'referrer_url'    => $lead['referrer_url']    ?? null,
+            ], static fn ($v) => $v !== null && $v !== '' && $v !== 0),
         ], static fn ($v) => $v !== null && $v !== '' && $v !== []);
     }
 

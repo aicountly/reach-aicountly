@@ -35,7 +35,10 @@ modes and superadmin approval gates.
     Console Sync Status page.
   - **Engage** — lead push via `POST {ENGAGE_API_BASE_URL}/internal/reach/leads`
     with header `X-Portal-Token: {ENGAGE_INBOUND_TOKEN}` (matches Engage's
-    `ReachController::ingest`). Duplicate detection is inferred locally.
+    `ReachController::ingest`). Duplicate detection is inferred locally. The push carries the
+    seller `ref` and UTM / landing data in `reach_meta`. Engage reports lead outcomes back to
+    `POST /api/v1/inbound/engage/lead-outcomes` (`X-Engage-Token: {REACH_INBOUND_ENGAGE_TOKEN}`),
+    shown under Leads → Lead Outcomes and on Analytics — `docs/integrations/ENGAGE_OUTCOMES.md`.
   - **Worker** — Playwright/UI/screenshot jobs via
     `worker.apis.aicountly.com/v1/{health,screenshot,review,runs}`; graceful
     degradation when the endpoints or token are unavailable.
@@ -99,6 +102,8 @@ npm run dev
      passthrough.
 7. On Engage (`engage.aicountly.org`) set `REACH_INBOUND_TOKEN` to the same
    value as Reach's `ENGAGE_INBOUND_TOKEN`.
+   For lead outcomes, set Reach's `REACH_INBOUND_ENGAGE_TOKEN` (≥32 characters) and give
+   Engage's outcome sender the same value (see `docs/integrations/ENGAGE_OUTCOMES.md`).
 8. On Console (`console.aicountly.org`) set `REACH_BOT_API_URL` to
    `https://reach.aicountly.org/api/v1` and `REACH_BOT_SERVICE_KEY` to the
    same value as Reach's `CONSOLE_INBOUND_TOKEN`.

@@ -5,6 +5,7 @@ namespace Config;
 use App\Filters\AutomationTokenFilter;
 use App\Filters\ConsoleTokenFilter;
 use App\Filters\CorsFilter;
+use App\Filters\EngageTokenFilter;
 use App\Filters\JsonBodySizeFilter;
 use App\Filters\JwtFilter;
 use App\Filters\PermissionFilter;
@@ -39,6 +40,7 @@ class Filters extends BaseFilters
         'super-admin'    => SuperAdminFilter::class,   // retained for backward-compat; not applied group-wide
         'console-token'  => ConsoleTokenFilter::class,
         'automation-token' => AutomationTokenFilter::class,
+        'engage-token'   => EngageTokenFilter::class,
         'public-capture' => PublicCaptureFilter::class,
         'throttle'       => RateLimitFilter::class,
         'body-size'      => JsonBodySizeFilter::class,
