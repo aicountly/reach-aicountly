@@ -66,6 +66,12 @@ final class AutomationTokenFilterTest extends CIUnitTestCase
         $this->assertNull($this->statusFor(['Authorization' => 'bearer ' . self::TOKEN]));
     }
 
+    public function testAcceptsABearerPrefixedCustomHeader(): void
+    {
+        $this->assertNull($this->statusFor(['X-Automation-Token' => 'Bearer ' . self::TOKEN]));
+        $this->assertSame(401, $this->statusFor(['X-Automation-Token' => 'Bearer nope']));
+    }
+
     public function testRejectsWrongOrMissingTokens(): void
     {
         $this->assertSame(401, $this->statusFor([]));

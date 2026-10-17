@@ -28,8 +28,13 @@ class AutomationTokenFilter implements FilterInterface
                 ]);
         }
 
-        $provided = (string) $request->getHeaderLine('X-Automation-Token');
+        $provided = trim((string) $request->getHeaderLine('X-Automation-Token'));
         $via      = $provided !== '' ? 'x-automation-token' : 'none';
+        // The environment's network secret always prefixes its value with the
+        // scheme it was saved with ("Bearer …"), whatever the header name.
+        if (preg_match('/^Bearer\s+(\S+)$/i', $provided, $pm)) {
+            $provided = $pm[1];
+        }
         $auth     = trim($request->getHeaderLine('Authorization'));
         if ($provided === '' && preg_match('/^Bearer\s+(\S+)$/i', $auth, $m)) {
             $provided = $m[1];
