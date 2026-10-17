@@ -11,19 +11,29 @@ use App\Libraries\JobService;
 /**
  * Orchestrates multi-channel campaign dispatch.
  *
- * When a campaign has channel variants (social, email, whatsapp, sms),
- * this service fans out one dispatch job per channel, each independently
- * tracked in `reach_campaign_dispatches`.
+ * fanOut() starts one dispatch per validated channel variant of an approved
+ * campaign version (email / SMS / WhatsApp through ChannelDispatchService,
+ * social through the distribution.dispatch.social job). dispatchCampaign()
+ * is what the scheduled-send job runs: it starts every approved channel
+ * campaign linked to the campaign, then fans out its latest approved version.
+ *
+ * Dispatch rows are created `queued` (the value the table's CHECK and
+ * App\Enums\DispatchStatus allow — the earlier 'pending' violated both).
  */
 class CampaignDispatchOrchestratorService
 {
+    private ChannelDispatchService $channels;
+
     public function __construct(
         private readonly JobService  $jobs,
         private readonly AuditLogger $audit,
-    ) {}
+        ?ChannelDispatchService $channels = null,
+    ) {
+        $this->channels = $channels ?? new ChannelDispatchService($jobs, null, $audit);
+    }
 
     /**
-     * Fan out dispatch jobs for all active channel variants of a campaign version.
+     * Fan out dispatches for all validated channel variants of a campaign version.
      */
     public function fanOut(int $campaignId, int $campaignVersionId, int $tenantId, ?int $actorId): array
     {
@@ -40,72 +50,128 @@ class CampaignDispatchOrchestratorService
 
         $variants = $db->table('reach_campaign_channel_variants')
             ->where('campaign_version_id', $campaignVersionId)
-            ->where('validation_status', 'passed')
+            ->where('validation_status', 'valid')
             ->get()->getResultArray();
 
         if (empty($variants)) {
             throw new \RuntimeException('No validated channel variants found for this campaign version.', 422);
         }
 
-        $jobTypeMap = [
-            'social'   => DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL,
-            'email'    => DistributionJobTypes::CAMPAIGN_DISPATCH_EMAIL,
-            'whatsapp' => DistributionJobTypes::CAMPAIGN_DISPATCH_WA,
-            'sms'      => DistributionJobTypes::CAMPAIGN_DISPATCH_SMS,
-        ];
-
         $dispatched = [];
+        $errors     = [];
         foreach ($variants as $variant) {
-            $channel = $variant['channel'];
-            if (!isset($jobTypeMap[$channel])) {
-                continue;
+            $channel = (string) $variant['channel'];
+            try {
+                if ($channel === 'social') {
+                    $dispatched[] = $this->queueSocialVariant($campaignId, $campaignVersionId, (int) $variant['id'], $tenantId, $actorId);
+                    continue;
+                }
+                $result = $this->channels->start(ChannelDispatchService::SOURCE_VARIANT, (int) $variant['id'], $tenantId, $actorId);
+                $dispatched[] = ['channel' => $channel, 'variant_id' => (int) $variant['id']] + $result;
+            } catch (\Throwable $e) {
+                // One channel failing to start must not hide the others, nor be reported as dispatched.
+                $errors[] = ['channel' => $channel, 'variant_id' => (int) $variant['id'], 'error' => $e->getMessage()];
             }
-
-            $idempotencyKey = 'orchestrator:' . $campaignId . ':' . $channel . ':' . $campaignVersionId;
-
-            $dispatchId = $db->table('reach_campaign_dispatches')->insert([
-                'uuid'            => sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-                    mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-                    mt_rand(0, 0xffff),
-                    mt_rand(0, 0x0fff) | 0x4000,
-                    mt_rand(0, 0x3fff) | 0x8000,
-                    mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)),
-                'campaign_id'     => $campaignId,
-                'tenant_id'       => $tenantId,
-                'channel'         => $channel,
-                'status'          => 'pending',
-                'idempotency_key' => $idempotencyKey,
-                'created_at'      => date('Y-m-d H:i:s'),
-                'updated_at'      => date('Y-m-d H:i:s'),
-            ]);
-
-            $insertedId = $db->insertID();
-            $jobId = $this->jobs->enqueue(
-                $jobTypeMap[$channel],
-                [
-                    'campaign_id'   => $campaignId,
-                    'dispatch_id'   => $insertedId,
-                    'variant_id'    => $variant['id'],
-                    'tenant_id'     => $tenantId,
-                ],
-                ['queue' => 'distribution', 'max_attempts' => 3, 'priority' => 60],
-            );
-
-            $dispatched[] = ['channel' => $channel, 'job_id' => $jobId];
         }
 
-        $db->table('reach_campaigns')->where('id', $campaignId)->update([
-            'status'     => 'dispatching',
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+        if ($dispatched !== []) {
+            $db->table('reach_campaigns')->where('id', $campaignId)->whereIn('status', ['approved', 'scheduled'])->update([
+                'status'     => 'dispatching',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
 
         $this->audit->record(AuditLogger::DISTRIBUTION_CAMPAIGN_DISPATCHING, [
             'campaign_id'  => $campaignId,
             'version_id'   => $campaignVersionId,
             'channels'     => array_column($dispatched, 'channel'),
-            'jobs_enqueued'=> count($dispatched),
+            'started'      => count($dispatched),
+            'errors'       => $errors,
         ], $actorId);
 
-        return ['dispatched_channels' => $dispatched, 'total' => count($dispatched)];
+        return ['dispatched_channels' => $dispatched, 'errors' => $errors, 'total' => count($dispatched)];
+    }
+
+    /**
+     * Start everything a campaign is due to send: linked email / WhatsApp /
+     * SMS campaigns that are approved or scheduled, plus the latest approved
+     * version's variants.
+     */
+    public function dispatchCampaign(int $campaignId, int $tenantId, ?int $actorId): array
+    {
+        $db      = \Config\Database::connect();
+        $started = [];
+        $errors  = [];
+
+        $sources = [];
+        foreach ($db->table('reach_email_campaigns')->select('id')->where('campaign_id', $campaignId)->whereIn('status', ['approved', 'scheduled'])->get()->getResultArray() as $row) {
+            $sources[] = [ChannelDispatchService::SOURCE_EMAIL_CAMPAIGN, (int) $row['id']];
+        }
+        foreach ($db->table('reach_whatsapp_campaigns')->select('id')->where('campaign_id', $campaignId)->whereIn('status', ['approved', 'scheduled'])->get()->getResultArray() as $row) {
+            $sources[] = [ChannelDispatchService::SOURCE_WHATSAPP_CAMPAIGN, (int) $row['id']];
+        }
+        if ($db->table('reach_sms_campaigns')->where('campaign_id', $campaignId)->countAllResults() > 0) {
+            $sources[] = [ChannelDispatchService::SOURCE_SMS_CAMPAIGN, $campaignId];
+        }
+
+        foreach ($sources as [$type, $id]) {
+            try {
+                $started[] = ['source' => $type . ':' . $id] + $this->channels->start($type, $id, $tenantId, $actorId);
+            } catch (\Throwable $e) {
+                $errors[] = ['source' => $type . ':' . $id, 'error' => $e->getMessage()];
+            }
+        }
+
+        $version = $db->table('reach_campaign_versions')->where('campaign_id', $campaignId)->where('approved_at IS NOT NULL', null, false)
+            ->orderBy('version_number', 'DESC')->get()->getRowArray();
+        if ($version !== null) {
+            try {
+                $fan = $this->fanOut($campaignId, (int) $version['id'], $tenantId, $actorId);
+                $started = array_merge($started, $fan['dispatched_channels']);
+                $errors  = array_merge($errors, $fan['errors']);
+            } catch (\Throwable $e) {
+                $errors[] = ['source' => 'version:' . $version['id'], 'error' => $e->getMessage()];
+            }
+        }
+
+        if ($started === [] && $errors !== []) {
+            $db->table('reach_campaigns')->where('id', $campaignId)->whereIn('status', ['approved', 'scheduled'])
+                ->update(['status' => 'failed', 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+
+        return ['campaign_id' => $campaignId, 'started' => $started, 'errors' => $errors];
+    }
+
+    private function queueSocialVariant(int $campaignId, int $versionId, int $variantId, int $tenantId, ?int $actorId): array
+    {
+        $db  = \Config\Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $key = 'orchestrator:' . $campaignId . ':social:' . $versionId . ':' . $variantId;
+        $existing = $db->table('reach_campaign_dispatches')->where('idempotency_key', $key)->get()->getRowArray();
+        if ($existing !== null) {
+            return ['channel' => 'social', 'variant_id' => $variantId, 'status' => 'already_dispatched', 'dispatch_id' => (int) $existing['id']];
+        }
+        $db->table('reach_campaign_dispatches')->insert([
+            'campaign_id'         => $campaignId,
+            'campaign_version_id' => $versionId,
+            'tenant_id'           => $tenantId,
+            'channel'             => 'social',
+            'status'              => 'queued',
+            'idempotency_key'     => $key,
+            'total_recipients'    => 1,
+            'source_type'         => ChannelDispatchService::SOURCE_VARIANT,
+            'source_id'           => $variantId,
+            'created_by'          => $actorId,
+            'created_at'          => $now,
+            'updated_at'          => $now,
+        ]);
+        $dispatchId = (int) $db->insertID();
+        $jobId = $this->jobs->enqueue(
+            DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL,
+            ['dispatch_id' => $dispatchId, 'variant_id' => $variantId, 'tenant_id' => $tenantId],
+            ['queue' => ChannelDispatchService::QUEUE, 'max_attempts' => 3, 'priority' => 60],
+        );
+
+        return ['channel' => 'social', 'variant_id' => $variantId, 'status' => 'queued', 'dispatch_id' => $dispatchId, 'job_id' => $jobId];
     }
 }

@@ -8,6 +8,7 @@ class MockSmsSender implements SmsSenderInterface
 {
     public function send(ChannelMessage $message): ProviderReceipt
     {
+        ProviderGuard::refuseMockInProduction('SMS', 'set SMS_API_KEY and SMS_SENDER_ID (DLT-registered header)');
         $scenario = $this->scenario($message->idempotencyKey);
         if ($scenario === 'rate_limit')    throw new \RuntimeException('MOCK: rate limit', 429);
         if ($scenario === 'transient_fail') throw new \RuntimeException('MOCK: transient failure', 503);
@@ -29,7 +30,8 @@ class MockSmsSender implements SmsSenderInterface
         return ['dlt_required' => true, 'char_limit' => 160, 'max_body_chars' => 160, 'encoding' => 'GSM7', 'provider_name' => 'mock_sms'];
     }
 
-    public function isEnabled(): bool { return true; }
+    /** Never "enabled" in production: the mock refuses to send there. */
+    public function isEnabled(): bool { return !ProviderGuard::isProduction(); }
 
     public function verifyCallback(array $headers, string $rawBody): bool { return true; }
 

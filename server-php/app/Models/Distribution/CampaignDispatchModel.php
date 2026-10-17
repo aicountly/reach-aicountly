@@ -21,7 +21,7 @@ class CampaignDispatchModel extends Model
         'tenant_id', 'channel', 'status', 'connection_id', 'idempotency_key',
         'scheduled_at', 'started_at', 'completed_at',
         'total_recipients', 'sent_count', 'failed_count', 'suppressed_count',
-        'lock_version', 'created_by',
+        'lock_version', 'created_by', 'source_type', 'source_id', 'skipped_count', 'last_error',
     ];
 
     public function findByUuid(string $uuid): ?array

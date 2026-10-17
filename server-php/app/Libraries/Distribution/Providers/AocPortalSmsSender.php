@@ -12,8 +12,17 @@ class AocPortalSmsSender implements SmsSenderInterface
     {
         $phone = $this->resolveRecipient($message);
         $templateId = trim((string) ($message->metadata['dlt_template_id'] ?? $message->templateId ?? ''));
+        if ($templateId === '') {
+            throw new \RuntimeException('DLT template ID is required for every SMS (TRAI).', 422);
+        }
 
-        if (!SmsSender::send($phone, $message->content, $templateId !== '' ? $templateId : null)) {
+        // SmsSender::send() returns true when SMS_SKIP_SEND is on without
+        // contacting the gateway. That must never be recorded as accepted.
+        if (SmsSender::isSendDisabled()) {
+            throw new SendSkippedException('SMS_SKIP_SEND is on — SMS not sent. Set SMS_SKIP_SEND=false to send for real.');
+        }
+
+        if (!SmsSender::send($phone, $message->content, $templateId)) {
             throw new \RuntimeException(
                 'SMS gateway rejected send. Check SMS_API_KEY, DLT template ID, and SMS_SKIP_SEND.',
                 502,
@@ -21,7 +30,7 @@ class AocPortalSmsSender implements SmsSenderInterface
         }
 
         return new ProviderReceipt(
-            providerMessageId: 'sms-' . substr(md5($message->idempotencyKey . $phone), 0, 12),
+            providerMessageId: 'local-sms-' . substr(md5($message->idempotencyKey . $phone), 0, 12),
             status:            'accepted',
             acceptedAt:        new \DateTimeImmutable(),
         );
@@ -45,7 +54,7 @@ class AocPortalSmsSender implements SmsSenderInterface
 
     public function isEnabled(): bool
     {
-        return SmsSender::isConfigured();
+        return SmsSender::isConfigured() && !SmsSender::isSendDisabled();
     }
 
     public function verifyCallback(array $headers, string $rawBody): bool
@@ -58,28 +67,14 @@ class AocPortalSmsSender implements SmsSenderInterface
         return 'aoc_portal_sms';
     }
 
+    /** Exactly the number on the message — no broadcast placeholder, no test-number fallback. */
     private function resolveRecipient(ChannelMessage $message): string
     {
         $phone = SmsSender::normalizePhone($message->recipientAddress);
-        if ($phone !== '' && $message->recipientAddress !== 'broadcast') {
+        if (strlen($phone) >= 10) {
             return $phone;
         }
 
-        $metaPhone = trim((string) ($message->metadata['to'] ?? $message->metadata['recipient_phone'] ?? ''));
-        $phone = SmsSender::normalizePhone($metaPhone);
-        if ($phone !== '') {
-            return $phone;
-        }
-
-        $fallback = trim((string) (getenv('CAMPAIGN_DISPATCH_TEST_PHONE') ?: $_ENV['CAMPAIGN_DISPATCH_TEST_PHONE'] ?? ''));
-        $phone = SmsSender::normalizePhone($fallback);
-        if ($phone !== '') {
-            return $phone;
-        }
-
-        throw new \RuntimeException(
-            'No valid SMS recipient. Set CAMPAIGN_DISPATCH_TEST_PHONE in .env or configure campaign audience.',
-            422,
-        );
+        throw new \RuntimeException('Invalid SMS recipient number.', 422);
     }
 }

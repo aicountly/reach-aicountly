@@ -23,6 +23,7 @@ use App\Jobs\CommunityDeploymentRetrySweepJob;
 use App\Jobs\PublicationJob;
 use App\Jobs\BlogCoverSweepJob;
 use App\Jobs\BlogWorkBlockJob;
+use App\Libraries\Distribution\Jobs\DistributionJobTypes;
 use RuntimeException;
 
 /**
@@ -69,6 +70,15 @@ class JobHandlerRegistry
         $this->handlers['reach.search_console_ingest']               = new \App\Jobs\SearchConsoleIngestJob();
         // SEO Command Centre daily snapshots
         $this->handlers['reach.seo_snapshot']                        = new \App\Jobs\SeoSnapshotJob();
+        // Campaign distribution (queue `distribution`) — email/SMS/WhatsApp batches,
+        // social posts, scheduled campaign starts and dispatch reconciliation.
+        $channelDispatch = new \App\Jobs\DistributionChannelDispatchJob();
+        $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_EMAIL]  = $channelDispatch;
+        $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_SMS]    = $channelDispatch;
+        $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_WA]     = $channelDispatch;
+        $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL] = new \App\Jobs\DistributionSocialDispatchJob();
+        $this->handlers[DistributionJobTypes::CAMPAIGN_SCHEDULE]        = new \App\Jobs\DistributionCampaignScheduleJob();
+        $this->handlers[DistributionJobTypes::CAMPAIGN_RECONCILE]       = new \App\Jobs\DistributionReconcileJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

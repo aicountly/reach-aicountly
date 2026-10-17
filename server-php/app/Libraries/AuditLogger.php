@@ -352,6 +352,17 @@ class AuditLogger
     public const DISTRIBUTION_SENDER_PROFILE_CREATED         = 'distribution.sender_profile.created';
     public const DISTRIBUTION_SMS_CAMPAIGN_CREATED           = 'distribution.sms_campaign.created';
     public const DISTRIBUTION_SMS_CAMPAIGN_UPDATED           = 'distribution.sms_campaign.updated';
+    // Campaign readiness (honest delivery): referenced by the dispatch services.
+    public const DISTRIBUTION_SMS_ACCEPTED                   = 'distribution.sms.accepted';
+    public const DISTRIBUTION_WHATSAPP_ACCEPTED              = 'distribution.whatsapp.accepted';
+    public const DISTRIBUTION_CAMPAIGN_DISPATCHING           = 'distribution.campaign.dispatching';
+    public const DISTRIBUTION_CAMPAIGN_SCHEDULED             = 'distribution.campaign.scheduled';
+    public const DISTRIBUTION_CAMPAIGN_CANCELLED             = 'distribution.campaign.cancelled';
+    public const DISTRIBUTION_CAMPAIGN_RECONCILED            = 'distribution.campaign.reconciled';
+    public const DISTRIBUTION_SEND_SKIPPED                   = 'distribution.send.skipped';
+    public const DISTRIBUTION_PROVIDER_NOT_CONFIGURED        = 'distribution.provider.not_configured';
+    public const DISTRIBUTION_TEST_SEND                      = 'distribution.test_send';
+    public const DISTRIBUTION_AUDIT_FIXED                    = 'distribution.audit.fixed';
 
     // Phase 8 — Intelligence: Content Identity
     public const CONTENT_IDENTITY_REGISTERED  = 'content.identity.registered';

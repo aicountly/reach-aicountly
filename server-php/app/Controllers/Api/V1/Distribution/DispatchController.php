@@ -127,4 +127,58 @@ class DispatchController extends BaseApiController
 
         return $this->ok($result, 202);
     }
+
+    /**
+     * POST /distribution/campaigns/:id/dispatch — start every approved channel
+     * send linked to the campaign (email / WhatsApp / SMS campaigns and the
+     * latest approved version's variants). Sends run on the `distribution` queue.
+     */
+    public function dispatchCampaign(string $campaignId): ResponseInterface
+    {
+        $campaign = \Config\Database::connect()->table('reach_campaigns')->where('id', (int) $campaignId)->get()->getRowArray();
+        if ($campaign === null || (int) ($campaign['tenant_id'] ?? 0) !== $this->tenantId()) {
+            return $this->fail('Campaign not found.', 404);
+        }
+        if (! in_array($campaign['status'], ['approved', 'scheduled'], true)) {
+            return $this->fail('Campaign must be approved before dispatch.', 409);
+        }
+        try {
+            $result = (new \App\Libraries\Distribution\CampaignDispatchOrchestratorService(new JobService(), new AuditLogger()))
+                ->dispatchCampaign((int) $campaignId, $this->tenantId(), $this->userId());
+        } catch (\RuntimeException $e) {
+            return $this->fail($e->getMessage(), $e->getCode() ?: 422);
+        }
+        if ($result['started'] === []) {
+            return $this->fail('Nothing was dispatched.', 422, $result['errors']);
+        }
+        return $this->ok($result, 202);
+    }
+
+    /** POST /distribution/campaigns/:id/schedule  {scheduled_at: ISO-8601} */
+    public function schedule(string $campaignId): ResponseInterface
+    {
+        $at = trim((string) ($this->input()['scheduled_at'] ?? ''));
+        if ($at === '') {
+            return $this->fail('scheduled_at is required.', 422);
+        }
+        try {
+            $result = (new \App\Libraries\Distribution\CampaignScheduleService(new JobService(), new AuditLogger()))
+                ->schedule((int) $campaignId, $at, $this->tenantId(), $this->userId());
+        } catch (\RuntimeException $e) {
+            return $this->fail($e->getMessage(), $e->getCode() ?: 422);
+        }
+        return $this->ok($result, 202);
+    }
+
+    /** POST /distribution/campaigns/:id/cancel — stops unsent batches */
+    public function cancel(string $campaignId): ResponseInterface
+    {
+        try {
+            (new \App\Libraries\Distribution\CampaignScheduleService(new JobService(), new AuditLogger()))
+                ->cancel((int) $campaignId, $this->tenantId(), $this->userId());
+        } catch (\RuntimeException $e) {
+            return $this->fail($e->getMessage(), $e->getCode() ?: 422);
+        }
+        return $this->ok(['campaign_id' => (int) $campaignId, 'status' => 'cancelled']);
+    }
 }

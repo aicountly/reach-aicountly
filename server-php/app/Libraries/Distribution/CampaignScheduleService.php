@@ -28,11 +28,19 @@ class CampaignScheduleService
             throw new \RuntimeException('Campaign not found.', 404);
         }
 
-        if (!in_array($campaign['status'] ?? '', ['approved', 'ready_for_review'], true)) {
+        if (($campaign['status'] ?? '') !== 'approved') {
             throw new \RuntimeException('Campaign must be approved before scheduling.', 409);
         }
 
-        $sendAt = new \DateTimeImmutable($scheduledAt, new \DateTimeZone('UTC'));
+        try {
+            $sendAt = new \DateTimeImmutable($scheduledAt, new \DateTimeZone('UTC'));
+        } catch (\Throwable) {
+            throw new \RuntimeException('scheduled_at is not a valid date/time.', 422);
+        }
+        $sendAt = $sendAt->setTimezone(new \DateTimeZone('UTC'));
+        if ($sendAt->getTimestamp() < time() - 60) {
+            throw new \RuntimeException('scheduled_at is in the past.', 422);
+        }
 
         $jobId = $this->jobs->enqueueAt(
             DistributionJobTypes::CAMPAIGN_SCHEDULE,
@@ -53,7 +61,7 @@ class CampaignScheduleService
             'job_id'      => $jobId,
         ], $actorId);
 
-        return ['job_id' => $jobId, 'scheduled_at' => $scheduledAt, 'status' => 'scheduled'];
+        return ['job_id' => $jobId, 'scheduled_at' => $sendAt->format('c'), 'status' => 'scheduled', 'queue' => ChannelDispatchService::QUEUE];
     }
 
     /**
@@ -67,9 +75,13 @@ class CampaignScheduleService
         if ($campaign === null || (int) ($campaign['tenant_id'] ?? 0) !== $tenantId) {
             throw new \RuntimeException('Campaign not found.', 404);
         }
-        if (($campaign['status'] ?? '') !== 'scheduled') {
-            throw new \RuntimeException('Only scheduled campaigns can be cancelled.', 409);
+        if (!in_array($campaign['status'] ?? '', ['scheduled', 'dispatching'], true)) {
+            throw new \RuntimeException('Only scheduled or dispatching campaigns can be cancelled.', 409);
         }
+
+        // Unsent batches stop: the dispatch job is a no-op for a cancelled dispatch.
+        $db->table('reach_campaign_dispatches')->where('campaign_id', $campaignId)->whereIn('status', ['queued', 'dispatching'])
+            ->update(['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s'), 'last_error' => 'Cancelled by operator.']);
 
         $db->table('reach_campaigns')->where('id', $campaignId)->update([
             'status'     => 'cancelled',

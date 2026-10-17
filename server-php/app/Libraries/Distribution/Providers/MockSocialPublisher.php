@@ -44,7 +44,7 @@ class MockSocialPublisher implements SocialPublisherInterface
 
     public function isEnabled(): bool
     {
-        return true; // mock is always available
+        return !ProviderGuard::isProduction(); // dev/test only
     }
 
     public function verifyCallback(array $headers, string $rawBody): bool
@@ -65,13 +65,16 @@ class MockSocialPublisher implements SocialPublisherInterface
         return 'success';
     }
 
+    /**
+     * The mock used to fall through here in production and hand back fake
+     * `mock-post-…` ids, which marked posts `posted` that never left Reach.
+     * It now refuses outright.
+     */
     private function assertNotConfiguredForProduction(): void
     {
-        if (getenv('CI') || getenv('APP_ENV') === 'testing') {
-            return;
-        }
-        if (getenv('SOCIAL_PROVIDER_MOCK') === 'true') {
-            return;
-        }
+        ProviderGuard::refuseMockInProduction(
+            'Social',
+            'no real social publisher is available (socialapi.ai adapter pending: API docs required; set social.socialapi.api_key once it is implemented)'
+        );
     }
 }

@@ -14,7 +14,11 @@ class GatewayEmailSender implements EmailSenderInterface
         $subject = (string) ($message->metadata['subject'] ?? 'Campaign');
         $html = $message->content;
 
-        if (!Mailer::send($to, $subject, $html)) {
+        $plain   = isset($message->metadata['body_text']) && is_string($message->metadata['body_text']) && $message->metadata['body_text'] !== ''
+            ? $message->metadata['body_text']
+            : null;
+
+        if (!Mailer::send($to, $subject, $html, $plain)) {
             throw new \RuntimeException(
                 'Email gateway rejected send: ' . (Mailer::getLastError() ?? 'unknown'),
                 502,
@@ -66,26 +70,19 @@ class GatewayEmailSender implements EmailSenderInterface
         return 'itwalk_email';
     }
 
+    /**
+     * The recipient is exactly the address on the message. There is no
+     * broadcast placeholder and no fallback to a test inbox: audience
+     * resolution supplies real addresses, and the test-send endpoint passes
+     * the test address explicitly.
+     */
     private function resolveRecipient(ChannelMessage $message): string
     {
         $to = trim($message->recipientAddress);
-        if ($to !== '' && $to !== 'list@broadcast' && filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        if ($to !== '' && filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return $to;
         }
 
-        $metaTo = trim((string) ($message->metadata['to'] ?? $message->metadata['recipient_email'] ?? ''));
-        if ($metaTo !== '' && filter_var($metaTo, FILTER_VALIDATE_EMAIL)) {
-            return $metaTo;
-        }
-
-        $fallback = trim((string) (getenv('CAMPAIGN_DISPATCH_TEST_EMAIL') ?: $_ENV['CAMPAIGN_DISPATCH_TEST_EMAIL'] ?? ''));
-        if ($fallback !== '' && filter_var($fallback, FILTER_VALIDATE_EMAIL)) {
-            return $fallback;
-        }
-
-        throw new \RuntimeException(
-            'No valid email recipient. Set CAMPAIGN_DISPATCH_TEST_EMAIL in .env or configure campaign audience.',
-            422,
-        );
+        throw new \RuntimeException('Invalid email recipient address.', 422);
     }
 }

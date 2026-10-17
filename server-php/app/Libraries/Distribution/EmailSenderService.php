@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Libraries\Distribution;
 
 use App\Libraries\AuditLogger;
-use App\Libraries\Distribution\Providers\ChannelMessage;
 use App\Libraries\Distribution\Providers\ChannelProviderFactory;
 use App\Libraries\Distribution\Providers\EmailSenderInterface;
 use App\Models\Distribution\CampaignDeliveryAttemptModel;
@@ -14,6 +13,7 @@ use App\Models\Distribution\ChannelSuppressionModel;
 class EmailSenderService
 {
     private EmailSenderInterface $sender;
+    private ?ChannelDispatchService $dispatcher = null;
 
     public function __construct(
         private readonly CampaignDeliveryAttemptModel $attemptModel,
@@ -24,83 +24,31 @@ class EmailSenderService
         $this->sender = ChannelProviderFactory::makeEmailSender();
     }
 
+    /**
+     * Queue a campaign send: the audience is resolved from the campaign's
+     * audience_filter (consent + suppression applied, deduped, capped) and sent
+     * in batches by the distribution.dispatch.email job. The campaign becomes
+     * `sent` only once a real provider has accepted at least one message.
+     */
     public function dispatch(int $campaignId, int $tenantId, ?int $actorId): array
     {
-        $db       = \Config\Database::connect();
-        $campaign = $db->table('reach_email_campaigns')->where('id', $campaignId)->get()->getRowArray();
+        return $this->dispatcher()->start(ChannelDispatchService::SOURCE_EMAIL_CAMPAIGN, $campaignId, $tenantId, $actorId);
+    }
 
-        if ($campaign === null || (int) ($campaign['tenant_id'] ?? 0) !== $tenantId) {
-            throw new \RuntimeException('Email campaign not found.', 404);
-        }
+    /** Send one copy to an explicitly named test address (no campaign status change). */
+    public function testSend(int $campaignId, int $tenantId, string $address, ?int $actorId): array
+    {
+        return $this->dispatcher()->testSend(ChannelDispatchService::SOURCE_EMAIL_CAMPAIGN, $campaignId, $tenantId, $address, $actorId);
+    }
 
-        if (!in_array($campaign['status'] ?? '', ['approved', 'scheduled'], true)) {
-            throw new \RuntimeException('Campaign must be approved before dispatch.', 409);
-        }
+    public function setDispatcher(ChannelDispatchService $dispatcher): void
+    {
+        $this->dispatcher = $dispatcher;
+    }
 
-        $idempotencyKey = 'email-dispatch:' . $campaignId . ':' . ($campaign['uuid'] ?? $campaignId);
-
-        // Check idempotency
-        $existing = $this->attemptModel->findByIdempotencyKey($idempotencyKey);
-        if ($existing !== null) {
-            return ['status' => 'already_dispatched', 'attempt' => $existing];
-        }
-
-        $toAddress = 'list@broadcast'; // In production: resolved from audience snapshot
-
-        $message = new ChannelMessage(
-            idempotencyKey:   $idempotencyKey,
-            recipientAddress: $toAddress,
-            content:          (string) ($campaign['body_html'] ?? $campaign['body_plain_text'] ?? ''),
-            metadata:         [
-                'subject'    => $campaign['subject'] ?? '',
-                'from_name'  => $campaign['from_name'] ?? '',
-                'from_email' => $campaign['from_email'] ?? '',
-            ],
-        );
-
-        $attemptId = $this->attemptModel->insert([
-            'dispatch_id'    => null,
-            'attempt_number' => 1,
-            'status'         => 'sending',
-            'provider'       => $this->sender->providerName(),
-            'idempotency_key'=> $idempotencyKey,
-            'created_at'     => date('Y-m-d H:i:s'),
-        ]);
-
-        try {
-            $receipt = $this->sender->send($message);
-
-            $this->attemptModel->update($attemptId, [
-                'status'              => 'accepted',
-                'provider_message_id' => $receipt->providerMessageId,
-                'accepted_at'         => date('Y-m-d H:i:s'),
-            ]);
-
-            $db->table('reach_email_campaigns')->where('id', $campaignId)->update([
-                'status'  => 'sent',
-                'sent_at' => date('Y-m-d H:i:s'),
-                'stats'   => json_encode(['dispatched_at' => date('c'), 'provider' => $this->sender->providerName()]),
-            ]);
-
-            $this->audit->record(AuditLogger::DISTRIBUTION_EMAIL_ACCEPTED, [
-                'campaign_id'         => $campaignId,
-                'provider_message_id' => $receipt->providerMessageId,
-            ], $actorId);
-
-            return ['status' => 'dispatched', 'receipt' => [
-                'provider_message_id' => $receipt->providerMessageId,
-                'status'              => $receipt->status,
-            ]];
-        } catch (\Throwable $e) {
-            $this->attemptModel->update($attemptId, [
-                'status'         => 'failed',
-                'failure_class'  => 'transient',
-                'failure_detail' => $e->getMessage(),
-                'failed_at'      => date('Y-m-d H:i:s'),
-            ]);
-            $db->table('reach_email_campaigns')->where('id', $campaignId)->update(['status' => 'failed']);
-            throw $e;
-        }
+    private function dispatcher(): ChannelDispatchService
+    {
+        return $this->dispatcher ??= new ChannelDispatchService(null, null, $this->audit);
     }
 
     /**
@@ -146,6 +94,21 @@ class EmailSenderService
         if ($campaign === null) {
             return ['status' => 'not_found'];
         }
-        return ['status' => $campaign['status'] ?? 'unknown', 'sent_at' => $campaign['sent_at'] ?? null];
+        return [
+            'status'   => $campaign['status'] ?? 'unknown',
+            'sent_at'  => $campaign['sent_at'] ?? null,
+            'dispatch' => self::latestDispatch($db, ChannelDispatchService::SOURCE_EMAIL_CAMPAIGN, $campaignId),
+        ];
+    }
+
+    /** @return array<string,mixed>|null */
+    public static function latestDispatch($db, string $sourceType, int $sourceId): ?array
+    {
+        try {
+            return $db->table('reach_campaign_dispatches')->where('source_type', $sourceType)->where('source_id', $sourceId)
+                ->orderBy('id', 'DESC')->get()->getRowArray();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

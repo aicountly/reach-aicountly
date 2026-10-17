@@ -18,7 +18,7 @@ class AudienceRecipientModel extends Model
         'snapshot_id', 'tenant_id', 'channel', 'channel_address_hash',
         'channel_address_masked', 'consent_status', 'suppressed',
         'suppression_reason', 'eligibility_status', 'eligibility_reason',
-        'dedup_key', 'created_at',
+        'dedup_key', 'subject_type', 'subject_id', 'created_at',
     ];
 
     public function countEligible(int $snapshotId): int

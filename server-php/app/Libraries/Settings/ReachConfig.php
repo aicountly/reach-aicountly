@@ -76,6 +76,20 @@ final class ReachConfig
             // ── Social ──────────────────────────────────────────────────────
             'social.socialapi.api_key' => ['group' => 'Social', 'label' => 'socialapi.ai API key', 'type' => 'secret', 'env' => 'SOCIALAPI_API_KEY'],
             'social.socialapi.base_url' => ['group' => 'Social', 'label' => 'socialapi.ai API base URL', 'type' => 'string', 'env' => 'SOCIALAPI_BASE_URL'],
+
+            // ── Distribution (campaign sends: email / SMS / WhatsApp) ───────
+            'distribution.batch_size' => ['group' => 'Distribution', 'label' => 'Recipients per dispatch batch', 'type' => 'int', 'default' => 100,
+                'help' => 'Each distribution job sends this many recipients, then queues the next batch.'],
+            'distribution.send_cap.email' => ['group' => 'Distribution', 'label' => 'Max email recipients per send', 'type' => 'int', 'default' => 5000,
+                'help' => 'Eligible recipients beyond this are left out of the snapshot (recorded as over cap).'],
+            'distribution.send_cap.sms' => ['group' => 'Distribution', 'label' => 'Max SMS recipients per send', 'type' => 'int', 'default' => 1000],
+            'distribution.send_cap.whatsapp' => ['group' => 'Distribution', 'label' => 'Max WhatsApp recipients per send', 'type' => 'int', 'default' => 1000],
+            'distribution.email.require_opt_in' => ['group' => 'Distribution', 'label' => 'Email requires recorded opt-in', 'type' => 'bool', 'default' => false,
+                'help' => 'Off: everyone not unsubscribed/suppressed/revoked is eligible. On: only leads with granted email consent (stricter DPDP posture).'],
+            'distribution.email.postal_address' => ['group' => 'Distribution', 'label' => 'Postal address in email footer', 'type' => 'string', 'env' => 'DISTRIBUTION_POSTAL_ADDRESS',
+                'help' => 'Required before any campaign email is sent. Printed in every campaign email footer.'],
+            'distribution.email.unsubscribe_base_url' => ['group' => 'Distribution', 'label' => 'Public Reach URL for unsubscribe links', 'type' => 'string', 'env' => 'REACH_PUBLIC_BASE_URL',
+                'help' => 'Base of the public one-click unsubscribe link (…/api/v1/public/unsubscribe). Blank = REACH_APP_URL.'],
         ];
     }
 

@@ -6,25 +6,45 @@ namespace App\Libraries\Distribution\Providers;
 
 use App\Libraries\Gateways\WhatsappSender;
 
+/**
+ * WhatsApp via Infobip. Campaign (marketing) messages go out as approved
+ * templates; a message without a template is refused, because a free-form
+ * text to someone outside the 24-hour customer-service window is against
+ * WhatsApp Business policy and is rejected by Meta.
+ */
 class GatewayWhatsAppSender implements WhatsAppSenderInterface
 {
     public function send(ChannelMessage $message): ProviderReceipt
     {
-        $phone = $this->resolveRecipient($message);
-        $content = trim($message->content);
-        if ($content === '' && !empty($message->metadata['template_id'])) {
-            $content = (string) ($message->metadata['template_id'] ?? 'campaign');
+        $phone    = $this->resolveRecipient($message);
+        $template = trim((string) ($message->templateId ?? $message->metadata['template_name'] ?? $message->metadata['template_id'] ?? ''));
+        if ($template === '') {
+            throw new \RuntimeException('WhatsApp campaign messages must use an approved template (template_name).', 422);
         }
 
-        if (!WhatsappSender::send($phone, $content)) {
+        // WhatsappSender returns "true" under WHATSAPP_SKIP_SEND without calling
+        // Infobip. That is not a send.
+        if (WhatsappSender::isSendDisabled()) {
+            throw new SendSkippedException('WHATSAPP_SKIP_SEND is on — WhatsApp message not sent. Set WHATSAPP_SKIP_SEND=false to send for real.');
+        }
+
+        $params = $message->templateVars;
+        if ($params === [] && is_array($message->metadata['template_params'] ?? null)) {
+            $params = $message->metadata['template_params'];
+        }
+        $language = (string) ($message->metadata['language'] ?? 'en');
+
+        $messageId = WhatsappSender::sendTemplate($phone, $template, array_values($params), $language, $message->idempotencyKey);
+        if ($messageId === null) {
+            $http = WhatsappSender::getLastHttpCode();
             throw new \RuntimeException(
-                'WhatsApp gateway rejected send. Check WHATSAPP_API_KEY, WHATSAPP_WABA_ID, and WHATSAPP_SKIP_SEND.',
-                502,
+                'WhatsApp gateway did not accept the message: ' . (WhatsappSender::getLastError() ?? 'unknown error'),
+                $http === 429 ? 429 : ($http >= 400 && $http < 500 ? 400 : 502),
             );
         }
 
         return new ProviderReceipt(
-            providerMessageId: 'wa-' . substr(md5($message->idempotencyKey . $phone), 0, 12),
+            providerMessageId: $messageId,
             status:            'accepted',
             acceptedAt:        new \DateTimeImmutable(),
         );
@@ -42,14 +62,15 @@ class GatewayWhatsAppSender implements WhatsAppSenderInterface
 
     public function getStatus(string $providerMessageId): ProviderStatus
     {
-        return new ProviderStatus(providerMessageId: $providerMessageId, normalisedStatus: 'delivered');
+        // No delivery-report polling yet: we only know Infobip accepted it.
+        return new ProviderStatus(providerMessageId: $providerMessageId, normalisedStatus: 'accepted');
     }
 
     public function getCapabilities(): array
     {
         return [
-            'template_required' => false,
-            'messaging_window'  => true,
+            'template_required' => true,
+            'messaging_window'  => 24,
             'media_types'       => ['text'],
             'provider_name'     => 'infobip_whatsapp',
         ];
@@ -57,12 +78,12 @@ class GatewayWhatsAppSender implements WhatsAppSenderInterface
 
     public function isEnabled(): bool
     {
-        return WhatsappSender::isConfigured();
+        return WhatsappSender::isConfigured() && !WhatsappSender::isSendDisabled();
     }
 
     public function verifyCallback(array $headers, string $rawBody): bool
     {
-        return true;
+        return false; // delivery-report webhooks are not wired yet
     }
 
     public function providerName(): string
@@ -70,28 +91,14 @@ class GatewayWhatsAppSender implements WhatsAppSenderInterface
         return 'infobip_whatsapp';
     }
 
+    /** Exactly the number on the message — no broadcast placeholder, no test-number fallback. */
     private function resolveRecipient(ChannelMessage $message): string
     {
         $phone = WhatsappSender::normalizePhone($message->recipientAddress);
-        if ($phone !== '' && $message->recipientAddress !== 'broadcast') {
+        if (strlen($phone) >= 10) {
             return $phone;
         }
 
-        $metaPhone = trim((string) ($message->metadata['to'] ?? $message->metadata['recipient_phone'] ?? ''));
-        $phone = WhatsappSender::normalizePhone($metaPhone);
-        if ($phone !== '') {
-            return $phone;
-        }
-
-        $fallback = trim((string) (getenv('CAMPAIGN_DISPATCH_TEST_PHONE') ?: $_ENV['CAMPAIGN_DISPATCH_TEST_PHONE'] ?? ''));
-        $phone = WhatsappSender::normalizePhone($fallback);
-        if ($phone !== '') {
-            return $phone;
-        }
-
-        throw new \RuntimeException(
-            'No valid WhatsApp recipient. Set CAMPAIGN_DISPATCH_TEST_PHONE in .env or configure campaign audience.',
-            422,
-        );
+        throw new \RuntimeException('Invalid WhatsApp recipient number.', 422);
     }
 }
