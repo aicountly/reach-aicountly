@@ -1,19 +1,19 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { MonitorSmartphone } from 'lucide-react';
 
+// The old Render Queue / Publications / YT Connections screens drove a manual
+// render-and-publish path that never worked; rendering and YouTube uploads now
+// run only in the automated pipeline (index tab), so they are not offered here.
 const navItems = [
-  { to: '/video',              label: 'Overview', end: true },
-  { to: '/video/ideas',        label: 'Idea Backlog' },
-  { to: '/video/projects',     label: 'Projects' },
-  { to: '/video/render-queue', label: 'Render Queue' },
-  { to: '/video/publications', label: 'Publications' },
-  { to: '/video/connections',  label: 'YT Connections' },
-  { to: '/video/operations',   label: 'Operations' },
+  { to: '/video',            label: 'Pipeline', end: true },
+  { to: '/video/ideas',      label: 'Idea Backlog' },
+  { to: '/video/projects',   label: 'Projects' },
+  { to: '/video/operations', label: 'Operations' },
 ];
 
 export default function VideoLayout() {
   const { pathname } = useLocation();
-  const onOverview = pathname === '/video';
+  const onIndex = pathname === '/video';
 
   return (
     <div className="page-layout page-layout--flush">
@@ -23,7 +23,7 @@ export default function VideoLayout() {
           <h1 className="page-layout__title">Video Automation</h1>
         </div>
         <p className="page-layout__subtitle">
-          Idea backlog, projects, render queue, and YouTube publication
+          Daily YouTube vlog and Short: routine script → Gemini vetting → voice-over → render → YouTube
         </p>
       </div>
 
@@ -34,7 +34,7 @@ export default function VideoLayout() {
             to={to}
             end={!!end}
             className={({ isActive }) =>
-              `sub-nav__link${(end ? onOverview : isActive) ? ' sub-nav__link--active' : ''}`
+              `sub-nav__link${(end ? onIndex : isActive) ? ' sub-nav__link--active' : ''}`
             }
           >
             {label}

@@ -13,11 +13,24 @@ use App\Exceptions\Video\ProviderInvalidRequestException;
  * Scenario is selected via $job['render_profile']['mock_scenario']
  * (defaults to 'success').
  *
- * No network calls are made.
+ * No network calls are made. Refuses to exist in production: a mock
+ * "rendered" job must never stand in for a real render.
  */
 class MockRenderProvider implements RenderProviderInterface
 {
     private array $queuedJobs = [];
+
+    public function __construct()
+    {
+        if (\App\Libraries\Distribution\Providers\ProviderGuard::isProduction()) {
+            throw new \LogicException('The mock render provider is not available in production. Videos are rendered by the automated pipeline (Reach → Video).');
+        }
+    }
+
+    public function providerName(): string
+    {
+        return 'mock';
+    }
 
     public function queue(array $job): RenderReceipt
     {

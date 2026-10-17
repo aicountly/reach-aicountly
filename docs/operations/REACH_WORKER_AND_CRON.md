@@ -97,6 +97,11 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 # (Append ,distribution here if/when that queue exists.)
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=default,blog,publishing,community,notifications,distribution --once --limit=20 --worker-id=cron >> writable/logs/worker.log 2>&1
 
+# Every minute — automated video pipeline (queue `video`). Its own worker so a
+# YouTube upload step (up to ~80 s) never holds up the other queues. Each run
+# does at most 3 short steps; see docs/operations/VIDEO_AUTOMATION_SETUP.md.
+* * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:work --queue=video --once --limit=3 --lease=300 --worker-id=video >> writable/logs/worker-video.log 2>&1
+
 # Every minute — recover expired leases, prune old jobs, self-heal empty AI routes.
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 
@@ -151,6 +156,8 @@ re-vetting with Gemini after an outage, hourly cover retries, publishing and
 verification. Run it by hand with `php spark reach:routine-sweep` (or
 `--id=N` for one submission). It does not depend on the `reach:blog-dispatch`
 window: routine articles publish during the day.
+Every hour `reach:schedule` also enqueues the video pipeline sweep (queue `video`:
+re-vets scripts left pending, retries blocked videos, re-queues lost steps).
 
 After every deploy (with AI keys already in `.env`):
 

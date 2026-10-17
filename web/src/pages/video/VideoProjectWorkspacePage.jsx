@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { formatDate } from '../../utils/formatDate';
 
@@ -15,8 +15,6 @@ function ProjectStatusBadge({ status }) {
 
 export default function VideoProjectWorkspacePage() {
   const { id: uuid } = useParams();
-  const location      = useLocation();
-  const navigate      = useNavigate();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -33,16 +31,6 @@ export default function VideoProjectWorkspacePage() {
   if (error)   return <p className="text-error">{error}</p>;
   if (!project) return <p className="text-error">Project not found.</p>;
 
-  const tabs = [
-    { label: 'Overview', path: `/video/projects/${uuid}` },
-    { label: 'Script',   path: `/video/projects/${uuid}/script` },
-    { label: 'Render',   path: `/video/projects/${uuid}/render` },
-    { label: 'Publish',  path: `/video/projects/${uuid}/publish` },
-    { label: 'Audit',    path: `/video/projects/${uuid}/audit` },
-  ];
-
-  const currentTab = location.pathname;
-
   return (
     <div>
       <div className="page-header">
@@ -53,17 +41,13 @@ export default function VideoProjectWorkspacePage() {
         </div>
       </div>
 
-      <div className="tab-bar mt-4">
-        {tabs.map(tab => (
-          <button
-            key={tab.path}
-            className={`tab-bar__tab ${currentTab === tab.path ? 'tab-bar__tab--active' : ''}`}
-            onClick={() => navigate(tab.path)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* The Script / Render / Publish / Audit tabs pointed at routes that never
+          existed. Rendering and YouTube publishing run in the automated
+          pipeline now, so this workspace shows the project only. */}
+      <p className="muted mt-4">
+        Rendering and YouTube publishing are automatic: approved scripts from the reach-video routine
+        move through the <Link to="/video">pipeline</Link>.
+      </p>
 
       <div className="tab-content mt-4">
         <ProjectOverviewTab project={project} onRefresh={() => {

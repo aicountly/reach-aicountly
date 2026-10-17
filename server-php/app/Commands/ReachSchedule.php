@@ -214,6 +214,10 @@ class ReachSchedule extends BaseCommand
             $add('reach.search_console_ingest', ['tenant_id' => 1], "search-console-ingest-{$today}");
         }
 
+        // Every hour: video pipeline sweep — re-vet scripts left pending, retry
+        // blocked items, re-queue lost steps (queue `video`).
+        $add('reach.video_pipeline_sweep', ['date' => $today, 'hour' => $hour], "video-pipeline-sweep-{$hourKey}", ['queue' => 'video']);
+
         // 05:00 — SEO rank + backlink snapshots of the freshest ingested day
         // (Search Console publishes with a ~3 day lag).
         if ($hour === 5) {

@@ -90,6 +90,9 @@ class JobHandlerRegistry
         $this->handlers['reach.structured_content_sweep']            = new \App\Jobs\StructuredContentSweepJob();
         // Stream C: Claude-routine blog/KB pipeline (vet → approve → cover → publish → verify)
         $this->handlers['reach.routine_content_sweep']               = new \App\Jobs\RoutineContentSweepJob();
+        // Automated video (queue `video`) — Stream V: one resumable step per job + hourly sweep.
+        $this->handlers['reach.video_pipeline_step']  = new \App\Jobs\VideoPipelineStepJob();
+        $this->handlers['reach.video_pipeline_sweep'] = new \App\Jobs\VideoPipelineSweepJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

@@ -95,11 +95,26 @@ class VideoCallbackAuthenticatorTest extends CIUnitTestCase
         $this->assertFalse($result['ok'], 'Signature without sha256= prefix should be rejected');
     }
 
-    public function testProductionRenderAdapterIsDisabledByDefault(): void
+    public function testLegacyMockProvidersRefuseInProduction(): void
     {
-        // The production adapter must throw when VIDEO_RENDER_PROVIDER is not 'production'
-        $this->expectException(\LogicException::class);
-        new \App\Libraries\Video\Providers\ProductionRenderAdapter();
+        \App\Libraries\Distribution\Providers\ProviderGuard::forceProduction(true);
+        try {
+            $this->expectException(\LogicException::class);
+            \App\Libraries\Video\Providers\VideoProviderFactory::makeRenderProvider();
+        } finally {
+            \App\Libraries\Distribution\Providers\ProviderGuard::forceProduction(null);
+        }
+    }
+
+    public function testLegacyMockYouTubePublisherRefusesInProduction(): void
+    {
+        \App\Libraries\Distribution\Providers\ProviderGuard::forceProduction(true);
+        try {
+            $this->expectException(\LogicException::class);
+            \App\Libraries\Video\Providers\VideoProviderFactory::makeYouTubePublisher();
+        } finally {
+            \App\Libraries\Distribution\Providers\ProviderGuard::forceProduction(null);
+        }
     }
 
     public function testProviderFactoryReturnsMockByDefault(): void

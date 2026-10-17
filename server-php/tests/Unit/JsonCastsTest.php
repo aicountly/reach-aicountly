@@ -29,6 +29,8 @@ final class JsonCastsTest extends CIUnitTestCase
         'Libraries/Distribution/DistributionAuditService.php'               => ['stats'],              // query builder
         'Libraries/AuditLogger.php'                                         => ['metadata'],           // AuditLogModel has no JSON cast
         'Libraries/Community/CommunityOperationalAgentService.php'          => ['metadata'],           // CommunityAgentRunModel has no JSON cast
+        'Libraries/Video/Automation/VideoAutomationService.php'             => ['metadata'],           // query builder (reach_approvals)
+        'Libraries/Video/Automation/VideoPipelineRunner.php'                => ['media_refs', 'hashtags'], // query builder (reach_social_posts)
     ];
 
     public function testTolerantCast(): void

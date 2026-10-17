@@ -1,5 +1,10 @@
 # Reach Video Automation — System Architecture
 
+> **2026-10-17 (Stream V):** rendering and YouTube publishing now run only in the automated pipeline
+> (routine script → Gemini vetting → OpenAI TTS → Shotstack → YouTube), see
+> [`docs/operations/VIDEO_AUTOMATION_SETUP.md`](../operations/VIDEO_AUTOMATION_SETUP.md). The manual
+> render/publish endpoints described below now refuse (HTTP 409/410) instead of pretending.
+
 **Prepared:** 2026-07-14
 **Repository:** reach-aicountly
 **Phase:** 6

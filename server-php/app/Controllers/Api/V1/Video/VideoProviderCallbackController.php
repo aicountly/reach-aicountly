@@ -11,6 +11,11 @@ use App\Libraries\AuditLogger;
 use App\Models\Video\VideoProviderEventModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
+/**
+ * Legacy generic provider callbacks (public, HMAC-verified via
+ * VideoCallbackAuthenticator, replay-protected by provider event id). The
+ * automated pipeline's Shotstack callback is ShotstackCallbackController.
+ */
 class VideoProviderCallbackController extends BaseApiController
 {
     public function renderCallback(): ResponseInterface
@@ -22,8 +27,9 @@ class VideoProviderCallbackController extends BaseApiController
         $timestampHeader = (int) $this->request->getHeaderLine('X-Timestamp');
         $providerEventId = $this->request->getHeaderLine('X-Provider-Event-Id');
 
-        if (ENVIRONMENT === 'testing' || $hmacKey === '') {
-            return $this->ok(['received' => true]);
+        // Fail closed: with no key configured nothing can be verified, so nothing is accepted.
+        if ($hmacKey === '') {
+            return $this->fail('Render callbacks are not configured (VIDEO_RENDER_HMAC_KEY). Shotstack uses v1/public/video/shotstack/callback.', 503);
         }
 
         $authenticator = new VideoCallbackAuthenticator(new VideoProviderEventModel());
@@ -61,8 +67,8 @@ class VideoProviderCallbackController extends BaseApiController
         $timestampHeader = (int) $this->request->getHeaderLine('X-Timestamp');
         $providerEventId = $this->request->getHeaderLine('X-Provider-Event-Id');
 
-        if (ENVIRONMENT === 'testing' || $hmacKey === '') {
-            return $this->ok(['received' => true]);
+        if ($hmacKey === '') {
+            return $this->fail('YouTube callbacks are not configured (YOUTUBE_WEBHOOK_SECRET).', 503);
         }
 
         $authenticator = new VideoCallbackAuthenticator(new VideoProviderEventModel());
