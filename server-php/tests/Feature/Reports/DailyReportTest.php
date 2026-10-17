@@ -75,7 +75,8 @@ final class DailyReportTest extends ApiTestCase
         $this->assertSame('not_configured', $s['seo_tracker']['status']);
         $this->assertNull($s['content']['counts']['workflow_guide'], 'No source table → not tracked, not 0.');
         $this->assertSame(0, $s['content']['counts']['blog']);
-        $this->assertFalse($s['vetting']['configured'], 'reach_ai_vetting_runs does not exist on this branch.');
+        $this->assertTrue($s['vetting']['configured'], 'reach_ai_vetting_runs is created by the vetting migration.');
+        $this->assertSame(['approve' => 0, 'revise' => 0, 'reject' => 0, 'other' => 0], $s['vetting']['counts'], 'No vetting runs yet.');
         $this->assertArrayHasKey('failed_jobs_24h', $s['pipeline']);
         $this->assertNotEmpty($s['todo']['items']);
         $this->assertSame('2026-10-16 02:30:00+00:00', $summary['window']['start'], '24h up to 08:00 IST (02:30 UTC).');
@@ -84,8 +85,6 @@ final class DailyReportTest extends ApiTestCase
     public function testVettingSectionSummarisesDecisionsWhenTheTableExists(): void
     {
         $db = Database::connect();
-        $db->query("CREATE TABLE reach_ai_vetting_runs (id BIGSERIAL PRIMARY KEY, content_type VARCHAR(40), decision VARCHAR(16),
-                    reasons_json JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
         try {
             $at = '2026-10-17 01:00:00+00:00';
             foreach ([
@@ -93,10 +92,10 @@ final class DailyReportTest extends ApiTestCase
                 ['community', 'reject', '["Claims a feature that does not exist", "Too short"]'], ['community', 'revise', '["Tone"]'],
                 ['blog', 'reject', '["Too short"]'],
             ] as [$type, $decision, $reasons]) {
-                $db->query('INSERT INTO reach_ai_vetting_runs (content_type, decision, reasons_json, created_at) VALUES (?, ?, ?::jsonb, ?)', [$type, $decision, $reasons, $at]);
+                $db->query("INSERT INTO reach_ai_vetting_runs (content_type, model, decision, reasons_json, input_sha256, created_at) VALUES (?, 'gemini-test', ?, ?::jsonb, repeat('a', 64), ?)", [$type, $decision, $reasons, $at]);
             }
             // outside the 24h window
-            $db->query("INSERT INTO reach_ai_vetting_runs (content_type, decision, created_at) VALUES ('blog', 'approve', '2026-10-10 00:00:00+00')");
+            $db->query("INSERT INTO reach_ai_vetting_runs (content_type, model, decision, input_sha256, created_at) VALUES ('blog', 'gemini-test', 'approve', repeat('a', 64), '2026-10-10 00:00:00+00')");
 
             $summary = (new DailyReportBuilder($db, null, new SeoTrackerService($db, new DataForSeoSerpClient(null, null)), static fn (): bool => false))
                 ->build('2026-10-17', new \DateTimeImmutable('2026-10-17 09:00:00', new \DateTimeZone('Asia/Kolkata')));
@@ -107,7 +106,7 @@ final class DailyReportTest extends ApiTestCase
             $this->assertSame(['reason' => 'Claims a feature that does not exist', 'count' => 2], $v['top_reject_reasons'][0]);
             $this->assertStringContainsString('Vetting rejected 3', implode("\n", $summary['sections']['todo']['items']));
         } finally {
-            $db->query('DROP TABLE IF EXISTS reach_ai_vetting_runs');
+            $db->query('DELETE FROM reach_ai_vetting_runs');
             SchemaGuard::reset();
         }
     }
