@@ -184,7 +184,22 @@ class AicountlyPublicSitePublisher implements PublicSitePublisherInterface
         }
 
         $category = $this->classifier->classifyHttpStatus($httpStatus);
-        return $this->errorResult($category, $httpStatus);
+        $result   = $this->errorResult($category, $httpStatus);
+        // The receiver's own error code and field-level validation messages
+        // (docs/REACH_RECEIVER_CONTENT_TYPES.md §2) name fields, never secrets;
+        // keep them so an operator can see why a payload was refused.
+        if (is_array($decoded)) {
+            if (isset($decoded['error_code']) && is_string($decoded['error_code'])) {
+                $result['error_code'] = mb_substr($decoded['error_code'], 0, 64);
+            }
+            if (isset($decoded['validation_errors']) && is_array($decoded['validation_errors'])) {
+                $result['validation_errors'] = array_values(array_map(
+                    static fn ($e): string => mb_substr((string) $e, 0, 300),
+                    array_slice(array_filter($decoded['validation_errors'], 'is_scalar'), 0, 50)
+                ));
+            }
+        }
+        return $result;
     }
 
     private function errorResult(string $category, int $httpStatus = 0): array

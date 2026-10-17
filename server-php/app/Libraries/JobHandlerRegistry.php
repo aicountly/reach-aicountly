@@ -86,6 +86,8 @@ class JobHandlerRegistry
         // Stream F: SEO Tracker (DataForSEO SERP checks) + daily analytics report
         $this->handlers['reach.seo_tracker']                         = new \App\Jobs\SeoTrackerJob();
         $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();
+        // Release notes + workflow guides: retry pending vetting / failed publishes
+        $this->handlers['reach.structured_content_sweep']            = new \App\Jobs\StructuredContentSweepJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

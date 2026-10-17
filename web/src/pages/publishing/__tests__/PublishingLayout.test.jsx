@@ -23,10 +23,10 @@ describe('PublishingLayout', () => {
     expect(screen.getByText('Readiness')).toBeInTheDocument();
   });
 
-  it('renders exactly 7 nav items', () => {
+  it('renders exactly 9 nav items', () => {
     renderWithAuth(<PublishingLayout />, ctx);
     const links = document.querySelectorAll('.sub-nav__link');
-    expect(links).toHaveLength(7);
+    expect(links).toHaveLength(9);
   });
 
   it('has sub-nav container', () => {

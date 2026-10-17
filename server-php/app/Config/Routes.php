@@ -124,6 +124,11 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community-plan',     'Api\\V1\\Community\\CommunityAutomationController::plan');
         $routes->post('community-qa',      'Api\\V1\\Community\\CommunityAutomationController::storeQa');
         $routes->post('community-answers', 'Api\\V1\\Community\\CommunityAutomationController::storeAnswer');
+        // Stream D — release notes ("What's new") + workflow guides (vetted, auto-published).
+        $routes->get('release-plan',     'Api\\V1\\Automation\\StructuredContentController::releasePlan');
+        $routes->get('workflow-plan',    'Api\\V1\\Automation\\StructuredContentController::workflowPlan');
+        $routes->post('release-notes',   'Api\\V1\\Automation\\StructuredContentController::storeReleaseNote');
+        $routes->post('workflow-guides', 'Api\\V1\\Automation\\StructuredContentController::storeWorkflowGuide');
     });
 
     // ---------------------------------------------------------------------
@@ -602,6 +607,10 @@ $routes->group('v1', static function ($routes) {
         // --- Phase 4: Publishing ---
         $routes->get('publishing/blogs',                                    'Api\\V1\\Publishing\\BlogPublishingController::index',                    ['filter' => 'permission:publishing.view']);
         $routes->get('publishing/knowledge-bases',                          'Api\\V1\\Publishing\\KbPublishingController::index',                      ['filter' => 'permission:publishing.view']);
+        $routes->get('publishing/release-notes',                            'Api\\V1\\Publishing\\StructuredSubmissionController::releaseNotes',       ['filter' => 'permission:publishing.view']);
+        $routes->post('publishing/release-notes/(:num)/retry',              'Api\\V1\\Publishing\\StructuredSubmissionController::retryReleaseNote/$1', ['filter' => 'permission:publishing.publish']);
+        $routes->get('publishing/workflow-guides',                          'Api\\V1\\Publishing\\StructuredSubmissionController::workflowGuides',     ['filter' => 'permission:publishing.view']);
+        $routes->post('publishing/workflow-guides/(:num)/retry',            'Api\\V1\\Publishing\\StructuredSubmissionController::retryWorkflowGuide/$1', ['filter' => 'permission:publishing.publish']);
         $routes->get('publishing/calendar',                                 'Api\\V1\\Publishing\\PublishingCalendarController::index',                 ['filter' => 'permission:publishing.view']);
         $routes->get('publishing/deployments',                              'Api\\V1\\Publishing\\DeploymentController::index',                        ['filter' => 'permission:publishing.view']);
         $routes->get('publishing/deployments/(:num)',                       'Api\\V1\\Publishing\\DeploymentController::show/$1',                      ['filter' => 'permission:publishing.view']);

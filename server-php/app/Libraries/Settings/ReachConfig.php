@@ -84,6 +84,11 @@ final class ReachConfig
             'automation.knowledge_base.daily_limit' => ['group' => 'Automation', 'label' => 'KB articles per day', 'type' => 'int', 'default' => 10],
             'automation.release_note.enabled' => ['group' => 'Automation', 'label' => 'Release notes automation', 'type' => 'bool', 'default' => true],
             'automation.workflow_guide.enabled' => ['group' => 'Automation', 'label' => 'Workflow guides automation', 'type' => 'bool', 'default' => true],
+            // Stream D — safety caps on routine submissions (a note per product per day, ~6 guides per launch app per week).
+            'automation.release_note.daily_limit' => ['group' => 'Automation', 'label' => 'Release notes per day', 'type' => 'int', 'default' => 40,
+                'help' => 'Submissions accepted per day across all products; further ones get HTTP 429.'],
+            'automation.workflow_guide.daily_limit' => ['group' => 'Automation', 'label' => 'Workflow guides per day', 'type' => 'int', 'default' => 40,
+                'help' => 'Submissions accepted per day across all launch apps; further ones get HTTP 429.'],
 
             // ── Reports ─────────────────────────────────────────────────────
             'reports.daily.recipients' => ['group' => 'Reports', 'label' => 'Daily analytics report recipients', 'type' => 'email_list', 'default' => 'pno@aicountly.com',
