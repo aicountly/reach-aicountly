@@ -14,8 +14,6 @@ use App\Libraries\Settings\ReachConfig;
  */
 class AutomationSettingsController extends BaseApiController
 {
-    private const AI_KEYS = ['ai.gemini.api_key', 'ai.openai.api_key', 'ai.perplexity.api_key'];
-
     public function index()
     {
         return $this->ok(ReachConfig::describe());
@@ -34,15 +32,8 @@ class AutomationSettingsController extends BaseApiController
             return $this->fail($e->getMessage(), 422);
         }
 
-        // A provider only becomes routable once the catalog knows it has a
-        // key; re-seed so a key saved here takes effect without a shell.
-        if (array_intersect($changed, self::AI_KEYS) !== []) {
-            try {
-                command('reach:ai-seed-catalog');
-            } catch (\Throwable $e) {
-                log_message('error', '[AutomationSettings] catalog re-seed failed: ' . $e->getMessage());
-            }
-        }
+        // A provider only becomes routable once the AI catalog records its
+        // key; reach:schedule (every minute) notices the change and re-seeds.
 
         $this->audit('settings.automation_update', 'settings', null, null, ['keys' => $changed]);
         return $this->ok(ReachConfig::describe());

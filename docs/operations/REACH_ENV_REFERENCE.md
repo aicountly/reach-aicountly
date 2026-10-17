@@ -29,7 +29,7 @@ See `server-php/.env.example`. In short:
 | Publishing | `AICOUNTLY_PUBLIC_SITE_BASE_URL`, `_SERVICE_TOKEN`, `_SIGNING_KEY` |
 | Reach tokens | `MEDIA_SIGNING_KEY`, `PUBLIC_LEAD_CAPTURE_TOKEN`, `REACH_AUTOMATION_TOKEN` |
 | Media storage | `MEDIA_STORAGE_PATH` — absolute path outside the document root |
-| AI keys | `AI_OPENAI_API_KEY`, `AI_GEMINI_API_KEY`, `AI_PERPLEXITY_API_KEY` |
+| AI keys | `AI_OPENAI_API_KEY`, `AI_GEMINI_API_KEY`, `AI_PERPLEXITY_API_KEY` — fallbacks; the keys can instead be saved (encrypted) in Settings → AI & Automation, which takes precedence. `REACH_SETTINGS_KEY` (optional, else `JWT_SECRET`) encrypts them. See `docs/automation/AI_VETTING.md`. |
 | Channels | social tokens, `EMAIL_API_KEY`, `SMS_*`, `WHATSAPP_*` |
 | Analytics | `GA4_*`, `SEARCH_CONSOLE_*`, `CONTENT_ANALYTICS_*`, `INDEXNOW_*` |
 | Switches | `BLOG_*_ENABLED`, `KB_AUTO_APPROVE`, `BLOG_GALLERY_ALERT_EMAIL` |

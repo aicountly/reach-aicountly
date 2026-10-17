@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Libraries\Settings\ReachConfig;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -67,7 +68,7 @@ class ReachSchedule extends BaseCommand
                 ->where('enabled', true)
                 ->where('deleted_at IS NULL', null, false)
                 ->countAllResults();
-            if ($count > 0) {
+            if ($count > 0 && ! $this->providerKeysChanged($db)) {
                 return false;
             }
             $this->call('reach:ai-seed-catalog');
@@ -76,6 +77,23 @@ class ReachSchedule extends BaseCommand
             log_message('error', 'reach:schedule AI catalog seed failed: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * True when a provider's key was added or removed (Settings → AI &
+     * Automation, or .env) since the catalog last recorded it, so a key saved
+     * in the UI becomes routable on the next tick without a shell.
+     */
+    private function providerKeysChanged($db): bool
+    {
+        $keys = ['openai' => 'ai.openai.api_key', 'gemini' => 'ai.gemini.api_key', 'perplexity' => 'ai.perplexity.api_key'];
+        foreach ($db->table('reach_ai_providers')->select('provider_key, configuration_status')->whereIn('provider_key', array_keys($keys))->get()->getResultArray() as $row) {
+            $hasKey = ReachConfig::secret($keys[$row['provider_key']]) !== null;
+            if ($hasKey !== ($row['configuration_status'] === 'configured')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
