@@ -104,7 +104,7 @@ class OfficialAnswerLifecycleService
             throw new InvalidArgumentException("Official identity is not active: {$identitySlug}");
         }
 
-        $existing = $this->answerModel->findByQuestionId((int) $question['id']);
+        $existing = $this->answerModel->findLiveByQuestionId((int) $question['id']);
         if ($existing !== null) {
             throw new RuntimeException(
                 "Question {$questionUuid} already has official answer {$existing['uuid']}."
@@ -154,7 +154,7 @@ class OfficialAnswerLifecycleService
     public function findRetryableDraft(string $questionUuid): ?array
     {
         $question = $this->questionRepo->requireByUuid($questionUuid);
-        $answer   = $this->answerModel->findByQuestionId((int) $question['id']);
+        $answer   = $this->answerModel->findLiveByQuestionId((int) $question['id']);
 
         if ($answer === null
             || ! in_array(CommunityAnswerStatus::tryFrom((string) $answer['status']), self::GENERATION_RETRYABLE_STATUSES, true)
@@ -296,7 +296,8 @@ class OfficialAnswerLifecycleService
         int    $approverId,
         ?int   $versionNumber = null,
         string $approvalType  = 'standard',
-        string $reason        = ''
+        string $reason        = '',
+        ?int   $vettingRunId  = null
     ): array {
         $answerId = $this->resolveAnswerId($answerUuid);
         $answer   = $this->answerRepo->findById($answerId);
@@ -318,7 +319,8 @@ class OfficialAnswerLifecycleService
             $versionNumber ?? $this->currentVersionNumber($answerId),
             $approverId,
             $approvalType,
-            $reason
+            $reason,
+            $vettingRunId
         );
     }
 

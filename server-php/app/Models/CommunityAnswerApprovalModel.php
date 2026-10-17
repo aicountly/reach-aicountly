@@ -14,7 +14,7 @@ class CommunityAnswerApprovalModel extends Model
     protected $allowedFields = [
         'answer_id', 'answer_version_number', 'version_checksum',
         'reach_approval_id', 'approved_by', 'approval_type',
-        'outcome', 'reason', 'created_at',
+        'outcome', 'reason', 'vetting_run_id', 'created_at',
     ];
 
     public function getLatestForAnswer(int $answerId): ?array

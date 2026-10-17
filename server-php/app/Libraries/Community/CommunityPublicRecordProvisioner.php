@@ -3,6 +3,7 @@
 namespace App\Libraries\Community;
 
 use App\Libraries\AuditLogger;
+use App\Libraries\Support\PgBoolean;
 use RuntimeException;
 
 /**
@@ -42,6 +43,14 @@ class CommunityPublicRecordProvisioner
     ];
 
     private const DEFAULT_ROLE = 'answering';
+
+    /**
+     * What every desk post tells readers about how it was made. Matches the
+     * public site's own desk label (aicountly-com community_desk_answer_label):
+     * desk content is AI-assisted and checked automatically — no person
+     * reviews it, and nothing sent from here may claim one did.
+     */
+    public const DESK_DISCLOSURE = 'Prepared with AI assistance and automatically checked for accuracy by the AICOUNTLY desk.';
 
     /**
      * Reach category → public category slug.
@@ -199,6 +208,7 @@ class CommunityPublicRecordProvisioner
                 'body'             => $body,
                 'author_type'      => 'official_bot',
                 'ai_assisted'      => true,
+                'ai_disclosure'    => self::DESK_DISCLOSURE,
                 'status'           => 'published',
                 'robots_directive' => 'index,follow',
                 'category_slug'    => self::publicCategoryFor($question['category'] ?? null),
@@ -270,7 +280,10 @@ class CommunityPublicRecordProvisioner
                 // forced: a human-written answer posted under a bot identity is
                 // a disclosure question for a person to answer, not something
                 // to paper over here.
-                'ai_assisted'      => (bool) ($answer['ai_assisted'] ?? false),
+                // Postgres hands booleans back as 't'/'f', and (bool) 'f' is
+                // true — so this used to claim AI assistance for every answer.
+                'ai_assisted'      => PgBoolean::isTrue($answer['ai_assisted'] ?? false),
+                'ai_disclosure'    => self::DESK_DISCLOSURE,
                 'robots_directive' => 'index,follow',
             ],
         ]);

@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Enums\CommunityAnswerStatus;
+use App\Libraries\Community\Automation\CommunityQaAutomationService;
 use App\Libraries\Community\OfficialAnswerPublishingService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -24,7 +25,8 @@ use App\Libraries\Database\SchemaGuard;
  * human, an approved intake feed), which this tick has no visibility into.
  * Everything scheduled here is infrastructure-only: detecting drift and
  * retrying/reconciling already-known records, never selecting new content
- * to act on. Due scheduled publishes are published here (lifecycle promise).
+ * to act on. Due scheduled publishes are published here (lifecycle promise),
+ * and routine Q&A submissions left pending by unavailable vetting are retried.
  *
  * Every enqueue below carries an idempotency_key derived from the current
  * time bucket so that overlapping or backed-up cron ticks cannot fan out
@@ -47,6 +49,7 @@ class CommunitySchedule extends BaseCommand
 
         $enqueuedIds = [];
         $publishedDue = $this->publishDueScheduledAnswers();
+        $automation   = $this->sweepAutomationSubmissions();
 
         // Every tick: sweep deployments whose backoff window has elapsed.
         $enqueuedIds['deployment_retry_sweep'] = $svc->enqueue(
@@ -103,9 +106,33 @@ class CommunitySchedule extends BaseCommand
             'ts'             => gmdate('c'),
             'enqueued'       => $enqueuedIds,
             'scheduled_publish' => $publishedDue,
+            'automation_sweep'  => $automation,
         ], JSON_UNESCAPED_SLASHES));
 
         return 0;
+    }
+
+    /**
+     * Routine Q&A submissions vetting could not decide yet (Gemini down or
+     * unconfigured) are re-vetted on their backoff, and approved ones not yet
+     * confirmed live are checked again. A few per tick: each vetting call can
+     * take a while, and this tick runs every five minutes.
+     *
+     * @return array<string, mixed>
+     */
+    private function sweepAutomationSubmissions(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! SchemaGuard::hasTable($db, 'reach_community_automation_submissions')) {
+                return ['retried' => 0, 'skipped' => 'table_missing'];
+            }
+
+            return (new CommunityQaAutomationService())->sweep(3);
+        } catch (Throwable $e) {
+            log_message('error', 'community automation sweep failed: ' . $e->getMessage());
+            return ['retried' => 0, 'error' => substr($e->getMessage(), 0, 200)];
+        }
     }
 
     /**

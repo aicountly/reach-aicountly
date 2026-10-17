@@ -5,6 +5,7 @@ const navItems = [
   { to: '/community/overview',    label: 'Overview', overview: true },
   { to: '/community/questions',   label: 'Question Inbox' },
   { to: '/community/answers',     label: 'Official Answers' },
+  { to: '/community/automated',   label: 'Automated feed' },
   { to: '/community/identities',  label: 'Identities' },
   { to: '/community/agents',      label: 'Agent Operations' },
   { to: '/community/moderation',  label: 'Moderation Queue' },

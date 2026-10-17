@@ -44,17 +44,32 @@ class CommunityOperationalAgentService
     /** Actions that create new public-facing content are window-gated; pure review/analysis actions are not. */
     private const WINDOW_GATED_ACTIONS = ['curate_question', 'draft_answer', 'post_comment'];
 
-    /** The expert desk that answers each question category; anything else goes to DEFAULT_DESK. */
+    /**
+     * The expert desk that answers each question category; anything else goes
+     * to DEFAULT_DESK. Both Reach's own categories and the public site's
+     * category slugs (CommunityCategoryCheck::PUBLIC_SLUGS) are listed, since
+     * the community-qa routine files questions under the public slugs.
+     */
     private const CATEGORY_DESKS = [
-        'accounting'     => 'aicountly-accounting-guide',
-        'gst'            => 'aicountly-gst-guide',
-        'income-tax'     => 'aicountly-income-tax-desk',
-        'tds-tcs'        => 'aicountly-income-tax-desk',
-        'payroll-hr'     => 'aicountly-payroll-desk',
-        'product-guides' => 'aicountly-smart-books-guide',
-        'books'          => 'aicountly-smart-books-guide',
+        'accounting'        => 'aicountly-accounting-guide',
+        'audit-accounting'  => 'aicountly-accounting-guide',
+        'gst'               => 'aicountly-gst-guide',
+        'income-tax'        => 'aicountly-income-tax-desk',
+        'tds-tcs'           => 'aicountly-income-tax-desk',
+        'payroll-hr'        => 'aicountly-payroll-desk',
+        'payroll'           => 'aicountly-payroll-desk',
+        'product-guides'    => 'aicountly-smart-books-guide',
+        'books'             => 'aicountly-smart-books-guide',
+        'saas-product-help' => 'aicountly-smart-books-guide',
     ];
     private const DEFAULT_DESK = 'aicountly-compliance-desk';
+
+    /** Product help for an app other than Smart Books is answered by the general product desk. */
+    private const PRODUCT_DESK      = 'aicountly-product-guide';
+    private const SMART_BOOKS_SLUGS = ['smart_books', 'smart-books', 'books'];
+
+    /** Categories that are about using an AICOUNTLY app rather than a tax or accounting topic. */
+    private const PRODUCT_CATEGORIES = ['saas-product-help', 'product-guides', 'books', 'technical-api'];
 
     /**
      * Automatic draft attempts a question gets before the bot stops retrying
@@ -99,13 +114,31 @@ class CommunityOperationalAgentService
     }
 
     /**
-     * Every desk deskForCategory() can return.
+     * The desk for a question that also names a product. A tax or accounting
+     * topic stays with its subject desk whatever app it mentions; a
+     * how-to-use-the-app question about anything but Smart Books goes to the
+     * product desk rather than being posted under the Smart Books desk's name.
+     */
+    public static function deskFor(?string $category, ?string $product): string
+    {
+        $category = strtolower(trim((string) $category));
+        $product  = strtolower(trim((string) $product));
+
+        if ($product !== '' && (in_array($category, self::PRODUCT_CATEGORIES, true) || $category === '')) {
+            return in_array($product, self::SMART_BOOKS_SLUGS, true) ? 'aicountly-smart-books-guide' : self::PRODUCT_DESK;
+        }
+
+        return self::deskForCategory($category);
+    }
+
+    /**
+     * Every desk deskForCategory() / deskFor() can return.
      *
      * @return list<string>
      */
     public static function answerDesks(): array
     {
-        return array_values(array_unique([...array_values(self::CATEGORY_DESKS), self::DEFAULT_DESK]));
+        return array_values(array_unique([...array_values(self::CATEGORY_DESKS), self::DEFAULT_DESK, self::PRODUCT_DESK]));
     }
 
     /**

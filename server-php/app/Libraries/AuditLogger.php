@@ -235,6 +235,10 @@ class AuditLogger
     public const COMMUNITY_ANSWER_APPROVAL_REJECTED     = 'community.answer.approval_rejected';
     public const COMMUNITY_ANSWER_VERIFICATION_RUN      = 'community.answer.verification_run';
     public const COMMUNITY_ANALYTICS_RECONCILED         = 'community.analytics.reconciled';
+    // Community Q&A routine submissions (v1/automation/community-qa, community-answers)
+    public const COMMUNITY_AUTOMATION_SUBMITTED         = 'community.automation.submitted';
+    public const COMMUNITY_AUTOMATION_DECIDED           = 'community.automation.decided';
+    public const COMMUNITY_AUTOMATION_PENDING           = 'community.automation.pending';
     public const COMMUNITY_SPACE_CREATED                = 'community.space.created';
     public const COMMUNITY_SPACE_UPDATED                = 'community.space.updated';
     public const COMMUNITY_MODERATION_FINDING_RESOLVED  = 'community.moderation.finding_resolved';

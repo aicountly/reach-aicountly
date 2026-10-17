@@ -75,6 +75,108 @@ class HtmlSanitizer
     }
 
     /**
+     * Whether purify() would take something away from $html, as opposed to
+     * only normalising it.
+     *
+     * Comparing purify($html) with $html byte for byte cannot answer that:
+     * HTMLPurifier adds rel="nofollow noopener" to every link, rewrites <br/>
+     * as <br />, re-encodes entities, swaps attribute quotes and closes open
+     * paragraphs, so nearly every real answer "changed" and was reported as
+     * unsafe. Both sides are parsed into a DOM and compared on what survives —
+     * elements, their attributes and their text — so a removed <script>,
+     * event handler, style attribute or javascript: link still counts, while
+     * markup the purifier merely re-spells does not. Tags outside the allowed
+     * set are compared by their text (the purifier unwraps them), and a few
+     * attributes that carry no risk (rel, target, class, id, lang, dir) are
+     * ignored.
+     */
+    public function wouldStripContent(?string $html): bool
+    {
+        if ($html === null || trim($html) === '') {
+            return false;
+        }
+
+        return $this->canonical($html) !== $this->canonical($this->purify($html));
+    }
+
+    /** Attributes whose removal by the purifier changes nothing a reader or the page can act on. */
+    private const BENIGN_ATTRIBUTES = ['rel', 'target', 'class', 'id', 'lang', 'dir'];
+
+    /** Attributes that make a disallowed element dangerous, not just unknown. */
+    private const ACTIVE_ATTRIBUTE = '/^(on|style$|src$|href$|data$|action$|formaction$|srcdoc$|xlink:href$)/i';
+
+    /** Elements the purifier keeps even when empty (AutoFormat.RemoveEmpty exemptions) or that are void. */
+    private const KEEP_WHEN_EMPTY = ['br', 'hr', 'td', 'th'];
+
+    private function canonical(string $html): string
+    {
+        $doc      = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"?><html><body>' . $html . '</body></html>', LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        $body = $doc->getElementsByTagName('body')->item(0);
+
+        return $body === null ? '' : $this->canonicalChildren($body);
+    }
+
+    private function canonicalChildren(\DOMNode $node): string
+    {
+        $out = '';
+        foreach ($node->childNodes as $child) {
+            $out .= $this->canonicalNode($child);
+        }
+        return $out;
+    }
+
+    private function canonicalNode(\DOMNode $node): string
+    {
+        if ($node instanceof \DOMText) {
+            $text = preg_replace('/\s+/u', ' ', $node->textContent) ?? $node->textContent;
+            return trim($text) === '' ? '' : $text;
+        }
+        if (! $node instanceof \DOMElement) {
+            return ''; // comments, processing instructions: the purifier drops them
+        }
+
+        $tag      = strtolower($node->tagName);
+        $children = $this->canonicalChildren($node);
+
+        if (! in_array($tag, $this->config->allowedTags, true)) {
+            // Unwrapped by the purifier: only its text survives. An active
+            // attribute on it is a marker the purified side can never match.
+            foreach ($node->attributes ?? [] as $attr) {
+                if (preg_match(self::ACTIVE_ATTRIBUTE, $attr->name) === 1) {
+                    return '[' . $tag . '@' . strtolower($attr->name) . ']' . $children;
+                }
+            }
+            return $children;
+        }
+
+        if (trim($children) === '' && ! in_array($tag, self::KEEP_WHEN_EMPTY, true)) {
+            return '';
+        }
+
+        $attrs = [];
+        foreach ($node->attributes ?? [] as $attr) {
+            $name = strtolower($attr->name);
+            if (in_array($name, self::BENIGN_ATTRIBUTES, true)) {
+                continue;
+            }
+            $attrs[$name] = trim($attr->value);
+        }
+        ksort($attrs);
+
+        $open = $tag;
+        foreach ($attrs as $name => $value) {
+            $open .= ' ' . $name . '="' . $value . '"';
+        }
+
+        return '<' . $open . '>' . $children . '</' . $tag . '>';
+    }
+
+    /**
      * Purify a set of keys inside an associative row. Missing keys are
      * skipped. Returns the mutated row so callers can chain.
      */

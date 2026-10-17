@@ -46,6 +46,19 @@ class CommunityOfficialAnswerModel extends Model
         return $this->where('question_id', $questionId)->first();
     }
 
+    /**
+     * The question's answer that is still in play — anything but archived,
+     * newest first. Archiving an answer (e.g. a stuck legacy draft cleared by
+     * community:legacy-drafts) frees the question for a new one.
+     */
+    public function findLiveByQuestionId(int $questionId): ?array
+    {
+        return $this->where('question_id', $questionId)
+            ->where('status !=', 'archived')
+            ->orderBy('id', 'DESC')
+            ->first();
+    }
+
     public function listForQuestion(int $questionId): array
     {
         return $this->where('question_id', $questionId)->findAll();
