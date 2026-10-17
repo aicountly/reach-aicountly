@@ -90,6 +90,33 @@ final class ReachConfig
                 'help' => 'Required before any campaign email is sent. Printed in every campaign email footer.'],
             'distribution.email.unsubscribe_base_url' => ['group' => 'Distribution', 'label' => 'Public Reach URL for unsubscribe links', 'type' => 'string', 'env' => 'REACH_PUBLIC_BASE_URL',
                 'help' => 'Base of the public one-click unsubscribe link (…/api/v1/public/unsubscribe). Blank = REACH_APP_URL.'],
+
+            // ── Stream V — automated video (routine script → vetting → TTS → Shotstack → YouTube) ──
+            'automation.video.enabled' => ['group' => 'Video', 'label' => 'Video automation', 'type' => 'bool', 'default' => true,
+                'help' => 'Off: the reach-video routine’s scripts are refused (HTTP 429) and nothing new is rendered.'],
+            'video.daily.vlogs' => ['group' => 'Video', 'label' => 'Vlogs (16:9, 2–6 min) per day', 'type' => 'int', 'default' => 1],
+            'video.daily.shorts' => ['group' => 'Video', 'label' => 'Shorts (9:16, ≤ 60 s) per day', 'type' => 'int', 'default' => 1],
+            'ai.vetting.model.video_script' => ['group' => 'Video', 'label' => 'Video script vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
+            'video.tts.model' => ['group' => 'Video', 'label' => 'Voice-over model (OpenAI TTS)', 'type' => 'string', 'env' => 'VIDEO_TTS_MODEL', 'default' => 'gpt-4o-mini-tts',
+                'help' => 'Uses the OpenAI API key above. e.g. gpt-4o-mini-tts, tts-1, tts-1-hd.'],
+            'video.tts.voice' => ['group' => 'Video', 'label' => 'Voice', 'type' => 'string', 'env' => 'VIDEO_TTS_VOICE', 'default' => 'coral',
+                'help' => 'OpenAI voice name: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse.'],
+            'video.shotstack.api_key' => ['group' => 'Video', 'label' => 'Shotstack API key', 'type' => 'secret', 'env' => 'SHOTSTACK_API_KEY',
+                'help' => 'The key for the environment below (Shotstack dashboard → API keys). Stage renders carry a watermark.'],
+            'video.shotstack.env' => ['group' => 'Video', 'label' => 'Shotstack environment', 'type' => 'string', 'env' => 'SHOTSTACK_ENV', 'default' => 'stage',
+                'help' => '"stage" (free, watermarked) or "v1" (production, billed).'],
+            'video.music.url' => ['group' => 'Video', 'label' => 'Background music URL (optional)', 'type' => 'string',
+                'help' => 'A royalty-free MP3 you are licensed to use, reachable over HTTPS. Blank = no music.'],
+            'video.brand.logo_url' => ['group' => 'Video', 'label' => 'Logo URL for videos', 'type' => 'string', 'default' => 'https://aicountly.com/assests/images/ai-logo.png'],
+            'video.youtube.client_id' => ['group' => 'Video', 'label' => 'YouTube OAuth client ID', 'type' => 'string', 'env' => 'YOUTUBE_CLIENT_ID',
+                'help' => 'Google Cloud → APIs & Services → Credentials → OAuth client (Web application).'],
+            'video.youtube.client_secret' => ['group' => 'Video', 'label' => 'YouTube OAuth client secret', 'type' => 'secret', 'env' => 'YOUTUBE_CLIENT_SECRET'],
+            'video.youtube.refresh_token' => ['group' => 'Video', 'label' => 'YouTube refresh token', 'type' => 'secret', 'env' => 'YOUTUBE_REFRESH_TOKEN',
+                'help' => 'Set by Video → “Connect YouTube channel”. Clear it (or Disconnect) to stop uploads.'],
+            'video.youtube.privacy' => ['group' => 'Video', 'label' => 'YouTube privacy', 'type' => 'string', 'default' => 'public',
+                'help' => 'public, unlisted or private. Until Google verifies the OAuth app, YouTube locks API uploads to private.'],
+            'video.youtube.category_id' => ['group' => 'Video', 'label' => 'YouTube category id', 'type' => 'string', 'default' => '28',
+                'help' => '28 = Science & Technology, 27 = Education.'],
         ];
     }
 

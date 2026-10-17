@@ -79,6 +79,9 @@ class JobHandlerRegistry
         $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL] = new \App\Jobs\DistributionSocialDispatchJob();
         $this->handlers[DistributionJobTypes::CAMPAIGN_SCHEDULE]        = new \App\Jobs\DistributionCampaignScheduleJob();
         $this->handlers[DistributionJobTypes::CAMPAIGN_RECONCILE]       = new \App\Jobs\DistributionReconcileJob();
+        // Automated video (queue `video`) — Stream V: one resumable step per job + hourly sweep.
+        $this->handlers['reach.video_pipeline_step']  = new \App\Jobs\VideoPipelineStepJob();
+        $this->handlers['reach.video_pipeline_sweep'] = new \App\Jobs\VideoPipelineSweepJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

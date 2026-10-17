@@ -57,6 +57,20 @@ $routes->get('v1/public/unsubscribe',  'Api\\V1\\Distribution\\UnsubscribeContro
 $routes->post('v1/public/unsubscribe', 'Api\\V1\\Distribution\\UnsubscribeController::unsubscribe');
 
 /*
+ * Stream V — automated video: public provider endpoints (no user auth).
+ *   video-media        signed + expiring voice-over/still URLs Shotstack fetches (Range-aware)
+ *   shotstack/callback render-finished callback; HMAC of the item uuid in the URL
+ *   youtube/oauth-callback  Google OAuth redirect; the single-use state is the guard
+ *   provider/*         legacy HMAC callbacks (VIDEO_RENDER_HMAC_KEY / YOUTUBE_WEBHOOK_SECRET),
+ *                      fail closed (503) when no key is configured
+ */
+$routes->get('v1/public/video-media/(:segment)',               'Api\\V1\\Video\\VideoMediaController::serve/$1');
+$routes->post('v1/public/video/shotstack/callback/(:segment)', 'Api\\V1\\Video\\ShotstackCallbackController::render/$1');
+$routes->get('v1/public/video/youtube/oauth-callback',         'Api\\V1\\Video\\YouTubeChannelController::oauthCallback', ['filter' => 'throttle:auth']);
+$routes->post('v1/public/video/provider/render-callback',      'Api\\V1\\Video\\VideoProviderCallbackController::renderCallback');
+$routes->post('v1/public/video/provider/youtube-callback',     'Api\\V1\\Video\\VideoProviderCallbackController::youtubeCallback');
+
+/*
  * -----------------------------------------------------------------------------
  * Legacy path aliases (pre-/v1 distribution UI).
  * Keep until production frontend is fully on /api/v1/... paths.
@@ -115,6 +129,10 @@ $routes->group('v1', static function ($routes) {
         $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');
         $routes->post('blog-drafts',    'Api\\V1\\Content\\AutomationIngestController::storeBlogDraft');
         $routes->post('kb-drafts',      'Api\\V1\\Content\\AutomationIngestController::storeKbDraft');
+
+        // Stream V — automated video (reach-video routine): script in → vetting → pipeline.
+        $routes->post('video-scripts',  'Api\\V1\\Video\\VideoAutomationController::storeScript');
+        $routes->get('video-plan',      'Api\\V1\\Video\\VideoAutomationController::plan');
     });
 
     // ---------------------------------------------------------------------
@@ -749,9 +767,17 @@ $routes->group('v1', static function ($routes) {
         // Audit (CP8)
         $routes->get('video/projects/(:segment)/audit',                      'Api\\V1\\Video\\VideoOperationsController::auditForProject/$1',             ['filter' => 'permission:video_audit.read']);
 
-        // Provider callbacks (CP7 — unauthenticated, HMAC-verified)
-        $routes->post('video/provider/render-callback',                      'Api\\V1\\Video\\VideoProviderCallbackController::renderCallback',           ['filter' => 'noauth']);
-        $routes->post('video/provider/youtube-callback',                     'Api\\V1\\Video\\VideoProviderCallbackController::youtubeCallback',          ['filter' => 'noauth']);
+        // Provider callbacks moved to the public block at the top (v1/public/video/…):
+        // they used an unregistered `noauth` filter inside the jwt group.
+
+        // Stream V — automated pipeline (routine scripts → vetting → TTS → Shotstack → YouTube)
+        $routes->get('video/pipeline',                                       'Api\\V1\\Video\\VideoPipelineController::index',                           ['filter' => 'permission:video.read']);
+        $routes->get('video/pipeline/status',                                'Api\\V1\\Video\\VideoPipelineController::status',                          ['filter' => 'permission:video_operations.read']);
+        $routes->get('video/pipeline/(:segment)',                            'Api\\V1\\Video\\VideoPipelineController::show/$1',                         ['filter' => 'permission:video.read']);
+        $routes->post('video/pipeline/(:segment)/retry',                     'Api\\V1\\Video\\VideoPipelineController::retry/$1',                        ['filter' => 'permission:video.retry']);
+        $routes->get('video/youtube/status',                                 'Api\\V1\\Video\\YouTubeChannelController::status',                         ['filter' => 'permission:video_connections.read']);
+        $routes->get('video/youtube/connect',                                'Api\\V1\\Video\\YouTubeChannelController::connect',                        ['filter' => 'permission:video_connections.manage']);
+        $routes->post('video/youtube/disconnect',                            'Api\\V1\\Video\\YouTubeChannelController::disconnect',                     ['filter' => 'permission:video_connections.manage']);
 
         // ── Phase 7: Distribution ─────────────────────────────────────────────
 

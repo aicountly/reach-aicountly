@@ -6,6 +6,9 @@ namespace App\Libraries\Video\Providers;
 
 interface RenderProviderInterface
 {
+    /** Short provider id stored on render job rows. */
+    public function providerName(): string;
+
     /**
      * Submit a render job to the provider.
      *

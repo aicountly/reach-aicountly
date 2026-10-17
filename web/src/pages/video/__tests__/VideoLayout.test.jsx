@@ -11,12 +11,19 @@ const ctx = {
 };
 
 describe('VideoLayout', () => {
-  it('renders Video Automation chrome and horizontal sub-nav', () => {
+  it('renders Video Automation chrome with the pipeline first', () => {
     renderWithAuth(<VideoLayout />, ctx);
     expect(screen.getByText('Video Automation')).toBeInTheDocument();
     expect(document.querySelector('.page-layout--flush')).toBeTruthy();
     expect(document.querySelector('.sub-nav')).toBeTruthy();
+    expect(screen.getByText('Pipeline')).toBeInTheDocument();
     expect(screen.getByText('Projects')).toBeInTheDocument();
-    expect(screen.getByText('YT Connections')).toBeInTheDocument();
+  });
+
+  it('no longer offers the retired manual render/publish screens', () => {
+    renderWithAuth(<VideoLayout />, ctx);
+    expect(screen.queryByText('Render Queue')).toBeNull();
+    expect(screen.queryByText('Publications')).toBeNull();
+    expect(screen.queryByText('YT Connections')).toBeNull();
   });
 });

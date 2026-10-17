@@ -10,7 +10,7 @@ namespace App\Libraries\Ai\Vetting;
  */
 final class Rubrics
 {
-    public const TYPES = ['community', 'blog', 'knowledge_base', 'release_note', 'workflow_guide'];
+    public const TYPES = ['community', 'blog', 'knowledge_base', 'release_note', 'workflow_guide', 'video_script'];
 
     private const COMMON = <<<'TXT'
 You are the final editor for AICOUNTLY, an Indian accounting and business software company
@@ -110,6 +110,38 @@ an AICOUNTLY product.
 - Steps concrete and in order; each step one action; use the product's own menu labels as given.
 - "Before you start", "What happens next" and FAQs must be consistent with the steps.
 - No jargon, no internals (no API, database, sync, module, server or code terms).
+TXT,
+            'video_script' => <<<'TXT'
+CONTENT: a script for an AICOUNTLY YouTube video — a 2–6 minute 16:9 vlog or a ≤ 60 second 9:16
+Short. Approving it publishes the video publicly on YouTube (and offers the Short to Instagram,
+Facebook and LinkedIn). The voice-over is read by a synthetic voice; on-screen text and captions
+are burned into the video from the script exactly as written.
+Accuracy:
+- Every statement about Indian law, GST, income tax, TDS, MCA/ROC, payroll, due dates, rates and
+  penalties must be correct as of the context date; generalise or remove anything uncertain.
+- Due dates that are commonly extended must be phrased as "usually" / "check the portal".
+Product claims:
+- Describe only features the context says exist. No claims about features that do not exist,
+  are "coming soon", or are implied by the visuals. If a scene's on-screen text or voice-over
+  claims a capability the context does not support, remove the claim (revise) or reject.
+- Screens referenced in `visual` must be real product pages from the context's screen list;
+  never describe what a screen shows beyond its plain purpose.
+Brand voice:
+- Warm, confident, practical Indian English for small-business owners, accountants and CAs.
+  Short spoken sentences that sound natural read aloud; no jargon without a few-word explanation.
+- No hype words ("revolutionary", "game-changing", "best-in-class"), no fear-mongering.
+YouTube policy-safe:
+- No misleading titles or thumbnails (the title and thumbnail_prompt must match the content),
+  no clickbait, no sensational claims, no medical/financial "get rich" advice, nothing that would
+  break YouTube's spam, deceptive-practices or harmful-content policies. Thumbnail prompts must
+  not ask for real people, logos of other companies, text-heavy images or shocking imagery.
+- No guarantees ("you will save", "never get a notice", "100% compliant", "zero penalties").
+CTA:
+- `cta_text` must be one clear, honest call to action (e.g. visit aicountly.com, start a free
+  trial only if the context says one exists). The last scene should lead into it.
+Structure (keep it; fix text only): title ≤ 100 characters with no < or >, description in plain
+text, tags relevant and short, scenes in order. For a Short, the voice-over must fit in 60 seconds
+(≈ 140 words in total). Do not change visual types or URLs; you may edit text fields.
 TXT,
         ];
     }

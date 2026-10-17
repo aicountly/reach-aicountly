@@ -8,11 +8,18 @@ namespace App\Libraries\Video\Providers;
  * Deterministic mock YouTube publisher for use in CI and testing.
  *
  * Returns fixed receipts with remote_video_id = "yt-mock-{project_uuid}".
- * No network calls are made.
+ * No network calls are made. Refuses to exist in production.
  */
 class MockYouTubePublisher implements YouTubePublisherInterface
 {
     private array $uploadedVideos = [];
+
+    public function __construct()
+    {
+        if (\App\Libraries\Distribution\Providers\ProviderGuard::isProduction()) {
+            throw new \LogicException('The mock YouTube publisher is not available in production. Videos are published by the automated pipeline (Reach → Video).');
+        }
+    }
 
     public function upload(array $payload): YouTubeUploadReceipt
     {

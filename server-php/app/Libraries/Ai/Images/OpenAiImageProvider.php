@@ -137,6 +137,11 @@ class OpenAiImageProvider implements ImageProviderInterface
     {
         $configuredSize = trim((string) ReachConfig::get('ai.image.size', ''));
         $size           = preg_match('/^\d{3,4}x\d{3,4}$/', $configuredSize) ? $configuredSize : $this->formatSize($input->width, $input->height);
+        // A caller that needs a specific aspect (e.g. a 9:16 video still) overrides the blog-cover setting.
+        $explicitSize = (string) ($input->extraParams['size'] ?? '');
+        if (preg_match('/^\d{3,4}x\d{3,4}$/', $explicitSize)) {
+            $size = $explicitSize;
+        }
         $model          = strtolower($modelKey);
 
         if (str_starts_with($model, 'dall-e-3')) {

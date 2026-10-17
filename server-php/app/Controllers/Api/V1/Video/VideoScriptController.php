@@ -85,34 +85,18 @@ class VideoScriptController extends BaseApiController
         return $this->ok($script, 201);
     }
 
+    /**
+     * Reach does not write video scripts with an LLM: the reach-video Claude
+     * routine writes them and submits them to v1/automation/video-scripts,
+     * where they are vetted and rendered automatically.
+     */
     public function generate(string $projectUuid): ResponseInterface
     {
-        $project = $this->findProject($projectUuid);
-        if ($project === null) {
+        if ($this->findProject($projectUuid) === null) {
             return $this->fail('Not found', 404);
         }
 
-        $body      = $this->input() ?: [];
-        $overrides = [
-            'target_duration_seconds' => (int) ($body['target_duration_seconds'] ?? 120),
-            'style_notes'             => $body['style_notes'] ?? '',
-        ];
-
-        try {
-            $service = new \App\Libraries\Video\VideoScriptGenerationService(
-                $this->projectRepo,
-                $this->scriptRepo,
-            );
-            $result = $service->requestGeneration($projectUuid, $this->userId(), $overrides);
-        } catch (\InvalidArgumentException $e) {
-            return $this->fail($e->getMessage(), 422);
-        } catch (\LogicException $e) {
-            return $this->fail($e->getMessage(), 409);
-        } catch (\Throwable $e) {
-            return $this->fail('Generation failed: ' . $e->getMessage(), 500);
-        }
-
-        return $this->ok($result, 202);
+        return $this->fail('Reach does not generate video scripts. Scripts are written by the reach-video routine and arrive through v1/automation/video-scripts; you can still write or paste a script here.', 410);
     }
 
     private function workflowService(): \App\Libraries\Video\VideoWorkflowService

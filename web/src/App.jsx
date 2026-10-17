@@ -179,13 +179,10 @@ import TechnicalDebtPage                from './pages/readiness/TechnicalDebtPag
 import ReleaseAcceptancePage            from './pages/readiness/ReleaseAcceptancePage.jsx';
 
 import VideoLayout                from './pages/video/VideoLayout.jsx';
-import VideoOverviewPage          from './pages/video/VideoOverviewPage.jsx';
+import VideoPipelinePage          from './pages/video/VideoPipelinePage.jsx';
 import VideoIdeaBacklogPage       from './pages/video/VideoIdeaBacklogPage.jsx';
 import VideoProjectListPage       from './pages/video/VideoProjectListPage.jsx';
 import VideoProjectWorkspacePage  from './pages/video/VideoProjectWorkspacePage.jsx';
-import VideoRenderQueuePage       from './pages/video/VideoRenderQueuePage.jsx';
-import VideoPublicationListPage   from './pages/video/VideoPublicationListPage.jsx';
-import VideoConnectionsPage       from './pages/video/VideoConnectionsPage.jsx';
 import VideoOperationsDashboardPage from './pages/video/VideoOperationsDashboardPage.jsx';
 
 import BlogCommandCentreLayout from './pages/blog-command-centre/BlogCommandCentreLayout.jsx';
@@ -504,13 +501,14 @@ export default function App() {
 
         {/* Phase 6 — Video Content Automation */}
         <Route path="/video" element={<VideoLayout />}>
-          <Route index element={<VideoOverviewPage />} />
+          <Route index element={<VideoPipelinePage />} />
           <Route path="ideas" element={<VideoIdeaBacklogPage />} />
           <Route path="projects" element={<VideoProjectListPage />} />
           <Route path="projects/:id" element={<VideoProjectWorkspacePage />} />
-          <Route path="render-queue" element={<VideoRenderQueuePage />} />
-          <Route path="publications" element={<VideoPublicationListPage />} />
-          <Route path="connections" element={<VideoConnectionsPage />} />
+          {/* Manual render / publish screens retired: the pipeline renders and uploads. */}
+          <Route path="render-queue" element={<Navigate to="/video" replace />} />
+          <Route path="publications" element={<Navigate to="/video" replace />} />
+          <Route path="connections" element={<Navigate to="/video" replace />} />
           <Route path="operations" element={<VideoOperationsDashboardPage />} />
         </Route>
 

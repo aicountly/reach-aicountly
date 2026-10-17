@@ -157,6 +157,20 @@ class ReachSchedule extends BaseCommand
             ]);
         }
 
+        // Every hour: video pipeline sweep — re-vet scripts left pending, retry
+        // blocked items, re-queue lost steps (queue `video`).
+        // reach:schedule may tick every minute; the sweep runs at most hourly.
+        try {
+            $recentSweep = Database::connect()->query(
+                "SELECT 1 FROM reach_jobs WHERE job_type = 'reach.video_pipeline_sweep' AND created_at > NOW() - INTERVAL '55 minutes' LIMIT 1"
+            )->getRowArray();
+        } catch (\Throwable) {
+            $recentSweep = true;
+        }
+        if (! $recentSweep) {
+            $svc->enqueue('reach.video_pipeline_sweep', ['date' => $today, 'hour' => $hour], ['queue' => 'video', 'enqueued_actor_type' => 'system']);
+        }
+
         // 05:00 — SEO rank + backlink snapshots (GSC data lags ~2 days)
         if ($hour === 5) {
             $svc->enqueue('reach.seo_snapshot', ['date' => null], [

@@ -5,29 +5,42 @@ declare(strict_types=1);
 namespace App\Controllers\Api\V1\Video;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Video\Automation\VideoPipelineStatus;
 use CodeIgniter\HTTP\ResponseInterface;
 
 class VideoOperationsController extends BaseApiController
 {
+    /**
+     * Pipeline health from what is really configured (keys, channel, signing
+     * key, mocks) — the old version said "live" whenever an env flag was set.
+     */
     public function index(): ResponseInterface
     {
-        $renderProvider = env('VIDEO_RENDER_PROVIDER', 'mock');
-        $youtubeEnabled = filter_var(env('YOUTUBE_PUBLISHING_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+        $status = VideoPipelineStatus::describe();
 
-        return $this->ok([
-            'render_provider'   => $renderProvider ?: 'mock',
-            'youtube_publisher' => $youtubeEnabled ? 'live' : 'mock',
-            'youtube_enabled'   => $youtubeEnabled,
-            'status'            => 'operational',
+        return $this->ok($status + [
+            'youtube_publisher' => $status['youtube']['connected'] ? 'connected' : 'not connected',
+            'status'            => $status['ready'] ? 'ready' : 'not_ready',
         ]);
     }
 
     public function auditForProject(string $projectUuid): ResponseInterface
     {
-        return $this->ok([
-            'project_uuid' => $projectUuid,
-            'events'       => [],
-            'message'      => 'No audit events recorded for this project yet.',
-        ]);
+        $events = [];
+        try {
+            $db = \Config\Database::connect();
+            $project = $db->table('reach_video_projects')->select('id')->where('uuid', $projectUuid)->get()->getRowArray();
+            if ($project) {
+                $events = $db->table('reach_audit_logs')
+                    ->select('action, created_at, user_id')
+                    ->groupStart()->like('action', 'video.', 'after')->groupEnd()
+                    ->where('entity_id', (int) $project['id'])
+                    ->orderBy('created_at', 'DESC')->limit(100)->get()->getResultArray();
+            }
+        } catch (\Throwable) {
+            $events = [];
+        }
+
+        return $this->ok(['project_uuid' => $projectUuid, 'events' => $events]);
     }
 }
