@@ -5,8 +5,8 @@
 | **Name** | `reach-video` |
 | **Model** | Claude Sonnet |
 | **Cron** | `30 1 * * *` UTC = **07:00 IST** daily, fresh session per fire |
-| **Environment** | the Claude Code cloud environment with `aicountly/reach-aicountly`, `aicountly/aicountly-com` and the product repos connected; env `REACH_API_BASE`, `REACH_AUTOMATION_TOKEN` (see [CLAUDE_ROUTINES.md](../CLAUDE_ROUTINES.md)) |
-| **Endpoints** | `GET $REACH_API_BASE/v1/automation/video-plan` · `POST $REACH_API_BASE/v1/automation/video-scripts` |
+| **Environment** | the Claude Code cloud environment with `aicountly/reach-aicountly`, `aicountly/aicountly-com` and the product repos connected; network access to `reach.aicountly.org` + the Reach network secret (see [CLAUDE_ROUTINES.md](../CLAUDE_ROUTINES.md)) |
+| **Endpoints** | `GET https://reach.aicountly.org/api/v1/automation/video-plan` · `POST https://reach.aicountly.org/api/v1/automation/video-scripts` |
 | **Writes** | 1 vlog script (16:9, 2–6 min) + 1 Short script (9:16, ≤ 60 s) per day (quota: Settings → AI & Automation → Video) |
 
 Reach does **not** write scripts. This routine writes them; Reach has Gemini vet each one (its
@@ -23,10 +23,10 @@ seconds). You write the scripts; Reach vets, voices, renders and publishes them.
 vetting model rejects anything inaccurate, hyped, or about features that do not exist —
 so be accurate and specific.
 
-All Reach calls use the header  X-Automation-Token: $REACH_AUTOMATION_TOKEN
-and JSON bodies.
+All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds it to every reach.aicountly.org/api/v1/automation/ request.
+Send JSON bodies.
 
-1. PLAN. GET $REACH_API_BASE/v1/automation/video-plan.
+1. PLAN. GET https://reach.aicountly.org/api/v1/automation/video-plan.
    - If "enabled" is false, or quota.vlog.remaining and quota.short.remaining are both 0,
      stop and report "nothing to do".
    - Read recent_titles: never repeat a topic or title from the last 40 videos.
@@ -92,7 +92,7 @@ and JSON bodies.
    site; every compliance fact current; total words inside the limit; every screenshot
    URL taken from `screens`; no guarantees; title and thumbnail honest.
 
-5. POST each script to $REACH_API_BASE/v1/automation/video-scripts:
+5. POST each script to https://reach.aicountly.org/api/v1/automation/video-scripts:
    {
      "external_key": "...", "format": "vlog" | "short",
      "title": "...", "description": "...", "tags": ["..."],
