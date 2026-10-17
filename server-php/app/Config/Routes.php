@@ -115,6 +115,11 @@ $routes->group('v1', static function ($routes) {
         $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');
         $routes->post('blog-drafts',    'Api\\V1\\Content\\AutomationIngestController::storeBlogDraft');
         $routes->post('kb-drafts',      'Api\\V1\\Content\\AutomationIngestController::storeKbDraft');
+
+        // Stream H: weekly growth-strategy routine (docs/automation/routines/reach-growth-strategy.md)
+        $routes->get('insights-digest',  'Api\\V1\\Intelligence\\InsightsAutomationController::insightsDigest');
+        $routes->post('strategy-memos',  'Api\\V1\\Intelligence\\InsightsAutomationController::storeStrategyMemo');
+        // end Stream H
     });
 
     // ---------------------------------------------------------------------
@@ -901,6 +906,22 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/visibility/runs',                        'Api\\V1\\Intelligence\\VisibilityController::queueRun',              ['filter' => 'permission:visibility.execute']);
         $routes->get('intelligence/visibility/runs',                         'Api\\V1\\Intelligence\\VisibilityController::runs',                  ['filter' => 'permission:visibility.read']);
         $routes->get('intelligence/visibility/observations',                 'Api\\V1\\Intelligence\\VisibilityController::observations',          ['filter' => 'permission:visibility.read']);
+        // Stream H: real AI-visibility execution + share of voice, and AI Insights
+        $routes->put('intelligence/visibility/prompts/(:num)',               'Api\\V1\\Intelligence\\VisibilityController::updatePrompt/$1',       ['filter' => 'permission:visibility.manage']);
+        $routes->get('intelligence/visibility/providers',                    'Api\\V1\\Intelligence\\VisibilityController::providers',             ['filter' => 'permission:visibility.read']);
+        $routes->get('intelligence/visibility/summary',                      'Api\\V1\\Intelligence\\VisibilityController::summary',               ['filter' => 'permission:visibility.read']);
+        $routes->get('intelligence/visibility/answers',                      'Api\\V1\\Intelligence\\VisibilityController::answers',               ['filter' => 'permission:visibility.read']);
+        $routes->get('intelligence/visibility/batches',                      'Api\\V1\\Intelligence\\VisibilityController::batches',               ['filter' => 'permission:visibility.read']);
+        $routes->post('intelligence/visibility/batches',                     'Api\\V1\\Intelligence\\VisibilityController::runBatch',              ['filter' => 'permission:visibility.execute']);
+        $routes->get('intelligence/insights',                                'Api\\V1\\Intelligence\\InsightsController::index',                   ['filter' => 'permission:intelligence.read']);
+        $routes->get('intelligence/insights/latest',                         'Api\\V1\\Intelligence\\InsightsController::latest',                  ['filter' => 'permission:intelligence.read']);
+        $routes->post('intelligence/insights/run',                           'Api\\V1\\Intelligence\\InsightsController::run',                     ['filter' => 'permission:intelligence.manage']);
+        $routes->get('intelligence/insights/actions',                        'Api\\V1\\Intelligence\\InsightsController::actions',                 ['filter' => 'permission:intelligence.read']);
+        $routes->patch('intelligence/insights/actions/(:num)',               'Api\\V1\\Intelligence\\InsightsController::updateAction/$1',         ['filter' => 'permission:intelligence.manage']);
+        $routes->get('intelligence/insights/memos',                          'Api\\V1\\Intelligence\\InsightsController::memos',                   ['filter' => 'permission:intelligence.read']);
+        $routes->get('intelligence/insights/memos/(:num)',                   'Api\\V1\\Intelligence\\InsightsController::memo/$1',                 ['filter' => 'permission:intelligence.read']);
+        $routes->get('intelligence/insights/(:num)',                         'Api\\V1\\Intelligence\\InsightsController::show/$1',                 ['filter' => 'permission:intelligence.read']);
+        // end Stream H
 
         // Phase 8: Competitors
         $routes->get('intelligence/competitors',                             'Api\\V1\\Intelligence\\CompetitorController::index',                 ['filter' => 'permission:competitor.read']);

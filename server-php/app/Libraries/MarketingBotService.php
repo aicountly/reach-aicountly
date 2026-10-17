@@ -33,6 +33,9 @@ use Config\Services;
  *
  * LLM keys are read from .env. If both are empty the service still runs
  * (it just returns stubbed content) so the whole pipeline can be tested.
+ * Exception: generate_analytics_summary and recommend_campaign_improvements
+ * come from the real AI Insights report (Intelligence → AI Insights) and fail
+ * with the reason when it cannot be produced — never placeholder text.
  */
 class MarketingBotService
 {
@@ -271,8 +274,8 @@ class MarketingBotService
             'generate_creative_brief' => $this->generateCreativeBrief($payload, $stubNote),
             'generate_content_calendar' => $this->generateContentCalendar($payload, $stubNote),
             'suggest_hashtags_keywords' => $this->suggestHashtagsKeywords($payload, $stubNote),
-            'generate_analytics_summary' => $this->generateAnalyticsSummary($payload, $stubNote),
-            'recommend_campaign_improvements' => $this->recommendCampaignImprovements($payload, $stubNote),
+            'generate_analytics_summary' => $this->generateAnalyticsSummary($payload),
+            'recommend_campaign_improvements' => $this->recommendCampaignImprovements($payload),
             'prepare_approval_package' => $this->prepareApprovalPackage($payload, $stubNote),
             'queue_approved_publishing' => $this->queueApprovedPublishing($payload, $stubNote),
             default => throw new \InvalidArgumentException("Unhandled action: {$action}"),
@@ -411,37 +414,75 @@ class MarketingBotService
         ];
     }
 
-    private function generateAnalyticsSummary(array $payload, string $note): array
+    /**
+     * Real analytics summary: the AI Insights report (Gemini over Reach's own
+     * data digest). Uses the latest report when it is at most 8 days old,
+     * otherwise runs one. Not configured / provider down → the action fails
+     * with that reason; there is no placeholder digest.
+     */
+    private function generateAnalyticsSummary(array $payload): array
     {
+        $report = $this->insightsReport();
+        $body   = $report['report'] ?? [];
+
         return [
-            'understanding'      => 'Summarise recent marketing performance.',
-            'data_accessed'      => [
-                'campaigns_recent' => (new CampaignModel())->orderBy('created_at', 'DESC')->limit(10)->countAllResults(),
-                'blogs_recent'     => (new BlogPostModel())->where('status', 'published')->countAllResults(),
-                'leads_recent'     => (new \App\Models\LeadModel())->countAllResults(),
-            ],
+            'understanding'      => 'Summarise recent marketing performance from Reach data (AI Insights report).',
+            'data_accessed'      => $this->insightsSources($report),
             'content_generated'  => [
-                'headline' => 'Marketing operations digest',
-                'note'     => $note,
+                'headline'           => sprintf('AI Insights %s – %s', $report['period_start'] ?? '?', $report['period_end'] ?? '?'),
+                'summary'            => $body['summary'] ?? '',
+                'whats_working'      => $body['whats_working'] ?? [],
+                'gaps'               => $body['gaps'] ?? [],
+                'unverified_numbers' => $report['unverified_numbers'] ?? [],
             ],
-            'recommended_action' => 'Share the digest with leadership; import into weekly report.',
+            'recommended_action' => 'Open Intelligence → AI Insights for the full report and the action list.',
+            'evidence'           => ['insights_report_id' => $report['id'] ?? null, 'model' => $report['model'] ?? null],
         ];
     }
 
-    private function recommendCampaignImprovements(array $payload, string $note): array
+    /** Recommendations from the same AI Insights report (see generateAnalyticsSummary). */
+    private function recommendCampaignImprovements(array $payload): array
     {
+        $report = $this->insightsReport();
+
         return [
-            'understanding'      => 'Recommend improvements to recent campaigns.',
+            'understanding'      => 'Recommend improvements from the latest AI Insights report.',
+            'data_accessed'      => $this->insightsSources($report),
             'content_generated'  => [
-                'recommendations' => [
-                    'Try shorter subject lines (< 42 chars) on next email campaign.',
-                    'Add carousel format to LinkedIn plan — currently zero carousels.',
-                    'Retarget landing-page visitors who did not convert within 7 days via email.',
-                ],
-                'note' => $note,
+                'recommendations'    => $report['report']['recommendations'] ?? [],
+                'unverified_numbers' => $report['unverified_numbers'] ?? [],
             ],
-            'recommended_action' => 'Attach recommendations to the target campaign and re-run copy generation.',
+            'recommended_action' => 'Track these in Intelligence → AI Insights → Act on this.',
+            'evidence'           => ['insights_report_id' => $report['id'] ?? null, 'model' => $report['model'] ?? null],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function insightsReport(): array
+    {
+        if (! \App\Libraries\Database\SchemaGuard::hasTable(\Config\Database::connect(), 'reach_ai_insight_reports')) {
+            throw new \RuntimeException('AI Insights is not installed: run database migrations.');
+        }
+        $svc    = new \App\Libraries\Intelligence\Insights\InsightsService();
+        $latest = $svc->latest();
+        if ($latest !== null && strtotime((string) $latest['created_at']) >= time() - 8 * 86400) {
+            return $latest;
+        }
+
+        return $svc->run('bot');
+    }
+
+    /** @return array<string, mixed> */
+    private function insightsSources(array $report): array
+    {
+        $sources = [];
+        foreach ((array) ($report['digest'] ?? []) as $name => $section) {
+            if (is_array($section) && array_key_exists('available', $section)) {
+                $sources[$name] = (bool) $section['available'];
+            }
+        }
+
+        return ['insights_report_id' => $report['id'] ?? null, 'period' => [$report['period_start'] ?? null, $report['period_end'] ?? null], 'sources_available' => $sources];
     }
 
     private function prepareApprovalPackage(array $payload, string $note): array

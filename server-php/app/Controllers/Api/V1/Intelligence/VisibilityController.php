@@ -10,6 +10,7 @@ use App\Models\Intelligence\AiVisibilityPromptModel;
 use App\Models\Intelligence\AiVisibilityPromptVersionModel;
 use App\Models\Intelligence\AiVisibilityRunModel;
 use App\Models\Intelligence\AiVisibilityObservationModel;
+use App\Libraries\Intelligence\Visibility\AiVisibilityService;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Libraries\Database\SchemaGuard;
 
@@ -19,7 +20,123 @@ class VisibilityController extends BaseApiController
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
         $model    = new AiVisibilityPromptModel();
-        return $this->response->setJSON(['data' => $model->getActiveForTenant($tenantId)]);
+        $status   = (string) ($this->request->getGet('status') ?? 'active');
+        $rows     = $status === 'all'
+            ? $model->where('tenant_id', $tenantId)->where('status !=', 'archived')->orderBy('id')->findAll()
+            : $model->getActiveForTenant($tenantId);
+
+        // Each prompt with the text that is actually asked (its active version).
+        $versions = [];
+        if ($rows !== []) {
+            foreach ((new AiVisibilityPromptVersionModel())->whereIn('prompt_id', array_column($rows, 'id'))->where('is_active', true)->findAll() as $v) {
+                $versions[(int) $v['prompt_id']] = $v;
+            }
+        }
+        foreach ($rows as &$row) {
+            $v                         = $versions[(int) $row['id']] ?? null;
+            $row['active_version']     = $v === null ? null : ['id' => (int) $v['id'], 'version_number' => (int) $v['version_number'], 'prompt_text' => $v['prompt_text']];
+            $row['has_active_version'] = $v !== null;
+        }
+        unset($row);
+
+        return $this->response->setJSON(['data' => $rows]);
+    }
+
+    /** PUT intelligence/visibility/prompts/{id} — name, topic, market (persona), locale, intent, status. Text changes go through versions. */
+    public function updatePrompt(int $id): ResponseInterface
+    {
+        $model  = new AiVisibilityPromptModel();
+        $prompt = $model->find($id);
+        if (! $prompt) {
+            return $this->fail('Not found', 404);
+        }
+        $body    = $this->input();
+        $allowed = array_intersect_key($body, array_flip(['name', 'topic', 'intent', 'persona', 'locale', 'status']));
+        if (isset($allowed['status']) && ! in_array($allowed['status'], ['draft', 'active', 'paused', 'archived'], true)) {
+            return $this->fail('status must be draft, active, paused or archived', 422);
+        }
+        if ($allowed === []) {
+            return $this->fail('Nothing to update', 422);
+        }
+        if (! $model->update($id, $allowed)) {
+            return $this->fail('Unable to update prompt', 422, $model->errors());
+        }
+        $this->audit('visibility.prompt.updated', 'ai_visibility_prompt', $id, $prompt, $model->find($id));
+
+        return $this->ok($model->find($id));
+    }
+
+    /** GET intelligence/visibility/providers — which assistants run, which are skipped and why. */
+    public function providers(): ResponseInterface
+    {
+        return $this->ok((new AiVisibilityService())->providers());
+    }
+
+    /** GET intelligence/visibility/summary?days=28 */
+    public function summary(): ResponseInterface
+    {
+        if (! $this->installed()) {
+            return $this->fail('AI visibility tables are not migrated yet. Run database migrations.', 503);
+        }
+        $days = (int) ($this->request->getGet('days') ?? 28);
+
+        return $this->ok((new AiVisibilityService())->summary($days > 0 ? $days : 28));
+    }
+
+    /** GET intelligence/visibility/answers?limit=50&provider=&prompt_id= */
+    public function answers(): ResponseInterface
+    {
+        if (! $this->installed()) {
+            return $this->ok([]);
+        }
+        $promptId = $this->request->getGet('prompt_id');
+
+        return $this->ok((new AiVisibilityService())->answers(
+            (int) ($this->request->getGet('limit') ?? 50),
+            $this->request->getGet('provider') ? (string) $this->request->getGet('provider') : null,
+            $promptId !== null && $promptId !== '' ? (int) $promptId : null,
+        ));
+    }
+
+    /** GET intelligence/visibility/batches */
+    public function batches(): ResponseInterface
+    {
+        if (! $this->installed()) {
+            return $this->ok([]);
+        }
+
+        return $this->ok((new AiVisibilityService())->batches((int) ($this->request->getGet('limit') ?? 20)));
+    }
+
+    /**
+     * POST intelligence/visibility/batches — "Run now": queue a manual pass
+     * over today's not-yet-asked prompts. 409 when no assistant is
+     * configured, 429 when the daily cap is used — never a fake success.
+     */
+    public function runBatch(): ResponseInterface
+    {
+        if (! $this->installed()) {
+            return $this->fail('AI visibility tables are not migrated yet. Run database migrations.', 503);
+        }
+        $svc = new AiVisibilityService();
+        if ($svc->providers() === [] || array_filter($svc->providers(), static fn (array $p): bool => $p['will_run']) === []) {
+            return $this->fail('No assistant is configured: add a Gemini, OpenAI or Perplexity API key in Settings → AI & Automation.', 409, ['providers' => $svc->providers()]);
+        }
+        $batch = $svc->startBatch('manual', $this->userId());
+        $this->audit('visibility.batch.started', 'ai_visibility_batch', (int) ($batch['id'] ?? 0), null, null, ['status' => $batch['status'] ?? null, 'runs' => count($batch['run_ids'] ?? [])]);
+        if (($batch['status'] ?? '') === 'skipped') {
+            $code = str_contains((string) ($batch['note'] ?? ''), 'cap') ? 429 : 409;
+            return $this->fail((string) $batch['note'], $code, ['batch' => $batch]);
+        }
+
+        return $this->ok($batch, 202);
+    }
+
+    private function installed(): bool
+    {
+        $db = \Config\Database::connect();
+
+        return SchemaGuard::hasTable($db, 'reach_ai_visibility_batches') && SchemaGuard::hasTable($db, 'reach_ai_visibility_runs');
     }
 
     public function createPrompt(): ResponseInterface
@@ -86,26 +203,34 @@ class VisibilityController extends BaseApiController
         return $this->response->setJSON(['data' => $vModel->find($versionId)]);
     }
 
+    /**
+     * POST intelligence/visibility/runs {prompt_version_id} — ask one prompt
+     * version to every configured assistant now. Each run is queued as a job
+     * the worker executes; 409 when no assistant is configured.
+     */
     public function queueRun(): ResponseInterface
     {
         $body      = $this->request->getJSON(true) ?? [];
         $versionId = (int) ($body['prompt_version_id'] ?? 0);
-        $tenantId  = (int) ($body['tenant_id'] ?? 1);
 
         if (!$versionId) return $this->response->setStatusCode(422)->setJSON(['error' => 'prompt_version_id required']);
 
+        try {
+            $ids = (new AiVisibilityService())->queuePromptVersion($versionId, $this->userId());
+        } catch (\DomainException $e) {
+            return $this->fail($e->getMessage(), 409);
+        } catch (\OverflowException $e) {
+            return $this->fail($e->getMessage(), 429);
+        } catch (\InvalidArgumentException $e) {
+            return $this->fail($e->getMessage(), 404);
+        }
+
         $runModel = new AiVisibilityRunModel();
-        $id       = $runModel->insert([
-            'tenant_id'        => $tenantId,
-            'prompt_version_id' => $versionId,
-            'run_type'         => 'manual_test',
-            'status'           => 'queued',
-            'queued_at'        => date('Y-m-d H:i:s'),
-        ]);
+        foreach ($ids as $id) {
+            (new AuditLogger())->log($this->userId(), AuditLogger::VISIBILITY_RUN_QUEUED, 'ai_visibility_run', $id, null, null, null, 'human');
+        }
 
-        (new AuditLogger())->log(null, AuditLogger::VISIBILITY_RUN_QUEUED, 'ai_visibility_run', (int)$id, null, null, null, 'human');
-
-        return $this->response->setStatusCode(201)->setJSON(['data' => $runModel->find($id)]);
+        return $this->response->setStatusCode(201)->setJSON(['data' => $runModel->whereIn('id', $ids)->findAll()]);
     }
 
     public function runs(): ResponseInterface

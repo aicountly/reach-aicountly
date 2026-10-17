@@ -13,7 +13,7 @@ import {
   ShieldCheck, Settings, Wrench, Activity, Cable, PlugZap, ListChecks,
   BookOpen, PenTool, Package, BrainCircuit,
   Globe, Send, MessagesSquare, Search, NotebookPen, ListOrdered,
-  Image, HelpCircle, FileSearch, FileBarChart,
+  Image, HelpCircle, FileSearch, FileBarChart, Lightbulb, Eye,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 import { isBlogCommandCentreEnabled } from './blogFeatureFlags';
@@ -91,6 +91,8 @@ export function buildNavSections() {
       items: [
         { label: 'Knowledge',         path: ROUTES.KNOWLEDGE, icon: BookOpen,     requires: 'knowledge.view' },
         { label: 'Intelligence',      path: '/intelligence',  icon: BarChart3,    requires: 'intelligence.read' },
+        { label: 'AI Insights',       path: '/intelligence/insights', icon: Lightbulb, requires: 'intelligence.read' },
+        { label: 'AI Visibility',     path: '/intelligence/visibility', icon: Eye,     requires: 'visibility.read' },
         { label: 'AI Control Centre', path: ROUTES.AI,        icon: BrainCircuit, requires: 'ai.generate' },
       ],
     },

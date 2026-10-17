@@ -49,6 +49,26 @@ final class ReachConfig
             'ai.vetting.model.workflow_guide' => ['group' => 'AI vetting', 'label' => 'Workflow guide vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
             'ai.insights.model' => ['group' => 'AI vetting', 'label' => 'AI Insights model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
 
+            // ── Stream H: AI visibility (GEO) + AI Insights (keep this block contiguous) ──
+            'visibility.enabled' => ['group' => 'AI visibility & insights', 'label' => 'Daily AI-visibility checks', 'type' => 'bool', 'default' => true,
+                'help' => 'Asks each active visibility prompt to every configured assistant once a day (05:00 IST) and records whether AICOUNTLY is mentioned.'],
+            'visibility.daily_prompt_limit' => ['group' => 'AI visibility & insights', 'label' => 'Visibility prompts per day', 'type' => 'int', 'default' => 25,
+                'help' => 'Cost cap. Each prompt is one call per configured assistant. Prompts not reached today run first tomorrow.'],
+            'visibility.providers' => ['group' => 'AI visibility & insights', 'label' => 'Assistants to check', 'type' => 'string', 'default' => 'gemini,openai,perplexity',
+                'help' => 'Comma-separated: gemini, openai, perplexity. An assistant without an API key is skipped and shown as skipped.'],
+            'visibility.brand_aliases' => ['group' => 'AI visibility & insights', 'label' => 'Names that count as an AICOUNTLY mention', 'type' => 'string', 'default' => 'AICOUNTLY,aicountly.com,AI Countly',
+                'help' => 'Comma-separated, matched as whole words, case-insensitive.'],
+            'visibility.gemini.search_grounding' => ['group' => 'AI visibility & insights', 'label' => 'Gemini answers with Google Search grounding', 'type' => 'bool', 'default' => true,
+                'help' => 'On = closer to what the Gemini app answers and returns cited sources; grounded calls are billed separately by Google.'],
+            'ai.openai.chat_model' => ['group' => 'AI visibility & insights', 'label' => 'OpenAI model for visibility checks', 'type' => 'model', 'env' => 'AI_OPENAI_DEFAULT_MODEL', 'default' => 'gpt-5-mini',
+                'help' => 'Chat Completions model. Without web search it reflects what the model knows, not a live search.'],
+            'ai.perplexity.model' => ['group' => 'AI visibility & insights', 'label' => 'Perplexity model for visibility checks', 'type' => 'model', 'env' => 'AI_PERPLEXITY_DEFAULT_MODEL', 'default' => 'sonar'],
+            'insights.weekly.enabled' => ['group' => 'AI visibility & insights', 'label' => 'Weekly AI Insights report', 'type' => 'bool', 'default' => true,
+                'help' => 'Runs every Sunday 16:00 IST with the AI Insights model. On-demand runs work either way.'],
+            'insights.site_url' => ['group' => 'AI visibility & insights', 'label' => 'Site checked for AI-readiness signals', 'type' => 'string', 'default' => 'https://aicountly.com',
+                'help' => 'llms.txt, schema.org JSON-LD and sitemap are read from here for the AI-readiness checklist.'],
+            // ── end Stream H ──
+
             // ── Images ──────────────────────────────────────────────────────
             'ai.image.model' => ['group' => 'Images', 'label' => 'Image model (OpenAI)', 'type' => 'string', 'env' => 'AI_OPENAI_IMAGE_MODEL', 'default' => 'dall-e-3',
                 'help' => 'e.g. dall-e-3 or gpt-image-1.'],

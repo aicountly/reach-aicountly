@@ -8,6 +8,7 @@ import { Search } from 'lucide-react';
  */
 const navItems = [
   { to: '/intelligence', end: true, label: 'Overview' },
+  { to: '/intelligence/insights', label: 'AI Insights' },
   { to: '/intelligence/search', end: true, label: 'Search' },
   { to: '/intelligence/search/queries', label: 'Queries' },
   { to: '/intelligence/search/pages', label: 'Pages' },
