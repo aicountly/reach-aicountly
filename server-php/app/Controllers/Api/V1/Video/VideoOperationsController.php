@@ -18,8 +18,11 @@ class VideoOperationsController extends BaseApiController
     {
         $status = VideoPipelineStatus::describe();
 
+        $path = $status['youtube_path'];
         return $this->ok($status + [
-            'youtube_publisher' => $status['youtube']['connected'] ? 'connected' : 'not connected',
+            'youtube_publisher' => $path['mode'] === 'direct'
+                ? ($status['youtube']['connected'] ? 'connected' : 'not connected')
+                : ($path['ready'] ? 'social-api.ai' : 'social-api.ai (not ready)'),
             'status'            => $status['ready'] ? 'ready' : 'not_ready',
         ]);
     }

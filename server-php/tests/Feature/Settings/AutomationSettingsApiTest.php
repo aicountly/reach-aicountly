@@ -68,6 +68,90 @@ final class AutomationSettingsApiTest extends ApiTestCase
         $this->withHeaders($h)->withBodyFormat('json')->call('PUT', 'v1/settings/automation', ['made.up.key' => 'x'])->assertStatus(422);
     }
 
+    public function testTheSocialApiSettingsAreOfferedValidatedAndSaved(): void
+    {
+        $h    = $this->authAs('super_admin');
+        $rows = array_column($this->json($this->withHeaders($h)->call('GET', 'v1/settings/automation')), null, 'key');
+
+        $this->assertSame('https://api.social-api.ai/v1', $rows['social.socialapi.base_url']['value']);
+        $this->assertSame('default', $rows['social.socialapi.base_url']['source']);
+        $this->assertSame('social-api.ai API key', $rows['social.socialapi.api_key']['label']);
+        $this->assertSame('secret', $rows['social.socialapi.api_key']['type']);
+        $this->assertSame('choice', $rows['video.youtube.publisher']['type']);
+        $this->assertSame(['social_api', 'direct'], $rows['video.youtube.publisher']['options']);
+        $this->assertSame('social_api', $rows['video.youtube.publisher']['value']);
+        $this->assertSame('json_object', $rows['social.socialapi.platform_data.youtube']['type']);
+        $this->assertStringContainsString('docs.social-api.ai', (string) $rows['social.socialapi.platform_data.youtube']['help']);
+        foreach (['youtube', 'instagram', 'facebook', 'linkedin', 'x', 'tiktok'] as $p) {
+            $this->assertSame('Social', $rows['social.socialapi.account.' . $p]['group']);
+            $this->assertSame('Social', $rows['social.socialapi.platform_data.' . $p]['group']);
+        }
+
+        $res = $this->withHeaders($h)->withBodyFormat('json')->call('PUT', 'v1/settings/automation', [
+            'social.socialapi.api_key'               => 'sapi_key_feature_secret_123',
+            'social.socialapi.account.youtube'       => 'acc_yt_42',
+            'social.socialapi.platform_data.youtube' => ' {"youtube": {"privacy": "unlisted"}} ',
+            'video.youtube.publisher'                => 'direct',
+        ]);
+        $res->assertStatus(200);
+        $this->assertStringNotContainsString('sapi_key_feature_secret_123', (string) $res->getJSON());
+        $raw = (new SettingModel())->where('key', 'social.socialapi.api_key')->first();
+        $this->assertStringNotContainsString('sapi_key_feature_secret_123', (string) $raw['value_json'], 'encrypted at rest');
+
+        ReachConfig::flush();
+        $this->assertSame('sapi_key_feature_secret_123', ReachConfig::secret('social.socialapi.api_key'));
+        $this->assertSame('acc_yt_42', ReachConfig::get('social.socialapi.account.youtube'));
+        $this->assertSame(['youtube' => ['privacy' => 'unlisted']], ReachConfig::jsonObject('social.socialapi.platform_data.youtube'));
+        $this->assertSame('direct', ReachConfig::get('video.youtube.publisher'));
+
+        $rows = array_column($this->json($this->withHeaders($h)->call('GET', 'v1/settings/automation')), null, 'key');
+        $this->assertTrue($rows['social.socialapi.api_key']['is_set']);
+        $this->assertNull($rows['social.socialapi.api_key']['value']);
+        $this->assertSame('{"youtube":{"privacy":"unlisted"}}', $rows['social.socialapi.platform_data.youtube']['value']);
+
+        foreach ([
+            ['social.socialapi.platform_data.youtube', '[1,2]'],
+            ['social.socialapi.platform_data.instagram', '{not json'],
+            ['video.youtube.publisher', 'ftp'],
+            ['social.socialapi.base_url', 'http://insecure.example/v1'],
+            ['social.socialapi.account.linkedin', 'has spaces'],
+        ] as [$key, $value]) {
+            $this->withHeaders($h)->withBodyFormat('json')->call('PUT', 'v1/settings/automation', [$key => $value])->assertStatus(422);
+        }
+        ReachConfig::flush();
+        $this->assertSame(['youtube' => ['privacy' => 'unlisted']], ReachConfig::jsonObject('social.socialapi.platform_data.youtube'), 'a refused value leaves the saved one');
+
+        // Clearing the JSON and the account falls back to "none" / auto-pick.
+        $this->withHeaders($h)->withBodyFormat('json')->call('PUT', 'v1/settings/automation', ['social.socialapi.platform_data.youtube' => '', 'social.socialapi.account.youtube' => ''])->assertStatus(200);
+        ReachConfig::flush();
+        $this->assertSame([], ReachConfig::jsonObject('social.socialapi.platform_data.youtube'));
+        $this->assertSame('', (string) ReachConfig::get('social.socialapi.account.youtube', ''));
+    }
+
+    public function testTheSocialApiLiveCheckListsAccountsAndNeverPosts(): void
+    {
+        $h = $this->authAs('super_admin');
+        $this->withHeaders($h)->withBodyFormat('json')->call('PUT', 'v1/settings/automation', ['social.socialapi.api_key' => 'sapi_key_live_check_456'])->assertStatus(200);
+        ReachConfig::flush();
+        \App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts::forget();
+        $http = (new FakeHttpTransport())->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, [
+            ['id' => 'acc_yt', 'name' => 'AICOUNTLY', 'platform' => 'youtube', 'status' => 'active'],
+        ]));
+        VideoProviders::override('http', $http);
+        try {
+            $res = $this->withHeaders($h)->withBodyFormat('json')->call('POST', 'v1/settings/automation/live-check', ['only' => ['social_api']]);
+            $res->assertStatus(200);
+            $data = $this->json($res);
+            $this->assertTrue($data['ok']);
+            $this->assertSame('social_api', $data['results'][0]['target']);
+            $this->assertStringContainsString('1 connected account(s): youtube 1', $data['results'][0]['message']);
+            $this->assertStringNotContainsString('sapi_key_live_check_456', (string) $res->getJSON());
+            $this->assertSame(['GET'], array_values(array_unique(array_column($http->requests, 'method'))));
+        } finally {
+            VideoProviders::reset();
+        }
+    }
+
     public function testReadersCannotWrite(): void
     {
         $h = $this->authAs('viewer');

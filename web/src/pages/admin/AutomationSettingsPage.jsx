@@ -5,6 +5,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
+import { jsonObjectError } from '../../utils/jsonObject';
 
 // Which provider check each group's "Test" button runs.
 const GROUP_TESTS = {
@@ -12,7 +13,17 @@ const GROUP_TESTS = {
   'SEO data': ['dataforseo'],
 };
 
+// Groups whose button runs a live check (POST v1/settings/automation/live-check) instead.
+const GROUP_LIVE_CHECKS = {
+  Social: [{ target: 'social_api', label: 'Check social-api.ai' }],
+};
+
 const SOURCE_LABEL = { settings: 'saved here', env: 'from server .env', default: 'default', unset: 'not set' };
+
+const CHOICE_LABEL = {
+  social_api: 'social_api — through social-api.ai',
+  direct: 'direct — Reach’s own Google OAuth upload',
+};
 
 function groupRows(rows) {
   const groups = [];
@@ -31,6 +42,45 @@ function detailEntries(detail, prefix = '') {
     if (v === null || v === undefined) return [];
     return [[`${prefix}${k}`, typeof v === 'boolean' ? (v ? 'yes' : 'no') : String(v)]];
   });
+}
+
+function LiveCheckReport({ report }) {
+  return (
+    <>
+      <Alert variant={report.ok ? 'success' : 'danger'}>
+        {report.passed} passed, {report.failed} failed{report.ran_at ? ` · ${new Date(report.ran_at).toLocaleString()}` : ''}
+      </Alert>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr><th>Check</th><th>Result</th><th>Reason</th></tr>
+          </thead>
+          <tbody>
+            {(report.results ?? []).map((r) => {
+              const details = detailEntries(r.detail);
+              return (
+                <tr key={r.target}>
+                  <td>{r.target}</td>
+                  <td><span className={`badge ${r.ok ? 'badge--success' : 'badge--danger'}`}>{r.ok ? 'OK' : 'FAIL'}</span></td>
+                  <td>
+                    {r.message}
+                    {details.length > 0 && (
+                      <details>
+                        <summary className="text-sm text-muted">Details</summary>
+                        <ul className="text-sm" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                          {details.map(([k, v]) => <li key={k}><strong>{k}</strong>: {v}</li>)}
+                        </ul>
+                      </details>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
 }
 
 /**
@@ -61,8 +111,8 @@ function LiveChecksCard() {
   return (
     <Card title="Live integration checks">
       <p className="text-sm text-muted" style={{ marginTop: 0 }}>
-        Calls Shotstack, YouTube, DataForSEO, Gemini, OpenAI and OpenAI TTS with the credentials saved here (or in the server .env):
-        one cheap authenticated request each, plus a one-second voice sample. Nothing is uploaded or rendered.
+        Calls Shotstack, YouTube, DataForSEO, Gemini, OpenAI, OpenAI TTS and social-api.ai with the credentials saved here (or in the server .env):
+        one cheap authenticated request each, plus a one-second voice sample. Nothing is uploaded, rendered or posted.
         For a Shotstack test render run <code>php spark reach:integrations-check --render-test</code> on the server.
       </p>
       <div className="page-header__actions">
@@ -71,42 +121,7 @@ function LiveChecksCard() {
         </button>
       </div>
       {failure && <Alert variant="danger">{failure}</Alert>}
-      {report && (
-        <>
-          <Alert variant={report.ok ? 'success' : 'danger'}>
-            {report.passed} passed, {report.failed} failed{report.ran_at ? ` · ${new Date(report.ran_at).toLocaleString()}` : ''}
-          </Alert>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr><th>Check</th><th>Result</th><th>Reason</th></tr>
-              </thead>
-              <tbody>
-                {(report.results ?? []).map((r) => {
-                  const details = detailEntries(r.detail);
-                  return (
-                    <tr key={r.target}>
-                      <td>{r.target}</td>
-                      <td><span className={`badge ${r.ok ? 'badge--success' : 'badge--danger'}`}>{r.ok ? 'OK' : 'FAIL'}</span></td>
-                      <td>
-                        {r.message}
-                        {details.length > 0 && (
-                          <details>
-                            <summary className="text-sm text-muted">Details</summary>
-                            <ul className="text-sm" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-                              {details.map(([k, v]) => <li key={k}><strong>{k}</strong>: {v}</li>)}
-                            </ul>
-                          </details>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      {report && <LiveCheckReport report={report} />}
     </Card>
   );
 }
@@ -130,6 +145,7 @@ export function AutomationSettingsPage() {
   const [error, setError]     = useState(null);
   const [notice, setNotice]   = useState(null);
   const [tests, setTests]     = useState({});
+  const [live, setLive]       = useState({});
 
   const load = () => adminService.automationSettings().then((d) => setRows(Array.isArray(d) ? d : []));
 
@@ -149,6 +165,10 @@ export function AutomationSettingsPage() {
       for (const row of group.rows) {
         if (!(row.key in edits)) continue;
         if (row.type === 'secret' && edits[row.key] === '') continue;
+        if (row.type === 'json_object') {
+          const why = jsonObjectError(edits[row.key]);
+          if (why) { setError(`${row.label}: ${why}`); setNotice(null); return; }
+        }
         body[row.key] = edits[row.key];
       }
     }
@@ -178,6 +198,16 @@ export function AutomationSettingsPage() {
       setTests((prev) => ({ ...prev, [target]: r }));
     } catch (e) {
       setTests((prev) => ({ ...prev, [target]: { ok: false, message: e.message } }));
+    }
+  };
+
+  const runLive = async (target) => {
+    setLive((prev) => ({ ...prev, [target]: { pending: true } }));
+    try {
+      const r = await adminService.runLiveChecks([target]);
+      setLive((prev) => ({ ...prev, [target]: { report: r } }));
+    } catch (e) {
+      setLive((prev) => ({ ...prev, [target]: { failure: e.message } }));
     }
   };
 
@@ -261,6 +291,34 @@ export function AutomationSettingsPage() {
                         </datalist>
                       </>
                     )}
+                    {row.type === 'choice' && (
+                      <select
+                        id={id}
+                        value={edits[row.key] ?? displayValue(row)}
+                        onChange={(e) => setEdit(row.key, e.target.value)}
+                        className="settings-row__input"
+                      >
+                        {(row.options ?? []).map((o) => <option key={o} value={o}>{CHOICE_LABEL[o] ?? o}</option>)}
+                      </select>
+                    )}
+                    {row.type === 'json_object' && (
+                      <>
+                        <textarea
+                          id={id}
+                          rows={3}
+                          placeholder='Blank = none. e.g. {"key": "value"} — keys from docs.social-api.ai'
+                          value={edits[row.key] ?? displayValue(row)}
+                          onChange={(e) => setEdit(row.key, e.target.value)}
+                          className="settings-row__input"
+                          spellCheck={false}
+                          aria-invalid={jsonObjectError(edits[row.key]) ? 'true' : undefined}
+                          style={{ fontFamily: 'monospace' }}
+                        />
+                        {row.key in edits && jsonObjectError(edits[row.key]) && (
+                          <span className="text-sm text-error" role="alert">{jsonObjectError(edits[row.key])}</span>
+                        )}
+                      </>
+                    )}
                     {(row.type === 'string' || row.type === 'email_list') && (
                       <input
                         id={id}
@@ -288,6 +346,11 @@ export function AutomationSettingsPage() {
                 <PlugZap size={14} aria-hidden="true" /> Test {target}
               </button>
             ))}
+            {(GROUP_LIVE_CHECKS[group.name] ?? []).map(({ target, label }) => (
+              <button key={target} type="button" className="btn btn-secondary" onClick={() => runLive(target)} disabled={live[target]?.pending}>
+                <Activity size={14} aria-hidden="true" /> {live[target]?.pending ? 'Checking…' : label}
+              </button>
+            ))}
             <button type="button" className="btn btn-primary" onClick={() => saveGroup(group)} disabled={saving === group.name}>
               <Save size={14} aria-hidden="true" /> {saving === group.name ? 'Saving…' : `Save ${group.name}`}
             </button>
@@ -296,6 +359,12 @@ export function AutomationSettingsPage() {
             <Alert key={target} variant={tests[target].ok ? 'success' : 'danger'}>
               {target}: {tests[target].message}
             </Alert>
+          ))}
+          {(GROUP_LIVE_CHECKS[group.name] ?? []).map(({ target }) => (
+            <div key={target}>
+              {live[target]?.failure && <Alert variant="danger">{target}: {live[target].failure}</Alert>}
+              {live[target]?.report && <LiveCheckReport report={live[target].report} />}
+            </div>
           ))}
         </Card>
       ))}

@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Libraries\Settings;
 
+use App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts;
+use App\Libraries\Distribution\Providers\SocialApi\SocialApiAiClient;
+use App\Libraries\Distribution\Providers\SocialApi\SocialApiException;
+use App\Libraries\Distribution\Providers\SocialApi\SocialApiPlatforms;
 use App\Libraries\Video\Automation\Http\CurlTransport;
+use App\Libraries\Video\Automation\YouTube\YouTubePublisherMode;
 use App\Libraries\Video\Automation\Http\HttpResponse;
 use App\Libraries\Video\Automation\Http\HttpTransport;
 use App\Libraries\Video\Automation\Render\ShotstackClient;
@@ -31,6 +36,9 @@ use Throwable;
  *   youtube    → OAuth token refresh + channels.list(snippet,status, mine=true);
  *                never uploads
  *   tts        → one short phrase through OpenAI TTS (bytes discarded)
+ *   social_api → GET /v1/accounts on social-api.ai with the saved key: lists the
+ *                connected accounts (platform, name, id — never the key) and
+ *                which account each platform would post to; never posts
  *
  * Results never carry a credential: every message and detail is scrubbed of
  * the configured secret values before it is returned.
@@ -40,7 +48,7 @@ use Throwable;
  */
 final class LiveIntegrationCheck
 {
-    public const TARGETS = ['shotstack', 'youtube', 'dataforseo', 'gemini', 'openai', 'tts'];
+    public const TARGETS = ['shotstack', 'youtube', 'dataforseo', 'gemini', 'openai', 'tts', 'social_api'];
 
     public const RENDER_TIMEOUT_SECS = 180;
     public const RENDER_POLL_SECS    = 5;
@@ -141,6 +149,7 @@ final class LiveIntegrationCheck
                     'shotstack' => $this->shotstack($renderTest, $progress),
                     'youtube'   => $this->youtube(),
                     'tts'       => $this->tts(),
+                    'social_api' => $this->socialApi(),
                     'gemini', 'openai', 'dataforseo' => $this->providers->check($target),
                     default     => $this->result($target, false, 'Unknown check.'),
                 };
@@ -365,6 +374,61 @@ final class LiveIntegrationCheck
             $body['model'],
             $body['voice'],
         ), ['bytes' => $size, 'duration_ms' => $ms, 'model' => $body['model'], 'voice' => $body['voice']]);
+    }
+
+    // ── social-api.ai ───────────────────────────────────────────────────────
+
+    private function socialApi(): array
+    {
+        $key = ReachConfig::secret('social.socialapi.api_key');
+        if ($key === null) {
+            return $this->result('social_api', false, 'social-api.ai API key is not set (Settings → AI & Automation → Social, or SOCIALAPI_API_KEY).');
+        }
+        $client   = new SocialApiAiClient($key, (string) ReachConfig::get('social.socialapi.base_url'), $this->http, static function (int $s): void {
+        }, getRetries: 0);
+        $detail   = ['base_url' => $client->baseUrl(), 'youtube_publisher' => YouTubePublisherMode::current()];
+        $accounts = new SocialApiAccounts($client, null, null, false);
+
+        try {
+            $all = $accounts->all(true);
+        } catch (SocialApiException $e) {
+            $message = match ($e->kind) {
+                SocialApiException::AUTH      => "social-api.ai rejected the API key (HTTP {$e->httpStatus}). Check social.socialapi.api_key (it starts with sapi_key_).",
+                SocialApiException::TRANSIENT => $e->httpStatus === 0
+                    ? 'Could not reach social-api.ai at ' . $client->baseUrl() . ' (network error). ' . $e->getMessage()
+                    : "social-api.ai answered HTTP {$e->httpStatus}. " . $e->getMessage(),
+                default                       => $e->getMessage(),
+            };
+            return $this->result('social_api', false, $message, $detail + ['kind' => $e->kind, 'http_status' => $e->httpStatus]);
+        }
+
+        $counts = [];
+        $lines  = [];
+        foreach ($all as $a) {
+            $p = $a['platform'] ?? ('unsupported:' . ($a['platform_raw'] ?? '?'));
+            $counts[$p] = ($counts[$p] ?? 0) + 1;
+            $lines[] = trim($p . ' ' . (($a['name'] ?? null) !== null ? '“' . $a['name'] . '” ' : '') . (($a['username'] ?? null) !== null ? '@' . ltrim((string) $a['username'], '@') . ' ' : '') . 'id=' . $a['id'] . ' status=' . ($a['status'] ?? 'n/a') . ($a['active'] ? '' : ' (not active)'));
+        }
+        $detail['accounts'] = $lines === [] ? 'none connected' : $lines;
+
+        $targets = [];
+        foreach (SocialApiPlatforms::PLATFORMS as $platform) {
+            $r = $accounts->check($platform);
+            $targets[$platform] = $r['ok']
+                ? 'posts go to ' . $r['account']['id'] . (($r['account']['name'] ?? null) !== null ? ' “' . $r['account']['name'] . '”' : '') . ' (' . ($r['account']['source'] === 'setting' ? 'social.socialapi.account.' . $platform : 'auto: the only active account') . ')'
+                : 'not available — ' . $r['reason'];
+        }
+        $detail['targets'] = $targets;
+
+        $summary = $counts === [] ? 'no accounts connected' : implode(', ', array_map(static fn ($p, $n) => "{$p} {$n}", array_keys($counts), $counts));
+        $ready   = array_keys(array_filter($targets, static fn ($t) => str_starts_with($t, 'posts go to')));
+
+        return $this->result('social_api', true, sprintf(
+            'Key accepted; %d connected account(s): %s. Ready to post to: %s. Nothing was posted.',
+            count($all),
+            $summary,
+            $ready === [] ? 'none' : implode(', ', $ready),
+        ), $detail);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

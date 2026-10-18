@@ -42,6 +42,11 @@ modes and superadmin approval gates.
   - **Worker** — Playwright/UI/screenshot jobs via
     `worker.apis.aicountly.com/v1/{health,screenshot,review,runs}`; graceful
     degradation when the endpoints or token are unavailable.
+  - **social-api.ai** — social posts (LinkedIn, Facebook, Instagram, X) and the video pipeline's
+    YouTube vlogs/Shorts (`social.socialapi.*`, `video.youtube.publisher`). Posts are `posted` only
+    once social-api.ai reports them published (polled every 5 minutes) —
+    [`docs/operations/SOCIAL_API.md`](docs/operations/SOCIAL_API.md). Verify with
+    `php spark reach:integrations-check --only=social_api`.
   - **AICOUNTLY.com blog publish** — HTTP placeholder against
     `{AICOUNTLY_SITE_API_BASE_URL}/blog/posts`. If either env is empty the
     post stays `approved` with `publishing_status = pending_publishing`.

@@ -77,7 +77,7 @@ export function SocialPlannerPage() {
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
-          {['draft','pending_approval','approved','scheduled','posted','manual_queue','rejected','failed','archived'].map((s) => (
+          {['draft','pending_approval','approved','scheduled','publishing','posted','manual_queue','rejected','failed','archived'].map((s) => (
             <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
           ))}
         </select>

@@ -136,13 +136,16 @@ class VideoAutomationService
             $quota[$format] = ['limit' => $limit, 'used' => $used, 'remaining' => max(0, $limit - $used)];
         }
         $channel = (new YouTubeChannelService())->status();
+        $path    = YouTube\YouTubePublisherMode::describe($channel);
 
         return [
             'enabled'            => (bool) ReachConfig::get('automation.video.enabled'),
             'date_ist'           => (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Kolkata')))->format('Y-m-d'),
             'quota'              => $quota,
-            'youtube_connected'  => $channel['connected'],
-            'youtube_channel'    => $channel['channel_title'],
+            // Whether videos can reach YouTube now, on the active path (video.youtube.publisher).
+            'youtube_connected'  => $path['ready'],
+            'youtube_publisher'  => $path['mode'],
+            'youtube_channel'    => $path['mode'] === 'direct' ? $channel['channel_title'] : ($path['account']['name'] ?? $path['account']['username'] ?? $path['account']['id'] ?? null),
             'rendering_configured' => ShotstackClient::isConfigured(),
             'voice_configured'   => ReachConfig::secret('ai.openai.api_key') !== null,
             'recent_titles'      => $this->repo->recentTitles(40),

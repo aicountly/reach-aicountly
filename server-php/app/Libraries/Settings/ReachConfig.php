@@ -24,7 +24,8 @@ final class ReachConfig
     private static ?array $cache = null;
 
     /**
-     * key => [group, label, type (string|secret|int|bool|email_list|model), env?, default?, help?]
+     * key => [group, label, type (string|secret|int|bool|email_list|model|choice|json_object), env?, default?, help?,
+     *         options? (choice), format? (https_url|account_id — extra validation of a string)]
      *
      * @return array<string, array<string, mixed>>
      */
@@ -111,9 +112,28 @@ final class ReachConfig
             'seo.dataforseo.login' => ['group' => 'SEO data', 'label' => 'DataForSEO login', 'type' => 'string', 'env' => 'DATAFORSEO_LOGIN'],
             'seo.dataforseo.password' => ['group' => 'SEO data', 'label' => 'DataForSEO password', 'type' => 'secret', 'env' => 'DATAFORSEO_PASSWORD'],
 
-            // ── Social ──────────────────────────────────────────────────────
-            'social.socialapi.api_key' => ['group' => 'Social', 'label' => 'socialapi.ai API key', 'type' => 'secret', 'env' => 'SOCIALAPI_API_KEY'],
-            'social.socialapi.base_url' => ['group' => 'Social', 'label' => 'socialapi.ai API base URL', 'type' => 'string', 'env' => 'SOCIALAPI_BASE_URL'],
+            // ── Social: social-api.ai (posts + YouTube videos) — keep this block contiguous ──
+            'social.socialapi.base_url' => ['group' => 'Social', 'label' => 'social-api.ai API base URL', 'type' => 'string', 'env' => 'SOCIALAPI_BASE_URL', 'default' => 'https://api.social-api.ai/v1', 'format' => 'https_url',
+                'help' => 'Leave the default unless social-api.ai tells you otherwise.'],
+            'social.socialapi.api_key' => ['group' => 'Social', 'label' => 'social-api.ai API key', 'type' => 'secret', 'env' => 'SOCIALAPI_API_KEY',
+                'help' => 'social-api.ai dashboard → API keys (starts with sapi_key_). After saving, run the social-api.ai live check (button below, or php spark reach:integrations-check --only=social_api).'],
+            'video.youtube.publisher' => ['group' => 'Social', 'label' => 'How videos reach YouTube', 'type' => 'choice', 'env' => 'VIDEO_YOUTUBE_PUBLISHER', 'default' => 'social_api', 'options' => ['social_api', 'direct'],
+                'help' => 'social_api = vlogs and Shorts go to YouTube through social-api.ai (its YouTube connection is already verified by Google). direct = Reach uploads with its own Google OAuth client (Settings → Video; Connect YouTube channel on the Video page).'],
+            'social.socialapi.account.youtube' => ['group' => 'Social', 'env' => 'SOCIALAPI_ACCOUNT_YOUTUBE', 'label' => 'social-api.ai account id: YouTube', 'type' => 'string', 'format' => 'account_id',
+                'help' => 'Blank = the single active YouTube account connected in social-api.ai. Set it when more than one is connected (the live check lists the ids).'],
+            'social.socialapi.account.instagram' => ['group' => 'Social', 'env' => 'SOCIALAPI_ACCOUNT_INSTAGRAM', 'label' => 'social-api.ai account id: Instagram', 'type' => 'string', 'format' => 'account_id', 'help' => 'Blank = the single active Instagram account.'],
+            'social.socialapi.account.facebook' => ['group' => 'Social', 'env' => 'SOCIALAPI_ACCOUNT_FACEBOOK', 'label' => 'social-api.ai account id: Facebook', 'type' => 'string', 'format' => 'account_id', 'help' => 'Blank = the single active Facebook account.'],
+            'social.socialapi.account.linkedin' => ['group' => 'Social', 'env' => 'SOCIALAPI_ACCOUNT_LINKEDIN', 'label' => 'social-api.ai account id: LinkedIn', 'type' => 'string', 'format' => 'account_id', 'help' => 'Blank = the single active LinkedIn account.'],
+            'social.socialapi.account.x' => ['group' => 'Social', 'env' => 'SOCIALAPI_ACCOUNT_X', 'label' => 'social-api.ai account id: X / Twitter', 'type' => 'string', 'format' => 'account_id', 'help' => 'Blank = the single active X account.'],
+            'social.socialapi.account.tiktok' => ['group' => 'Social', 'env' => 'SOCIALAPI_ACCOUNT_TIKTOK', 'label' => 'social-api.ai account id: TikTok', 'type' => 'string', 'format' => 'account_id', 'help' => 'Blank = the single active TikTok account. (Reach has no TikTok channel yet.)'],
+            'social.socialapi.platform_data.youtube' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_YOUTUBE', 'label' => 'platform_data for YouTube posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged as-is into platform_data of every YouTube post (privacy, category, made-for-kids…). Copy the exact keys from docs.social-api.ai → Platforms → YouTube; Reach does not guess them. Blank = none.'],
+            'social.socialapi.platform_data.instagram' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_INSTAGRAM', 'label' => 'platform_data for Instagram posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → Instagram. Blank = none.'],
+            'social.socialapi.platform_data.facebook' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_FACEBOOK', 'label' => 'platform_data for Facebook posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → Facebook. Blank = none.'],
+            'social.socialapi.platform_data.linkedin' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_LINKEDIN', 'label' => 'platform_data for LinkedIn posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → LinkedIn. Blank = none.'],
+            'social.socialapi.platform_data.x' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_X', 'label' => 'platform_data for X posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → X. Blank = none.'],
+            'social.socialapi.platform_data.tiktok' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_TIKTOK', 'label' => 'platform_data for TikTok posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → TikTok. Blank = none.'],
+            // ── end social-api.ai ──
 
             // ── Distribution (campaign sends: email / SMS / WhatsApp) ───────
             'distribution.batch_size' => ['group' => 'Distribution', 'label' => 'Recipients per dispatch batch', 'type' => 'int', 'default' => 100,
@@ -280,9 +300,39 @@ final class ReachConfig
                 $row['value']   = self::get($key);
                 $row['default'] = $meta['default'] ?? null;
             }
+            if (isset($meta['options'])) {
+                $row['options'] = array_values((array) $meta['options']);
+            }
             $out[] = $row;
         }
         return $out;
+    }
+
+    /**
+     * A `json_object` setting decoded: [] when blank. A stored value that is
+     * somehow not a JSON object (edited in the database, or a malformed env
+     * value) reads as [] and is logged rather than sent half-understood.
+     *
+     * @return array<string, mixed>
+     */
+    public static function jsonObject(string $key): array
+    {
+        $raw = self::get($key, '');
+        if (is_array($raw)) {
+            return $raw;
+        }
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded) || (array_is_list($decoded) && $decoded !== [])) {
+            if (function_exists('log_message')) {
+                log_message('warning', "[ReachConfig] {$key} is not a JSON object; ignored.");
+            }
+            return [];
+        }
+        return $decoded;
     }
 
     /** Drop the per-request cache (tests, or after a write elsewhere). */
@@ -315,9 +365,10 @@ final class ReachConfig
         };
     }
 
-    private static function validate(string $key, mixed $value): mixed
+    /** The value set() would store, or InvalidArgumentException (public for the settings API and tests). */
+    public static function validate(string $key, mixed $value): mixed
     {
-        $type = self::registry()[$key]['type'];
+        $type = (self::registry()[$key] ?? throw new \InvalidArgumentException("Unknown setting: {$key}"))['type'];
         if ($type === 'int') {
             if (! is_numeric($value) || (int) $value < 0) {
                 throw new \InvalidArgumentException("{$key} must be a non-negative number.");
@@ -338,7 +389,33 @@ final class ReachConfig
         if ($type === 'model' && $str !== '' && ! preg_match('/^[A-Za-z0-9._\-\/]{2,120}$/', $str)) {
             throw new \InvalidArgumentException("{$key}: not a valid model id.");
         }
+        if ($type === 'choice' && $str !== '' && ! in_array($str, (array) (self::registry()[$key]['options'] ?? []), true)) {
+            throw new \InvalidArgumentException("{$key} must be one of: " . implode(', ', (array) self::registry()[$key]['options']) . '.');
+        }
+        if ($type === 'json_object' && $str !== '') {
+            return self::normalizeJsonObject($key, $str);
+        }
+        $format = (string) (self::registry()[$key]['format'] ?? '');
+        if ($format === 'https_url' && $str !== '' && (! preg_match('#^https://[^\s/?\#]+#i', $str) || filter_var($str, FILTER_VALIDATE_URL) === false)) {
+            throw new \InvalidArgumentException("{$key} must be an https:// URL.");
+        }
+        if ($format === 'account_id' && $str !== '' && ! preg_match('/^[A-Za-z0-9._:@\-]{1,200}$/', $str)) {
+            throw new \InvalidArgumentException("{$key}: not a valid account id (letters, digits and . _ : @ - only).");
+        }
         return $str;
+    }
+
+    private static function normalizeJsonObject(string $key, string $str): string
+    {
+        try {
+            $decoded = json_decode($str, true, 32, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new \InvalidArgumentException("{$key} is not valid JSON: " . $e->getMessage() . '.');
+        }
+        if (! is_array($decoded) || ! str_starts_with(ltrim($str), '{')) {
+            throw new \InvalidArgumentException("{$key} must be a JSON object, e.g. {\"key\": \"value\"}.");
+        }
+        return $decoded === [] ? '{}' : (string) json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private static function env(string $name): string

@@ -60,6 +60,11 @@ final class VideoAutomationPipelineTest extends ApiTestCase
             'YOUTUBE_REFRESH_TOKEN'  => null,
             'YOUTUBE_CLIENT_ID'      => null,
             'YOUTUBE_CLIENT_SECRET'  => null,
+            // These tests exercise the direct YouTube upload; the social-api.ai
+            // path has its own test (VideoSocialApiPublishingTest).
+            'VIDEO_YOUTUBE_PUBLISHER' => 'direct',
+            'SOCIALAPI_API_KEY'      => null,
+            'SOCIAL_PROVIDER'        => null,
         ]);
         $this->verdicts = [];
         $this->youtube  = new MockYouTubeClient();

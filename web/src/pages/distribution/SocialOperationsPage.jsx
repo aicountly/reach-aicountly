@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
-const FILTERS = ['all', 'approved', 'posted', 'failed', 'scheduled'];
+const FILTERS = ['all', 'approved', 'publishing', 'posted', 'failed', 'scheduled'];
 
 export default function SocialOperationsPage() {
   const [posts, setPosts]     = useState([]);
@@ -50,7 +50,11 @@ export default function SocialOperationsPage() {
     <div>
       <div className="page-header">
         <h1>Social Distribution</h1>
-        <p className="page-header__subtitle">Dispatch approved posts to social channels via provider</p>
+        <p className="page-header__subtitle">
+          Dispatch approved posts to social channels via the provider (social-api.ai). <em>publishing</em> = social-api.ai
+          accepted the post and is delivering it; it becomes <em>posted</em> only when social-api.ai reports it published
+          (checked every 5 minutes; failed after 30 minutes without confirmation).
+        </p>
       </div>
 
       <div className="filter-bar mb-4">
@@ -91,12 +95,18 @@ export default function SocialOperationsPage() {
                 <td className="text-truncate" style={{ maxWidth: '300px' }}>
                   {(p.content || '').slice(0, 80)}{(p.content || '').length > 80 ? '…' : ''}
                 </td>
-                <td><span className="badge badge--neutral">{p.status}</span></td>
+                <td>
+                  <span className="badge badge--neutral">{p.status}</span>
+                  {p.provider_error_code && <div className="text-sm text-error">{p.provider_error_code}</div>}
+                  {p.error_message && (p.status === 'failed' || p.status === 'publishing') && (
+                    <div className="text-sm muted" style={{ maxWidth: 320 }}>{p.error_message}</div>
+                  )}
+                </td>
                 <td>{p.provider ?? '—'}</td>
                 <td>
-                  {p.status === 'approved' && (
+                  {(p.status === 'approved' || (p.status === 'failed' && p.approval_status === 'approved')) && (
                     <button type="button" className="btn btn--sm btn--primary" onClick={() => handleDispatch(p.id)}>
-                      Dispatch
+                      {p.status === 'failed' ? 'Retry' : 'Dispatch'}
                     </button>
                   )}
                   {p.remote_url && (

@@ -8,6 +8,12 @@ namespace App\Libraries\Video\Automation\Http;
  * cURL implementation of HttpTransport. Never follows redirects (a provider
  * redirect is surfaced to the caller), verifies TLS, and reports a transport
  * failure as status 0 with the cURL error rather than throwing.
+ *
+ * Large files never pass through PHP memory:
+ *   options['sink_file']  stream the response body into this file path
+ *                         (the returned body is then '')
+ *   options['body_file']  stream the request body from this file path
+ *                         (with $body = null; e.g. a PUT to a presigned URL)
  */
 final class CurlTransport implements HttpTransport
 {
@@ -51,15 +57,49 @@ final class CurlTransport implements HttpTransport
             curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
         }
 
+        $in   = null;
+        $sink = null;
+        if (isset($options['body_file']) && $body === null) {
+            $in = @fopen((string) $options['body_file'], 'rb');
+            if ($in === false) {
+                curl_close($ch);
+                return new HttpResponse(0, '', [], 'cannot read ' . basename((string) $options['body_file']));
+            }
+            curl_setopt_array($ch, [
+                CURLOPT_UPLOAD     => true,
+                CURLOPT_INFILE     => $in,
+                CURLOPT_INFILESIZE => (int) filesize((string) $options['body_file']),
+            ]);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        }
+        if (isset($options['sink_file'])) {
+            $sink = @fopen((string) $options['sink_file'], 'wb');
+            if ($sink === false) {
+                curl_close($ch);
+                if (is_resource($in)) {
+                    fclose($in);
+                }
+                return new HttpResponse(0, '', [], 'cannot write the download file');
+            }
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+            curl_setopt($ch, CURLOPT_FILE, $sink);
+        }
+
         $raw    = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error  = curl_error($ch);
         curl_close($ch);
+        if (is_resource($in)) {
+            fclose($in);
+        }
+        if (is_resource($sink)) {
+            fclose($sink);
+        }
 
         if ($raw === false) {
             return new HttpResponse(0, '', $responseHeaders, $error !== '' ? $error : 'request failed');
         }
 
-        return new HttpResponse($status, (string) $raw, $responseHeaders);
+        return new HttpResponse($status, $sink !== null ? '' : (string) $raw, $responseHeaders);
     }
 }

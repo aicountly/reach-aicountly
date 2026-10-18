@@ -331,6 +331,7 @@ class AuditLogger
     public const DISTRIBUTION_DISPATCH_CANCELLED             = 'distribution.dispatch.cancelled';
     public const DISTRIBUTION_DISPATCH_FAILED                = 'distribution.dispatch.failed';
     public const DISTRIBUTION_DISPATCH_DEAD_LETTERED         = 'distribution.dispatch.dead_lettered';
+    public const DISTRIBUTION_SOCIAL_SUBMITTED               = 'distribution.social.submitted';
     public const DISTRIBUTION_SOCIAL_POSTED                  = 'distribution.social.posted';
     public const DISTRIBUTION_SOCIAL_FAILED                  = 'distribution.social.failed';
     public const DISTRIBUTION_SOCIAL_WITHDRAWN               = 'distribution.social.withdrawn';

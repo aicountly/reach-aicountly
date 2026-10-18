@@ -51,7 +51,8 @@ class AutomationSettingsController extends BaseApiController
 
     /**
      * "Run live checks": the same checks as `php spark reach:integrations-check`
-     * (Shotstack key, YouTube token + channel, DataForSEO, Gemini, OpenAI, TTS)
+     * (Shotstack key, YouTube token + channel, DataForSEO, Gemini, OpenAI, TTS,
+     * social-api.ai accounts — never posts)
      * against the live services. Body: {"only": ["youtube", …]} (optional).
      * The Shotstack test render is CLI-only — it waits minutes and may bill.
      */

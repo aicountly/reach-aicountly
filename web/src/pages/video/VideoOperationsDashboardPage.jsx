@@ -58,10 +58,26 @@ export default function VideoOperationsDashboardPage() {
             <h3 className="card__title">YouTube publishing</h3>
             <div className="card__body">
               <dl className="definition-list" style={{ margin: 0 }}>
-                <dt>Channel</dt>
-                <dd>{ops.youtube?.connected ? (ops.youtube.channel_title || 'connected') : 'not connected'}</dd>
-                <dt>Privacy</dt>
-                <dd>{ops.youtube?.privacy}</dd>
+                <dt>Publishes via</dt>
+                <dd>
+                  {ops.youtube_path?.label ?? 'direct upload'}{' '}
+                  {ops.youtube_path && (
+                    <span className={`badge ${ops.youtube_path.ready ? 'badge--success' : 'badge--warning'}`}>{ops.youtube_path.ready ? 'ready' : 'not ready'}</span>
+                  )}
+                </dd>
+                {ops.youtube_path?.mode === 'social_api' ? (
+                  <>
+                    <dt>social-api.ai account</dt>
+                    <dd>{ops.youtube_path.account?.id ? `${ops.youtube_path.account.name ? `“${ops.youtube_path.account.name}” ` : ''}${ops.youtube_path.account.id}` : (ops.youtube_path.reason || 'not resolved')}</dd>
+                  </>
+                ) : (
+                  <>
+                    <dt>Channel</dt>
+                    <dd>{ops.youtube?.connected ? (ops.youtube.channel_title || 'connected') : 'not connected'}</dd>
+                    <dt>Privacy</dt>
+                    <dd>{ops.youtube?.privacy}</dd>
+                  </>
+                )}
               </dl>
               <Link to="/video" className="stat-card__link">Connect or manage →</Link>
             </div>

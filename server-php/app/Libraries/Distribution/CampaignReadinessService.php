@@ -7,11 +7,13 @@ namespace App\Libraries\Distribution;
 use App\Libraries\Distribution\Providers\ChannelProviderFactory;
 use App\Libraries\Distribution\Providers\MockSocialPublisher;
 use App\Libraries\Distribution\Providers\ProviderGuard;
+use App\Libraries\Distribution\Providers\SocialApi\SocialApiPlatforms;
 use App\Libraries\Distribution\Providers\SocialApiAiPublisher;
 use App\Libraries\Gateways\Mailer;
 use App\Libraries\Gateways\SmsSender;
 use App\Libraries\Gateways\WhatsappSender;
 use App\Libraries\Settings\ReachConfig;
+use App\Libraries\Video\Automation\YouTube\YouTubePublisherMode;
 
 /**
  * Live, honest readiness of every campaign channel (GET v1/distribution/readiness).
@@ -20,7 +22,8 @@ use App\Libraries\Settings\ReachConfig;
  *   ready           a real provider is configured and sends for real
  *   test_mode       provider configured but *_SKIP_SEND is on — nothing leaves Reach
  *   not_configured  credentials/settings missing; sends fail closed
- *   blocked         waiting on something outside this codebase (e.g. socialapi.ai docs)
+ *   blocked         waiting on something outside this codebase (e.g. a social-api.ai
+ *                   account to connect, or a key social-api.ai refuses)
  *   not_supported   no integration exists in Reach
  *
  * Never returns a secret value — only whether it is set.
@@ -128,7 +131,15 @@ class CampaignReadinessService
             + ['opted_in_leads' => $this->grantedConsents('whatsapp')];
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * Social channels through social-api.ai: `ready` only when the key and
+     * base URL are set and an account for that platform resolves (setting
+     * override, or the single active account in GET /accounts — cached 10
+     * minutes). Key missing → not_configured; account none / ambiguous /
+     * key refused / API unreachable → blocked, with the reason.
+     *
+     * @return array<string,mixed>
+     */
     private function social(string $key, string $label): array
     {
         $reasons = [];
@@ -145,24 +156,39 @@ class CampaignReadinessService
             $hasKey = ReachConfig::secret('social.socialapi.api_key') !== null;
         } catch (\Throwable) {
         }
-        $checks = [self::check('social.socialapi.api_key', 'secret', $hasKey, 'socialapi.ai API key (Settings → AI & Automation → Social).')];
+        $baseUrl  = trim((string) self::setting('social.socialapi.base_url'));
+        $platform = SocialApiPlatforms::forChannel($key) ?? $key;
+        $checks   = [
+            self::check('social.socialapi.api_key', 'secret', $hasKey, 'social-api.ai API key (Settings → AI & Automation → Social).'),
+            self::check('social.socialapi.base_url', 'setting', $baseUrl !== '', 'social-api.ai API base URL (default https://api.social-api.ai/v1).'),
+        ];
+        $account = null;
 
         if ($publisher instanceof SocialApiAiPublisher) {
-            $state     = 'blocked';
-            $reasons[] = SocialApiAiPublisher::PENDING_MESSAGE;
+            if (! $hasKey || $baseUrl === '') {
+                $state     = 'not_configured';
+                $reasons[] = ! $hasKey ? 'social.socialapi.api_key is not set: posts fail closed.' : 'social.socialapi.base_url is empty.';
+            } else {
+                $r = $publisher->readiness($key);
+                $checks[] = self::check('social.socialapi.account.' . $platform, 'social-api.ai', $r['ok'], "A {$label} account connected in social-api.ai (or its id in social.socialapi.account.{$platform}).");
+                if ($r['ok']) {
+                    $state   = 'ready';
+                    $account = $r['account'];
+                } else {
+                    $state     = 'blocked';
+                    $reasons[] = (string) $r['reason'];
+                }
+            }
         } elseif ($publisher instanceof MockSocialPublisher) {
             $state     = 'not_configured';
             $reasons[] = ProviderGuard::isProduction()
-                ? 'No real social publisher: posts fail closed (approved posts go to the manual queue).'
-                : 'Development mock publisher in use — nothing is posted anywhere.';
+                ? 'No real social publisher: set social.socialapi.api_key. Until then posts fail closed (approved posts go to the manual queue).'
+                : 'Development mock publisher in use — nothing is posted anywhere. Set social.socialapi.api_key to publish through social-api.ai.';
         } else {
             $state = $publisher !== null && $publisher->isEnabled() ? 'ready' : 'not_configured';
         }
-        if ($key === 'youtube') {
-            $reasons[] = 'Video uploads use the separate video pipeline (VIDEO_* settings), not campaign social posts.';
-        }
 
-        return [
+        $channel = [
             'channel'  => $key,
             'label'    => $label,
             'group'    => 'social',
@@ -171,9 +197,22 @@ class CampaignReadinessService
             'reasons'  => $reasons,
             'checks'   => $checks,
             'manual'   => [
-                "{$label} account/page connected inside socialapi.ai (once the adapter exists).",
+                "{$label} connected in social-api.ai (one active account, or its id in social.socialapi.account.{$platform}).",
+                'After saving the key: php spark reach:integrations-check --only=social_api (or the social-api.ai check on Settings → AI & Automation → Social).',
             ],
         ];
+        if ($account !== null) {
+            $channel['account'] = ['id' => $account['id'], 'name' => $account['name'] ?? null, 'username' => $account['username'] ?? null, 'source' => $account['source'] ?? null];
+        }
+        if ($key === 'youtube') {
+            $mode = YouTubePublisherMode::current();
+            $channel['youtube_publisher'] = $mode;
+            $channel['reasons'][] = $mode === YouTubePublisherMode::SOCIAL_API
+                ? 'The video pipeline publishes vlogs and Shorts to YouTube through social-api.ai (video.youtube.publisher = social_api).'
+                : 'The video pipeline uploads to YouTube directly with Reach’s Google OAuth client (video.youtube.publisher = direct); this social-api.ai state applies to YouTube posts only.';
+        }
+
+        return $channel;
     }
 
     /** @return array<string,mixed> */
@@ -187,7 +226,7 @@ class CampaignReadinessService
             'provider' => null,
             'reasons'  => [
                 "No {$label} integration exists in Reach (no campaign, audience or spend API code).",
-                'Unknown whether socialapi.ai covers paid ads — its docs were not available; confirm before planning paid launches through Reach.',
+                'social-api.ai is used for organic posts and videos only; Reach has no paid-ads integration through it.',
             ],
             'checks'   => [],
             'manual'   => ["Run {$label} campaigns directly in the {$label} manager for launch."],

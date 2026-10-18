@@ -39,7 +39,7 @@ Super admins and Reach admins (`settings.manage`) can change, without a code cha
 - **Image model** — OpenAI image model (default `dall-e-3`) and size.
 - **Automation** — on/off and daily volume per content type.
 - **Reports** — daily analytics report recipients (default `pno@aicountly.com`).
-- **SEO data** — DataForSEO login/password. **Social** — socialapi.ai key and base URL.
+- **SEO data** — DataForSEO login/password. **Social** — social-api.ai key, base URL, per-platform account ids and platform_data, and how videos reach YouTube (see `docs/operations/SOCIAL_API.md`).
 
 After a provider key is added or removed, `reach:schedule` (every minute) re-seeds the AI
 catalog so the provider becomes routable — no shell needed.

@@ -83,6 +83,8 @@ class JobHandlerRegistry
         $this->handlers[DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL] = new \App\Jobs\DistributionSocialDispatchJob();
         $this->handlers[DistributionJobTypes::CAMPAIGN_SCHEDULE]        = new \App\Jobs\DistributionCampaignScheduleJob();
         $this->handlers[DistributionJobTypes::CAMPAIGN_RECONCILE]       = new \App\Jobs\DistributionReconcileJob();
+        // social-api.ai: confirm `publishing` posts (published / failed / 30-minute timeout).
+        $this->handlers[\App\Libraries\Distribution\SocialPostStatusPoller::JOB_TYPE] = new \App\Jobs\SocialPostPollJob();
         // Stream F: SEO Tracker (DataForSEO SERP checks) + daily analytics report
         $this->handlers['reach.seo_tracker']                         = new \App\Jobs\SeoTrackerJob();
         $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();

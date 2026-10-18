@@ -25,8 +25,8 @@ const REPORT = {
       reasons: ['SMS_SKIP_SEND is on.'], checks: [], manual: [], opted_in_leads: 12,
     },
     {
-      channel: 'linkedin', label: 'LinkedIn', group: 'social', state: 'blocked', provider: 'socialapi',
-      reasons: ['socialapi.ai adapter pending: API docs required. Nothing was posted.'], checks: [], manual: [],
+      channel: 'linkedin', label: 'LinkedIn', group: 'social', state: 'blocked', provider: 'social_api',
+      reasons: ['No active LinkedIn account is connected in social-api.ai. Connect LinkedIn in social-api.ai, or set social.socialapi.account.linkedin. Nothing was posted.'], checks: [], manual: [],
     },
     {
       channel: 'google_ads', label: 'Google Ads', group: 'ads', state: 'not_supported', provider: null,
@@ -60,7 +60,7 @@ describe('CampaignReadinessPage', () => {
 
     expect(within(screen.getByTestId('readiness-sms')).getByText('Test mode')).toBeInTheDocument();
     expect(within(screen.getByTestId('readiness-sms')).getByText(/opt-in: 12/)).toBeInTheDocument();
-    expect(within(screen.getByTestId('readiness-linkedin')).getByText(/socialapi\.ai adapter pending/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('readiness-linkedin')).getByText(/No active LinkedIn account is connected in social-api\.ai/)).toBeInTheDocument();
     expect(within(screen.getByTestId('readiness-google_ads')).getByText('Not supported')).toBeInTheDocument();
   });
 

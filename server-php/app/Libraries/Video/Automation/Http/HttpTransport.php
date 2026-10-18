@@ -12,7 +12,9 @@ interface HttpTransport
 {
     /**
      * @param array<string, string> $headers
-     * @param array{timeout?: int} $options
+     * @param array{timeout?: int, sink_file?: string, body_file?: string} $options
+     *        sink_file: write the response body to this path (body returned as '');
+     *        body_file: send this file as the request body (with $body = null)
      */
     public function request(string $method, string $url, array $headers = [], ?string $body = null, array $options = []): HttpResponse;
 }

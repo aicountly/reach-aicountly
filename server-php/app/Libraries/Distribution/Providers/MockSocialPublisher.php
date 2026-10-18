@@ -74,7 +74,7 @@ class MockSocialPublisher implements SocialPublisherInterface
     {
         ProviderGuard::refuseMockInProduction(
             'Social',
-            'no real social publisher is available (socialapi.ai adapter pending: API docs required; set social.socialapi.api_key once it is implemented)'
+            'no real social publisher is available (set social.socialapi.api_key — Settings → AI & Automation → Social — to publish through social-api.ai)'
         );
     }
 }
