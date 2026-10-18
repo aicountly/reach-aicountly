@@ -10,7 +10,7 @@ namespace App\Libraries\Settings;
  */
 class ProviderConnectivityCheck
 {
-    /** @var callable(string $method, string $url, array $headers): array{status:int, body:string} */
+    /** @var callable(string $method, string $url, array $headers): array{status:int, body:string, error?:?string} */
     private $http;
 
     public function __construct(?callable $http = null)
@@ -37,13 +37,19 @@ class ProviderConnectivityCheck
      */
     public function geminiModels(): array
     {
+        return $this->geminiModelList()['models'];
+    }
+
+    /** @return array{status: int, error: ?string, models: list<array{id: string, label: string}>} */
+    private function geminiModelList(): array
+    {
         $key = ReachConfig::secret('ai.gemini.api_key');
         if ($key === null) {
-            return [];
+            return ['status' => 0, 'error' => null, 'models' => []];
         }
         $res = ($this->http)('GET', $this->geminiBase() . '/v1beta/models?pageSize=1000&key=' . rawurlencode($key), []);
         if ($res['status'] !== 200) {
-            return [];
+            return ['status' => $res['status'], 'error' => $res['error'] ?? null, 'models' => []];
         }
         $out = [];
         foreach ((json_decode($res['body'], true)['models'] ?? []) as $m) {
@@ -54,7 +60,7 @@ class ProviderConnectivityCheck
             $out[] = ['id' => $id, 'label' => (string) ($m['displayName'] ?? $id)];
         }
         usort($out, static fn ($a, $b) => strcmp($b['id'], $a['id']));
-        return $out;
+        return ['status' => 200, 'error' => null, 'models' => $out];
     }
 
     private function gemini(): array
@@ -62,9 +68,15 @@ class ProviderConnectivityCheck
         if (ReachConfig::secret('ai.gemini.api_key') === null) {
             return $this->notSet('gemini');
         }
-        $models = $this->geminiModels();
+        $list   = $this->geminiModelList();
+        $models = $list['models'];
+        if ($list['status'] === 0) {
+            return $this->unreachable('gemini', 'Gemini', $list['error']);
+        }
         if ($models === []) {
-            return ['ok' => false, 'target' => 'gemini', 'message' => 'Gemini rejected the key or returned no models.'];
+            return ['ok' => false, 'target' => 'gemini', 'message' => $list['status'] === 200
+                ? 'Gemini accepted the key but offered no models that can generate content.'
+                : 'Gemini rejected the key (HTTP ' . $list['status'] . ').'];
         }
         $vetting = ReachConfig::vettingModel('community');
         $known   = in_array($vetting, array_column($models, 'id'), true);
@@ -85,6 +97,9 @@ class ProviderConnectivityCheck
             return $this->notSet('openai');
         }
         $res = ($this->http)('GET', 'https://api.openai.com/v1/models', ['Authorization: Bearer ' . $key]);
+        if ($res['status'] === 0) {
+            return $this->unreachable('openai', 'OpenAI', $res['error'] ?? null);
+        }
         if ($res['status'] !== 200) {
             return ['ok' => false, 'target' => 'openai', 'message' => 'OpenAI rejected the key (HTTP ' . $res['status'] . ').'];
         }
@@ -105,6 +120,9 @@ class ProviderConnectivityCheck
             return $this->notSet('perplexity');
         }
         $res = ($this->http)('GET', 'https://api.perplexity.ai/models', ['Authorization: Bearer ' . $key]);
+        if ($res['status'] === 0) {
+            return $this->unreachable('perplexity', 'Perplexity', $res['error'] ?? null);
+        }
         // Perplexity has no free list endpoint on every plan; 401/403 is the
         // only answer that proves the key wrong.
         $ok = ! in_array($res['status'], [401, 403], true) && $res['status'] !== 0;
@@ -119,14 +137,34 @@ class ProviderConnectivityCheck
             return $this->notSet('dataforseo');
         }
         $res = ($this->http)('GET', 'https://api.dataforseo.com/v3/appendix/user_data', ['Authorization: Basic ' . base64_encode($login . ':' . $password)]);
-        $body = json_decode($res['body'], true) ?? [];
-        $ok   = $res['status'] === 200 && (int) ($body['status_code'] ?? 0) === 20000;
+        if ($res['status'] === 0) {
+            return $this->unreachable('dataforseo', 'DataForSEO', $res['error'] ?? null);
+        }
+        $body = json_decode($res['body'], true);
+        $body = is_array($body) ? $body : [];
+        $code = (int) ($body['status_code'] ?? 0);
+        $ok   = $res['status'] === 200 && $code === 20000;
         $bal  = $body['tasks'][0]['result'][0]['money']['balance'] ?? null;
+        if ($ok) {
+            return [
+                'ok'      => true,
+                'target'  => 'dataforseo',
+                'message' => 'Connected.' . (is_numeric($bal) ? ' Balance: $' . $bal : ''),
+                'detail'  => is_numeric($bal) ? ['balance_usd' => (float) $bal] : [],
+            ];
+        }
+        $why = is_string($body['status_message'] ?? null) ? ' ' . mb_substr($body['status_message'], 0, 160) : '';
         return [
-            'ok'      => $ok,
+            'ok'      => false,
             'target'  => 'dataforseo',
-            'message' => $ok ? 'Connected.' . ($bal !== null ? ' Balance: $' . $bal : '') : 'DataForSEO rejected the credentials.',
+            'message' => 'DataForSEO rejected the credentials (HTTP ' . $res['status'] . ($code > 0 ? ', status ' . $code : '') . ').' . $why,
         ];
+    }
+
+    private function unreachable(string $target, string $provider, ?string $error): array
+    {
+        $why = $error !== null && $error !== '' ? ': ' . mb_substr($error, 0, 160) : '';
+        return ['ok' => false, 'target' => $target, 'message' => 'Could not reach ' . $provider . ' (network error' . $why . ').'];
     }
 
     private function notSet(string $target): array
@@ -140,7 +178,7 @@ class ProviderConnectivityCheck
         return rtrim((string) $base, '/');
     }
 
-    /** @return array{status: int, body: string} */
+    /** @return array{status: int, body: string, error: ?string} */
     public static function curl(string $method, string $url, array $headers): array
     {
         $ch = curl_init($url);
@@ -154,7 +192,8 @@ class ProviderConnectivityCheck
         ]);
         $body   = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error  = curl_error($ch);
         curl_close($ch);
-        return ['status' => $body === false ? 0 : $status, 'body' => $body === false ? '' : (string) $body];
+        return ['status' => $body === false ? 0 : $status, 'body' => $body === false ? '' : (string) $body, 'error' => $body === false ? ($error !== '' ? $error : 'request failed') : null];
     }
 }

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\Settings;
 
 use App\Libraries\Settings\ReachConfig;
+use App\Libraries\Video\Automation\VideoProviders;
 use App\Models\SettingModel;
 use Tests\Support\ApiTestCase;
+use Tests\Support\Video\FakeHttpTransport;
 
 /**
  * @covers \App\Controllers\Api\V1\AutomationSettingsController
  * @covers \App\Controllers\Api\V1\SettingsController
+ * @covers \App\Libraries\Settings\LiveIntegrationCheck
  */
 final class AutomationSettingsApiTest extends ApiTestCase
 {
@@ -69,6 +72,60 @@ final class AutomationSettingsApiTest extends ApiTestCase
     {
         $h = $this->authAs('viewer');
         $this->withHeaders($h)->call('GET', 'v1/settings/automation')->assertStatus(403);
+    }
+
+    public function testLiveCheckRunsTheChecksAndNeverReturnsASecret(): void
+    {
+        $env = ['DATAFORSEO_LOGIN' => 'ops@aicountly.com', 'DATAFORSEO_PASSWORD' => 'dfs-live-secret', 'SHOTSTACK_API_KEY' => 'ss-live-secret', 'SHOTSTACK_BASE_URL' => null, 'SHOTSTACK_ENV' => null];
+        $backup = [];
+        foreach ($env as $k => $v) {
+            $backup[$k] = $_ENV[$k] ?? null;
+            if ($v === null) {
+                unset($_ENV[$k]);
+                putenv($k);
+            } else {
+                $_ENV[$k] = $v;
+                putenv("{$k}={$v}");
+            }
+        }
+        ReachConfig::flush();
+        $http = (new FakeHttpTransport())
+            ->on('GET', '#dataforseo#', FakeHttpTransport::json(200, ['status_code' => 20000, 'tasks' => [['result' => [['money' => ['balance' => 7]]]]]]))
+            ->on('GET', '#shotstack\.io/edit/stage/templates$#', FakeHttpTransport::json(401, ['message' => 'Unauthorized']));
+        VideoProviders::override('http', $http);
+
+        try {
+            $h   = $this->authAs('super_admin');
+            $res = $this->withHeaders($h)->withBodyFormat('json')->call('POST', 'v1/settings/automation/live-check', ['only' => ['dataforseo', 'shotstack']]);
+            $res->assertStatus(200);
+            $data = $this->json($res);
+            $this->assertFalse($data['ok']);
+            $this->assertSame(['shotstack', 'dataforseo'], array_column($data['results'], 'target'));
+            $rows = array_column($data['results'], null, 'target');
+            $this->assertTrue($rows['dataforseo']['ok']);
+            $this->assertStringContainsString('Shotstack rejected the key', $rows['shotstack']['message']);
+            $this->assertStringNotContainsString('dfs-live-secret', (string) $res->getJSON());
+            $this->assertStringNotContainsString('ss-live-secret', (string) $res->getJSON());
+            $this->assertCount(2, $http->requests, 'no render from the UI');
+
+            $this->withHeaders($h)->withBodyFormat('json')->call('POST', 'v1/settings/automation/live-check', ['render_test' => true])->assertStatus(422);
+            $this->withHeaders($h)->withBodyFormat('json')->call('POST', 'v1/settings/automation/live-check', ['only' => ['slack']])->assertStatus(422);
+            $this->assertCount(2, $http->requests);
+
+            $this->withHeaders($this->authAs('viewer'))->withBodyFormat('json')->call('POST', 'v1/settings/automation/live-check', [])->assertStatus(403);
+        } finally {
+            VideoProviders::reset();
+            foreach ($backup as $k => $v) {
+                if ($v === null) {
+                    unset($_ENV[$k]);
+                    putenv($k);
+                } else {
+                    $_ENV[$k] = $v;
+                    putenv("{$k}={$v}");
+                }
+            }
+            ReachConfig::flush();
+        }
     }
 
     public function testGeneralSettingsMaskSecretsAndIgnoreTheMaskOnSave(): void

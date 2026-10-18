@@ -3,8 +3,10 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Settings\LiveIntegrationCheck;
 use App\Libraries\Settings\ProviderConnectivityCheck;
 use App\Libraries\Settings\ReachConfig;
+use App\Libraries\Video\Automation\VideoProviders;
 
 /**
  * Settings → AI & Automation: AI keys, the vetting model per content type,
@@ -45,6 +47,37 @@ class AutomationSettingsController extends BaseApiController
         $result = (new ProviderConnectivityCheck())->check($target);
         $this->audit('settings.automation_test', 'settings', null, null, ['target' => $target, 'ok' => $result['ok']]);
         return $this->ok($result);
+    }
+
+    /**
+     * "Run live checks": the same checks as `php spark reach:integrations-check`
+     * (Shotstack key, YouTube token + channel, DataForSEO, Gemini, OpenAI, TTS)
+     * against the live services. Body: {"only": ["youtube", …]} (optional).
+     * The Shotstack test render is CLI-only — it waits minutes and may bill.
+     */
+    public function liveCheck()
+    {
+        $body = $this->input();
+        if (! empty($body['render_test'])) {
+            return $this->fail('The Shotstack test render is only available from the server: php spark reach:integrations-check --render-test', 422);
+        }
+        try {
+            $targets = LiveIntegrationCheck::parseTargets($body['only'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return $this->fail($e->getMessage(), 422);
+        }
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+        $report = (new LiveIntegrationCheck(VideoProviders::http(), timeoutCap: 15))->run($targets);
+
+        $this->audit('settings.automation_live_check', 'settings', null, null, [
+            'targets' => $targets,
+            'ok'      => $report['ok'],
+            'failed'  => array_values(array_map(static fn ($r) => $r['target'], array_filter($report['results'], static fn ($r) => ! $r['ok']))),
+        ]);
+        return $this->ok($report);
     }
 
     public function geminiModels()

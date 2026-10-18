@@ -138,6 +138,7 @@ HTTP request
 | POST   | v1/jobs/{id}/cancel               | `job.cancel` + `throttle:integration`    |
 | POST   | v1/engage-push/{id}               | `lead.manage` + `throttle:integration`   |
 | POST   | v1/settings                       | `settings.manage`                        |
+| POST   | v1/settings/automation/live-check | `settings.manage` + `throttle:integration` |
 | POST   | v1/bot-settings                   | `bot.configure`                          |
 
 The full table is authoritative in `app/Config/Routes.php`.
