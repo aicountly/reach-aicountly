@@ -60,7 +60,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
             'VIDEO_PIPELINE_MOCKS'    => null,
             'SOCIALAPI_BASE_URL'      => null,
             'SOCIAL_PROVIDER'         => null,
-            'VIDEO_YOUTUBE_PUBLISHER' => null,
+            'VIDEO_YOUTUBE_PUBLISHER' => 'direct', // the full-run tests exercise the direct uploader; see testAFullRunSkips…
         ]);
         \App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts::forget();
         $this->slept = [];
@@ -129,6 +129,24 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
     }
 
     // ── target parsing ──────────────────────────────────────────────────────
+
+    public function testAFullRunSkipsTheDirectYouTubeLoginWhileVideosGoThroughSocialApi(): void
+    {
+        $this->setVideoEnv(['VIDEO_YOUTUBE_PUBLISHER' => 'social_api']);
+        $http   = $this->healthy();
+        $report = $this->check($http)->run();
+
+        $yt = array_values(array_filter($report['results'], static fn ($r) => $r['target'] === 'youtube'))[0];
+        $this->assertTrue($yt['skipped']);
+        $this->assertTrue($yt['ok'], 'a skipped check does not fail the run');
+        $this->assertStringContainsString('social-api.ai', $yt['message']);
+        $this->assertSame(1, $report['skipped']);
+        $this->assertSame(count($report['results']) - 1, $report['passed']);
+        $this->assertSame([], $http->to('#oauth2\.googleapis\.com|youtube/v3#'), 'no Google call is made');
+
+        $only = $this->check($this->healthy())->run(['youtube']);
+        $this->assertArrayNotHasKey('skipped', $only['results'][0], '--only=youtube still tests the direct login');
+    }
 
     public function testTargetsDefaultToAllAndKeepCanonicalOrder(): void
     {

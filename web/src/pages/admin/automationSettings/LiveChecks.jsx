@@ -19,7 +19,7 @@ export function LiveCheckReport({ report }) {
   return (
     <>
       <Alert variant={report.ok ? 'success' : 'danger'}>
-        {report.passed} passed, {report.failed} failed{report.ran_at ? ` · ${when(report.ran_at)}` : ''}
+        {report.passed} passed, {report.failed} failed{report.skipped ? `, ${report.skipped} skipped` : ''}{report.ran_at ? ` · ${when(report.ran_at)}` : ''}
       </Alert>
       <div className="table-wrap">
         <table className="data-table">
@@ -30,7 +30,7 @@ export function LiveCheckReport({ report }) {
             {(report.results ?? []).map((r) => (
               <tr key={r.target}>
                 <td>{r.target}</td>
-                <td><span className={`badge ${r.ok ? 'badge--success' : 'badge--danger'}`}>{r.ok ? 'OK' : 'FAIL'}</span></td>
+                <td><span className={`badge ${r.skipped ? 'badge--muted' : r.ok ? 'badge--success' : 'badge--danger'}`}>{r.skipped ? 'SKIP' : r.ok ? 'OK' : 'FAIL'}</span></td>
                 <td>
                   {r.message}
                   <Details detail={r.detail} />
@@ -61,7 +61,7 @@ export function SectionLiveChecks({ targets, results, pending, errors, optional 
             <div className="as-checks__head">
               <span className="font-semibold">{CHECK_LABEL[t] ?? t}</span>
               {pending[t] && <span className="badge badge--muted as-badge">checking…</span>}
-              {r && <span className={`badge ${r.ok ? 'badge--success' : 'badge--danger'}`}>{r.ok ? 'OK' : 'FAIL'}</span>}
+              {r && <span className={`badge ${r.skipped ? 'badge--muted' : r.ok ? 'badge--success' : 'badge--danger'}`}>{r.skipped ? 'SKIP' : r.ok ? 'OK' : 'FAIL'}</span>}
               {r && !r.ok && optional.includes(t) && <span className="badge badge--muted as-badge">only needed for direct upload</span>}
               {r?.ran_at && <span className="text-xs text-muted">{when(r.ran_at)}</span>}
             </div>
