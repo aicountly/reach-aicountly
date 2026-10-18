@@ -14,5 +14,7 @@ class WorkerHealthSnapshotModel extends ReachModel
         'response', 'error_message', 'created_at',
     ];
 
-    protected array $casts = ['response' => '?json-array'];
+    // PostgreSQL returns booleans as 't'/'f'; without the cast the admin page read 'f' as truthy
+    // and showed a failed ping as Ok.
+    protected array $casts = ['ok' => 'boolean', 'response' => '?json-array'];
 }
