@@ -29,7 +29,7 @@ Search Console), also see
   **CRITICAL:** Blog automation enqueues on the `blog` queue (and
   publishing on `publishing`, Community Q&A on `community`, and every
   email/notification job — the 08:00 IST daily analytics report, the
-  approval digest, due-date reminders, the cover-gallery alert — on
+  approval digest, due-date reminders, the cover-generation failure alert — on
   `notifications`). A worker that does not list a queue **never** processes
   its jobs; they sit `pending` with nothing reporting it. Until 2026-10 the
   documented cron line omitted `notifications`, so none of those emails ever
@@ -123,7 +123,8 @@ period, not sixty times.
 
 | When | Job | Queue | Key |
 |------|-----|-------|-----|
-| every hour | `reach.blog_cover_sweep` | blog | `blog-cover-sweep-<Y-m-d-H>` |
+| every hour | `reach.cover_gallery_autofill` — generates the covers the upcoming blog index is missing (GPT Image, AICOUNTLY logo), capped by `covers.auto.daily_limit` | blog | `cover-gallery-autofill-<Y-m-d-H>` |
+| every hour | `reach.blog_cover_sweep` — re-attempts parked articles (re-armed when a new cover lands) | blog | `blog-cover-sweep-<Y-m-d-H>` |
 | every hour | `reach.content_due_date_reminder`, `reach.content_overdue_escalation` | notifications | `<type>-<Y-m-d-H>` |
 | every hour | `reach.content_schedule_readiness` | default | `content-schedule-readiness-<Y-m-d-H>` |
 | 03:00 UTC (08:30 IST) | `reach.content_refresh_detection` | default | per day |
@@ -132,7 +133,7 @@ period, not sixty times.
 | 06:00 UTC (11:30 IST) | `reach.content_base_sync` | default | per day |
 | 07:00 UTC (12:30 IST) | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
 | 08:00 UTC (13:30 IST) | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
-| 09:00 UTC (14:30 IST) | `reach.gallery_deficit_alert` | notifications | per day |
+| 09:00 UTC (14:30 IST) | `reach.gallery_deficit_alert` — informational email **only** when cover generation keeps failing (`covers.alerts.*`); the deficit itself is a line in the daily report | notifications | per day |
 | 06:00 IST (00:30 UTC) | `reach.seo_tracker` — DataForSEO SERP checks, capped by `seo.tracker.max_keywords_per_day`; a no-op without credentials | default | `seo-tracker-<IST date>` |
 | 08:00 IST (02:30 UTC) | `reach.daily_analytics_report` — email to `reports.daily.recipients`; never re-sent for a date already sent | notifications | `daily-report-<IST date>` |
 | 01:00 IST (19:30 UTC) | `reach.bot_plan` mode `daily` — snapshot yesterday's actuals (and the 4 days before, which may still change), review the last 7 days (variance, root causes, lessons), self-tune within bounds (`bot.self_tune.enabled`), regenerate every plan period; `php spark reach:bot-plan` by hand | default | `bot-plan-daily-<IST date>` |
@@ -157,7 +158,7 @@ report's pipeline-health section names them, e.g. "email via itwalk_api, fallbac
 Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
 Daily jobs handled by `reach:schedule` (no extra cron lines needed):
 05:00 UTC (10:30 IST) SEO rank/backlink snapshots · 06:00 UTC (11:30 IST) content-base sync ·
-09:00 UTC (14:30 IST) cover-gallery deficit email. Times shown in the UI, emails and CLI are IST —
+09:00 UTC (14:30 IST) cover-generation failure alert (sent only on repeated failures). Times shown in the UI, emails and CLI are IST —
 [`TIMEZONES.md`](TIMEZONES.md).
 Every 5 minutes `reach:schedule` also enqueues `reach.routine_content_sweep`
 (default queue), which carries Claude-routine blog/KB submissions forward —

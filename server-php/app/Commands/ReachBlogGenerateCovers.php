@@ -3,7 +3,6 @@
 namespace App\Commands;
 
 use App\Libraries\Ai\Images\ImageProviderRegistry;
-use App\Libraries\Blog\BlogFeatureFlags;
 use App\Libraries\Blog\WorkBlockService;
 use App\Libraries\Database\SchemaGuard;
 use CodeIgniter\CLI\BaseCommand;
@@ -102,8 +101,8 @@ class ReachBlogGenerateCovers extends BaseCommand
                 CLI::newLine();
                 CLI::error('Cannot queue cover generation: ' . $blocked);
                 CLI::write(
-                    'Fix that first, or give these posts covers from the Cover Gallery, or waive the '
-                    . 'cover_image validation per post to publish without one.',
+                    'Fix that first; until then these posts stay off the site (a relevant Cover Gallery '
+                    . 'cover is still assigned automatically when one exists).',
                     'yellow',
                 );
 
@@ -152,8 +151,12 @@ class ReachBlogGenerateCovers extends BaseCommand
      */
     private function generationBlockedReason(): ?string
     {
-        if (! (new BlogFeatureFlags())->isEnabled('image_generation')) {
-            return 'image generation is disabled (BLOG_IMAGE_GENERATION_ENABLED).';
+        // Same switch the cover block itself obeys (WorkBlockService).
+        $flag = \App\Libraries\Automation\Routine\RoutineFlags::explain('blog.ai_cover');
+        if (! $flag['enabled']) {
+            return $flag['source'] === 'env_kill_switch'
+                ? "image generation is disabled ({$flag['kill_switch']}=false in .env)."
+                : 'image generation is disabled (automation.blog.ai_cover is off in Settings → AI & Automation).';
         }
 
         try {

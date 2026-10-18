@@ -107,6 +107,63 @@ final class TimelineBuilderTest extends CIUnitTestCase
         $this->assertArrayNotHasKey('soundtrack', $out['edit']['timeline']);
     }
 
+    /** @return array{0: list<array<string,mixed>>, 1: list<array<string,mixed>>, 2: float} logo clips, scene clips (non-logo images/texts), duration */
+    private static function brandedRender(string $format): array
+    {
+        $scenes = [self::scene(1, 'image', 10.0, 'Two returns'), self::scene(2, 'title_card', 8.0, 'GSTR-1 vs GSTR-3B'), self::scene(3, 'image', 6.0, 'Dashboard')];
+        $out    = TimelineBuilder::build(self::script($format), $scenes, [
+            'logo_url'       => TimelineBuilder::DEFAULT_LOGO_URL,
+            'logo_badge_url' => 'https://reach.example/api/v1/public/video-media/badge.png?exp=1&sig=z',
+        ]);
+        $logos = array_values(array_filter(self::clips($out['edit'], 'image'), static fn ($c) => str_contains($c['asset']['src'], 'ai-logo') || str_contains($c['asset']['src'], 'badge.png')));
+
+        return [$logos, $out['scene_starts'], $out['duration']];
+    }
+
+    public function testEverySceneCarriesTheLogoCornerMarkIn16By9(): void
+    {
+        [$logos, $starts, $duration] = self::brandedRender('vlog');
+
+        $badges = array_values(array_filter($logos, static fn ($c) => str_contains($c['asset']['src'], 'badge.png')));
+        $this->assertCount(3, $badges, 'one corner mark per scene');
+        foreach ($badges as $i => $clip) {
+            $this->assertSame('topRight', $clip['position']);
+            $this->assertSame(array_values($starts)[$i], $clip['start']);
+        }
+        $cards = array_values(array_filter($logos, static fn ($c) => str_contains($c['asset']['src'], 'ai-logo')));
+        $this->assertCount(2, $cards, 'intro card and end card carry the full logo');
+        $this->assertSame(0.0, $cards[0]['start']);
+        $this->assertEqualsWithDelta($duration - 3.5, $cards[1]['start'], 0.001);
+    }
+
+    public function testEverySceneCarriesTheLogoCornerMarkIn9By16AndTheEndCardIsBranded(): void
+    {
+        [$logos, $starts, $duration] = self::brandedRender('short');
+
+        $badges = array_values(array_filter($logos, static fn ($c) => str_contains($c['asset']['src'], 'badge.png')));
+        $this->assertCount(3, $badges);
+        $this->assertSame(array_values($starts), array_column($badges, 'start'));
+        $cards = array_values(array_filter($logos, static fn ($c) => str_contains($c['asset']['src'], 'ai-logo')));
+        $this->assertCount(1, $cards, 'Shorts have no intro; the end card carries the logo');
+        $this->assertEqualsWithDelta($duration - 3.0, $cards[0]['start'], 0.001);
+
+        $out   = TimelineBuilder::build(self::script('short'), [self::scene(1, 'title_card', 5.0, 'TDS due on the 7th')], ['logo_url' => TimelineBuilder::DEFAULT_LOGO_URL]);
+        $texts = self::clips($out['edit'], 'text');
+        $this->assertContains('aicountly.com', array_column(array_column($texts, 'asset'), 'text'));
+        $this->assertContains('Try AICOUNTLY Smart Books at aicountly.com', array_column(array_column($texts, 'asset'), 'text'));
+        $card = array_values(array_filter($texts, static fn ($c) => $c['asset']['text'] === 'TDS due on the 7th'))[0];
+        $this->assertSame(TimelineBuilder::GREEN_SOFT, $card['asset']['background']['color'], 'title cards use the brand panel');
+        $this->assertSame(TimelineBuilder::NAVY, $card['asset']['font']['color']);
+        $this->assertSame(1080, $out['edit']['output']['size']['width']);
+    }
+
+    public function testABlankOrInsecureLogoSettingFallsBackToTheOfficialLogo(): void
+    {
+        $this->assertSame('https://aicountly.com/assests/images/ai-logo.png', TimelineBuilder::logoUrl(''));
+        $this->assertSame(TimelineBuilder::DEFAULT_LOGO_URL, TimelineBuilder::logoUrl('http://insecure/logo.png'));
+        $this->assertSame('https://cdn.example/logo.png', TimelineBuilder::logoUrl('https://cdn.example/logo.png'));
+    }
+
     public function testNonHttpsUrlsAreDropped(): void
     {
         $out = TimelineBuilder::build(self::script('vlog'), [self::scene(1, 'title_card', 5.0, 'Hi')], ['logo_url' => 'http://insecure/logo.png', 'music_url' => 'javascript:alert(1)']);

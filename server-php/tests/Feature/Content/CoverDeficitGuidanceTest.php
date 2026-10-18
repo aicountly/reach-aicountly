@@ -67,7 +67,7 @@ final class CoverDeficitGuidanceTest extends ApiTestCase
             $entry['stream'],
         );
 
-        $this->assertGreaterThanOrEqual(3, $result['score'], 'Following the console\'s own advice must produce a matchable cover.');
+        $this->assertGreaterThanOrEqual(\App\Libraries\Media\CoverRelevanceScorer::minScore(), $result['topical'], 'Following the console\'s own advice must produce a matchable cover.');
     }
 
     public function testRetiredAssetsStopReportingAsMissingFiles(): void

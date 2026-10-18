@@ -20,25 +20,56 @@ class CoverPromptBuilder
      *                               own. Given one, it becomes the required
      *                               visual concept rather than being ignored.
      */
-    public function build(string $title, ?string $summary = null, ?string $category = null, ?string $sceneHint = null): string
+    public function build(string $title, ?string $summary = null, ?string $category = null, ?string $sceneHint = null, array $keyPoints = []): string
     {
         $title     = trim($title) !== '' ? trim($title) : 'business finance and compliance';
         $summary   = trim((string) $summary);
         $category  = trim((string) $category);
         $sceneHint = trim((string) $sceneHint);
 
+        $points = [];
+        foreach ($keyPoints as $point) {
+            $point = trim(preg_replace('/\s+/', ' ', strip_tags((string) $point)) ?? '');
+            if ($point !== '' && count($points) < 4) {
+                $points[] = mb_substr($point, 0, 80);
+            }
+        }
+
         $subject = mb_substr($title, 0, 180);
         $context = $summary !== '' ? (' Context: ' . mb_substr($summary, 0, 240)) : '';
         $theme   = $category !== '' ? (' Theme: ' . $category . '.') : '';
         $scene   = $sceneHint !== '' ? (' Depict: ' . rtrim(mb_substr($sceneHint, 0, 240), '. ') . '.') : '';
+        $covers  = $points !== [] ? (' The article covers: ' . implode('; ', $points) . ' — show these as visual objects, not words.') : '';
 
         return 'Flat editorial illustration for a professional finance and accounting blog article about "'
-            . $subject . '".' . $theme . $scene . $context
+            . $subject . '".' . $theme . $scene . $context . $covers
             . ' Style: modern minimal vector illustration, clean geometric shapes,'
-            . ' calm green and white brand palette with soft accents, generous negative space,'
+            . ' calm green and white brand palette (AICOUNTLY greens #8cc854 and #1b7f00, navy #071a33 accents) with soft accents, generous negative space,'
             . ' subtle Indian business setting where people appear.'
-            . ' Composition: 3:2 landscape, single clear focal concept.'
+            . ' Composition: 3:2 landscape, single clear focal concept, keep the bottom-right corner calm (a logo is placed there afterwards).'
             . ' Strictly no text, no words, no letters, no numbers, no logos, no watermarks.';
+    }
+
+    /**
+     * Section headings of an article body — the "key points" a cover can
+     * show. Markdown "## " headings first, then HTML <h2>/<h3>.
+     *
+     * @return list<string>
+     */
+    public static function keyPointsFrom(?string $markdown, ?string $html = null): array
+    {
+        $out = [];
+        if (is_string($markdown) && $markdown !== '' && preg_match_all('/^#{2,3}\s+(.+)$/m', $markdown, $m)) {
+            $out = $m[1];
+        } elseif (is_string($html) && $html !== '' && preg_match_all('/<h[23][^>]*>(.*?)<\/h[23]>/is', $html, $m)) {
+            $out = $m[1];
+        }
+        $out = array_values(array_filter(array_map(
+            static fn ($h) => trim(html_entity_decode(strip_tags((string) $h), ENT_QUOTES)),
+            $out,
+        ), static fn (string $h) => $h !== '' && ! preg_match('/^(faq|frequently asked|conclusion|summary|key takeaways|references|sources)/i', $h)));
+
+        return array_slice($out, 0, 4);
     }
 
     /**

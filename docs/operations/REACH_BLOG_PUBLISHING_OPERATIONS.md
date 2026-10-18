@@ -98,54 +98,169 @@ php spark reach:media-reconcile --fix    # retire them, then re-upload
 A retired row leaves the rotation, which also stops the deficit report
 counting covers that do not exist.
 
-### Cover images
+### Cover images (no human in the loop, since 18 Oct 2026)
 
-Gallery covers are assigned by topical relevance (`CoverRelevanceScorer`)
-against the article's category, portfolio stream, tags and title keywords —
-not by rotation order alone, which is what previously fronted a GST article
-with a landscape photo. Tuning:
+Nobody makes, uploads or approves covers. Reach generates them with the
+configured OpenAI GPT Image model (`ai.image.model`, default
+`gpt-image-2.5-flare`; `ai.image.size` 1536x1024; `ai.image.quality`), puts the
+official AICOUNTLY logo on them, keeps the Cover Gallery stocked, and decides
+per article whether to reuse a gallery cover or draw a fresh one.
 
-These are optional overrides — the defaults below are what runs unless a real
-`.env` says otherwise, and none of them appear in `.env.example`. See
-[REACH_ENV_REFERENCE.md](REACH_ENV_REFERENCE.md) for the full split between
-required settings and code-side policy.
+**Brand style.** Every prompt (`CoverPromptBuilder`) is a flat editorial vector
+illustration in the green/white brand palette (AICOUNTLY greens `#8cc854`,
+`#1b7f00`, navy `#071a33` accents), one focal concept, and *strictly no text, no
+letters, no logos*. The model never draws the brand: `CoverBranding`
+composites the real logo (aicountly.com `assests/images/ai-logo.png`, bundled at
+`server-php/app/Assets/brand/aicountly-logo.png`) as a bottom-right corner mark
+on a ≈96 % white rounded plate, 15 % of the image width, 2.2 % margin — legible
+on dark and light art. The unbranded original is kept (`original_file_path`).
+Without GD the cover is stored unbranded and logged; branding never costs a
+cover. `covers.brand.logo_enabled` switches the mark off.
+
+#### Reuse or generate — the rule for every new blog (routine and calendar)
+
+`CoverSelectionService` (called by `RoutineCoverService` for Claude-routine
+blogs and by the `GENERATE_IMAGE` work block for calendar/pipeline blogs):
+
+1. **Reuse a relevant gallery cover.** Candidates are active
+   `gallery_upload` and `ai_gallery` assets outside the reuse cooldown.
+   `CoverRelevanceScorer` scores them against the article: a cover stocked for
+   the article's own content-base entry (`source_key` = the item's
+   `content_base_key`) +20, a category tag +6, each tag keyword shared with the
+   title/category/tags +3, prompt keywords up to +3. The **topical** score must
+   reach `CoverRelevanceScorer::minScore()` = 6 (a category tag, two shared tag
+   keywords, or the entry key). A portfolio-stream match only orders relevant
+   covers — it never makes one relevant (every routine blog is stream
+   `marketing`; the old floor of 3 let a stream match alone attach any
+   marketing image to any article). A never-used cover beats a used one; ties
+   go to the least recently used. A legacy unbranded upload is branded on the
+   way out.
+2. **Otherwise generate a fresh cover** from the article itself: current title,
+   summary and section headings (`## …` / `<h2>`, FAQ/conclusion dropped), plus
+   the routine's `cover_prompt` scene note when it sent one. The published
+   category is the theme — never the portfolio stream. The new cover is
+   branded, stored as an `ai_gallery` asset tagged with the article's keywords
+   and marked used, so a later article on the same topic can reuse it after the
+   cooldown. Generation follows `automation.blog.ai_cover` (default on) with the
+   `BLOG_IMAGE_GENERATION_ENABLED=false` kill switch; Claude-routine items also
+   honour `BLOG_ROUTINE_AI_COVER_FALLBACK`. OpenAI GPT Image is the provider
+   (Gemini image only when no OpenAI key is configured).
+3. **Neither** → the article has no cover and says why (see below). Nothing is
+   marked as having a cover it does not have; an unconfigured or failing image
+   provider stores nothing.
+
+`MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK` ("any free cover") is retired and
+ignored. `MEDIA_GALLERY_MIN_RELEVANCE` can raise the floor but not lower it
+below 6.
+
+#### Keeping the gallery stocked (hourly)
+
+`reach.cover_gallery_autofill` (`blog` queue, key
+`cover-gallery-autofill-<Y-m-d-H>`) reads the same deficit the console shows —
+upcoming blog-index entries in the next `MEDIA_GALLERY_LOOKAHEAD_DAYS` (14)
+versus active, matchable gallery covers — and generates covers for the entries
+that have none, earliest target date first, from each entry's title, brief and
+`cover_prompt`. Each is an active `ai_gallery` asset with `source_key` = the
+entry key and the entry's keywords as tags; the article later written from that
+entry finds it by key.
+
+- **Cost:** at most `min(deficit, covers.auto.daily_limit − generated today, 5)`
+  per run; `covers.auto.daily_limit` (default 10) also bounds
+  `reach:covers-refresh`. A new article no gallery cover fits still gets its
+  cover (counted, not blocked).
+- **Idempotent per entry:** an entry with a stocked cover (any status) or whose
+  article already has a cover is never generated again; a unique index on
+  `(source_key) WHERE kind='ai_gallery'` backs this up.
+- Stops at the first "not configured" answer and after two failures in a run.
+- **Switches:** `covers.auto.enabled` (default on); `BLOG_IMAGE_GENERATION_ENABLED=false`
+  in `.env` also stops it.
+- Every paid attempt (success or failure) is a row in
+  `reach_cover_generation_attempts` (`purpose` = `gallery_stock` / `article` /
+  `refresh`) — what the cap, the daily report and the alert read.
+
+#### Parked articles are released automatically
+
+With `BLOG_REQUIRE_COVER_IMAGE=true` (the default) an article with no cover does
+not walk on to publication: a failed `cover_image` validation is recorded with
+the reason (`gallery_no_relevant_cover; …`, `no_image_provider_configured`,
+`image_generation_disabled`, or the provider error), the item is parked, and
+readiness gates 6 and 11b block every publish path.
+
+Release is automatic. `reach.blog_cover_sweep` (hourly) re-runs the cover
+block for parked calendar articles (one retry key per article per day,
+**re-armed whenever a new gallery cover has landed since the last attempt**),
+and the autofill runs the sweep right after it stocks covers. Claude-routine
+blogs waiting for a cover retry hourly through `RoutineContentPipeline` with
+the same reuse-or-generate rule. A waiver (Daily Approval Centre →
+`POST /v1/approval-queue/:id/waive-validation`) still exists for an article
+that should go out without a hero — but on aicountly.com such a post shows a
+random picsum.photos stock image (see below), so prefer letting Reach generate.
+
+#### What reaches a person
+
+The old 09:00 email ("Cover-image gallery deficit: N image(s) needed … Prompts
+to generate … Upload at: Reach console → Quality Centre → Cover Gallery") is
+gone. Instead:
+
+- the daily analytics report (08:00 IST) has a **Cover images** section:
+  `Covers: N generated automatically (24h), gallery has M active, deficit D`
+  (+ failed attempts and the last error when there were any);
+- `reach.gallery_deficit_alert` (09:00 UTC, same job type) emails **only** when
+  generation keeps failing — at least `covers.alerts.failure_threshold` (3)
+  failures in 24 h with no recovery, or no OpenAI key while covers are needed —
+  and says what failed. It is informational; Reach keeps retrying.
+  `covers.alerts.enabled` turns it off; recipients are
+  `covers.alerts.recipients` (env `BLOG_GALLERY_ALERT_EMAIL`, the old email's
+  address), else `reports.daily.recipients`.
+
+#### Replacing stock / logo-less covers on live posts
+
+```bash
+php spark reach:covers-refresh --dry-run            # list what would change, spend nothing
+php spark reach:covers-refresh --limit=10           # regenerate + republish (cover only)
+php spark reach:work --queue=publishing --once --limit=10
+```
+
+A live post (`published`, `verification_pending`, `live`) is refreshed when its
+cover is missing, not a Reach media URL, points at a missing/retired asset, is
+an operator upload or legacy image (provenance not `aicountly_generated`), or
+has no logo. It gets a fresh, branded cover drawn from its own title, summary
+and headings (never a gallery reuse), and is re-published through the normal
+publisher with the **same content version** — only the cover changes. Bounded
+by `covers.auto.daily_limit`; the rest is reported as deferred for the next run.
+A republish the publisher refuses is reported as `regenerated_republish_refused`
+with the reason — the live post keeps its old image until a publish succeeds.
+
+#### Why aicountly.com showed unrelated photos
+
+`aicountly-com/includes/blog/Helpers.php` → `blog_image_url()` returns
+`https://picsum.photos/seed/<crc32(slug)>/800/450` (a random Lorem Picsum stock
+photo — cyclists, raindrops, pineapples) whenever a post has no ingested hero,
+and `blog/article.php` falls back to the same URL in the `<img onerror>`. A
+post ends up with no hero when Reach sent no `featured_image_url`
+(cover waived / not required) or when the receiver's `HeroImageFetcher` could
+not download it (signed media URL 404 — `MEDIA_SIGNING_KEY` unset, the binary
+deleted by an rsync `--delete`, or the asset retired). Reach now always sends a
+branded cover; `reach:covers-refresh` repairs the live posts. The picsum
+fallback itself lives in the aicountly-com repository and should be replaced
+with a branded default there.
+
+Tuning (optional `.env` overrides; see [REACH_ENV_REFERENCE.md](REACH_ENV_REFERENCE.md)):
 
 | Variable | Default | Effect |
 |---|---|---|
-| `BLOG_REQUIRE_COVER_IMAGE` | `true` | No blog publishes without a suitable cover; a miss parks the article for review |
-| `MEDIA_GALLERY_MIN_RELEVANCE` | `3` | Score floor an asset must clear to be assigned |
-| `MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK` | `false` | When true, falls back to any free cover instead of leaving the article without one |
+| `BLOG_REQUIRE_COVER_IMAGE` | `true` | No blog publishes without a cover; a miss parks the article until one is generated |
+| `MEDIA_GALLERY_MIN_RELEVANCE` | `6` | Topical score floor for reusing a gallery cover (cannot go below 6) |
 | `MEDIA_GALLERY_REUSE_COOLDOWN_DAYS` | `30` | Minimum gap before a cover is reused |
-| `BLOG_IMAGE_GENERATION_ENABLED` | `false` | Gates the **paid** AI image leg only — the gallery is assigned either way |
-| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Generate a cover when no gallery asset is relevant (needs the flag above) |
+| `MEDIA_GALLERY_LOOKAHEAD_DAYS` | `14` | How far ahead the deficit / autofill looks |
+| `BLOG_IMAGE_GENERATION_ENABLED` | unset | Only an explicit `false` matters: a kill switch for all cover generation (articles, autofill, refresh) |
+| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Claude-routine items: generate when no gallery cover is relevant |
 | `BLOG_MIN_PUBLISH_WORDS` | `300` | Minimum publishable article length |
 
-Source order is gallery-first, generation-second. `BLOG_IMAGE_GENERATION_ENABLED`
-used to short-circuit the whole cover step, so choosing "gallery, not paid API"
-silently produced no cover at all; it now gates only the paid leg, and pipeline
-items fall back to the gallery whenever that leg is off or unusable.
-
-Untagged gallery assets can never be matched — Quality → Media Gallery flags
-them and the deficit report counts them under `untagged`.
-
-#### When no suitable cover exists
-
-With `BLOG_REQUIRE_COVER_IMAGE=true` (the default) the article does **not**
-walk on to publication:
-
-1. A `cover_image` validation is recorded as **failed** on the content item,
-   with the reason (`gallery_no_relevant_cover`, `image_generation_disabled`,
-   or the provider error).
-2. The item moves to `internal_review` — the Blog Command Centre review queue —
-   and the SEO step is *not* chained, so automation stops there.
-3. Readiness blocks every publish path twice over: gate 6 (unwaived failed
-   validation) and gate 11b (featured image missing).
-
-To clear it, either upload/tag a matching gallery asset and re-run the cover
-work block, or — when a post genuinely should go out without a hero — waive the
-`cover_image` validation with a reason (Daily Approval Centre →
-`POST /v1/approval-queue/:id/waive-validation`). The waiver is audited and
-downgrades gate 11b to a warning for that item only.
+Settings (Settings → AI & Automation → Images): `covers.auto.enabled`,
+`covers.auto.daily_limit`, `covers.brand.logo_enabled`, `covers.alerts.enabled`,
+`covers.alerts.recipients`, `covers.alerts.failure_threshold`, plus
+`automation.blog.ai_cover` under Blog & KB routines.
 
 ---
 

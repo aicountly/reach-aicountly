@@ -5,7 +5,6 @@ namespace App\Libraries\Blog;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\Generation\AiGenerationOrchestrator;
 use App\Libraries\Ai\Generation\AiGenerationRequestService;
-use App\Libraries\Ai\Images\ImageGenerationInput;
 use App\Libraries\Ai\Images\ImageProviderRegistry;
 use App\Libraries\Blog\Roadmap\RoadmapOptimizerService;
 use App\Libraries\Blog\Roadmap\RoadmapSignalProvider;
@@ -974,25 +973,28 @@ class WorkBlockService
     }
 
     /**
-     * Cover image for a fact-verified draft.
+     * Cover image for a fact-verified draft (calendar pipeline and parked
+     * routine items alike) — CoverSelectionService's rule:
      *
-     * Source order is gallery-first, generation-second. Claude-routine items
-     * are assigned a topically matched cover from the curated gallery instead
-     * of spending on AI images; pipeline items generate one via the same
-     * provider family that wrote the text (openai → gpt-image-1, gemini →
-     * Nano Banana Pro), and fall back to the gallery when that leg is
-     * unavailable. The binary is persisted through MediaAssetStore and exposed
-     * as a signed public URL that aicountly.com's HeroImageFetcher can pull.
+     *   1. a relevant gallery cover (operator upload or one of Reach's own
+     *      stocked ai_gallery covers), never-used first, branded on the way out;
+     *   2. otherwise a fresh GPT Image cover (ai.image.model) drawn from the
+     *      article's title, summary and headings, branded with the AICOUNTLY
+     *      mark and added to the gallery;
+     *   3. otherwise image_failed with the reason.
      *
-     * BLOG_IMAGE_GENERATION_ENABLED gates the PAID leg only — it used to
-     * return before the gallery branch, so an operator who chose "gallery, not
-     * API" silently got no cover at all.
+     * Generation follows automation.blog.ai_cover (default on) with the
+     * BLOG_IMAGE_GENERATION_ENABLED=false kill switch — the same switch the
+     * routine pipeline uses, so "no human uploads covers" holds for calendar
+     * articles too. Claude-routine items additionally honour
+     * BLOG_ROUTINE_AI_COVER_FALLBACK. OpenAI GPT Image is the provider; Gemini
+     * image only when OpenAI is not configured.
      *
      * Outcome handling (BLOG_REQUIRE_COVER_IMAGE, default on): a cover that
-     * cannot be sourced parks the item for a human instead of walking on to
-     * publication — recordCoverVerdict() writes the cover_image validation and
-     * moves the item into the review queue. With the flag off the old
-     * behaviour returns: warn, chain SEO, publish without a hero.
+     * cannot be sourced parks the item instead of walking on to publication —
+     * recordCoverVerdict() writes the cover_image validation. The hourly cover
+     * sweep re-attempts parked items, and re-arms them as soon as a new cover
+     * lands in the gallery.
      *
      * @param array<string,mixed> $block
      * @return array<string,mixed>
@@ -1002,181 +1004,63 @@ class WorkBlockService
         $contentItemId    = (int) ($block['content_item_id'] ?? 0);
         $contentVersionId = (int) ($block['content_version_id'] ?? 0);
 
-        $item    = $contentItemId > 0
-            ? ($this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [])
-            : [];
-        $details = $contentItemId > 0
-            ? ($this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [])
-            : [];
-        $galleryMiss = null;
-        $aiEnabled   = $this->flags->isEnabled('image_generation');
-
-        // Claude-routine drafts try the curated gallery first (rotation-managed),
-        // not AI generation — 12+ blogs/day of AI covers is exactly the spend
-        // the gallery exists to avoid. When no gallery asset is topically
-        // relevant we fall through to AI generation rather than fronting the
-        // article with an unrelated stock photo; that costs one image on the
-        // rare miss instead of every post.
-        //
-        // Pipeline items take the same route whenever the paid leg is switched
-        // off: a curated cover always beats no cover.
-        $galleryFirst = ($details['origin'] ?? 'pipeline') === 'claude_routine' || ! $aiEnabled;
-
-        if ($galleryFirst && $contentItemId > 0) {
-            $output = $this->assignGalleryCover($contentItemId, $item, $details);
-            $aiFallback = $aiEnabled
-                && filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL);
-
-            if (empty($output['image_failed'])) {
-                return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
-            }
-
-            if (! $aiFallback) {
-                return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
-            }
-
-            $galleryMiss = $output;
+        if ($contentItemId <= 0) {
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, ['image_failed' => true, 'reason' => 'no_content_item']);
         }
 
-        if (! $aiEnabled) {
-            // Nothing left to try: no gallery match (or no item to match) and
-            // the paid leg is off by configuration.
-            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
-                'image_failed' => true,
-                'reason'       => 'image_generation_disabled',
-                'gallery_miss' => $galleryMiss,
-            ]));
-        }
+        $item    = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [];
+        $details = $this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
 
-        $input  = $this->decodeInput($block);
-        $prompt = trim((string) ($input['prompt'] ?? ''));
-        if ($prompt === '' && $contentItemId > 0) {
-            $version = $contentVersionId > 0
-                ? $this->db->table('reach_content_versions')->where('id', $contentVersionId)->get()->getRowArray()
-                : null;
-            // The published category is a sharper theme than the portfolio
-            // stream, so the cover matches what the listing card says.
-            $category = (string) ($this->db->table('reach_blog_publication_profiles')
-                ->select('category')
-                ->where('content_item_id', $contentItemId)
-                ->get()->getRowArray()['category'] ?? '');
-            $prompt = (new \App\Libraries\Ai\Images\CoverPromptBuilder())->build(
-                (string) ($item['title'] ?? ''),
-                (string) ($version['summary'] ?? ''),
-                $category !== '' ? $category : (string) ($details['portfolio_stream'] ?? ''),
-            );
-        }
-        if ($prompt === '') {
-            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
-                'image_failed' => true,
-                'reason'       => 'no_prompt_available',
-                'gallery_miss' => $galleryMiss,
-            ]));
-        }
+        $aiEnabled = \App\Libraries\Automation\Routine\RoutineFlags::enabled('blog.ai_cover');
+        $allowGenerate = $aiEnabled && (($details['origin'] ?? 'pipeline') !== 'claude_routine'
+            || filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL));
 
-        $registry   = new ImageProviderRegistry();
-        $configured = array_keys($registry->configuredProviders());
-        if ($configured === []) {
-            // The paid leg is enabled but unusable. A curated cover is still
-            // better than none, so try the gallery before parking the item.
-            if ($galleryMiss === null && $contentItemId > 0) {
-                $fallback = $this->assignGalleryCover($contentItemId, $item, $details);
-                if (empty($fallback['image_failed'])) {
-                    return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $fallback);
-                }
-                $galleryMiss = $fallback;
-            }
+        $input    = $this->decodeInput($block);
+        $registry = new ImageProviderRegistry();
+        $configured = $registry->configuredProviders();
+        $provider = $configured[\App\Libraries\Ai\Images\OpenAiImageProvider::PROVIDER_KEY]
+            ?? (reset($configured) ?: new \App\Libraries\Ai\Images\OpenAiImageProvider());
 
-            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
-                'image_failed' => true,
-                'reason'       => 'no_image_provider_configured',
-                'gallery_miss' => $galleryMiss,
-            ]));
-        }
+        $selection = (new \App\Libraries\Media\CoverSelectionService(
+            new \App\Libraries\Media\CoverGenerator($provider, $this->db),
+            $this->db,
+        ))->coverFor($contentItemId, [
+            'allow_generate'        => $allowGenerate,
+            'prompt'                => trim((string) ($input['prompt'] ?? '')),
+            'generation_off_reason' => $aiEnabled ? 'routine_ai_cover_fallback_disabled' : 'image_generation_disabled',
+        ]);
 
-        // Same provider family as the text generator.
-        $generatorRun = $contentVersionId > 0 ? $this->db->table('reach_ai_generation_artifacts a')
-            ->join('reach_ai_generation_runs r', 'r.id = a.generation_run_id')
-            ->join('reach_ai_providers p', 'p.id = r.provider_id')
-            ->select('p.provider_key')
-            ->where('a.content_version_id', $contentVersionId)
-            ->orderBy('a.id', 'DESC')->limit(1)->get()->getRowArray() : null;
-        $textProvider = (string) ($generatorRun['provider_key'] ?? '');
-        $imageKeyMap  = ['openai' => 'openai_image', 'gemini' => 'gemini_image'];
-        $requestedKey = (string) ($input['provider'] ?? $imageKeyMap[$textProvider] ?? $block['provider_route'] ?? '');
-        $providerKey  = in_array($requestedKey, $configured, true) ? $requestedKey : $configured[0];
-        $provider     = $registry->get($providerKey);
-
-        $makeInput = static fn (string $model) => new ImageGenerationInput(
-            prompt: $prompt,
-            modelKey: $model,
-            width: (int) ($input['width'] ?? 1536),
-            height: (int) ($input['height'] ?? 1024),
-        );
-
-        try {
-            try {
-                $result = $provider->generateImage($makeInput((string) ($input['model'] ?? '')));
-            } catch (\Throwable $e) {
-                $fallbackModel = trim((string) env('AI_GEMINI_IMAGE_FALLBACK_MODEL', 'gemini-2.5-flash-image'));
-                if ($providerKey === 'gemini_image' && $fallbackModel !== ''
-                    && str_contains(strtolower($e->getMessage()), 'not')  // NOT_FOUND / not available / not supported
-                ) {
-                    $result = $provider->generateImage($makeInput($fallbackModel));
-                } else {
-                    throw $e;
-                }
-            }
-
-            $binary = $this->firstImageBinary($result);
-            if ($binary === null) {
-                throw new \RuntimeException('image_provider_returned_no_usable_image');
-            }
-
-            $store = new \App\Libraries\Media\MediaAssetStore($this->db);
-            $asset = $store->storeBinary($binary, [
-                'kind'             => 'ai_generated',
-                'content_item_id'  => $contentItemId > 0 ? $contentItemId : null,
-                'prompt_used'      => $prompt,
-                'portfolio_stream' => $details['portfolio_stream'] ?? null,
-            ]);
-            $publicUrl = $store->publicUrl($asset);
-
-            if ($contentItemId > 0) {
-                $this->setFeaturedImage($contentItemId, $publicUrl, $this->coverAltText($contentItemId, $item));
-            }
+        if ($selection['ok']) {
+            $this->setFeaturedImage($contentItemId, (string) $selection['url'], $this->coverAltText($contentItemId, $item));
 
             $output = array_filter([
-                'provider_key' => $result->providerKey,
-                'model_key'    => $result->modelKey,
-                'image_count'  => $result->imageCount,
-                'duration_ms'  => $result->durationMs,
-                'asset_id'     => $asset['id'] ?? null,
-                'asset_uuid'   => $asset['asset_uuid'] ?? null,
-                'public_url'   => $publicUrl,
-                'gallery_miss' => $galleryMiss,
+                'gallery_assigned' => $selection['source'] === 'gallery' ? true : null,
+                'generated'        => $selection['source'] === 'generated' ? true : null,
+                'provider_key'     => $selection['source'] === 'generated' ? $provider->getProviderKey() : null,
+                'model_key'        => $selection['model_key'],
+                'asset_id'         => $selection['asset_id'],
+                'asset_uuid'       => $selection['asset_uuid'],
+                'public_url'       => $selection['url'],
+                'relevance_score'  => $selection['relevance_score'],
+                'match_reasons'    => $selection['source'] === 'gallery' ? $selection['match_reasons'] : null,
+                'branded'          => $selection['branded'],
+                'gallery_miss'     => $selection['source'] === 'generated' ? $selection['gallery_miss'] : null,
             ], static fn ($v) => $v !== null);
-        } catch (\Throwable $e) {
-            // The provider failed. Fall back to the gallery before giving up —
-            // a curated cover beats parking the article over a transient 5xx.
-            $fallback = $galleryMiss === null && $contentItemId > 0
-                ? $this->assignGalleryCover($contentItemId, $item, $details)
-                : null;
 
-            if ($fallback !== null && empty($fallback['image_failed'])) {
-                $fallback['generation_error'] = mb_substr($e->getMessage(), 0, 200);
-                $output = $fallback;
-            } else {
-                $output = array_filter([
-                    'image_failed' => true,
-                    'reason'       => mb_substr($e->getMessage(), 0, 200),
-                    'provider_key' => $providerKey,
-                    'gallery_miss' => $galleryMiss ?? $fallback,
-                ], static fn ($v) => $v !== null);
-            }
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
         }
 
-        return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
+        $reason = ! $allowGenerate
+            ? (string) ($aiEnabled ? 'routine_ai_cover_fallback_disabled' : 'image_generation_disabled')
+            : ($configured === [] ? 'no_image_provider_configured' : (string) ($selection['generation_error'] ?? 'generation_failed'));
+
+        return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
+            'image_failed'     => true,
+            'reason'           => mb_substr($reason, 0, 200),
+            'gallery_miss'     => $selection['gallery_miss'],
+            'generation_error' => $selection['generation_error'],
+            'provider_key'     => $allowGenerate ? $provider->getProviderKey() : null,
+        ], static fn ($v) => $v !== null));
     }
 
     /**
@@ -1304,46 +1188,6 @@ class WorkBlockService
     }
 
     /**
-     * Topically relevant gallery cover (scored against the article's category,
-     * stream, tags and title), least-recently-used among equally relevant
-     * assets, with the reuse cooldown enforced. No relevant asset → reported as
-     * a miss so the caller generates a cover from the article instead of
-     * attaching an unrelated photo.
-     *
-     * @param array<string,mixed> $item
-     * @param array<string,mixed> $details
-     * @return array<string,mixed>
-     */
-    private function assignGalleryCover(int $contentItemId, array $item, array $details): array
-    {
-        try {
-            $assignment = (new \App\Libraries\Media\MediaGalleryAssignmentService($this->db))
-                ->assignFor($contentItemId);
-        } catch (\Throwable $e) {
-            return ['image_failed' => true, 'reason' => 'gallery_assignment_error: ' . mb_substr($e->getMessage(), 0, 160)];
-        }
-
-        if ($assignment === null) {
-            return ['image_failed' => true, 'reason' => 'gallery_no_relevant_cover'];
-        }
-
-        $this->setFeaturedImage(
-            $contentItemId,
-            $assignment['public_url'],
-            $this->coverAltText($contentItemId, $item),
-        );
-
-        return [
-            'gallery_assigned' => true,
-            'asset_id'         => $assignment['asset_id'],
-            'asset_uuid'       => $assignment['asset_uuid'],
-            'public_url'       => $assignment['public_url'],
-            'relevance_score'  => $assignment['relevance_score'],
-            'match_reasons'    => $assignment['match_reasons'],
-        ];
-    }
-
-    /**
      * Alt text that describes the article, not the file — the readiness gate
      * requires it and screen readers depend on it.
      *
@@ -1374,26 +1218,6 @@ class WorkBlockService
                 'featured_image_alt'       => mb_substr($alt, 0, 512),
                 'updated_at'               => date('Y-m-d H:i:s'),
             ]);
-    }
-
-    private function firstImageBinary(\App\Libraries\Ai\Images\ImageGenerationResult $result): ?string
-    {
-        foreach ($result->images as $image) {
-            if (! empty($image['b64'])) {
-                $decoded = base64_decode((string) $image['b64'], true);
-                if ($decoded !== false && $decoded !== '') {
-                    return $decoded;
-                }
-            }
-            if (! empty($image['url'])) {
-                $fetched = $this->httpGet((string) $image['url']);
-                if ($fetched !== null && $fetched !== '') {
-                    return $fetched;
-                }
-            }
-        }
-
-        return null;
     }
 
     private function chainSeoOptimize(int $contentItemId, int $contentVersionId): void

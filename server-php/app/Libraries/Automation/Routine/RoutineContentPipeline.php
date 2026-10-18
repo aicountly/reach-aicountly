@@ -28,7 +28,7 @@ use Config\Database;
  *
  *   ingest → vet (Gemini; revise is re-vetted once) → approve under the
  *   SystemApprover with a checksum of the FINAL text → SEO + publication
- *   profile (author) → cover (blog: fresh DALL·E, else gallery) → publish
+ *   profile (author) → cover (blog: relevant gallery cover, else fresh GPT Image) → publish
  *   through PublicationDeploymentService → verify the public copy.
  *
  * The vetting run is the verification and the review of record: for routine
@@ -517,7 +517,7 @@ class RoutineContentPipeline
         $result = ($this->covers ?? new RoutineCoverService())->provide($itemId, isset($sub['cover_prompt']) ? (string) $sub['cover_prompt'] : null);
 
         if ($result['ok']) {
-            $this->recordCover($itemId, $versionId, true, $result['source'] === 'generated' ? 'Cover image generated (DALL·E)' : 'Cover image assigned from the gallery');
+            $this->recordCover($itemId, $versionId, true, $result['source'] === 'generated' ? 'Cover image generated (GPT Image, AICOUNTLY-branded)' : 'Cover image assigned from the gallery');
             $this->submissions->update($id, [
                 'status'         => RoutineSubmissions::APPROVED,
                 'cover_status'   => $result['source'],

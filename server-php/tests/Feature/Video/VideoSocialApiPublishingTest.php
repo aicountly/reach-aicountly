@@ -182,7 +182,8 @@ final class VideoSocialApiPublishingTest extends ApiTestCase
         $create = json_decode((string) $this->http->to('#/v1/posts$#', 'POST')[0]['body'], true);
         $this->assertSame($post['title'], $create['title']);
         $this->assertSame($post['content'], $create['text'], 'the YouTube description is the post text');
-        $this->assertSame([['account_id' => 'acc_yt']], $create['targets']);
+        // YouTube is published public unless social.socialapi.youtube.visibility says otherwise.
+        $this->assertSame([['account_id' => 'acc_yt', 'visibility' => 'public']], $create['targets']);
         $this->assertSame([['source_type' => 'media_id', 'media_id' => 'med_yt']], $create['media']);
         $this->assertTrue($create['publish_now']);
         $this->assertSame(['youtube' => ['privacy_status' => 'public']], $create['platform_data']);
