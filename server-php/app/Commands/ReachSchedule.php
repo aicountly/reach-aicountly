@@ -165,10 +165,17 @@ class ReachSchedule extends BaseCommand
             $add('reach.daily_marketing_pack', ['date' => $tomorrow], "marketing-pack-{$tomorrow}");
         }
 
-        // Every hour: release articles parked for want of a cover. Covers
-        // arrive when an operator uploads them, not on a schedule, so an
+        // Every hour: stock the Cover Gallery with the covers the upcoming blog
+        // index is missing (GPT Image, AICOUNTLY-branded; capped by
+        // covers.auto.daily_limit, idempotent per index entry). No human
+        // uploads covers any more.
+        $add('reach.cover_gallery_autofill', ['limit' => 5], "cover-gallery-autofill-{$hourKey}", ['queue' => 'blog']);
+
+        // Every hour: release articles parked for want of a cover. Covers land
+        // through the day (the autofill above, an occasional upload), so an
         // article parked at 09:10 should not wait a day because its cover
-        // landed at 09:15. Idempotent per article per day.
+        // arrived at 09:15. Idempotent per article per day, re-armed when a
+        // new gallery cover appears.
         $add('reach.blog_cover_sweep', ['limit' => 25], "blog-cover-sweep-{$hourKey}", ['queue' => 'blog']);
 
         // Stream C — every 5 minutes: carry Claude-routine blog/KB submissions
@@ -204,7 +211,8 @@ class ReachSchedule extends BaseCommand
             $add('reach.content_base_sync', ['date' => $today], "content-base-sync-{$today}");
         }
 
-        // 09:00 — superadmin cover-gallery deficit reminder (skips when no deficit)
+        // 09:00 — informational email only if cover generation keeps failing
+        // (the deficit itself is a line in the daily report; nobody is asked to upload)
         if ($hour === 9) {
             $add('reach.gallery_deficit_alert', ['date' => $today], "gallery-deficit-{$today}", ['queue' => 'notifications']);
         }

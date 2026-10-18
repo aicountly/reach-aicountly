@@ -17,6 +17,7 @@ namespace App\Libraries\Media;
 class CoverRelevanceScorer
 {
     /** Weights, highest signal first. */
+    private const W_SOURCE_KEY     = 20; // generated for exactly this content-base entry
     private const W_CATEGORY_TAG   = 6;
     private const W_STREAM         = 4;
     private const W_TAG_KEYWORD    = 3;
@@ -25,8 +26,18 @@ class CoverRelevanceScorer
     /** Keyword hits from prompt text saturate — one asset cannot win on noise. */
     private const MAX_PROMPT_SCORE = 3;
 
-    /** Default relevance floor; below this an asset is not offered. */
-    public const DEFAULT_MIN_SCORE = 3;
+    /**
+     * Default relevance floor; below this an asset is not offered.
+     *
+     * Measured on TOPICAL signals only — the entry key, a category tag, tag
+     * keywords and prompt keywords. A portfolio-stream match ranks between
+     * relevant assets but can never make an asset relevant on its own: every
+     * routine blog and most uploads carry the stream "marketing", so "stream
+     * alone clears the floor" (the old rule, floor 3 < stream weight 4) let any
+     * marketing-tagged image front any article. 6 = a category tag, two shared
+     * tag keywords, or the entry key.
+     */
+    public const DEFAULT_MIN_SCORE = 6;
 
     /**
      * Words that carry no topical signal for finance/compliance content.
@@ -57,14 +68,22 @@ class CoverRelevanceScorer
     /**
      * Score one gallery asset for one article.
      *
-     * @param array<string,mixed> $asset    row from reach_media_gallery_assets
-     * @param list<string>        $keywords from articleKeywords()
-     * @return array{score:int, reasons:list<string>}
+     * @param array<string,mixed> $asset      row from reach_media_gallery_assets
+     * @param list<string>        $keywords   from articleKeywords()
+     * @param string              $articleKey the article's content-base key, when it has one
+     * @return array{score:int, topical:int, reasons:list<string>}
      */
-    public function score(array $asset, array $keywords, string $category = '', string $stream = ''): array
+    public function score(array $asset, array $keywords, string $category = '', string $stream = '', string $articleKey = ''): array
     {
         $score   = 0;
         $reasons = [];
+        $streamPoints = 0;
+
+        $sourceKey = trim((string) ($asset['source_key'] ?? ''));
+        if ($articleKey !== '' && $sourceKey !== '' && $sourceKey === trim($articleKey)) {
+            $score += self::W_SOURCE_KEY;
+            $reasons[] = 'source_key';
+        }
 
         $assetTags   = $this->normalizeTags($asset['category_tags'] ?? []);
         $assetStream = strtolower(trim((string) ($asset['portfolio_stream'] ?? '')));
@@ -78,6 +97,7 @@ class CoverRelevanceScorer
 
         if ($stream !== '' && $assetStream !== '' && $assetStream === $stream) {
             $score += self::W_STREAM;
+            $streamPoints = self::W_STREAM;
             $reasons[] = 'portfolio_stream';
         }
 
@@ -95,11 +115,11 @@ class CoverRelevanceScorer
             $reasons[] = "prompt_keywords:{$promptHits}";
         }
 
-        return ['score' => $score, 'reasons' => $reasons];
+        return ['score' => $score, 'topical' => $score - $streamPoints, 'reasons' => $reasons];
     }
 
     /**
-     * Rank candidates, dropping anything below the relevance floor. Ties keep
+     * Rank candidates, dropping anything below the (topical) relevance floor. Ties keep
      * the caller's order, which is least-recently-used first, so rotation
      * still holds among equally relevant covers.
      *
@@ -107,14 +127,15 @@ class CoverRelevanceScorer
      * @param list<string>              $keywords
      * @return list<array{asset:array<string,mixed>, score:int, reasons:list<string>}>
      */
-    public function rank(array $assets, array $keywords, string $category = '', string $stream = '', ?int $minScore = null): array
+    public function rank(array $assets, array $keywords, string $category = '', string $stream = '', ?int $minScore = null, string $articleKey = ''): array
     {
         $minScore = $minScore ?? self::minScore();
         $ranked   = [];
 
         foreach ($assets as $index => $asset) {
-            $result = $this->score($asset, $keywords, $category, $stream);
-            if ($result['score'] < $minScore) {
+            $result = $this->score($asset, $keywords, $category, $stream, $articleKey);
+            // The floor is topical: a stream match alone never qualifies.
+            if ($result['topical'] < $minScore) {
                 continue;
             }
             $ranked[] = [
@@ -134,18 +155,25 @@ class CoverRelevanceScorer
         }, $ranked);
     }
 
+    /**
+     * MEDIA_GALLERY_MIN_RELEVANCE can raise the floor but not lower it below
+     * DEFAULT_MIN_SCORE: deployments documented "3" for years, and 3 is the
+     * value that let unrelated covers through.
+     */
     public static function minScore(): int
     {
-        return max(1, (int) env('MEDIA_GALLERY_MIN_RELEVANCE', self::DEFAULT_MIN_SCORE));
+        return max(self::DEFAULT_MIN_SCORE, (int) env('MEDIA_GALLERY_MIN_RELEVANCE', self::DEFAULT_MIN_SCORE));
     }
 
     /**
-     * When no asset clears the floor, an unrelated cover is worse than none:
-     * publish continues without a hero unless an operator opts in.
+     * Retired (18 Oct 2026). MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK used to let
+     * an operator attach "any free cover" when nothing matched. Every cover
+     * must now be about its article: on a miss Reach generates one instead,
+     * so the switch is ignored and this always answers false.
      */
     public static function allowUnmatchedFallback(): bool
     {
-        return filter_var(env('MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK', false), FILTER_VALIDATE_BOOL);
+        return false;
     }
 
     /**

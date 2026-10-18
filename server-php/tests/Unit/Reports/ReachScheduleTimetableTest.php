@@ -82,6 +82,24 @@ final class ReachScheduleTimetableTest extends CIUnitTestCase
         $this->assertArrayHasKey('reach.seo_snapshot', self::byType('2026-10-17 05:10:00'));
     }
 
+    public function testCoverGalleryAutofillRunsHourlyOnTheBlogQueue(): void
+    {
+        $a = self::byType('2026-10-17 10:05:00')['reach.cover_gallery_autofill'];
+        $b = self::byType('2026-10-17 10:55:00')['reach.cover_gallery_autofill'];
+        $c = self::byType('2026-10-17 11:05:00')['reach.cover_gallery_autofill'];
+
+        $this->assertSame('cover-gallery-autofill-2026-10-17-10', $a['opts']['idempotency_key']);
+        $this->assertSame($a['opts']['idempotency_key'], $b['opts']['idempotency_key']);
+        $this->assertNotSame($a['opts']['idempotency_key'], $c['opts']['idempotency_key']);
+        $this->assertSame('blog', $a['opts']['queue']);
+        $this->assertArrayHasKey('reach.blog_cover_sweep', self::byType('2026-10-17 10:05:00'));
+        foreach (['covers.auto.enabled', 'covers.auto.daily_limit', 'covers.alerts.enabled', 'covers.alerts.recipients', 'covers.brand.logo_enabled'] as $key) {
+            $this->assertArrayHasKey($key, \App\Libraries\Settings\ReachConfig::registry());
+        }
+        $this->assertSame(10, \App\Libraries\Settings\ReachConfig::registry()['covers.auto.daily_limit']['default']);
+        $this->assertTrue(\App\Libraries\Settings\ReachConfig::registry()['covers.auto.enabled']['default']);
+    }
+
     public function testEveryPlannedJobHasAHandler(): void
     {
         $registry = new \App\Libraries\JobHandlerRegistry();

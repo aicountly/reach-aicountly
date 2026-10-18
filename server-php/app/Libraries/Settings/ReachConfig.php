@@ -78,6 +78,20 @@ final class ReachConfig
             'ai.image.quality' => ['group' => 'Images', 'label' => 'Image quality (GPT Image)', 'type' => 'choice', 'env' => 'AI_OPENAI_IMAGE_QUALITY', 'default' => 'medium', 'options' => ['low', 'medium', 'high', 'auto'],
                 'help' => 'Price and detail rise with quality; medium suits blog covers and video stills.'],
 
+            // ── Stream 1 — covers without a human (keep this block contiguous) ──
+            'covers.auto.enabled' => ['group' => 'Images', 'label' => 'Keep the Cover Gallery stocked automatically', 'type' => 'bool', 'default' => true,
+                'help' => 'Every hour Reach generates the covers the upcoming blog index is missing (GPT Image, AICOUNTLY-branded) and adds them to the gallery. BLOG_IMAGE_GENERATION_ENABLED=false in .env also turns it off.'],
+            'covers.auto.daily_limit' => ['group' => 'Images', 'label' => 'Covers generated per day (gallery stocking and refresh)', 'type' => 'int', 'default' => 10,
+                'help' => 'Cost cap for the hourly gallery stocking and reach:covers-refresh. A new article that no gallery cover fits still gets one (it is counted, not blocked).'],
+            'covers.brand.logo_enabled' => ['group' => 'Images', 'label' => 'Put the AICOUNTLY logo on covers', 'type' => 'bool', 'default' => true,
+                'help' => 'Corner mark on a white plate, bottom right. The unbranded original is kept.'],
+            'covers.alerts.enabled' => ['group' => 'Images', 'label' => 'Email when cover generation keeps failing', 'type' => 'bool', 'default' => true,
+                'help' => 'Informational, at most once a day (09:00 UTC), only after repeated failures (provider error or no API key). Daily numbers are in the daily report either way.'],
+            'covers.alerts.recipients' => ['group' => 'Images', 'label' => 'Cover alert recipients', 'type' => 'email_list', 'env' => 'BLOG_GALLERY_ALERT_EMAIL', 'default' => '',
+                'help' => 'Comma-separated. Blank = the daily analytics report recipients.'],
+            'covers.alerts.failure_threshold' => ['group' => 'Images', 'label' => 'Failed cover generations (24 h) before an alert', 'type' => 'int', 'default' => 3],
+            // ── end stream 1 ──
+
             // ── Automation volumes & switches ───────────────────────────────
             'automation.community.enabled' => ['group' => 'Automation', 'label' => 'Community Q&A automation', 'type' => 'bool', 'default' => true],
             'automation.community.daily_limit' => ['group' => 'Automation', 'label' => 'Community Q&A per day', 'type' => 'int', 'default' => 10],
@@ -195,7 +209,8 @@ final class ReachConfig
                 'help' => '"stage" (free, watermarked) or "v1" (production, billed).'],
             'video.music.url' => ['group' => 'Video', 'label' => 'Background music URL (optional)', 'type' => 'string',
                 'help' => 'A royalty-free MP3 you are licensed to use, reachable over HTTPS. Blank = no music.'],
-            'video.brand.logo_url' => ['group' => 'Video', 'label' => 'Logo URL for videos', 'type' => 'string', 'default' => 'https://aicountly.com/assests/images/ai-logo.png'],
+            'video.brand.logo_url' => ['group' => 'Video', 'label' => 'Logo URL for videos', 'type' => 'string', 'default' => 'https://aicountly.com/assests/images/ai-logo.png',
+                'help' => 'The official AICOUNTLY logo on aicountly.com. Used on the intro/end cards; every scene also carries the corner mark (this logo on a white plate). Blank or non-https = the official logo.'],
             'video.youtube.client_id' => ['group' => 'Video', 'label' => 'YouTube OAuth client ID', 'type' => 'string', 'env' => 'YOUTUBE_CLIENT_ID',
                 'help' => 'Google Cloud → APIs & Services → Credentials → OAuth client (Web application).'],
             'video.youtube.client_secret' => ['group' => 'Video', 'label' => 'YouTube OAuth client secret', 'type' => 'secret', 'env' => 'YOUTUBE_CLIENT_SECRET'],

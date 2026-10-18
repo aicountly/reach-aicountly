@@ -43,6 +43,7 @@ final class DailyReportRenderer
         $body .= self::section('SEO Tracker', self::trackerHtml($s['seo_tracker'] ?? []));
         $body .= self::section('Content published (last 24h)', self::contentHtml($s['content'] ?? []));
         $body .= self::section('AI vetting (last 24h)', self::vettingHtml($s['vetting'] ?? []));
+        $body .= self::section('Cover images', self::coversHtml($s['covers'] ?? []));
         $body .= self::section('Pipeline health', self::pipelineHtml($s['pipeline'] ?? []));
 
         $title = 'Daily analytics report — ' . self::e(self::longDate((string) $summary['report_date']));
@@ -145,6 +146,14 @@ final class DailyReportRenderer
             foreach ($v['top_reject_reasons'] as $r) {
                 $out[] = sprintf('  - %s (%d)', $r['reason'], $r['count']);
             }
+        }
+
+        $out[] = '';
+        $out[] = '== Cover images ==';
+        $c = $s['covers'] ?? [];
+        $out[] = isset($c['line']) ? (string) $c['line'] : self::noteOf($c);
+        if (! empty($c['last_error']) && (int) ($c['failed'] ?? 0) > 0) {
+            $out[] = '  Last error: ' . mb_substr((string) $c['last_error'], 0, 200);
         }
 
         $out[] = '';
@@ -293,6 +302,25 @@ final class DailyReportRenderer
             . self::table(['Reason', 'Count'], array_map(static fn ($r) => [$r['reason'], (string) $r['count']], $v['top_reject_reasons']));
 
         return $tiles . $reasons;
+    }
+
+    /** @param array<string, mixed> $c */
+    private static function coversHtml(array $c): string
+    {
+        if (! isset($c['line'])) {
+            return self::note($c);
+        }
+        $rows = [
+            ['Generated automatically (24h)', (string) (int) $c['generated']],
+            ['Active covers in the gallery', (string) (int) $c['gallery_active']],
+            ['Deficit (upcoming entries without a cover)', $c['deficit'] === null ? 'unknown' : (string) $c['deficit']],
+            ['Failed generation attempts (24h)', (string) (int) $c['failed']],
+        ];
+        if (! empty($c['last_error']) && (int) $c['failed'] > 0) {
+            $rows[] = ['Last error', mb_substr((string) $c['last_error'], 0, 200)];
+        }
+
+        return self::table(['Signal', 'Value'], $rows);
     }
 
     /** @param array<string, mixed> $p */

@@ -9,7 +9,7 @@ needs them. Cloud Routines fire at most **hourly**.
 The routines only **write**. Reach decides: every submission is vetted by
 **Gemini** (Settings → AI & Automation picks the model; its decision is final,
 no human review), approved under the login-disabled *Reach System Bot*, given
-a DALL·E cover (blogs) and published to aicountly.com. The old two-model rule
+an AICOUNTLY-branded cover (blogs) and published to aicountly.com. The old two-model rule
 (Opus writes, a Sonnet subagent fact-checks, Reach requires a
 `verification_report` from a different model) is retired: a
 `verification_report` is still accepted and stored if a routine sends one, but
@@ -51,7 +51,7 @@ Endpoints the routines use:
 | `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | KB quota, per-product cadence (launch apps first), topic seeds, existing articles |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable URLs for internal links |
 | `GET  https://reach.aicountly.org/api/v1/automation/content-base` | strategy base + legacy blog index (optional) |
-| `GET  https://reach.aicountly.org/api/v1/automation/gallery/status` | cover-gallery deficit (informational) |
+| `GET  https://reach.aicountly.org/api/v1/automation/gallery/status` | cover-gallery deficit (informational — Reach fills it itself every hour) |
 | `POST https://reach.aicountly.org/api/v1/automation/blog-drafts` | submit a blog draft |
 | `POST https://reach.aicountly.org/api/v1/automation/kb-drafts` | submit a KB draft |
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | community quota, open questions, recent titles, topic mix |
@@ -86,12 +86,17 @@ see `pipeline.status`), **200** `already_ingested` (content key reused),
    replaces CROSS_REVIEW and HUMAN_REVIEW_GATE for routine items.
 4. **Profiles** — SEO profile, publication profile with author
    `automation.blog.author_name` ("AICOUNTLY Editorial Team").
-5. **Cover (blogs)** — a fresh DALL·E image (`ai.image.model`, prompt from
-   `CoverPromptBuilder`: title, summary, category, the routine's
-   `cover_prompt`; no text in the image) with alt text; the gallery only if
-   generation fails. With neither, the article waits (`awaiting_cover`) and is
-   retried hourly; it publishes coverless only when the readiness gate allows
-   it (cover rule off, or an operator waived the `cover_image` validation).
+5. **Cover (blogs)** — a relevant, preferably unused Cover Gallery cover
+   (one Reach stocked for this entry's `content_base_key` wins outright);
+   otherwise a fresh GPT Image cover (`ai.image.model`, prompt from
+   `CoverPromptBuilder`: title, summary, section headings, category, the
+   routine's `cover_prompt`; no text in the image), the AICOUNTLY logo
+   composited, added to the gallery — with alt text. Rule and tuning:
+   `docs/operations/REACH_BLOG_PUBLISHING_OPERATIONS.md` → Cover images. With
+   neither (no OpenAI key, provider failing), the article waits
+   (`awaiting_cover`) and is retried hourly; it publishes coverless only when
+   the readiness gate allows it (cover rule off, or an operator waived the
+   `cover_image` validation).
    KB articles get no image: the aicountly.com KB receiver
    (`syncKnowledgeBaseArticle`, `help-article.php`) has no image field and its
    sanitizer strips `<img>`.
@@ -124,6 +129,7 @@ items default to LOW risk.
 | `automation.blog.daily_limit` / `automation.knowledge_base.daily_limit` | 6 / 10 | — |
 | `automation.blog.auto_publish` | on | `BLOG_AUTO_PUBLISH_ENABLED`, `BLOG_PUBLIC_PUBLISHER_ENABLED` |
 | `automation.blog.ai_cover` | on | `BLOG_IMAGE_GENERATION_ENABLED` |
+| `covers.auto.enabled` (group Images) — hourly Cover Gallery stocking, capped by `covers.auto.daily_limit` (10) | on | `BLOG_IMAGE_GENERATION_ENABLED` |
 | `automation.knowledge_base.auto_publish` | on | `KB_AUTO_PUBLISH_ENABLED` |
 | `automation.blog.author_name` | AICOUNTLY Editorial Team | — |
 | `automation.vetting.min_compliance_score` | 5 | — |

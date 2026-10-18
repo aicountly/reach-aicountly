@@ -11,10 +11,14 @@ use Config\Database;
 
 /**
  * Deficit = covers needed for upcoming index entries (next
- * MEDIA_GALLERY_LOOKAHEAD_DAYS) minus active, non-cooling gallery assets.
- * Surfaced on the console dashboard, the automation status endpoint, and a
- * daily superadmin email so the ~20-images/day personal-account budget is
- * spent on exactly the covers that are missing.
+ * MEDIA_GALLERY_LOOKAHEAD_DAYS) minus active, non-cooling, matchable gallery
+ * assets (operator uploads and Reach's own `ai_gallery` covers).
+ *
+ * Nobody is asked to fill it any more: CoverGalleryAutofillService reads this
+ * report every hour and generates the missing covers itself (GPT Image,
+ * branded, capped by covers.auto.daily_limit). The figure is informational —
+ * console dashboard, automation status endpoint, and the "Covers" line of the
+ * daily report.
  */
 class MediaGalleryDeficitService
 {
@@ -60,6 +64,11 @@ class MediaGalleryDeficitService
                 'stream'       => $stream,
                 // The raw scene note from the content base, kept for reference.
                 'cover_prompt' => $hint,
+                // The entry's brief: what the article will say, so a stocked
+                // cover is drawn from the topic and not from the title alone.
+                'brief'        => (string) ($entry['brief_prompt'] ?? ''),
+                'product_slug' => (string) ($entry['product_slug'] ?? ''),
+                'seed_keyword' => (string) ($entry['seed_keyword'] ?? ''),
                 // What an operator actually pastes into ChatGPT or Gemini. The
                 // portfolio stream is deliberately NOT passed as the theme:
                 // "marketing" is an editorial bucket, and handing it to an
@@ -93,7 +102,7 @@ class MediaGalleryDeficitService
                          WHERE category_tags = '[]'::jsonb AND portfolio_stream IS NULL
                      ) AS untagged
                  FROM reach_media_gallery_assets
-                 WHERE status = 'active' AND kind = 'gallery_upload' {$cooldownSql}"
+                 WHERE status = 'active' AND kind IN ('gallery_upload','ai_gallery') {$cooldownSql}"
             )->getRowArray();
             $available = (int) ($row['matchable'] ?? 0);
             $untagged  = (int) ($row['untagged'] ?? 0);

@@ -19,7 +19,7 @@ use Config\Database;
  * saying so — a section never shows invented or placeholder figures, and one
  * failing source never takes the rest of the report down with it.
  *
- * Sections: search, traffic, seo_tracker, content, vetting, pipeline, todo.
+ * Sections: search, traffic, seo_tracker, content, vetting, covers, pipeline, todo.
  */
 class DailyReportBuilder
 {
@@ -42,6 +42,7 @@ class DailyReportBuilder
         private ?SeoTrackerService $tracker = null,
         private ?\Closure $searchConfigured = null,
         private ?\Closure $emailProviders = null,
+        private ?\Closure $coverStatus = null,
     ) {
         $this->db  = $db ?? Database::connect();
         $this->ga4 ??= new Ga4DailySnapshot();
@@ -73,6 +74,7 @@ class DailyReportBuilder
             'seo_tracker' => $this->guard('seo_tracker', fn () => $this->seoTracker()),
             'content'     => $this->guard('content', fn () => $this->content($window)),
             'vetting'     => $this->guard('vetting', fn () => $this->vetting($window)),
+            'covers'      => $this->guard('covers', fn () => $this->covers($window)),
             'pipeline'    => $this->guard('pipeline', fn () => $this->pipeline($window)),
         ];
         $sections['todo'] = ['configured' => true, 'items' => self::todo($sections)];
@@ -320,6 +322,30 @@ class DailyReportBuilder
     }
 
     /**
+     * Cover automation in the report window — replaces the old "please
+     * upload covers" email with one informational line.
+     *
+     * @param array{start:string, end:string} $window
+     * @return array<string, mixed>
+     */
+    private function covers(array $window): array
+    {
+        $s = $this->coverStatus !== null
+            ? ($this->coverStatus)($window)
+            : (new \App\Libraries\Media\CoverGenerationAlertService($this->db))->status($window['start'], $window['end']);
+
+        $s['configured'] = true;
+        $s['line'] = sprintf(
+            'Covers: %d generated automatically (24h), gallery has %d active, deficit %s',
+            (int) $s['generated'],
+            (int) $s['gallery_active'],
+            $s['deficit'] === null ? 'unknown' : (string) $s['deficit'],
+        ) . ((int) $s['failed'] > 0 ? sprintf(' — %d generation attempt(s) failed', (int) $s['failed']) : '');
+
+        return $s;
+    }
+
+    /**
      * @param array{start:string, end:string} $window
      * @return array<string, mixed>
      */
@@ -427,6 +453,14 @@ class DailyReportBuilder
         if (! empty($vet['configured']) && ($vet['counts']['reject'] ?? 0) > ($vet['counts']['approve'] ?? 0) && ($vet['counts']['reject'] ?? 0) > 0) {
             $items[] = sprintf('Vetting rejected %d draft(s) vs %d approved — review the top reject reasons and adjust the routine prompts.',
                 $vet['counts']['reject'], $vet['counts']['approve'] ?? 0);
+        }
+
+        $covers = $s['covers'] ?? [];
+        if (isset($covers['provider_configured']) && ! $covers['provider_configured'] && (int) ($covers['deficit'] ?? 0) > 0) {
+            $items[] = 'Cover images cannot be generated: the OpenAI API key is not set (Settings → AI & Automation). Articles without a suitable gallery cover wait until it is.';
+        } elseif ((int) ($covers['failed'] ?? 0) > 0 && (int) ($covers['generated'] ?? 0) === 0) {
+            $items[] = sprintf('Cover generation failed %d time(s) in 24h and none succeeded%s — check the image model (ai.image.model) and the OpenAI key.',
+                (int) $covers['failed'], ! empty($covers['last_error']) ? ' (last error: ' . mb_substr((string) $covers['last_error'], 0, 140) . ')' : '');
         }
 
         $content = $s['content'] ?? [];

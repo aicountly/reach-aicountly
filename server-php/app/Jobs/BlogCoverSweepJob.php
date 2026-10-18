@@ -11,8 +11,8 @@ use App\Libraries\JobHandlerInterface;
 /**
  * Hourly release of articles parked for want of a cover.
  *
- * Runs hourly rather than daily because covers arrive when an operator
- * uploads them, not on a schedule — an article parked at 09:10 should not
+ * Runs hourly rather than daily because covers arrive through the day (the
+ * hourly gallery autofill, the odd upload) — an article parked at 09:10 should not
  * wait until tomorrow because its cover landed at 09:15. The sweep itself is
  * idempotent per article per day, so an hourly cadence costs one query when
  * there is nothing to do.

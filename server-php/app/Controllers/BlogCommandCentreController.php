@@ -271,7 +271,8 @@ class BlogCommandCentreController extends BaseApiController
         return [
             'generation_enabled'   => $flags->isEnabled('ai_generation'),
             'verification_enabled' => $flags->isEnabled('fact_verification'),
-            'images_enabled'       => $flags->isEnabled('image_generation'),
+            // The cover block's own switch (automation.blog.ai_cover, BLOG_IMAGE_GENERATION_ENABLED kill switch).
+            'images_enabled'       => \App\Libraries\Automation\Routine\RoutineFlags::enabled('blog.ai_cover'),
             'text'                 => $text,
             'image'                => $image,
         ];

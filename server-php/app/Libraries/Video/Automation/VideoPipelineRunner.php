@@ -15,12 +15,14 @@ use App\Libraries\Distribution\SocialPublisherService;
 use App\Models\Distribution\CampaignDeliveryAttemptModel;
 use App\Models\Distribution\CampaignDispatchModel;
 use App\Models\Distribution\CampaignOperationalMetricsModel;
+use App\Libraries\Media\CoverBranding;
 use App\Libraries\Media\VideoMediaStore;
 use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Video\Automation\Render\CaptionBuilder;
 use App\Libraries\Video\Automation\Render\TimelineBuilder;
 use App\Libraries\Video\Automation\Tts\Mp3Duration;
 use App\Libraries\Video\Automation\Visuals\ImageNormalizer;
+use App\Libraries\Video\Automation\Visuals\StillPromptBuilder;
 use App\Libraries\Video\Automation\YouTube\YouTubeMetadata;
 use App\Libraries\Video\Automation\YouTube\YouTubePublisherMode;
 use Config\Services;
@@ -219,12 +221,17 @@ final class VideoPipelineRunner
 
             $ref = (string) $scene['visual']['url_or_prompt'];
             try {
+                // A still illustrates what this scene says: the prompt is built
+                // from the video's title/topic and the scene's own voice-over and
+                // caption (StillPromptBuilder), not just the routine's short note.
+                $stillPrompt = $source === 'screenshot' ? null : StillPromptBuilder::forScene($script, $scene);
                 $raw = $source === 'screenshot'
                     ? VideoProviders::screenshots()->capture($ref, $w, $h)
-                    : VideoProviders::stills()->generate($ref, $short ? 'portrait' : 'landscape');
+                    : VideoProviders::stills()->generate((string) $stillPrompt, $short ? 'portrait' : 'landscape');
                 $img   = ImageNormalizer::toJpeg($raw, $w, $h);
                 $media = $this->media->store($img['bytes'], $img['mime'], ['item_id' => $id, 'width' => $img['width'], 'height' => $img['height']]);
-                $this->repo->updateAsset((int) $asset['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $asset['attempts'] + 1, 'detail' => $source === 'screenshot' ? $ref : 'DALL·E still']);
+                $this->repo->updateAsset((int) $asset['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $asset['attempts'] + 1,
+                    'detail' => $source === 'screenshot' ? $ref : mb_substr('GPT Image still: ' . $stillPrompt, 0, 1000)]);
             } catch (VideoProviderException|\RuntimeException $e) {
                 $transient = $e instanceof VideoProviderException && $e->kind === VideoProviderException::TRANSIENT;
                 $attempts  = (int) $asset['attempts'] + 1;
@@ -248,9 +255,16 @@ final class VideoPipelineRunner
                 $pending++;
             } else {
                 try {
-                    $img   = ImageNormalizer::toJpeg(VideoProviders::stills()->generate($prompt, 'landscape'), 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
+                    $img   = ImageNormalizer::toJpeg(VideoProviders::stills()->generate(StillPromptBuilder::forThumbnail($script), 'landscape'), 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
+                    // The thumbnail is shown outside the video, so it carries
+                    // the AICOUNTLY mark itself (bottom-right corner plate).
+                    $branded = (new CoverBranding())->apply($img['bytes']);
+                    if ($branded['branded']) {
+                        $img = ImageNormalizer::toJpeg($branded['bytes'], 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
+                    }
                     $media = $this->media->store($img['bytes'], $img['mime'], ['item_id' => $id, 'width' => 1280, 'height' => 720]);
-                    $this->repo->updateAsset((int) $thumb['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $thumb['attempts'] + 1, 'detail' => 'DALL·E thumbnail']);
+                    $this->repo->updateAsset((int) $thumb['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $thumb['attempts'] + 1,
+                        'detail' => 'GPT Image thumbnail' . ($branded['branded'] ? ', AICOUNTLY logo' : ' (logo not applied: ' . $branded['reason'] . ')')]);
                 } catch (VideoProviderException|\RuntimeException $e) {
                     $attempts = (int) $thumb['attempts'] + 1;
                     if ($e instanceof VideoProviderException && $e->kind === VideoProviderException::TRANSIENT && $attempts < 3) {
@@ -279,7 +293,8 @@ final class VideoPipelineRunner
 
         $scenes = $this->resolvedScenes($item);
         $build  = TimelineBuilder::build($script, $scenes, [
-            'logo_url'     => (string) ReachConfig::get('video.brand.logo_url'),
+            'logo_url'       => TimelineBuilder::logoUrl((string) ReachConfig::get('video.brand.logo_url')),
+            'logo_badge_url' => $this->logoBadgeUrl(),
             'music_url'    => (string) ReachConfig::get('video.music.url'),
             'callback_url' => self::callbackUrl((string) $item['uuid']),
         ]);
@@ -741,6 +756,35 @@ final class VideoPipelineRunner
             $this->repo->update($id, [$column => 'failed']);
             $this->repo->addWarning($id, "{$label} not set on YouTube: " . mb_substr($e->getMessage(), 0, 300)
                 . ($column === 'thumbnail_status' && $e->kind === VideoProviderException::AUTH ? ' (custom thumbnails need a phone-verified channel)' : ''));
+        }
+    }
+
+    /**
+     * Signed URL of the AICOUNTLY corner mark (official logo on a white
+     * rounded plate, CoverBranding::badgePng) the template lays over every
+     * scene, so the logo stays legible on dark stills as well as light
+     * screenshots. Stored once (no item, never purged) and re-signed per
+     * render. Null when it cannot be made — the template then uses the plain
+     * logo URL, so a render is never lost to branding.
+     */
+    private function logoBadgeUrl(): ?string
+    {
+        try {
+            $png = (new CoverBranding())->badgePng(320);
+            if ($png === null) {
+                return null;
+            }
+            $existing = \Config\Database::connect()->table('reach_video_media')
+                ->where('checksum_sha256', hash('sha256', $png))
+                ->where('item_id IS NULL', null, false)
+                ->get()->getRowArray();
+            $media = $existing ?: $this->media->store($png, 'image/png', ['width' => 320]);
+
+            return $this->media->signedUrl($media);
+        } catch (\Throwable $e) {
+            log_message('warning', 'Video: logo badge unavailable, using the plain logo: ' . $e->getMessage());
+
+            return null;
         }
     }
 

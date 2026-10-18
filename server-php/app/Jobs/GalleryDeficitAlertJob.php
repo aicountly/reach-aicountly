@@ -4,50 +4,25 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Libraries\Gateways\Mailer;
 use App\Libraries\JobContext;
 use App\Libraries\JobHandlerInterface;
-use App\Libraries\Media\MediaGalleryDeficitService;
+use App\Libraries\Media\CoverGenerationAlertService;
 
 /**
- * Daily gallery-deficit reminder to the superadmin: how many covers are
- * missing for the upcoming blog index, with the exact cover prompts to
- * generate (the superadmin produces ~20 images/day on personal AI accounts).
- * Sends nothing when there is no deficit.
+ * reach.gallery_deficit_alert (09:00 UTC, notifications queue).
+ *
+ * This used to email a superadmin the cover deficit with prompts to generate
+ * and "Upload at: Reach console → Quality Centre → Cover Gallery" — a request
+ * for a human to make images. Reach now generates covers itself
+ * (reach.cover_gallery_autofill), the daily numbers are in the daily
+ * analytics report, and this job only sends an informational email when
+ * cover generation keeps failing (CoverGenerationAlertService). The job type
+ * keeps its name so already-queued rows still have a handler.
  */
 class GalleryDeficitAlertJob implements JobHandlerInterface
 {
     public function handle(array $payload, JobContext $ctx): array
     {
-        $report = (new MediaGalleryDeficitService())->report();
-
-        if ($report['deficit'] <= 0) {
-            return ['sent' => false, 'reason' => 'no_deficit'] + $report;
-        }
-
-        $to = trim((string) env('BLOG_GALLERY_ALERT_EMAIL', ''));
-        if ($to === '') {
-            return ['sent' => false, 'reason' => 'BLOG_GALLERY_ALERT_EMAIL_not_set'] + $report;
-        }
-
-        $lines = [
-            "Cover-image gallery deficit: {$report['deficit']} image(s) needed",
-            "Upcoming entries (next {$report['lookahead_days']} days): {$report['needed']} | Active gallery covers available: {$report['available']}",
-            '',
-            'Prompts to generate:',
-        ];
-        foreach ($report['upcoming'] as $i => $entry) {
-            $lines[] = ($i + 1) . '. [' . ($entry['target_date'] ?: 'no date') . '] ' . $entry['title'];
-            if ($entry['cover_prompt'] !== '') {
-                $lines[] = '   Prompt: ' . $entry['cover_prompt'];
-            }
-        }
-        $lines[] = '';
-        $lines[] = 'Upload at: Reach console → Quality Centre → Cover Gallery';
-
-        $body = implode("\n", $lines);
-        $sent = Mailer::send($to, "[Reach] Cover gallery deficit: {$report['deficit']} image(s) needed", nl2br(htmlspecialchars($body)), $body);
-
-        return ['sent' => $sent, 'to' => $to] + $report;
+        return (new CoverGenerationAlertService())->run();
     }
 }
