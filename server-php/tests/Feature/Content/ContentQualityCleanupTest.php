@@ -123,8 +123,8 @@ final class ContentQualityCleanupTest extends DatabaseTestCase
             public function generateImage(ImageGenerationInput $input): ImageGenerationResult
             {
                 $this->calls++;
-                $img = imagecreatetruecolor(64, 40);
-                imagefilledrectangle($img, 0, 0, 63, 39, imagecolorallocate($img, 20, 140, 90 + $this->calls));
+                $img = imagecreatetruecolor(1536, 1024);
+                imagefilledrectangle($img, 0, 0, 1535, 1023, imagecolorallocate($img, 20, 140, 90 + $this->calls));
                 ob_start();
                 imagepng($img);
                 $png = (string) ob_get_clean();

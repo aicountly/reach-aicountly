@@ -206,7 +206,8 @@ final class CommandCentreTest extends ApiTestCase
 
     public function testSectionsAreServedFromCacheUntilFresh(): void
     {
-        $first = $this->fetch('sections=activity');
+        // Start from a freshly built section: earlier tests in this class may have cached one.
+        $first = $this->fetch('sections=activity&fresh=1');
         Database::connect()->table('reach_content_items')->insert([
             'content_type' => 'blog', 'title' => 'New', 'slug' => 'new-' . bin2hex(random_bytes(3)),
             'workflow_status' => 'live', 'published_at' => date('Y-m-d H:i:s'),
