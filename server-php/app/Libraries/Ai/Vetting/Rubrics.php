@@ -10,7 +10,7 @@ namespace App\Libraries\Ai\Vetting;
  */
 final class Rubrics
 {
-    public const TYPES = ['community', 'blog', 'knowledge_base', 'release_note', 'workflow_guide', 'video_script', 'social_reply'];
+    public const TYPES = ['community', 'blog', 'knowledge_base', 'release_note', 'workflow_guide', 'video_script', 'social_reply', 'social_post'];
 
     private const COMMON = <<<'TXT'
 You are the final editor for AICOUNTLY, an Indian accounting and business software company
@@ -168,6 +168,24 @@ Content rules:
 Reject when the message is spam, abuse, harassment, political or religious bait, a legal threat
 or a media enquiry, when any public reply would be risky, or when the reply cannot be made
 compliant. Revise to fix tone, length, sign-off or a doubtful claim.
+TXT,
+            'social_post' => <<<'TXT'
+CONTENT: a public social media post from the official AICOUNTLY account (LinkedIn, Facebook,
+Instagram, X and/or YouTube), written by an automated routine — often on the owner's instruction
+(e.g. a launch announcement). Approving it publishes it at once on every network listed in
+`channels`; any `media_urls` are attached as given.
+- Every statement about AICOUNTLY must be supported by the context (company facts, products). No
+  invented features, prices, dates, customers, user counts, partnerships, awards or statistics;
+  "launch" / "now available" claims only when the context or the owner instruction says so.
+- No guarantees or promises of outcomes, no hype words ("revolutionary", "game-changing"), no
+  clickbait, no fear-mongering, no disparagement of competitors, nothing a network's spam or
+  deceptive-practices policy would remove.
+- Tone: warm, confident, plain Indian English. Fits the networks: X ≤ 280 characters including
+  hashtags and link; others short (a few sentences). At most 5 relevant hashtags.
+- If the post says or implies the content is made with AI (AI voice, AI-generated video), keep
+  that disclosure; never remove one.
+- Links must point to aicountly.com (or an AICOUNTLY social profile) unless the context gives another.
+Return `final` with the same fields (text, title, hashtags, link); edit text only.
 TXT,
         ];
     }

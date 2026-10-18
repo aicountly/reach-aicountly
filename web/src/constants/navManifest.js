@@ -54,8 +54,8 @@ export function buildNavSections() {
         { id: 'command-centre', label: 'Command centre', path: ROUTES.DASHBOARD, icon: LayoutDashboard, end: true, requires: 'dashboard.view', keywords: 'dashboard home overview' },
         // Page built by the bot-plan stream (plan today / tomorrow / week / month vs achieved).
         { id: 'bot-plan', label: 'Bot plan', path: ROUTES.BOT_PLAN, icon: Target, requires: 'bot.view', keywords: 'plan today tomorrow week month achieved targets daily pack' },
-        { id: 'bot-run-now', label: 'Run now', path: ROUTES.BOT_ACTIVITIES, icon: Zap, requires: 'dashboard.view', keywords: 'bot activities trigger routine run' },
-        { id: 'bot-ask', label: 'Ask the bot', path: ROUTES.BOT_ASK, icon: MessageCircleQuestion, requires: 'dashboard.view', keywords: 'chat question assistant' },
+        { id: 'bot-run-now', label: 'Run now', path: ROUTES.BOT_ACTIVITIES, icon: Zap, requires: ['bot.view', 'bot.run', 'settings.view'], keywords: 'bot activities trigger routine run' },
+        { id: 'bot-ask', label: 'Ask the bot', path: ROUTES.BOT_ASK, icon: MessageCircleQuestion, requires: ['bot.view', 'bot.command', 'settings.manage'], keywords: 'chat question assistant' },
       ],
     },
     {
@@ -141,8 +141,6 @@ export function visibleNavSections(has) {
  * at merge, delete the entry here once the real <Route> exists.
  */
 export const PLANNED_ROUTES = [
-  { path: ROUTES.BOT_ACTIVITIES, label: 'Run now', description: 'Start a bot activity or routine on demand.' },
-  { path: ROUTES.BOT_ASK, label: 'Ask the bot', description: 'Ask the bot about its work and plans.' },
 ];
 
 /**

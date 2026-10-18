@@ -100,6 +100,8 @@ class JobHandlerRegistry
         $this->handlers['reach.video_pipeline_sweep'] = new \App\Jobs\VideoPipelineSweepJob();
         // Bot Plan & Performance: actuals snapshot, review + self-tune, plan regeneration.
         $this->handlers[\App\Jobs\BotPlanJob::TYPE]  = new \App\Jobs\BotPlanJob();
+        // Stream 9 — "Run now" of a cron command (Bot → Activities); allow-listed by BotActivityRegistry.
+        $this->handlers[\App\Libraries\Bot\BotActivityRegistry::COMMAND_JOB_TYPE] = new \App\Jobs\BotActivityCommandJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

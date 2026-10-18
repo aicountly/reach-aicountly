@@ -45,24 +45,36 @@ class VideoAutomationService
             throw new VideoQuotaException('Video automation is switched off (Settings → AI & Automation → Video). Stop for today.');
         }
         $script = VideoScriptValidator::normalize($payload);
+        // Stream 9: a script made for an owner command (Bot → Ask the bot) and the
+        // networks its video is offered to. Validated before anything is stored.
+        $channels = BotCommandVideoRules::socialChannels($payload);
 
         $existing = $this->repo->findByExternalKey($script['external_key']);
         if ($existing !== null) {
             return ['status' => 'already_received'] + $this->summary($existing);
         }
+        $command = BotCommandVideoRules::command($payload);
 
-        $limit = $this->dailyLimit($script['format']);
-        $used  = $this->repo->countToday($script['format']);
-        if ($used >= $limit) {
-            throw new VideoQuotaException(sprintf("Today's %s quota is used (%d of %d). Stop for today.", $script['format'], $used, $limit));
-        }
-        // A routine that keeps sending scripts the vetting model rejects must stop too.
-        if ($this->repo->countToday($script['format'], true) >= max(3, $limit * 3)) {
-            throw new VideoQuotaException("Too many {$script['format']} scripts were submitted today. Stop for today.");
+        if ($command !== null) {
+            // The owner asked for it: the routine's daily quota does not apply; the per-command cap does.
+            BotCommandVideoRules::assertCommandQuota($this->repo->db(), $command);
+        } else {
+            $limit = $this->dailyLimit($script['format']);
+            $used  = $this->repo->countToday($script['format']);
+            if ($used >= $limit) {
+                throw new VideoQuotaException(sprintf("Today's %s quota is used (%d of %d). Stop for today.", $script['format'], $used, $limit));
+            }
+            // A routine that keeps sending scripts the vetting model rejects must stop too.
+            if ($this->repo->countToday($script['format'], true) >= max(3, $limit * 3)) {
+                throw new VideoQuotaException("Too many {$script['format']} scripts were submitted today. Stop for today.");
+            }
         }
 
-        $id = $this->repo->create($script, $payload);
-        AuditLogger::record('video.script.received', ['item_id' => $id, 'external_key' => $script['external_key'], 'format' => $script['format']], null);
+        $id = $this->repo->create($script, $payload, [
+            'bot_command_id'       => $command !== null ? (int) $command['id'] : null,
+            'social_channels_json' => $channels !== null ? json_encode($channels) : null,
+        ]);
+        AuditLogger::record('video.script.received', ['item_id' => $id, 'external_key' => $script['external_key'], 'format' => $script['format'], 'bot_command' => $command['uuid'] ?? null, 'social_channels' => $channels], null);
 
         return $this->vet($id);
     }
@@ -177,6 +189,8 @@ class VideoAutomationService
             'vetting_decision' => $item['vetting_decision'],
             'vetting_reasons'  => $item['vetting_reasons_json'],
             'youtube_url'      => $item['youtube_url'],
+            'social_channels'  => VideoSocialDistributor::channelsFor($item),
+            'bot_command_id'   => isset($item['bot_command_id']) && $item['bot_command_id'] !== null ? (int) $item['bot_command_id'] : null,
         ];
     }
 

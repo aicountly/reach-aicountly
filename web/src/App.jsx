@@ -50,6 +50,8 @@ import { BotQueuePage } from './pages/bot/BotQueuePage';
 import { BotReportsPage } from './pages/bot/BotReportsPage';
 import { BotReportDetailPage } from './pages/bot/BotReportDetailPage';
 import { BotPlanPage } from './pages/bot/BotPlanPage';
+import { BotActivitiesPage } from './pages/bot/BotActivitiesPage';
+import { BotAskPage } from './pages/bot/BotAskPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 
 import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
@@ -385,6 +387,8 @@ export default function App() {
 
         <Route path={ROUTES.BOT_QUEUE}          element={<BotQueuePage />} />
         <Route path={ROUTES.BOT_REPORTS}        element={<BotReportsPage />} />
+        <Route path={ROUTES.BOT_ACTIVITIES}     element={<BotActivitiesPage />} />
+        <Route path={ROUTES.BOT_ASK}            element={<BotAskPage />} />
         <Route path={ROUTES.BOT_REPORT_DETAIL}  element={<BotReportDetailPage />} />
         <Route path={ROUTES.BOT_PLAN}            element={<BotPlanPage />} />
         <Route path={ROUTES.APPROVALS}          element={<ApprovalsPage />} />

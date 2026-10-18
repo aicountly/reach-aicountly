@@ -20,6 +20,9 @@ final class ReachConfig
 {
     private const ENC_PREFIX = 'v1:';
 
+    /** A Claude Code Routines API trigger ("fire") URL. */
+    public const ROUTINE_FIRE_URL_PATTERN = '#^https://api\.anthropic\.com/v1/claude_code/routines/trig_[A-Za-z0-9_-]{6,120}/fire$#';
+
     /** @var array<string, mixed>|null */
     private static ?array $cache = null;
 
@@ -262,6 +265,18 @@ final class ReachConfig
             // ── Bot Plan & Performance (stream 8) ───────────────────────────
             'bot.self_tune.enabled' => ['group' => 'Automation', 'label' => 'Bot self-tuning (Plan & Performance)', 'type' => 'bool', 'default' => true,
                 'help' => 'On: after each daily review the bot lowers targets that cannot be reached (and restores them), retries stuck drafts and safe failed jobs, and steers the routine briefing towards topics that perform — within hard bounds, every change logged on Bot → Plan & Performance. Off: nothing is applied; the log shows what it would have done.'],
+
+            // ── Stream 9: bot actions — Run now + Ask the bot (keep this block contiguous) ──
+            'bot.command.routine_fire_url' => ['group' => 'Bot commands', 'label' => 'reach-command routine: API trigger URL', 'type' => 'string', 'env' => 'BOT_COMMAND_ROUTINE_FIRE_URL', 'format' => 'routine_fire_url',
+                'help' => 'claude.ai → Routines → reach-command → Add another trigger → API → copy the URL (https://api.anthropic.com/v1/claude_code/routines/trig_…/fire). Bot → Ask the bot and Run now for Claude routines fire it. Setup: docs/operations/BOT_ACTIONS.md.'],
+            'bot.command.routine_token' => ['group' => 'Bot commands', 'label' => 'reach-command routine: API trigger token', 'type' => 'secret', 'env' => 'BOT_COMMAND_ROUTINE_TOKEN',
+                'help' => 'The token claude.ai shows once when you generate it for that API trigger (starts with sk-ant-oat01-). Stored encrypted; never shown again. Regenerating it in claude.ai invalidates the old one — paste the new one here.'],
+            'automation.social.enabled' => ['group' => 'Bot commands', 'label' => 'Accept routine social posts (v1/automation/social-posts)', 'type' => 'bool', 'default' => true,
+                'help' => 'Off: social posts submitted by routines are refused (HTTP 429). Posts are Gemini-vetted and published through social-api.ai.'],
+            'automation.social.daily_limit' => ['group' => 'Bot commands', 'label' => 'Routine social posts per day (outside owner commands)', 'type' => 'int', 'default' => 6,
+                'help' => 'Submissions per IST day not tied to an owner command. Each submission may target several networks. Posts made for an owner command count against that command (10 at most) instead.'],
+            'ai.vetting.model.social_post' => ['group' => 'Bot commands', 'label' => 'Social post vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
+            // ── end bot actions ──
         ];
     }
 
@@ -471,6 +486,9 @@ final class ReachConfig
         $format = (string) (self::registry()[$key]['format'] ?? '');
         if ($format === 'https_url' && $str !== '' && (! preg_match('#^https://[^\s/?\#]+#i', $str) || filter_var($str, FILTER_VALIDATE_URL) === false)) {
             throw new \InvalidArgumentException("{$key} must be an https:// URL.");
+        }
+        if ($format === 'routine_fire_url' && $str !== '' && ! preg_match(self::ROUTINE_FIRE_URL_PATTERN, $str)) {
+            throw new \InvalidArgumentException("{$key} must be a Claude routine API trigger URL: https://api.anthropic.com/v1/claude_code/routines/trig_…/fire");
         }
         if ($format === 'account_id' && $str !== '' && ! preg_match('/^[A-Za-z0-9._:@\-]{1,200}$/', $str)) {
             throw new \InvalidArgumentException("{$key}: not a valid account id (letters, digits and . _ : @ - only).");

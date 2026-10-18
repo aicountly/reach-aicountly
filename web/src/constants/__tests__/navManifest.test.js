@@ -63,12 +63,10 @@ describe('navManifest', () => {
     expect(map['/admin/local-bot-reports']).toBe('/bot/reports');
   });
 
-  it('lists the routes other streams are building so nav entries never dead-end', () => {
+  it('has no placeholder left for pages that have landed', () => {
     const paths = PLANNED_ROUTES.map((r) => r.path);
-    expect(paths).toEqual(expect.arrayContaining(['/bot/activities', '/bot/ask']));
-    // Landed with their real pages (Bot plan, Social inbox), so no placeholders any more.
-    expect(paths).not.toContain('/bot/plan');
-    expect(paths).not.toContain('/social/inbox');
+    // Bot plan, Run now, Ask the bot and Social inbox all have real pages now.
+    for (const p of ['/bot/plan', '/bot/activities', '/bot/ask', '/social/inbox']) expect(paths).not.toContain(p);
     const navPaths = new Set(buildNavSections().flatMap((s) => s.items).map((i) => i.path));
     for (const p of paths) expect(navPaths.has(p), p).toBe(true);
   });

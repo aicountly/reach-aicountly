@@ -171,6 +171,8 @@ period, not sixty times.
 | 01:00 IST (19:30 UTC) | `reach.bot_plan` mode `daily` — snapshot yesterday's actuals (and the 4 days before, which may still change), review the last 7 days (variance, root causes, lessons), self-tune within bounds (`bot.self_tune.enabled`), regenerate every plan period; `php spark reach:bot-plan` by hand | default | `bot-plan-daily-<IST date>` |
 | every other hour (IST) | `reach.bot_plan` mode `refresh` — regenerate the plans only; a new version is stored only when a number changed | default | `bot-plan-refresh-<IST date>-<IST hour>` |
 
+Run any of these (and the cron commands above, and the Claude routines) now from **Bot → Activities** in Reach — it queues the same job / runs the same command; see [`BOT_ACTIONS.md`](BOT_ACTIONS.md).
+
 Run or re-run by hand:
 
 ```bash
