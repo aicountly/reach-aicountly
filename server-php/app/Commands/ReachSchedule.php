@@ -227,6 +227,19 @@ class ReachSchedule extends BaseCommand
             $add('reach.structured_content_sweep', ['limit' => 20], 'structured-content-sweep-' . $utc->format('YmdHi'), ['queue' => 'publishing']);
         }
 
+        // 01:00 UTC (06:30 IST) — content quality safety net: re-vet what went live in the
+        // last 48 h; a vetting-model reject takes it down and queues a
+        // same-slug rewrite (ContentRevetService). Before the 02:30 report.
+        if ($hour === 1) {
+            $add('reach.content_quality_sweep', ['hours' => 48], "content-quality-sweep-{$today}", ['queue' => 'publishing']);
+        }
+
+        // Every 15 minutes: leads Engage has not accepted yet (retry_scheduled)
+        // are retried with backoff; nobody has to press "Push".
+        if ($minute % 15 === 0) {
+            $add('reach.engage_push_retry_sweep', ['limit' => 25], 'engage-push-retry-' . $utc->format('YmdHi'), ['queue' => 'default']);
+        }
+
         // 03:00 UTC (08:30 IST) — refresh detection
         if ($hour === 3) {
             $add('reach.content_refresh_detection', [], "content-refresh-detection-{$today}");

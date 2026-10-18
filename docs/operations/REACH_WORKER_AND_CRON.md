@@ -159,6 +159,7 @@ period, not sixty times.
 | every hour | `reach.blog_cover_sweep` — re-attempts parked articles (re-armed when a new cover lands) | blog | `blog-cover-sweep-<Y-m-d-H>` |
 | every hour | `reach.content_due_date_reminder`, `reach.content_overdue_escalation` | notifications | `<type>-<Y-m-d-H>` |
 | every hour | `reach.content_schedule_readiness` | default | `content-schedule-readiness-<Y-m-d-H>` |
+| 01:00 UTC (06:30 IST) | `reach.content_quality_sweep` — re-vets what went live in the last 48 h; a Gemini reject withdraws the page and queues a same-slug rewrite (`reach:content-revet` by hand) | publishing | `content-quality-sweep-<date>` |
 | 03:00 UTC (08:30 IST) | `reach.content_refresh_detection` | default | per day |
 | **04:00 UTC (09:30 IST)** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
 | 05:00 UTC (10:30 IST) | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |

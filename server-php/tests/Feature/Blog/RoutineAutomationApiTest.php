@@ -116,6 +116,28 @@ final class RoutineAutomationApiTest extends ApiTestCase
         $this->withHeaders($viewer)->call('POST', 'v1/routine-submissions/' . $list['items'][0]['id'] . '/retry')->assertStatus(403);
     }
 
+    public function testRegenerateNextNeedsTheTokenAndHandsOutQueuedWorkOnce(): void
+    {
+        $this->withHeaders(['Accept' => 'application/json'])->call('GET', 'v1/automation/regenerate/next')->assertStatus(401);
+        $empty = $this->withHeaders($this->routine())->call('GET', 'v1/automation/regenerate/next?type=blog');
+        $empty->assertStatus(200);
+        $this->assertNull($this->data($empty)['item']);
+        $this->withHeaders($this->routine())->call('GET', 'v1/automation/regenerate/next?type=video')->assertStatus(422);
+
+        $db = \Config\Database::connect();
+        $db->table('reach_content_items')->insert(['uuid' => bin2hex(random_bytes(16)), 'content_type' => 'blog', 'title' => 'GST filing checklist for small businesses',
+            'slug' => 'gst-filing-checklist', 'workflow_status' => 'unpublished', 'approval_status' => 'rejected', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
+        $itemId = (int) $db->insertID();
+        $id = (new \App\Libraries\Content\Quality\RegenerationQueue())->enqueue($itemId, ['OFF_TOPIC: describes the draft generation step'], true);
+
+        $first = $this->data($this->withHeaders($this->routine())->call('GET', 'v1/automation/regenerate/next?type=blog'));
+        $this->assertSame($id, $first['item']['regeneration_id']);
+        $this->assertSame('gst-filing-checklist', $first['item']['slug']);
+        $this->assertSame(['regeneration_id' => $id], $first['item']['submit']['include']);
+        $this->assertSame(['OFF_TOPIC: describes the draft generation step'], $first['item']['why']);
+        $this->assertNull($this->data($this->withHeaders($this->routine())->call('GET', 'v1/automation/regenerate/next?type=blog'))['item']);
+    }
+
     public function testRefusalsAreSpecific(): void
     {
         $this->withHeaders($this->routine())->withBodyFormat('json')->call('POST', 'v1/automation/blog-drafts', $this->draft(['content_base_key' => '']))->assertStatus(422);

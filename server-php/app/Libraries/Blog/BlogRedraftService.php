@@ -74,9 +74,14 @@ class BlogRedraftService
     }
 
     /**
-     * Reset item to outline_ready and enqueue a fresh GENERATE_DRAFT block.
+     * Queue a same-slug rewrite by the Claude blog routine
+     * (RegenerationQueue → GET v1/automation/regenerate/next). Reach's own
+     * GENERATE_DRAFT step is retired: it wrote the off-topic posts this
+     * replaces. The approval is revoked so nothing publishes the stub
+     * meanwhile; a live post stays where it is until its rewrite lands
+     * (take it down first with reach:content-revet or the listing audit).
      *
-     * @return array{content_item_id:int,work_block_id:int,from_status:string}
+     * @return array{content_item_id:int, regeneration_id:?int, work_block_id:null, from_status:string}
      */
     public function redraft(int $contentItemId, ?int $actorId = null): array
     {
@@ -94,67 +99,51 @@ class BlogRedraftService
         $from = (string) ($item['workflow_status'] ?? '');
         $now  = date('Y-m-d H:i:s');
 
-        // Complete open human-review gates so they do not keep the item parked.
-        $this->db->table('reach_work_blocks')
-            ->where('content_item_id', $contentItemId)
-            ->where('block_type', WorkBlockService::TYPE_HUMAN_REVIEW_GATE)
-            ->whereIn('eligibility_status', ['blocked', 'eligible', 'leased', 'running', 'queued', 'pending'])
-            ->update([
-                'eligibility_status' => 'completed',
-                'output_json'        => json_encode(['outcome' => 'superseded_by_redraft'], JSON_UNESCAPED_SLASHES),
-                'completed_at'       => $now,
-                'updated_at'         => $now,
-            ]);
-
-        // Cancel any in-flight generate/fact/seo/cross blocks so the new draft wins.
+        // Retire the old pipeline's open blocks so nothing re-parks or re-sends it.
         $this->db->table('reach_work_blocks')
             ->where('content_item_id', $contentItemId)
             ->whereIn('block_type', [
+                WorkBlockService::TYPE_HUMAN_REVIEW_GATE,
                 WorkBlockService::TYPE_GENERATE_DRAFT,
                 WorkBlockService::TYPE_FACT_VERIFY,
                 WorkBlockService::TYPE_SEO_OPTIMIZE,
                 WorkBlockService::TYPE_CROSS_REVIEW,
+                WorkBlockService::TYPE_PUBLISH_BLOG,
             ])
             ->whereIn('eligibility_status', ['pending', 'eligible', 'queued', 'running', 'blocked', 'leased'])
             ->update([
                 'eligibility_status' => 'cancelled',
+                'output_json'        => json_encode(['outcome' => 'superseded_by_routine_rewrite'], JSON_UNESCAPED_SLASHES),
                 'updated_at'         => $now,
             ]);
 
-        $this->db->table('reach_content_items')->where('id', $contentItemId)->update([
-            'workflow_status' => BlogStateMachine::OUTLINE_READY,
-            'approval_status' => 'pending',
-            'updated_at'      => $now,
-        ]);
-
-        $this->db->table('reach_content_blog_details')
-            ->where('content_item_id', $contentItemId)
-            ->update([
-                'automation_state' => BlogStateMachine::OUTLINE_READY,
-                'updated_at'       => $now,
+        $live = in_array($from, [BlogStateMachine::LIVE, BlogStateMachine::PUBLISHED, BlogStateMachine::VERIFICATION_PENDING], true);
+        if (strtolower((string) ($item['approval_status'] ?? '')) === 'approved' && ! $live) {
+            (new BlogContentApprovalService())->revoke($contentItemId, 'Stub body: queued for a routine rewrite', $actorId);
+        }
+        if (! $live) {
+            $this->db->table('reach_content_items')->where('id', $contentItemId)->update([
+                'workflow_status' => BlogStateMachine::REJECTED,
+                'approval_status' => 'rejected',
+                'updated_at'      => $now,
             ]);
+            $this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)
+                ->update(['automation_state' => BlogStateMachine::REJECTED, 'updated_at' => $now]);
+        }
 
-        $workBlocks = new WorkBlockService();
-        $blockId    = $workBlocks->create([
-            'block_type'         => WorkBlockService::TYPE_GENERATE_DRAFT,
-            'scope'              => 'blog',
-            'content_item_id'    => $contentItemId,
-            'content_version_id' => null,
-            'eligibility_status' => 'eligible',
-            'priority'           => 5,
-            'idempotency_key'    => "blog-{$contentItemId}-redraft-draft-" . gmdate('YmdHis') . '-' . bin2hex(random_bytes(3)),
-            'input_json'         => ['reason' => 'redraft_stub_body', 'from_status' => $from],
-        ]);
+        $regenerationId = (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))
+            ->enqueue($contentItemId, ['The saved body is a placeholder, not an article.'], $live);
 
         AuditLogger::record('blog.content_redraft_queued', [
             'content_item_id' => $contentItemId,
             'from_status'     => $from,
-            'work_block_id'   => $blockId,
+            'regeneration_id' => $regenerationId,
         ], $actorId);
 
         return [
             'content_item_id' => $contentItemId,
-            'work_block_id'   => $blockId,
+            'regeneration_id' => $regenerationId,
+            'work_block_id'   => null,
             'from_status'     => $from,
         ];
     }

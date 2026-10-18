@@ -321,7 +321,26 @@ class DailyReportBuilder
             $top[] = ['reason' => $text, 'count' => $n];
         }
 
-        return ['configured' => true, 'total' => count($rows), 'counts' => $counts, 'by_type' => $byType, 'top_reject_reasons' => $top];
+        return ['configured' => true, 'total' => count($rows), 'counts' => $counts, 'by_type' => $byType, 'top_reject_reasons' => $top,
+                'quality' => $this->quality($window)];
+    }
+
+    /**
+     * Content clean-up / daily safety net (informational): re-vets of stored
+     * content, pages taken down and same-slug rewrites in the queue.
+     *
+     * @param array{start:string, end:string} $window
+     * @return array<string, int>|null
+     */
+    private function quality(array $window): ?array
+    {
+        if (! SchemaGuard::hasTable($this->db, 'reach_content_quality_checks')) {
+            return null;
+        }
+        $summary = (new \App\Libraries\Content\Quality\QualityCheckLog($this->db))->summarySince($window['start']);
+        $open    = (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))->counts();
+
+        return $summary + ['rewrites_open' => array_sum($open)];
     }
 
     /**
@@ -411,10 +430,13 @@ class DailyReportBuilder
         return ['configured' => true] + \App\Libraries\Distribution\SocialInbox\SocialInboxService::stats($this->db, $window['start'], $window['end']);
     }
 
-    // ── "What to do today" ─────────────────────────────────────────────────
+    // ── "Today at a glance" ────────────────────────────────────────────────
 
     /**
      * Rule-based, ordered by impact; at most 8 items. Pure so it can be tested.
+     * Observations, not chores: routine content work (rewrites, refreshes,
+     * topics) is the routines' job, so nothing here asks a person to do it.
+     * The only asks left are one-time connections and broken plumbing.
      *
      * @param array<string, array<string, mixed>> $s
      * @return list<string>
@@ -430,20 +452,20 @@ class DailyReportBuilder
             $clicks = (float) ($search['day']['clicks'] ?? 0);
             $base   = (float) ($search['baseline']['clicks'] ?? 0);
             if ($base >= 5 && $clicks < $base * 0.8) {
-                $items[] = sprintf('Search clicks on %s were %d vs a 7-day average of %.1f (%d%%). Check the declined queries below.',
+                $items[] = sprintf('Search clicks on %s were %d vs a 7-day average of %.1f (%d%%); the declined queries are listed below.',
                     $search['date'], (int) $clicks, $base, (int) round(($clicks - $base) / $base * 100));
             }
             foreach (array_slice($search['movers']['declined'] ?? [], 0, 2) as $m) {
-                $items[] = sprintf('Refresh the page ranking for "%s" — it slipped from %.1f to %.1f.', $m['query'], $m['previous_position'], $m['position']);
+                $items[] = sprintf('"%s" slipped from position %.1f to %.1f.', $m['query'], $m['previous_position'], $m['position']);
             }
             $striking = array_filter($search['top_queries'] ?? [], static fn ($q) => ($q['avg_position'] ?? 0) > 3 && ($q['avg_position'] ?? 0) <= 15 && ($q['impressions'] ?? 0) >= 20);
             usort($striking, static fn ($a, $b) => $b['impressions'] <=> $a['impressions']);
             foreach (array_slice($striking, 0, 2) as $q) {
-                $items[] = sprintf('"%s" sits at position %.1f with %d impressions — strengthen that page to push it into the top 3.', $q['dimension_value'], $q['avg_position'], $q['impressions']);
+                $items[] = sprintf('"%s" sits at position %.1f with %d impressions — within reach of the top 3.', $q['dimension_value'], $q['avg_position'], $q['impressions']);
             }
             foreach ($search['top_pages'] ?? [] as $p) {
                 if (($p['impressions'] ?? 0) >= 100 && ($p['ctr'] ?? 1) < 0.01) {
-                    $items[] = sprintf('Rewrite the title/meta description of %s — %d impressions but %.1f%% CTR.', $p['dimension_value'], $p['impressions'], ($p['ctr'] ?? 0) * 100);
+                    $items[] = sprintf('%s has %d impressions but a %.1f%% CTR — its title/meta description draws few clicks.', $p['dimension_value'], $p['impressions'], ($p['ctr'] ?? 0) * 100);
                     break;
                 }
             }
@@ -454,7 +476,7 @@ class DailyReportBuilder
             $items[] = 'Add DataForSEO credentials (Settings → AI & Automation → SEO data) to start tracking positions against competitors.';
         }
         foreach (array_slice($tracker['beaten'] ?? [], 0, 2) as $b) {
-            $items[] = sprintf('%s outranks us for "%s" (#%d vs %s) — plan content for it.', $b['competitor'], $b['keyword'], $b['competitor_rank'],
+            $items[] = sprintf('%s outranks us for "%s" (#%d vs %s).', $b['competitor'], $b['keyword'], $b['competitor_rank'],
                 $b['our_rank'] === null ? 'not in top 100' : '#' . $b['our_rank']);
         }
 
@@ -472,7 +494,7 @@ class DailyReportBuilder
 
         $vet = $s['vetting'] ?? [];
         if (! empty($vet['configured']) && ($vet['counts']['reject'] ?? 0) > ($vet['counts']['approve'] ?? 0) && ($vet['counts']['reject'] ?? 0) > 0) {
-            $items[] = sprintf('Vetting rejected %d draft(s) vs %d approved — review the top reject reasons and adjust the routine prompts.',
+            $items[] = sprintf('Vetting rejected %d draft(s) vs %d approved; the top reject reasons are listed below.',
                 $vet['counts']['reject'], $vet['counts']['approve'] ?? 0);
         }
 

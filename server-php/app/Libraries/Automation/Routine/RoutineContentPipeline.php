@@ -182,6 +182,8 @@ class RoutineContentPipeline
         if (! $verdict['approved']) {
             $this->submissions->update($id, $record + ['status' => RoutineSubmissions::REJECTED]);
             $this->retireItem($type, $itemId, $verdict);
+            // A rejected rewrite of a queued item: offer the topic again.
+            (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))->requeueAfterRejection($itemId, $verdict['reasons']);
 
             return;
         }
@@ -353,7 +355,11 @@ class RoutineContentPipeline
         // A corrected slug is taken only when it is well-formed and free —
         // never at the cost of a collision the readiness gate would block.
         $slug = strtolower(trim((string) ($final['slug'] ?? '')));
-        if ($slug !== '' && $slug !== (string) $item['slug'] && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1
+        // Never move an article that has been on the public site (a rewrite
+        // is republished at its URL; links to it must keep working).
+        $everPublic = $this->db->table('reach_publication_deployments')->where('content_item_id', $itemId)
+            ->where('public_content_id IS NOT NULL', null, false)->countAllResults() > 0;
+        if (! $everPublic && $slug !== '' && $slug !== (string) $item['slug'] && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1
             && $this->db->table('reach_content_items')->where('slug', $slug)->where('id !=', $itemId)->countAllResults() === 0
             && $this->db->table('reach_content_seo_profiles')->where('slug', $slug)->where('content_item_id !=', $itemId)->countAllResults() === 0
         ) {
@@ -665,6 +671,22 @@ class RoutineContentPipeline
         }
 
         $status = (string) $deployment['status'];
+        // A deployment the worker never sent (dead-lettered job, a cron that
+        // does not drain the publishing queue) used to hold the article in
+        // "publishing" forever. After two hours it counts as failed, so the
+        // normal retry path queues a fresh one.
+        if (in_array($status, ['queued', 'sending'], true)
+            && strtotime((string) ($deployment['updated_at'] ?? 'now')) < time() - 7200) {
+            $this->db->table('reach_publication_deployments')->where('id', $deployment['id'])->update([
+                'status'         => 'failed',
+                'error_category' => 'not_sent',
+                'redacted_error' => 'Not sent within 2 hours: the publishing job did not run (check that reach:work drains the publishing queue).',
+                'updated_at'     => date('Y-m-d H:i:s'),
+            ]);
+            $deployment['status'] = $status = 'failed';
+            $deployment['error_category'] = 'not_sent';
+            $deployment['redacted_error'] = 'Not sent within 2 hours: the publishing job did not run.';
+        }
         if ($status === 'failed' || $status === 'cancelled') {
             $attempts = (int) $row['publish_attempts'];
             $this->submissions->update($id, [
@@ -712,6 +734,7 @@ class RoutineContentPipeline
             'verified_at'  => $now,
             'last_error'   => null,
         ]);
+        (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))->markLiveForItem($itemId);
         AuditLogger::record($row['content_type'] === 'blog' ? 'blog.routine_live' : 'kb.routine_live', [
             'content_item_id' => $itemId, 'deployment_id' => (int) $deployment['id'], 'canonical_url' => $deployment['canonical_url'] ?? null,
         ]);

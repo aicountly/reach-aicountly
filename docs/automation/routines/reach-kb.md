@@ -17,6 +17,7 @@ Endpoints (no auth header of your own — the environment's network secret adds 
 | `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=knowledge_base` | read first: today's plan, yesterday vs plan, top 3 lags with causes and what the bot changed, vetting reasons to avoid, topic mix |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable help/blog URLs |
 | `POST https://reach.aicountly.org/api/v1/automation/kb-drafts` | submit one help article; Reach has Gemini vet it (knowledge_base rubric) and publishes approved ones to aicountly.com/help |
+| `GET  https://reach.aicountly.org/api/v1/automation/regenerate/next?type=knowledge_base` | a live or approved article whose text failed re-vetting and must be rewritten (same slug) — handled first |
 
 ## Prompt
 
@@ -26,7 +27,7 @@ this run that explain how to do real tasks in AICOUNTLY apps, submit each one, t
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
-0. BRIEFING (read it first — this is how the bot learns from its lags)
+0a. BRIEFING (read it first — this is how the bot learns from its lags)
    GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=knowledge_base
    - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
      what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
@@ -34,6 +35,13 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
    - Use avoid_reasons.knowledge_base to steer clear of what Gemini rejected recently, and when choosing between products prefer topic_mix.prefer (the products furthest behind their cadence).
    - If the call fails, carry on without it — it informs, it never blocks; Reach still
      enforces the quota and Gemini still decides.
+0b. REWRITES FIRST
+   GET https://reach.aicountly.org/api/v1/automation/regenerate/next?type=knowledge_base
+   - If "item" is not null: write a completely new article for item.title / item.product_slug
+     (read item.why for what was wrong with the old text — do not reuse it), research and write
+     it exactly as in step 2, and submit it with "regeneration_id": item.regeneration_id added
+     to the normal kb-drafts body. The slug is kept by Reach. It counts against your budget.
+     Repeat step 0 while budget remains and item is not null.
 
 1. PLAN
    GET https://reach.aicountly.org/api/v1/automation/kb-plan

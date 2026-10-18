@@ -10,10 +10,12 @@ use Config\Database;
 use Throwable;
 
 /**
- * `php spark reach:blog-redraft` — re-queue GENERATE_DRAFT for stub/placeholder bodies.
- *
- * Typical production fix after "Untitled draft" versions landed in internal_review:
- *   php spark reach:blog-redraft --stubs --prefer=gemini
+ * `php spark reach:blog-redraft` — queue a same-slug rewrite by the Claude blog
+ * routine for stub/placeholder bodies (RegenerationQueue; Reach's own
+ * GENERATE_DRAFT step is retired). The routine picks it up from
+ * GET v1/automation/regenerate/next on its next run; the rewrite is vetted
+ * and published automatically.
+ *   php spark reach:blog-redraft --stubs
  *   php spark reach:blog-redraft --id=3
  */
 class ReachBlogRedraft extends BaseCommand
@@ -22,15 +24,12 @@ class ReachBlogRedraft extends BaseCommand
 
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-redraft';
-    protected $description = 'Re-generate genuine blog drafts for stub/placeholder bodies.';
-    protected $usage       = 'reach:blog-redraft [--id=N] [--stubs] [--limit=20] [--dispatch] [--work] [--prefer=gemini]';
+    protected $description = 'Queue routine rewrites (same slug) for blog items whose body is a stub/placeholder.';
+    protected $usage       = 'reach:blog-redraft [--id=N] [--stubs] [--limit=20]';
     protected $options     = [
         '--id'      => 'Content item id to redraft.',
         '--stubs'   => 'Redraft all blog items whose current version is a stub body.',
         '--limit'   => 'Max stub items to scan (default 20).',
-        '--dispatch'=> 'Print dispatch hint after queueing.',
-        '--work'    => 'Print worker hint after queueing.',
-        '--prefer'  => 'Hint which AI provider catalog preference to use (e.g. gemini).',
     ];
 
     public function run(array $params): int
@@ -41,13 +40,6 @@ class ReachBlogRedraft extends BaseCommand
         }
         $stubs    = $this->sparkFlag('stubs', $params);
         $limit    = max(1, (int) ($this->sparkOption('limit', $params, '20') ?? '20'));
-        $dispatch = $this->sparkFlag('dispatch', $params);
-        $work     = $this->sparkFlag('work', $params);
-        $prefer   = (string) ($this->sparkOption('prefer', $params, '') ?? '');
-
-        if ($prefer !== '') {
-            CLI::write("Hint: ensure AI routes prefer {$prefer} (php spark reach:ai-seed-catalog --prefer={$prefer})", 'yellow');
-        }
 
         $svc  = new BlogRedraftService();
         $db   = Database::connect();
@@ -89,23 +81,12 @@ class ReachBlogRedraft extends BaseCommand
             }
         }
 
-        if ($dispatch) {
-            CLI::write('Dispatch: run `php spark reach:blog-dispatch --force` if blocks stay pending.', 'yellow');
-        }
-        if ($work) {
-            CLI::write('Worker: run `php spark reach:work --queue blog,publishing,community,default --limit 40`', 'yellow');
-        }
-
         CLI::write(json_encode([
             'event'   => 'blog_redraft.completed',
             'ts'      => gmdate('c'),
             'scanned' => count($targets),
             'items'   => $done,
-            'next'    => [
-                'php spark reach:ai-seed-catalog --prefer=gemini',
-                'php spark reach:blog-dispatch --force',
-                'php spark reach:work --queue blog,publishing,community,default --limit 40',
-            ],
+            'next'    => 'Nothing to run: the reach-blog routine takes queued rewrites first (GET v1/automation/regenerate/next).',
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
         return 0;

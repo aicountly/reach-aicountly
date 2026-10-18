@@ -46,9 +46,9 @@ export function BlogReviewDetailPage() {
     try {
       const result = await fn();
       if (key === 'approve') {
-        setNotice('Approved. You can publish from Ready to Publish.');
+        setNotice('Approved. Gemini vets this version when it is published.');
       } else if (key === 'redraft') {
-        setNotice(result?.message || 'Genuine AI draft generation queued. Wait for the worker/cron, then refresh.');
+        setNotice(result?.message || 'Queued for a rewrite by the blog routine; it is vetted and published automatically.');
       } else {
         setNotice('Saved.');
       }
@@ -89,7 +89,8 @@ export function BlogReviewDetailPage() {
       {isStub && (
         <Alert variant="warning">
           This is not a real article — the saved body is a placeholder (e.g. &quot;Untitled draft&quot;).
-          Do not approve it. Click <strong>Regenerate genuine draft</strong> to re-run AI generation for a full blog post.
+          Do not approve it. Click <strong>Queue a rewrite</strong>: the blog routine writes a new article on this topic and slug,
+          and it is vetted and published automatically.
         </Alert>
       )}
 
@@ -105,11 +106,11 @@ export function BlogReviewDetailPage() {
               className="btn btn-primary"
               disabled={!!actioning}
               onClick={() => {
-                if (!window.confirm('Queue a fresh AI draft for this topic? The placeholder body will be replaced after the worker runs.')) return;
+                if (!window.confirm('Queue a rewrite of this topic by the blog routine? The placeholder is taken out of the approval flow; the rewrite keeps this slug.')) return;
                 run('redraft', () => contentService.redraftItem(id));
               }}
             >
-              <RefreshCw size={13} /> {actioning === 'redraft' ? 'Queuing…' : 'Regenerate genuine draft'}
+              <RefreshCw size={13} /> {actioning === 'redraft' ? 'Queuing…' : 'Queue a rewrite'}
             </button>
           )}
           {canEdit && (
@@ -203,9 +204,9 @@ export function BlogReviewDetailPage() {
           </Card>
           <Card title="What to do">
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#4b5563', lineHeight: 1.6 }}>
-              <li>If you see a stub warning, regenerate — do not approve.</li>
-              <li>After the worker finishes, refresh and read the full article.</li>
-              <li>Edit if needed, then Approve → Ready to Publish.</li>
+              <li>Nothing, normally: routine articles are vetted by Gemini and published on their own.</li>
+              <li>A stub warning means the text is not an article — queue a rewrite instead of approving.</li>
+              <li>Anything you approve here is still vetted by Gemini against this exact text before it goes live.</li>
             </ol>
           </Card>
         </aside>

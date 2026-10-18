@@ -25,9 +25,9 @@ use Throwable;
  * Two remediations, usually run together:
  *   --unpublish  takes the fake article down from aicountly.com now, so
  *                readers stop seeing it while the rewrite is generated.
- *   --fix        re-queues a genuine draft via BlogRedraftService. The
- *                rewritten article still needs human approval before it
- *                republishes — that gate is not bypassed here.
+ *   --fix        queues a same-slug rewrite by the blog routine via
+ *                BlogRedraftService; the rewrite is vetted by Gemini and
+ *                republished automatically like any routine article.
  *
  *   php spark reach:blog-listing-audit
  *   php spark reach:blog-listing-audit --unpublish --fix
@@ -136,8 +136,8 @@ class ReachBlogListingAudit extends BaseCommand
             if ($fix && $stubBody) {
                 try {
                     $result            = (new BlogRedraftService())->redraft((int) $item['id']);
-                    $finding['action'] = 'redraft_queued';
-                    $finding['work_block_id'] = $result['work_block_id'];
+                    $finding['action'] = 'rewrite_queued';
+                    $finding['regeneration_id'] = $result['regeneration_id'];
                 } catch (Throwable $e) {
                     $finding['action'] = 'redraft_failed';
                     $finding['error']  = $e->getMessage();

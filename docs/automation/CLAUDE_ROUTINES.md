@@ -56,6 +56,7 @@ Endpoints the routines use:
 | `GET  https://reach.aicountly.org/api/v1/automation/gallery/status` | cover-gallery deficit (informational — Reach fills it itself every hour) |
 | `POST https://reach.aicountly.org/api/v1/automation/blog-drafts` | submit a blog draft |
 | `POST https://reach.aicountly.org/api/v1/automation/kb-drafts` | submit a KB draft |
+| `GET  https://reach.aicountly.org/api/v1/automation/regenerate/next?type=blog\|knowledge_base` | the next item whose text failed re-vetting, to rewrite first at the same slug (claimed for 2 h); submit it with `regeneration_id` |
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | community quota, open questions, recent titles, topic mix |
 | `POST https://reach.aicountly.org/api/v1/automation/community-qa` | submit a desk FAQ (question + answer) for vetting and publishing |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | submit the desk's answer to an open member question |
@@ -143,6 +144,26 @@ The scheduled sweep (`reach.routine_content_sweep`, enqueued by
 carries every stage forward. The Blog Command Centre → Verification →
 **Routine Articles** and Publishing → **Knowledge Bases** pages show each
 submission's decision, reasons, scores, cover and status, with **Retry**.
+
+### Publish gate, re-vetting and same-slug rewrites
+
+Every blog publish (routine, "Publish now", schedule, auto-publish, republish) passes
+`BlogPublishVetGate`: the active approval of the exact version must carry a Gemini `approve`
+run, or the version is vetted on the spot; revise/reject/outage refuse the publish. The rubric
+rejects bodies that do not deliver their title, filler, and text about how the content was
+produced (`OFF_TOPIC:` reasons).
+
+`php spark reach:content-revet [--dry-run]` re-vets every approved-but-unpublished and every
+live blog/KB/release note/workflow guide (`--community` adds a report of live community
+answers): heuristics first (`ContentQualityHeuristics`), then Gemini on the current version.
+Unpublished passes are adopted into this pipeline (no quota), unpublished fails are rejected and
+queued for a rewrite; a live page is taken down only on a Gemini **reject** — withdrawn through
+the publisher (reversible, the slug stays reserved) and queued for a rewrite. The routines take
+rewrites first from `regenerate/next`; the rewrite becomes a new version of the same item, gets a
+fresh cover and is republished at the same URL. `reach.content_quality_sweep` (01:00 UTC) runs the
+same check on what went live in the last 48 h; the daily report carries one informational line.
+Reach's own draft generator (`GENERATE_DRAFT` / `REVISE_CONTENT` / `CROSS_REVIEW` work blocks) is
+retired and fails closed.
 
 ### High-risk content — the decision of record
 

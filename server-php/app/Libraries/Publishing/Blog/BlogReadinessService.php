@@ -85,6 +85,22 @@ class BlogReadinessService
             }
         }
 
+        // Gate 4c: the vetting model's approval of this version. Every
+        // publish vets an unvetted version on the spot (BlogPublishVetGate),
+        // so "not vetted yet" is a warning; a version Gemini declined blocks.
+        if ($version && $item['approval_status'] === 'approved') {
+            try {
+                $vet = (new \App\Libraries\Blog\BlogPublishVetGate(null, $this->db))->status($contentItemId, (int) $version['id']);
+                if (str_starts_with($vet['reason'], 'vetting_run_not_approve:')) {
+                    $blocking[] = 'The vetting model did not approve this version; it needs a new version that passes vetting';
+                } elseif (! $vet['vetted']) {
+                    $warnings[] = 'Not yet vetted by Gemini for this version; it is vetted when published';
+                }
+            } catch (\Throwable) {
+                // Readiness is advisory here; the publish path enforces the gate.
+            }
+        }
+
         // Gate 5: validation status
         if ($item['validation_status'] === 'blocking' || $item['validation_status'] === 'failed') {
             $blocking[] = 'Unresolved critical validation findings';
