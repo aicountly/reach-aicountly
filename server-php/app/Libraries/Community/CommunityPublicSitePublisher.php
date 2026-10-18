@@ -133,6 +133,15 @@ class CommunityPublicSitePublisher implements CommunityPublisherInterface
         return $this->get($path);
     }
 
+    public function getMemberQuestions(string $sinceIso8601, int $afterId = 0, int $limit = 200): array
+    {
+        // Signed over the path only, like getChanges() (see request()).
+        return $this->get('/api/reach/v1/community/member-questions'
+            . '?since=' . rawurlencode($sinceIso8601)
+            . '&after_id=' . max(0, $afterId)
+            . '&limit=' . max(1, min($limit, 200)));
+    }
+
     public function healthCheck(): bool
     {
         if (!$this->isConfigured()) {

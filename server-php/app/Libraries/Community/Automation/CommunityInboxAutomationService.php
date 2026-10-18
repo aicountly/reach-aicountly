@@ -132,7 +132,7 @@ class CommunityInboxAutomationService
 
         $rows = $this->db->query(
             "SELECT q.id, q.uuid, q.title, q.body, q.category, q.product, q.source_type, q.intake_timestamp,
-                    q.routine_queued_at, q.triage_score, q.triage_decision,
+                    q.routine_queued_at, q.triage_score, q.triage_decision, q.public_url,
                     (SELECT c.risk_classification FROM reach_community_question_classifications c
                       WHERE c.question_id = q.id ORDER BY c.id DESC LIMIT 1) AS risk,
                     (SELECT COUNT(*) FROM reach_community_automation_submissions s
@@ -180,6 +180,8 @@ class CommunityInboxAutomationService
                 'product_slug'      => $row['product'],
                 'asked_by'          => $row['source_type'] === 'official_question' ? 'curated' : 'member',
                 'asked_at'          => $row['intake_timestamp'],
+                // A member's question from aicountly.com: the answer is posted on this thread.
+                'thread_url'        => $row['source_type'] === CommunityMemberQuestionFeedService::SOURCE_TYPE ? $row['public_url'] : null,
                 'queued_at'         => $row['routine_queued_at'],
                 'triage_score'      => (float) $row['triage_score'],
                 'risk'              => $row['risk'],
@@ -232,6 +234,40 @@ class CommunityInboxAutomationService
         ]);
 
         return $this->viewOf($this->questions->findById((int) $question['id']) ?? $question);
+    }
+
+    /**
+     * Close a question because of what happened to it at its source (the
+     * member deleted it, moderation hid it, it was answered on the site). An
+     * answer still waiting for vetting is withdrawn with the same reason; one
+     * already published stays, and the question keeps its published state.
+     *
+     * @return bool whether anything changed
+     */
+    public function closeForSource(int $questionId, string $reason, string $note): bool
+    {
+        $rows = $this->openRows(1, $questionId);
+        $row  = $rows[0] ?? null;
+        if ($row === null || $row['published_answer_id'] !== null
+            || in_array($row['handled_by'], [CommunityInboxPolicy::CLOSED, CommunityInboxPolicy::CLOSED_BY_PERSON], true)
+        ) {
+            return false;
+        }
+
+        if ($row['inflight_status'] === 'pending') {
+            $this->db->table('reach_community_automation_submissions')
+                ->where('question_id', $questionId)->where('status', 'pending')
+                ->update([
+                    'status'        => 'withdrawn',
+                    'reasons_json'  => json_encode([$note], JSON_UNESCAPED_UNICODE),
+                    'next_retry_at' => null,
+                    'updated_at'    => gmdate('Y-m-d H:i:sP'),
+                ]);
+            $row['inflight_status'] = null;
+        }
+
+        $this->close($row, ['handled_by' => CommunityInboxPolicy::CLOSED, 'close_reason' => $reason, 'note' => $note]);
+        return true;
     }
 
     /** @return array<string, mixed> */
@@ -399,11 +435,13 @@ class CommunityInboxAutomationService
                 $changed[] = 'released';
                 break;
             case 'queue':
-                // Keep the release note ("old draft archived after N h") once
-                // the question is in the queue: it says why it is there.
+                // Keep a note that says how the question got into the queue
+                // (an old draft released after N h, a member's edit) rather
+                // than overwrite it with the plain "queued" line.
                 if ($decision['note'] === CommunityInboxPolicy::QUEUED_NOTE && $row['routine_queued_at'] !== null
                     && ($row['handled_by'] ?? null) === CommunityInboxPolicy::QUEUE
-                    && str_contains((string) $row['handling_note'], 'archived after')
+                    && (str_contains((string) $row['handling_note'], 'archived after')
+                        || str_contains((string) $row['handling_note'], 'Edited by the member'))
                 ) {
                     break;
                 }

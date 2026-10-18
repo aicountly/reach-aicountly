@@ -107,8 +107,8 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 
 # Every 5 minutes — Community Q&A housekeeping (scheduled publish, deployment
 # retries, re-vetting routine submissions left pending by unavailable vetting,
-# and settling the Question Inbox: published / duplicate / auto-closed /
-# routine queue).
+# pulling members' questions from aicountly.com/community, and settling the
+# Question Inbox: published / duplicate / auto-closed / routine queue).
 */5 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
 
 # Every 30 minutes — community intake housekeeping: seed curation, intake

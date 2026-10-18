@@ -39,6 +39,8 @@ class CommunityQuestionModel extends Model
         'handled_by', 'handling_note', 'handling_updated_at', 'routine_queued_at',
         'closed_at', 'close_reason', 'answered_by_question_id',
         'triage_decision', 'triage_vetting_run_id', 'triage_checked_at', 'automation_failures',
+        // What aicountly.com last said about a member's question (member feed).
+        'public_external_id', 'public_url', 'source_checksum', 'source_status', 'source_synced_at',
     ];
 
     // tags / sensitivity_flags are native Postgres TEXT[] columns. The old

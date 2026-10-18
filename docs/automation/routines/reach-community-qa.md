@@ -17,7 +17,7 @@ All calls: no auth header of your own — the environment's network secret adds 
 | Endpoint | Purpose |
 |---|---|
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
-| `GET  https://reach.aicountly.org/api/v1/automation/community/pending?limit=10` | the Question Inbox's routine queue: `{enabled, remaining_today, max_this_run, questions: [{question_id, title, body, category_slug, product_slug, asked_by, asked_at, queued_at, triage_score, risk, previous_attempts, answer_endpoint}]}` — members first, then highest triage score, then oldest; one per question text. Reach settles the inbox before answering (answered questions marked published, duplicates and unanswerable questions closed, stuck drafts handed over) |
+| `GET  https://reach.aicountly.org/api/v1/automation/community/pending?limit=10` | the Question Inbox's routine queue: `{enabled, remaining_today, max_this_run, questions: [{question_id, title, body, category_slug, product_slug, asked_by, asked_at, queued_at, thread_url, triage_score, risk, previous_attempts, answer_endpoint}]}` (`thread_url` is set for a real member's question from aicountly.com; the answer is posted on that thread) — members first, then highest triage score, then oldest; one per question text. Reach settles the inbox before answering (answered questions marked published, duplicates and unanswerable questions closed, stuck drafts handed over) |
 | `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/answer` | the desk's answer to that inbox question: `{answer_html, short_answer?, source_references?, provenance}` — the same vetting → approval → publish path as `community-answers` |
 | `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/decline` | `{reason}` — you cannot answer it truthfully (e.g. the product code does not show how); Reach closes it with your reason so it does not wait for ever |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
@@ -62,7 +62,9 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
    triage_score, then the oldest). Answer up to max_this_run of them before writing
    any new FAQ: for each, POST /v1/automation/community/pending/{question_id}/answer
    with {answer_html, short_answer, source_references, provenance}. Answer the
-   question that was asked, in its own terms; do not rewrite it. A question about the
+   question that was asked, in its own terms; do not rewrite it. Questions with a
+   thread_url were asked by a real member on aicountly.com/community: your answer is
+   posted as the desk's reply on their thread, so write it as a reply. A question about the
    asker's own situation still gets an answer: the general rule plus one line
    suggesting they confirm the specifics with their CA (step 4).
    - If you cannot answer one truthfully — the product code does not show how to do
@@ -149,6 +151,15 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
   or a routine decline close it with the reason; an old in-Reach draft that has not moved for
   `automation.community.stuck_hours` (default 6) is archived and its question handed to the
   **routine queue**. The inbox shows who handles each question and since when.
+- **Members' questions from aicountly.com.** `community:schedule` pulls the receiver's signed
+  `GET /api/reach/v1/community/member-questions` listing (same bearer + HMAC + nonce trust as every
+  receiver call; nothing on the site calls Reach) into normal intake as `public_submission`
+  (personal-data screen, classification, triage, duplicate check, then the inbox rules above). The
+  answer is published onto the member's own thread (`public_question_id`), never as a new desk FAQ
+  page, and Reach never rewrites the member's post. An edit before it is answered updates Reach's
+  copy and screens it again; an edit after the answer is noted; a member delete or a moderation hide
+  closes it with that reason (a waiting answer is withdrawn). The cursor is the
+  `community_member_questions_cursor` setting; the first run reads every member question ever asked.
 - `php spark community:legacy-drafts` still lists answers stranded by the old in-Reach drafting;
   the sweep now releases them on its own after `stuck_hours`, so `--clear --confirm` is only a
   shortcut.

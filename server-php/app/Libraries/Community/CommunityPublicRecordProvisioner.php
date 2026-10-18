@@ -138,8 +138,26 @@ class CommunityPublicRecordProvisioner
         }
 
         $identitySlug = $this->ensureIdentity($identity);
-        $this->ensureQuestion($question, $identitySlug);
-        $this->ensureAnswer($answer, $question, $identitySlug, $version);
+
+        // A member's own question from aicountly.com already has its thread
+        // there: the answer goes onto that post. Upserting the question would
+        // re-post the member's words as a desk FAQ page (the receiver refuses
+        // to rewrite a member's post anyway).
+        $memberPostId = self::memberPostIdOf($question);
+        if ($memberPostId === null) {
+            $this->ensureQuestion($question, $identitySlug);
+        }
+        $this->ensureAnswer($answer, $question, $identitySlug, $version, $memberPostId);
+    }
+
+    /** The aicountly.com post id of a member's question pulled from the site, or null. */
+    public static function memberPostIdOf(array $question): ?int
+    {
+        if (($question['source_type'] ?? '') !== 'public_submission') {
+            return null;
+        }
+        $id = (string) ($question['public_external_id'] ?? '');
+        return ctype_digit($id) && (int) $id > 0 ? (int) $id : null;
     }
 
     /** @return string The identity slug the public site knows this identity by. */
@@ -251,7 +269,7 @@ class CommunityPublicRecordProvisioner
         }
     }
 
-    private function ensureAnswer(array $answer, array $question, string $identitySlug, ?array $version): void
+    private function ensureAnswer(array $answer, array $question, string $identitySlug, ?array $version, ?int $memberPostId = null): void
     {
         $body = trim((string) ($version['content'] ?? ''));
         if ($body === '') {
@@ -260,9 +278,11 @@ class CommunityPublicRecordProvisioner
             );
         }
 
-        $result = $this->publisher->createAnswer([
+        $result = $this->publisher->createAnswer(array_filter([
             'reach_answer_uuid'            => (string) $answer['uuid'],
             'reach_question_uuid'          => (string) $question['uuid'],
+            // Answer the member's post itself (the receiver links it to the uuid above).
+            'public_question_id'           => $memberPostId,
             'operation'                    => 'create_answer',
             'content_type'                 => 'community_answer',
             'official_identity_slug'       => $identitySlug,
@@ -286,7 +306,7 @@ class CommunityPublicRecordProvisioner
                 'ai_disclosure'    => self::DESK_DISCLOSURE,
                 'robots_directive' => 'index,follow',
             ],
-        ]);
+        ], static fn ($v) => $v !== null));
 
         $this->assertOk($result, 'answer', (string) $answer['uuid']);
 
