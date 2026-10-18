@@ -54,6 +54,11 @@ final class CampaignReadinessApiTest extends ApiTestCase
         foreach (['facebook', 'instagram', 'linkedin', 'twitter'] as $social) {
             $this->assertNotSame('ready', $byChannel[$social]['state'], 'no real social publisher exists yet');
         }
+        // Email lists the providers it would use, by name only; none here (no Console, no EMAIL_API_KEY).
+        $this->assertSame([], $byChannel['email']['providers']);
+        $this->assertSame('none', $byChannel['email']['provider_source']);
+        $this->assertSame('not_configured', $byChannel['email']['state']);
+        $this->assertStringStartsWith('email: no provider configured', $byChannel['email']['provider_line']);
         $this->assertSame('distribution', $data['queue']['name']);
         $this->assertStringNotContainsString('test-jwt-secret', $res->getJSON(), 'no secret values in the report');
     }

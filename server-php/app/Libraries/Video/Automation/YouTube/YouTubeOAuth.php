@@ -35,6 +35,7 @@ final class YouTubeOAuth
     private HttpTransport $http;
     private ?string $accessToken = null;
     private int $accessTokenExpires = 0;
+    private ?string $grantedScope = null;
 
     public function __construct(?HttpTransport $http = null)
     {
@@ -102,6 +103,7 @@ final class YouTubeOAuth
         }
         $this->accessToken        = $access;
         $this->accessTokenExpires = time() + max(60, (int) ($json['expires_in'] ?? 3600)) - 60;
+        $this->grantedScope       = $granted !== '' ? $granted : null;
 
         return ['refresh_token' => $refresh, 'access_token' => $access, 'expires_in' => (int) ($json['expires_in'] ?? 3600), 'scope' => $granted];
     }
@@ -133,10 +135,20 @@ final class YouTubeOAuth
         $json = $res->json();
         $this->accessToken        = (string) ($json['access_token'] ?? '');
         $this->accessTokenExpires = time() + max(60, (int) ($json['expires_in'] ?? 3600)) - 60;
+        $this->grantedScope       = is_string($json['scope'] ?? null) && $json['scope'] !== '' ? $json['scope'] : null;
         if ($this->accessToken === '') {
             throw new VideoProviderException('Google returned no access token.', VideoProviderException::TRANSIENT);
         }
         return $this->accessToken;
+    }
+
+    /**
+     * Scopes Google reported with the last token it issued (space-separated),
+     * or null when it did not say.
+     */
+    public function grantedScopes(): ?string
+    {
+        return $this->grantedScope;
     }
 
     /** Best-effort revoke at Google; true when Google confirmed. */

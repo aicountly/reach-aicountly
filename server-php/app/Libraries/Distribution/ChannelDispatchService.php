@@ -584,7 +584,7 @@ class ChannelDispatchService
         $sender = $this->sender($channel);
         if ($this->isMock($sender) && ProviderGuard::isProduction()) {
             $need = match ($channel) {
-                'email'    => 'set EMAIL_API_KEY and SENDER_EMAIL',
+                'email'    => 'add an email provider for reach in Console → Email providers (or EMAIL_API_KEY as the last resort) and set SENDER_EMAIL',
                 'sms'      => 'set SMS_API_KEY and SMS_SENDER_ID',
                 default    => 'set WHATSAPP_API_KEY and WHATSAPP_WABA_ID',
             };

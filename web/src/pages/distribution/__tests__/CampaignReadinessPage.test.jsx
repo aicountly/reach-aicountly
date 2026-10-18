@@ -13,9 +13,11 @@ const REPORT = {
   queue: { name: 'distribution', pending: 0, stalled: false, note: 'Campaign sends run on the `distribution` queue.' },
   channels: [
     {
-      channel: 'email', label: 'Email', group: 'messaging', state: 'not_configured', provider: 'itwalk_email',
-      reasons: ['Sends fail closed: nothing is marked sent.', 'EMAIL_API_KEY is not set.'],
-      checks: [{ key: 'EMAIL_API_KEY', kind: 'env', ok: false, note: '' }, { key: 'SENDER_EMAIL', kind: 'env', ok: true, note: '' }],
+      channel: 'email', label: 'Email', group: 'messaging', state: 'not_configured', provider: 'itwalk_api → aicountly_smtp',
+      providers: [{ code: 'itwalk_api', type: 'http_api', priority: 10, role: 'primary' }, { code: 'aicountly_smtp', type: 'smtp', priority: 20, role: 'fallback' }],
+      provider_source: 'console_stale',
+      reasons: ['Sends fail closed: nothing is marked sent.', 'SENDER_EMAIL is not set.'],
+      checks: [{ key: 'email providers', kind: 'console', ok: true, note: '' }, { key: 'SENDER_EMAIL', kind: 'env', ok: false, note: '' }],
       manual: ['SPF, DKIM and DMARC records published.'],
     },
     {
@@ -54,7 +56,7 @@ describe('CampaignReadinessPage', () => {
 
     const email = within(screen.getByTestId('readiness-email'));
     expect(email.getByText('Not configured')).toBeInTheDocument();
-    expect(email.getByText('EMAIL_API_KEY')).toBeInTheDocument();
+    expect(email.getByText('SENDER_EMAIL')).toBeInTheDocument();
 
     expect(within(screen.getByTestId('readiness-sms')).getByText('Test mode')).toBeInTheDocument();
     expect(within(screen.getByTestId('readiness-sms')).getByText(/opt-in: 12/)).toBeInTheDocument();
@@ -67,6 +69,14 @@ describe('CampaignReadinessPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('readiness-email')).toBeInTheDocument());
     expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+  });
+
+  it('lists the email providers by name in send order, with the source when not live Console', async () => {
+    api.get.mockResolvedValue(REPORT);
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('providers-email')).toBeInTheDocument());
+    expect(screen.getByTestId('providers-email')).toHaveTextContent('Providers (in send order): itwalk_api (primary), aicountly_smtp (fallback) — source: console_stale');
+    expect(within(screen.getByTestId('readiness-sms')).getByText('Provider: aoc_portal_sms')).toBeInTheDocument();
   });
 
   it('shows the API error instead of a status', async () => {

@@ -331,6 +331,8 @@ $routes->group('v1', static function ($routes) {
         $routes->get('settings/automation',               'Api\\V1\\AutomationSettingsController::index',        ['filter' => 'permission:settings.view']);
         $routes->put('settings/automation',               'Api\\V1\\AutomationSettingsController::update',       ['filter' => 'permission:settings.manage']);
         $routes->post('settings/automation/test',         'Api\\V1\\AutomationSettingsController::test',         ['filter' => 'permission:settings.manage']);
+        // Live checks of Shotstack / YouTube / DataForSEO / Gemini / OpenAI / TTS (same code as reach:integrations-check).
+        $routes->post('settings/automation/live-check',   'Api\\V1\\AutomationSettingsController::liveCheck',    ['filter' => ['permission:settings.manage', 'throttle:integration']]);
         $routes->get('settings/automation/gemini-models', 'Api\\V1\\AutomationSettingsController::geminiModels', ['filter' => 'permission:settings.view']);
 
         $routes->get('audit-logs',                'Api\\V1\\AuditLogController::index',                ['filter' => 'permission:audit.view']);

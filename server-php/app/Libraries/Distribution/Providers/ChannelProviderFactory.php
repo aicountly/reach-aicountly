@@ -88,12 +88,14 @@ class ChannelProviderFactory
             return new MockEmailSender();
         }
 
-        if (in_array($provider, ['itwalk', 'gateway', 'infobip', ''], true)) {
+        // itwalk / gateway / infobip are historical names: every real send now goes through
+        // Console's email providers (EmailDispatcher), whichever transports they use.
+        if (in_array($provider, ['itwalk', 'gateway', 'infobip', 'console', 'smtp', ''], true)) {
             return new GatewayEmailSender();
         }
 
         throw new \LogicException(
-            "Email provider '{$provider}' is not configured. Set EMAIL_PROVIDER=itwalk and EMAIL_API_KEY."
+            "Email provider '{$provider}' is not configured. Leave EMAIL_PROVIDER empty (or itwalk/gateway) to use Console's email providers for reach."
         );
     }
 

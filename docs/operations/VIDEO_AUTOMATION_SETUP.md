@@ -168,6 +168,12 @@ production item with mocks enabled is `blocked`, never published.
 
 ## 10. Not verified against the live services
 
+To verify the credentials and the services from the Reach server, run
+`php spark reach:integrations-check` (add `--only=shotstack --render-test` for a 3-second test
+render that exercises the `text` asset and the Montserrat font) — see
+[LIVE_INTEGRATION_CHECKS.md](LIVE_INTEGRATION_CHECKS.md). The same checks (without the render)
+are behind **Run live checks** on Settings → AI & Automation.
+
 The pipeline is covered by unit tests with scripted HTTP and DB tests with mock providers; it has
 **not** been run against live Shotstack, OpenAI TTS, Google OAuth or YouTube from this build.
 Check on the first real run: Shotstack's acceptance of the `text` asset fields and the fonts

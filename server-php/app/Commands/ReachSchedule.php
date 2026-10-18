@@ -143,6 +143,7 @@ class ReachSchedule extends BaseCommand
         $utc      = $now->setTimezone(new \DateTimeZone('UTC'));
         $today    = $utc->format('Y-m-d');
         $hour     = (int) $utc->format('H');
+        $minute   = (int) $utc->format('i');
         $hourKey  = $utc->format('Y-m-d-H');
         $ist      = $now->setTimezone(new \DateTimeZone('Asia/Kolkata'));
         $istDate  = $ist->format('Y-m-d');
@@ -172,11 +173,8 @@ class ReachSchedule extends BaseCommand
 
         // Stream C — every 5 minutes: carry Claude-routine blog/KB submissions
         // forward (re-vet with backoff, hourly cover retry, publish, verify).
-        if ((int) date('i') % 5 === 0) {
-            $svc->enqueue('reach.routine_content_sweep', ['limit' => 10], [
-                'queue'           => 'default',
-                'idempotency_key' => 'routine-content-sweep-' . date('YmdHi'),
-            ]);
+        if ($minute % 5 === 0) {
+            $add('reach.routine_content_sweep', ['limit' => 10], 'routine-content-sweep-' . $utc->format('YmdHi'), ['queue' => 'default']);
         }
 
         // Every hour: due-date reminders, overdue escalation, schedule readiness
@@ -186,11 +184,8 @@ class ReachSchedule extends BaseCommand
 
         // Every 15 minutes: release notes / workflow guides waiting on vetting
         // (Gemini unavailable) or on a publish that has not gone live yet.
-        if ((int) date('i') % 15 === 0) {
-            $svc->enqueue('reach.structured_content_sweep', ['limit' => 20], [
-                'queue'           => 'publishing',
-                'idempotency_key' => 'structured-content-sweep-' . date('YmdHi'),
-            ]);
+        if ($minute % 15 === 0) {
+            $add('reach.structured_content_sweep', ['limit' => 20], 'structured-content-sweep-' . $utc->format('YmdHi'), ['queue' => 'publishing']);
         }
 
         // 03:00 — refresh detection

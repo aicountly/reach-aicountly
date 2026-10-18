@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Reports;
 
 use App\Libraries\Database\SchemaGuard;
+use App\Libraries\Gateways\Mailer;
 use App\Libraries\Intelligence\Connectors\ConnectorProviderFactory;
 use App\Libraries\Intelligence\Connectors\GoogleSearchConsoleConnector;
 use App\Libraries\Intelligence\SearchSiteAnalyticsService;
@@ -40,6 +41,7 @@ class DailyReportBuilder
         private ?Ga4DailySnapshot $ga4 = null,
         private ?SeoTrackerService $tracker = null,
         private ?\Closure $searchConfigured = null,
+        private ?\Closure $emailProviders = null,
     ) {
         $this->db  = $db ?? Database::connect();
         $this->ga4 ??= new Ga4DailySnapshot();
@@ -323,7 +325,7 @@ class DailyReportBuilder
      */
     private function pipeline(array $window): array
     {
-        $out = ['configured' => true];
+        $out = ['configured' => true, 'email' => $this->emailLine()];
 
         if (SchemaGuard::hasTable($this->db, 'reach_jobs')) {
             $q = fn (string $sql, array $b = []): int => (int) ($this->db->query($sql, $b)->getRowArray()['c'] ?? 0);
@@ -410,6 +412,9 @@ class DailyReportBuilder
         }
 
         $pipe = $s['pipeline'] ?? [];
+        if (str_starts_with((string) ($pipe['email'] ?? ''), 'email: no provider')) {
+            $items[] = 'No email provider is configured for Reach — add one in Console → Email providers (bound to reach); until then reports and campaign mail are not sent.';
+        }
         if (($pipe['dead_letters'] ?? 0) > 0) {
             $items[] = sprintf('%d job(s) are dead-lettered — inspect and retry them in Job Monitor.', $pipe['dead_letters']);
         }
@@ -434,6 +439,16 @@ class DailyReportBuilder
         }
 
         return array_slice($items, 0, 8);
+    }
+
+    /** "email via itwalk_api, fallback aicountly_smtp" — provider names only (EmailProviderResolver). */
+    private function emailLine(): string
+    {
+        try {
+            return $this->emailProviders !== null ? (string) ($this->emailProviders)() : Mailer::providerSummary()['line'];
+        } catch (\Throwable) {
+            return 'email: provider lookup failed';
+        }
     }
 
     private function searchConsoleConfigured(): bool
