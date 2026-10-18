@@ -36,7 +36,7 @@ final class ReachConfig
             'ai.gemini.api_key' => ['group' => 'AI providers', 'label' => 'Gemini API key', 'type' => 'secret', 'env' => 'AI_GEMINI_API_KEY',
                 'help' => 'Google AI Studio key. Used for vetting, insights and AI-visibility checks.'],
             'ai.openai.api_key' => ['group' => 'AI providers', 'label' => 'OpenAI API key', 'type' => 'secret', 'env' => 'AI_OPENAI_API_KEY',
-                'help' => 'Used for image generation (DALL·E) and AI-visibility checks.'],
+                'help' => 'Used for image generation (GPT Image), the video voice-over and AI-visibility checks.'],
             'ai.perplexity.api_key' => ['group' => 'AI providers', 'label' => 'Perplexity API key', 'type' => 'secret', 'env' => 'AI_PERPLEXITY_API_KEY',
                 'help' => 'Optional. AI-visibility checks.'],
 
@@ -98,7 +98,7 @@ final class ReachConfig
             // hard kill-switch that these settings cannot override (RoutineFlags).
             'automation.blog.auto_publish' => ['group' => 'Blog & KB routines', 'label' => 'Auto-publish Gemini-approved blogs', 'type' => 'bool', 'default' => true,
                 'help' => 'Off = approved blogs wait for someone to press Publish. BLOG_AUTO_PUBLISH_ENABLED=false or BLOG_PUBLIC_PUBLISHER_ENABLED=false in .env also turns it off.'],
-            'automation.blog.ai_cover' => ['group' => 'Blog & KB routines', 'label' => 'Generate a DALL·E cover for each routine blog', 'type' => 'bool', 'default' => true,
+            'automation.blog.ai_cover' => ['group' => 'Blog & KB routines', 'label' => 'Generate an AI cover image for each routine blog', 'type' => 'bool', 'default' => true,
                 'help' => 'Falls back to the cover gallery when generation fails. BLOG_IMAGE_GENERATION_ENABLED=false in .env also turns it off.'],
             'automation.blog.author_name' => ['group' => 'Blog & KB routines', 'label' => 'Author shown on routine blogs', 'type' => 'string', 'default' => 'AICOUNTLY Editorial Team'],
             'automation.knowledge_base.auto_publish' => ['group' => 'Blog & KB routines', 'label' => 'Auto-publish Gemini-approved help articles', 'type' => 'bool', 'default' => true,

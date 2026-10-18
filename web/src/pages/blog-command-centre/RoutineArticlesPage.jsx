@@ -12,7 +12,7 @@ export function RoutineArticlesPage() {
         <div>
           <h2 style={{ margin: 0 }}>Routine Articles</h2>
           <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-            Gemini approves, corrects or rejects every routine blog; approved ones get a DALL·E cover and publish automatically.
+            Gemini approves, corrects or rejects every routine blog; approved ones get an AI cover image and publish automatically.
             Items Gemini marks high risk wait in the Verification Queue for a person.
           </p>
         </div>
