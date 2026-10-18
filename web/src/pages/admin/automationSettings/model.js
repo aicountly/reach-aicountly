@@ -298,7 +298,7 @@ export function sectionStatus(section, rowsByKey, results) {
   ];
   if (failed.length) return { level: 'error', reasons };
   if (missing.length) return { level: 'warning', reasons };
-  const passed = section.checks.filter((t) => results?.[t]?.ok === true);
+  const passed = section.checks.filter((t) => results?.[t]?.ok === true && !results[t].skipped);
   return { level: 'ok', reasons: passed.map((t) => `${CHECK_LABEL[t] ?? t} live check passed`) };
 }
 

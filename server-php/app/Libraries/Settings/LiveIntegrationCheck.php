@@ -140,10 +140,25 @@ final class LiveIntegrationCheck
      */
     public function run(array $targets = [], bool $renderTest = false, ?callable $progress = null): array
     {
-        $targets = $targets === [] ? self::TARGETS : $targets;
+        $runAll  = $targets === [];
+        $targets = $runAll ? self::TARGETS : $targets;
         $results = [];
         foreach ($targets as $target) {
             $started = microtime(true);
+            // A full run skips the direct YouTube uploader while videos go through social-api.ai:
+            // its OAuth client is then not needed, and failing on it would hide real failures.
+            // `--only=youtube` (or the Video section's own check) still tests it.
+            if ($runAll && $target === 'youtube' && YouTubePublisherMode::current() === YouTubePublisherMode::SOCIAL_API) {
+                $results[] = [
+                    'target'      => 'youtube',
+                    'ok'          => true,
+                    'skipped'     => true,
+                    'message'     => 'Skipped: videos reach YouTube through social-api.ai (Settings → Social), so the direct YouTube login is not used. Run --only=youtube to test it anyway.',
+                    'detail'      => ['youtube_publisher' => YouTubePublisherMode::SOCIAL_API],
+                    'duration_ms' => 0,
+                ];
+                continue;
+            }
             try {
                 $r = match ($target) {
                     'shotstack' => $this->shotstack($renderTest, $progress),
@@ -166,13 +181,15 @@ final class LiveIntegrationCheck
                 'duration_ms' => (int) round((microtime(true) - $started) * 1000),
             ]);
         }
-        $failed = count(array_filter($results, static fn ($r) => ! $r['ok']));
+        $failed  = count(array_filter($results, static fn ($r) => ! $r['ok']));
+        $skipped = count(array_filter($results, static fn ($r) => ! empty($r['skipped'])));
 
         return [
             'ok'      => $failed === 0,
             'ran_at'  => gmdate('c'),
-            'passed'  => count($results) - $failed,
+            'passed'  => count($results) - $failed - $skipped,
             'failed'  => $failed,
+            'skipped' => $skipped,
             'results' => $results,
         ];
     }

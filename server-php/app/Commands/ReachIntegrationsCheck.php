@@ -80,12 +80,12 @@ class ReachIntegrationsCheck extends BaseCommand
     {
         $out = [];
         foreach ($report['results'] as $r) {
-            $out[] = sprintf('  %-4s  %-10s  %s', $r['ok'] ? 'OK' : 'FAIL', $r['target'], $r['message']);
+            $out[] = sprintf('  %-4s  %-10s  %s', ! empty($r['skipped']) ? 'SKIP' : ($r['ok'] ? 'OK' : 'FAIL'), $r['target'], $r['message']);
             foreach (self::flatten((array) ($r['detail'] ?? [])) as $k => $v) {
                 $out[] = sprintf('        %s: %s', $k, $v);
             }
         }
-        $out[] = sprintf('%d passed, %d failed.', $report['passed'], $report['failed']);
+        $out[] = sprintf('%d passed, %d failed', $report['passed'], $report['failed']) . (! empty($report['skipped']) ? sprintf(', %d skipped.', $report['skipped']) : '.');
         return $out;
     }
 
