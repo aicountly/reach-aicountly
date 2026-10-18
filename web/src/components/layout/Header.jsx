@@ -1,55 +1,63 @@
-import { LogOut, User } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { Menu, Search } from 'lucide-react';
 import { BotModeBadge } from '../bot/BotModeBadge';
 import { ReachLogo } from '../brand/ReachLogo';
 import { AppLauncher } from './AppLauncher';
 import { NotificationBell } from './NotificationBell';
+import { UserMenu } from './UserMenu';
+import { SIDEBAR_ID } from './Sidebar';
 
-export function Header() {
-  const { user, logout } = useAuth();
-  const doLogout = async () => {
-    await logout();
-  };
+function isMac() {
+  try {
+    return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Top bar. Wraps down gracefully: the search box shrinks to an icon, the
+ * user's name and the "Bot:" word drop out, and on phones the hamburger and
+ * the Reach mark take the place of the (hidden) sidebar.
+ */
+export function Header({ mode = 'desktop', navOpen = false, onOpenNav, onOpenPalette, menuButtonRef }) {
+  const shortcut = isMac() ? '⌘K' : 'Ctrl K';
+  const showMenu = mode !== 'desktop';
   return (
-    <header style={{
-      height: 'var(--header-height)',
-      width: '100%',
-      boxSizing: 'border-box',
-      background: 'var(--color-surface)',
-      borderBottom: '1px solid var(--color-border)',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 1.5rem', position: 'sticky', top: 0, zIndex: 100,
-      flexShrink: 0,
-    }}>
-      <div className="flex items-center gap-3">
-        <ReachLogo height={28} />
-        <span className="text-sm text-muted" style={{ marginLeft: '0.25rem' }}>
-          Marketing operations portal
-        </span>
-      </div>
-      <div className="flex items-center gap-3">
-        <AppLauncher />
-        <NotificationBell />
-        <BotModeBadge />
-        <div className="flex items-center gap-2">
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            background: 'var(--color-primary-light)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <User size={14} style={{ color: 'var(--color-primary)' }} />
-          </div>
-          <span className="text-sm font-semibold">{user?.name || user?.email || ''}</span>
-        </div>
-        <span style={{ color: 'var(--color-border)' }} aria-hidden>|</span>
+    <header className="reach-header" data-mode={mode}>
+      <div className="reach-header__start">
+        {showMenu && (
+          <button
+            ref={menuButtonRef}
+            type="button"
+            className="reach-icon-btn reach-header__menu"
+            onClick={onOpenNav}
+            aria-label="Navigation menu"
+            aria-controls={SIDEBAR_ID}
+            aria-expanded={navOpen}
+            data-testid="nav-menu-button"
+          >
+            <Menu size={20} aria-hidden="true" />
+          </button>
+        )}
+        {mode === 'phone' && <span className="reach-header__mark"><ReachLogo height={28} compact /></span>}
         <button
           type="button"
-          onClick={doLogout}
-          className="btn btn-secondary"
-          style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+          className="reach-header__search"
+          onClick={onOpenPalette}
+          aria-label={`Search pages and settings (${shortcut})`}
+          aria-haspopup="dialog"
+          data-testid="open-command-palette"
         >
-          <LogOut size={12} /> Sign out
+          <Search size={16} aria-hidden="true" />
+          <span className="reach-header__search-text">Search pages and settings…</span>
+          <kbd className="reach-kbd reach-header__search-kbd">{shortcut}</kbd>
         </button>
+      </div>
+      <div className="reach-header__end">
+        <AppLauncher />
+        <NotificationBell />
+        <span className="reach-header__bot"><BotModeBadge /></span>
+        <UserMenu />
       </div>
     </header>
   );

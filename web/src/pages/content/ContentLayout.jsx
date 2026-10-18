@@ -2,10 +2,10 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 
+// 2026-10 IA: Daily Pack (in-Reach generation) and the manual Calendar
+// retired — their routes redirect (navManifest LEGACY_REDIRECTS).
 const NAV_ITEMS = [
   { to: ROUTES.CONTENT, label: 'All Content', exact: true },
-  { to: ROUTES.CONTENT_DAILY_PACK, label: 'Daily Pack' },
-  { to: ROUTES.CONTENT_CALENDAR, label: 'Calendar' },
 ];
 
 export function ContentLayout() {
@@ -14,7 +14,7 @@ export function ContentLayout() {
 
   return (
     <div>
-      <nav style={{
+      {NAV_ITEMS.length > 1 && <nav style={{
         display: 'flex',
         gap: 4,
         borderBottom: '1px solid #e5e7eb',
@@ -38,7 +38,7 @@ export function ContentLayout() {
             {item.label}
           </NavLink>
         ))}
-      </nav>
+      </nav>}
       <Outlet />
     </div>
   );

@@ -22,7 +22,7 @@ export default function DistributionOverviewPage() {
     { title: 'Campaign Workspace', description: 'Manage versioned campaigns with approval workflow.', to: '/distribution/campaigns', icon: '📋' },
     { title: 'Audience Segments',  description: 'Define and preview dynamic audience segments.',       to: '/distribution/audience/segments', icon: '👥' },
     { title: 'Suppressions',       description: 'Manage unsubscribes, bounces, and complaints.',      to: '/distribution/suppressions', icon: '🚫' },
-    { title: 'Social Dispatch',    description: 'Dispatch approved posts to social channels.',         to: '/distribution/social', icon: '📣' },
+    { title: 'Social Dispatch',    description: 'Social posts, YouTube videos and their status — in Social & Ads.', to: '/social/calendar', icon: '📣' },
     { title: 'Email Dispatch',     description: 'Send email campaigns via governed provider.',         to: '/distribution/email', icon: '✉️' },
     { title: 'WhatsApp',           description: 'Template-based WhatsApp broadcasts.',                 to: '/distribution/whatsapp', icon: '💬' },
     { title: 'SMS',                description: 'SMS campaigns with DLT compliance.',                  to: '/distribution/sms', icon: '📱' },

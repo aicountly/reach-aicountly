@@ -127,7 +127,7 @@ export const BCC_SECTIONS = [
   // of its leaves was a DEEP_LINK into /intelligence/*, so clicking the tab
   // ejected the operator out of the Blog Command Centre and into a surface
   // with its own 15-tab strip. It is now "Blog SEO and Indexing" under the
-  // sidebar's SEO block (see constants/blogSeoNav.js); the old
+  // sidebar's SEO block (now merged into the SEO Command Centre); the old
   // /blog-command-centre/seo/* paths redirect there.
   {
     id: 'analytics',
