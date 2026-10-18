@@ -26,7 +26,9 @@ class MediaAssetStore
     }
 
     /**
-     * @param array{kind?:string, content_item_id?:int|null, prompt_used?:string|null, category_tags?:list<string>, portfolio_stream?:string|null, created_by?:int|null} $meta
+     * @param array{kind?:string, content_item_id?:int|null, prompt_used?:string|null, category_tags?:list<string>, portfolio_stream?:string|null, created_by?:int|null,
+     *              source_key?:string|null, provenance?:string|null, branded?:bool, model_key?:string|null, original_binary?:string|null} $meta
+     *        original_binary: the unbranded original, kept beside the stored file (original_file_path).
      * @return array<string,mixed> the stored asset row
      */
     public function storeBinary(string $binary, array $meta = []): array
@@ -53,6 +55,17 @@ class MediaAssetStore
             throw new \RuntimeException('media_write_failed');
         }
 
+        $original = null;
+        if (isset($meta['original_binary']) && is_string($meta['original_binary']) && $meta['original_binary'] !== '') {
+            $info     = @getimagesizefromstring($meta['original_binary']);
+            $origExt  = match ((string) ($info['mime'] ?? '')) { 'image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp', default => 'img' };
+            $original = $dir . '/' . $uuid . '.orig.' . $origExt;
+            if (file_put_contents($original, $meta['original_binary']) === false) {
+                $original = null; // the branded cover is what matters; losing the original is logged, not fatal
+                log_message('warning', "MediaAssetStore: could not keep the original for {$uuid}");
+            }
+        }
+
         $row = [
             'asset_uuid'       => $uuid,
             'kind'             => (string) ($meta['kind'] ?? 'gallery_upload'),
@@ -71,6 +84,17 @@ class MediaAssetStore
             'created_at'       => date('Y-m-d H:i:s'),
             'updated_at'       => date('Y-m-d H:i:s'),
         ];
+        // Provenance columns arrive with 2026-10-18-210001_AutoCoverGallery;
+        // until it has run, uploads keep working without them.
+        if (\App\Libraries\Database\SchemaGuard::hasColumn($this->db, 'reach_media_gallery_assets', 'provenance')) {
+            $row += [
+                'source_key'         => $meta['source_key'] ?? null,
+                'provenance'         => $meta['provenance'] ?? null,
+                'branded'            => ! empty($meta['branded']),
+                'original_file_path' => $original,
+                'model_key'          => $meta['model_key'] ?? null,
+            ];
+        }
         $this->db->table('reach_media_gallery_assets')->insert($row);
         $row['id'] = (int) $this->db->insertID();
 
@@ -127,6 +151,64 @@ class MediaAssetStore
         }
 
         return hash_equals(self::signature($assetUuid), $signature);
+    }
+
+    public static function isBranded(array $asset): bool
+    {
+        $v = $asset['branded'] ?? false;
+
+        return $v === true || $v === 't' || $v === 1 || $v === '1' || $v === 'true';
+    }
+
+    /**
+     * Composite the AICOUNTLY corner mark onto an existing, unbranded asset
+     * (an upload from before covers were branded). The unbranded file is kept
+     * as original_file_path; the public URL (by uuid) does not change. When
+     * branding cannot run the asset is returned untouched.
+     *
+     * @param array<string,mixed> $asset full row
+     * @return array<string,mixed>
+     */
+    public function ensureBranded(array $asset, ?CoverBranding $branding = null): array
+    {
+        if (self::isBranded($asset) || ! array_key_exists('branded', $asset)) {
+            return $asset;
+        }
+        $path = (string) ($asset['file_path'] ?? '');
+        $raw  = is_file($path) ? (string) file_get_contents($path) : '';
+        if ($raw === '') {
+            return $asset;
+        }
+
+        $result = ($branding ?? new CoverBranding())->apply($raw);
+        if (! $result['branded']) {
+            return $asset;
+        }
+
+        try {
+            $processed = $this->processor->toWebUnderCap($result['bytes']);
+            $original  = preg_replace('/\.(\w+)$/', '.orig.$1', $path) ?: ($path . '.orig');
+            if (! @copy($path, $original) || file_put_contents($path, $processed['bytes']) === false) {
+                return $asset;
+            }
+            $update = [
+                'branded'            => true,
+                'original_file_path' => $original,
+                'bytes'              => strlen($processed['bytes']),
+                'mime'               => $processed['mime'],
+                'width'              => $processed['width'],
+                'height'             => $processed['height'],
+                'checksum_sha256'    => hash('sha256', $processed['bytes']),
+                'updated_at'         => date('Y-m-d H:i:s'),
+            ];
+            $this->db->table('reach_media_gallery_assets')->where('id', (int) $asset['id'])->update($update);
+
+            return $update + $asset;
+        } catch (\Throwable $e) {
+            log_message('warning', 'MediaAssetStore: branding asset ' . ($asset['id'] ?? '?') . ' failed: ' . $e->getMessage());
+
+            return $asset;
+        }
     }
 
     public function markUsed(int $assetId, ?int $contentItemId): void

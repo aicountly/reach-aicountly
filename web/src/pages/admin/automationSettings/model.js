@@ -9,9 +9,10 @@
  * typed into the (empty) field on this page.
  */
 import {
-  Bot, Eye, FileBarChart, Image, KeyRound, Newspaper, Send, Settings2, Share2, ShieldCheck, TrendingUp, Video,
+  Bot, Eye, FileBarChart, Image, KeyRound, MessageCircle, Newspaper, Send, Settings2, Share2, ShieldCheck, TrendingUp, Video,
 } from 'lucide-react';
 import { jsonObjectError } from '../../../utils/jsonObject';
+import { formatDateTime } from '../../../utils/formatDate';
 
 /** Live-check target (POST v1/settings/automation/live-check) → display name. */
 export const CHECK_LABEL = {
@@ -66,9 +67,18 @@ export const SECTION_META = {
     id: 'social', icon: Share2, checks: ['social_api'],
     description: 'The social-api.ai connection, how and with what visibility videos reach YouTube, and per-network accounts, platform_data and target options.',
   },
+  'Social inbox': {
+    id: 'social-inbox', icon: MessageCircle, checks: ['social_api'],
+    liveChecks: [{ targets: ['social_api'], label: 'Check social-api.ai (incl. inbox)' }],
+    description: 'The bot that reads comments and DMs, answers with vetted replies, lodges complaints in Flow and records sales leads — caps, confidence floor, the assumed inbox paths and the Reach → Flow key.',
+  },
   Distribution: {
     id: 'distribution', icon: Send,
     description: 'Batch sizes, send caps and compliance for email, SMS and WhatsApp campaign sends.',
+  },
+  'Bot commands': {
+    id: 'bot-commands', icon: Bot,
+    description: 'The reach-command Claude routine behind Bot → Ask the bot (API trigger URL and token), and routine social posts.',
   },
   Video: {
     id: 'video', icon: Video, checks: ['shotstack', 'youtube', 'tts'],
@@ -314,11 +324,9 @@ export function detailEntries(detail, prefix = '') {
   });
 }
 
-/** A live-check `ran_at` as local date + time ('' when missing or unreadable). */
+/** A live-check `ran_at` as dd-mm-yyyy HH:mm IST ('' when missing or unreadable). */
 export function formatRanAt(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+  return formatDateTime(iso, '');
 }
 
 /** Pretty-printed JSON text, or null when the text is blank or not JSON. */

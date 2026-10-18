@@ -51,8 +51,8 @@ describe('PublishingCalendarPage', () => {
       { id: 3, content_type: 'blog', content_title: 'TDS Article', status: 'scheduled', scheduled_at: '2026-08-02T09:00:00Z' },
     ]);
     renderWithAuth(<PublishingCalendarPage />, ctx);
-    await waitFor(() => expect(screen.getByText('2026-08-01')).toBeInTheDocument());
-    expect(screen.getByText('2026-08-02')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('01-08-2026')).toBeInTheDocument());
+    expect(screen.getByText('02-08-2026')).toBeInTheDocument();
     expect(screen.getByText('GST Article')).toBeInTheDocument();
     expect(screen.getByText('TDS Article')).toBeInTheDocument();
   });

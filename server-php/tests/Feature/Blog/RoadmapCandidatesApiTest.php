@@ -130,4 +130,15 @@ final class RoadmapCandidatesApiTest extends ApiTestCase
 
         $this->assertSame(403, $response->response()->getStatusCode());
     }
+
+    public function testFlagsAreRealBooleansSoUnlockedRowsAreNotShownAsLocked(): void
+    {
+        $headers = $this->authAs('reach_admin');
+        $this->seedCandidate('Plain candidate', 'marketing', 'roadmap_selected');
+
+        $row = $this->fetch($headers)['items'][0];
+        $this->assertFalse($row['is_locked'], 'Postgres "f" must not reach the console as a truthy string');
+        $this->assertFalse($row['is_human_pinned']);
+        $this->assertTrue($row['in_routine_queue']);
+    }
 }

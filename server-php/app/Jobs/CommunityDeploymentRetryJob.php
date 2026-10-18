@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Libraries\NonRetryableJobException;
 use App\Libraries\AuditLogger;
 use App\Libraries\Community\OfficialAnswerPublishingService;
 use App\Libraries\JobContext;
@@ -26,12 +27,12 @@ class CommunityDeploymentRetryJob implements JobHandlerInterface
     {
         $deploymentUuid = (string) ($payload['deployment_uuid'] ?? '');
         if ($deploymentUuid === '') {
-            throw new \InvalidArgumentException('CommunityDeploymentRetryJob: deployment_uuid is required.');
+            throw new NonRetryableJobException('CommunityDeploymentRetryJob: deployment_uuid is required.');
         }
 
         $deployment = (new CommunityDeploymentModel())->findByUuid($deploymentUuid);
         if ($deployment === null) {
-            throw new \RuntimeException("Deployment not found: {$deploymentUuid}");
+            throw new NonRetryableJobException("Deployment not found: {$deploymentUuid}");
         }
 
         $actorId = $ctx->enqueuedByUserId;
@@ -45,7 +46,9 @@ class CommunityDeploymentRetryJob implements JobHandlerInterface
         ], $actorId);
 
         if (in_array($outcome, ['dead_letter', 'approval_invalidated'], true)) {
-            throw new \RuntimeException(
+            // Terminal on the deployment side: retrying the job would only
+            // call retryDeployment() on a dead-lettered deployment again.
+            throw new NonRetryableJobException(
                 "Deployment {$deploymentUuid} could not be republished (outcome: {$outcome})."
             );
         }

@@ -153,6 +153,9 @@ class CommunityAgentsRun extends BaseCommand
                 $outcomes[] = ['question_id' => $questionId, 'status' => 'success'];
                 $completed++;
             } catch (\Throwable $e) {
+                // Counted, so a question whose screen keeps failing stops
+                // being retried; the inbox sweep then closes it with the reason.
+                $selector->recordProcessingFailure($questionId);
                 $outcomes[] = ['question_id' => $questionId, 'status' => 'failed', 'error' => substr($e->getMessage(), 0, 120)];
             }
         }
@@ -168,10 +171,20 @@ class CommunityAgentsRun extends BaseCommand
         $db = Database::connect();
 
         $questions = $db->query(
-            "SELECT id FROM reach_community_questions
-             WHERE (category IS NULL OR category = '')
-               AND moderation_state = 'clean'
-             ORDER BY id ASC
+            // A question the heuristic classifier already found no category
+            // for is not retried: the same text gets the same answer, and the
+            // same three rows were otherwise picked every run, for ever,
+            // starving every question behind them.
+            "SELECT q.id FROM reach_community_questions q
+             WHERE (q.category IS NULL OR q.category = '')
+               AND q.moderation_state = 'clean'
+               AND q.status NOT IN ('archived', 'duplicate_merged', 'published')
+               AND NOT EXISTS (
+                       SELECT 1 FROM reach_community_question_classifications c
+                        WHERE c.question_id = q.id
+                          AND (c.category_classification IS NULL OR c.category_classification = '')
+                   )
+             ORDER BY q.id ASC
              LIMIT ?",
             [$limit]
         )->getResultArray();

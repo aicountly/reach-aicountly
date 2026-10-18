@@ -34,5 +34,13 @@ interface CommunityPublisherInterface
      */
     public function getChanges(string $sinceIso8601, int $limit = 500): array;
 
+    /**
+     * Questions real members asked on aicountly.com/community (new, edited,
+     * hidden or deleted) after a cursor — what the desks should answer.
+     * Signed GET /api/reach/v1/community/member-questions; the response has
+     * questions[], next_cursor {since, after_id} and has_more.
+     */
+    public function getMemberQuestions(string $sinceIso8601, int $afterId = 0, int $limit = 200): array;
+
     public function healthCheck(): bool;
 }

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Libraries\JobContext;
 use App\Libraries\JobHandlerInterface;
 use App\Libraries\NotificationService;
+use App\Libraries\Support\DisplayTime;
 
 /**
  * Escalates overdue content items: notifies admin owners.
@@ -39,7 +40,7 @@ class ContentOverdueEscalationJob implements JobHandlerInterface
                 $notifSvc->dispatch(
                     (int) $item['created_by'],
                     NotificationService::TYPE_REVIEW_OVERDUE,
-                    "Content \"{$item['title']}\" is overdue (was due {$item['due_date']}).",
+                    "Content \"{$item['title']}\" is overdue (was due " . DisplayTime::date($item['due_date']) . ').',
                     [
                         'entity_type' => 'content_item',
                         'entity_id'   => $item['id'],

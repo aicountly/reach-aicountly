@@ -82,6 +82,32 @@ final class ReachScheduleTimetableTest extends CIUnitTestCase
         $this->assertArrayHasKey('reach.seo_snapshot', self::byType('2026-10-17 05:10:00'));
     }
 
+    public function testCoverGalleryAutofillRunsHourlyOnTheBlogQueue(): void
+    {
+        $a = self::byType('2026-10-17 10:05:00')['reach.cover_gallery_autofill'];
+        $b = self::byType('2026-10-17 10:55:00')['reach.cover_gallery_autofill'];
+        $c = self::byType('2026-10-17 11:05:00')['reach.cover_gallery_autofill'];
+
+        $this->assertSame('cover-gallery-autofill-2026-10-17-10', $a['opts']['idempotency_key']);
+        $this->assertSame($a['opts']['idempotency_key'], $b['opts']['idempotency_key']);
+        $this->assertNotSame($a['opts']['idempotency_key'], $c['opts']['idempotency_key']);
+        $this->assertSame('blog', $a['opts']['queue']);
+        $this->assertArrayHasKey('reach.blog_cover_sweep', self::byType('2026-10-17 10:05:00'));
+        foreach (['covers.auto.enabled', 'covers.auto.daily_limit', 'covers.alerts.enabled', 'covers.alerts.recipients', 'covers.brand.logo_enabled'] as $key) {
+            $this->assertArrayHasKey($key, \App\Libraries\Settings\ReachConfig::registry());
+        }
+        $this->assertSame(10, \App\Libraries\Settings\ReachConfig::registry()['covers.auto.daily_limit']['default']);
+        $this->assertTrue(\App\Libraries\Settings\ReachConfig::registry()['covers.auto.enabled']['default']);
+    }
+
+    public function testContentQualitySweepRunsOnceADayBeforeTheReport(): void
+    {
+        $jobs = self::byType('2026-10-17 01:20:00');
+        $this->assertSame('content-quality-sweep-2026-10-17', $jobs['reach.content_quality_sweep']['opts']['idempotency_key']);
+        $this->assertSame('publishing', $jobs['reach.content_quality_sweep']['opts']['queue'], 'a queue the documented worker drains');
+        $this->assertArrayNotHasKey('reach.content_quality_sweep', self::byType('2026-10-17 02:20:00'));
+    }
+
     public function testEveryPlannedJobHasAHandler(): void
     {
         $registry = new \App\Libraries\JobHandlerRegistry();
@@ -135,5 +161,16 @@ final class ReachScheduleTimetableTest extends CIUnitTestCase
         $this->assertSame('distribution', $at20['reach.social_post_poll']['opts']['queue']);
         $this->assertArrayNotHasKey('reach.social_post_poll', self::byType('2026-10-17 10:21:00'));
         $this->assertTrue((new \App\Libraries\JobHandlerRegistry())->has('reach.social_post_poll'));
+    }
+
+    public function testTheSocialInboxIsPolledEveryTenMinutesOnTheDistributionQueue(): void
+    {
+        $at20 = self::byType('2026-10-17 10:20:00');
+        $this->assertSame('social-inbox-poll-202610171020', $at20['reach.social_inbox_poll']['opts']['idempotency_key']);
+        $this->assertSame('distribution', $at20['reach.social_inbox_poll']['opts']['queue']);
+        $this->assertSame(15, $at20['reach.social_inbox_poll']['payload']['limit']);
+        $this->assertArrayNotHasKey('reach.social_inbox_poll', self::byType('2026-10-17 10:25:00'));
+        $this->assertArrayNotHasKey('reach.social_inbox_poll', self::byType('2026-10-17 10:21:00'));
+        $this->assertTrue((new \App\Libraries\JobHandlerRegistry())->has('reach.social_inbox_poll'));
     }
 }

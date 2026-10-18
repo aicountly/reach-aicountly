@@ -94,6 +94,8 @@ class RoadmapOptimizerService
 
         $ranked = [];
 
+        $handoff = self::routineHandoff();
+
         foreach ($candidates as $candidate) {
             $candidateId = (int) $candidate['id'];
             $rawSignals  = $this->signals->gatherForCandidate($candidate, $forDate);
@@ -101,15 +103,38 @@ class RoadmapOptimizerService
 
             $prevScore = $this->currentScoreTotal($candidateId);
             if ($this->stability->shouldSkipForMovement((float) $score['total_score'], $prevScore)) {
+                // Small moves keep the previous total (no decision churn), but
+                // the day is still recorded so "scored for" and the 7d / 28d
+                // trends stay current instead of freezing on the first score.
                 $score['movement_skipped'] = true;
                 if ($prevScore !== null) {
                     $score['total_score'] = $prevScore;
                 }
-            } else {
+            }
+            if (! $dryRun) {
+                $this->scoring->persistScore($candidateId, $score, $forDate);
+            }
+            $scoredCount++;
+
+            // Already selected and waiting for the blog routine: rescore only.
+            // Re-deciding it every night would spend the daily/weekly caps on
+            // topics that are already in the routine's queue.
+            if ($handoff && ($candidate['status'] ?? '') === 'roadmap_selected' && empty($candidate['content_item_id'])) {
                 if (! $dryRun) {
-                    $this->scoring->persistScore($candidateId, $score, $forDate);
+                    $this->db()->table('reach_topic_candidates')->where('id', $candidateId)->update([
+                        'status' => 'roadmap_selected', 'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
                 }
-                $scoredCount++;
+                $ranked[] = [
+                    'candidate_id'  => $candidateId,
+                    'title'         => $candidate['title'] ?? '',
+                    'total_score'   => $score['total_score'],
+                    'decision'      => 'SELECTED',
+                    'reason'        => 'Selected earlier; waiting in the blog routine queue (v1/automation/content-base/next).',
+                    'work_block_id' => null,
+                    'dry_run'       => $dryRun,
+                ];
+                continue;
             }
 
             $context  = $this->signals->buildDecisionContext($candidate, $rawSignals, $forDate);
@@ -152,7 +177,15 @@ class RoadmapOptimizerService
                 $decisionId = $this->persistDecision($candidate, $score, $decision, $runId, $forDate, count($ranked) + 1);
                 $decisionCount++;
 
-                if ($decision['decision'] === RoadmapDecisionEngine::CREATE_NEW) {
+                if ($decision['decision'] === RoadmapDecisionEngine::CREATE_NEW && $handoff) {
+                    // The blog routine writes it: the candidate joins the
+                    // routine's next-topic queue. No in-Reach brief/draft work
+                    // block — Reach plans, vets and publishes; it does not write.
+                    $this->db()->table('reach_topic_candidates')->where('id', $candidateId)->update([
+                        'status' => 'roadmap_selected', 'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                    $weeklyUsed++;
+                } elseif ($decision['decision'] === RoadmapDecisionEngine::CREATE_NEW) {
                     $workBlockId = $this->createGenerateBriefWorkBlock($candidate, $decisionId);
                     if ($workBlockId !== null) {
                         $workBlockCount++;
@@ -333,11 +366,22 @@ class RoadmapOptimizerService
     {
         // Human-pinned rows bypass cooldown so operators can force a pilot/retry
         // without waiting for BLOG_ROADMAP_COOLDOWN_DAYS.
+        // Selected topics still waiting for the routine are rescored daily
+        // too (routine hand-off), so their score and trends stay current.
         $builder = $this->db()->table('reach_topic_candidates')
-            ->whereIn('status', ['candidate', 'scored'])
             ->where('is_locked', false)
             ->groupStart()
+                ->whereIn('status', ['candidate', 'scored']);
+        if (self::routineHandoff()) {
+            $builder->orGroupStart()
+                ->where('status', 'roadmap_selected')
+                ->where('content_item_id IS NULL', null, false)
+            ->groupEnd();
+        }
+        $builder->groupEnd()
+            ->groupStart()
                 ->where('is_human_pinned', true)
+                ->orWhere('status', 'roadmap_selected')
                 ->orGroupStart()
                     ->where('cooldown_until IS NULL', null, false)
                     ->orWhere('cooldown_until <=', date('Y-m-d H:i:s'))
@@ -435,6 +479,16 @@ class RoadmapOptimizerService
         ]);
 
         return (int) $this->db()->insertID();
+    }
+
+    /**
+     * Routine hand-off (default on): a CREATE_NEW decision puts the topic in
+     * the blog routine's queue instead of creating Reach's own brief/draft
+     * work blocks, whose drafting steps are retired.
+     */
+    public static function routineHandoff(): bool
+    {
+        return (bool) \App\Libraries\Settings\ReachConfig::get('automation.roadmap.routine_handoff', true);
     }
 
     private function normalizeStream(string $stream): string

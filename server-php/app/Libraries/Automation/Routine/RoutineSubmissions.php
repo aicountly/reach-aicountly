@@ -79,9 +79,12 @@ class RoutineSubmissions
      */
     public function usedToday(string $contentType): int
     {
+        // Older approved items adopted after re-vetting (origin 'revet')
+        // publish nothing new and do not use up the routine's quota.
         return $this->db->table('reach_routine_submissions')
             ->where('content_type', $contentType)
             ->where('status !=', self::REJECTED)
+            ->where('origin !=', 'revet')
             ->where('created_at >=', self::istMidnight())
             ->countAllResults();
     }

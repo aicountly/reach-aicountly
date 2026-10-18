@@ -10,7 +10,7 @@ routine ──POST v1/automation/video-scripts──▶ validate ─▶ Gemini v
    approve → approved by "Reach System Bot" (reach_approvals row + vetting run id)
         ▼  jobs on the `video` queue, one short step per cron run
   tts            OpenAI text-to-speech per scene (MP3 stored by Reach)
-  visuals        product screenshots (Worker) / DALL·E stills / title cards + DALL·E thumbnail
+  visuals        product screenshots (Worker) / GPT Image stills / title cards + GPT Image thumbnail (AICOUNTLY logo composited)
   render_submit  Shotstack timeline (branded template, captions burned in) → render
   render_poll    Shotstack status (the render callback brings the poll forward)
   youtube_upload video.youtube.publisher = social_api (default): MP4 → social-api.ai media store
@@ -90,7 +90,7 @@ Details and every assumption about social-api.ai's answers: [SOCIAL_API.md](SOCI
 
 ## 2. OpenAI (voice-over and stills) and Gemini (vetting)
 
-- *OpenAI API key* (Settings → AI providers) is used for text-to-speech and DALL·E.
+- *OpenAI API key* (Settings → AI providers) is used for text-to-speech and GPT Image stills (`ai.image.model`).
   *Voice-over model* defaults to `gpt-4o-mini-tts`, *Voice* to `coral` (any OpenAI voice name).
 - *Gemini API key* + *Video script vetting model* (blank = default vetting model). Without a
   working vetting model scripts wait as `pending_vetting` and are re-vetted hourly — they are
@@ -151,7 +151,7 @@ connect again.
 | `video.tts.model` / `video.tts.voice` | gpt-4o-mini-tts / coral | OpenAI TTS |
 | `video.shotstack.api_key` (secret) / `video.shotstack.env` | — / stage | renderer |
 | `video.music.url` | blank | optional royalty-free background MP3 (https) |
-| `video.brand.logo_url` | aicountly.com logo | logo used on cards and as a corner mark |
+| `video.brand.logo_url` | `https://aicountly.com/assests/images/ai-logo.png` (official logo) | logo on the intro/end cards; blank or non-https falls back to the official logo |
 | `video.youtube.publisher` (Social card) | social_api | `social_api` = through social-api.ai, `direct` = Reach's own upload |
 | `social.socialapi.api_key` / `account.youtube` / `platform_data.youtube` (Social card) | — / auto / blank | social-api.ai path (see SOCIAL_API.md) |
 | `video.youtube.client_id` / `client_secret` (secret) | — | OAuth web client (direct only) |
@@ -175,7 +175,7 @@ delays the other queues; `reach:schedule` already runs the hourly video sweep):
 Then create the routine (`reach-video`, Sonnet, `30 1 * * *` UTC = 07:00 IST) from the prompt in
 [`docs/automation/routines/reach-video.md`](../automation/routines/reach-video.md).
 
-A vlog takes roughly: TTS 1–3 cron runs, visuals 2–6 runs (DALL·E ~20 s per still), render
+A vlog takes roughly: TTS 1–3 cron runs, visuals 2–6 runs (GPT Image ~20 s per still), render
 3–10 min at Shotstack, upload 1–10 runs depending on size — typically published 20–40 minutes
 after the script arrives.
 
@@ -230,3 +230,20 @@ Check on the first real run: Shotstack's acceptance of the `text` asset fields a
 `containsSyntheticMedia` upload flag, and that the Worker exposes `POST v1/screenshot`
 (WorkerPlaywrightClient's contract — the worker repository only shows a pull-based session
 runner; if it is missing, screenshot scenes become title cards with a warning).
+
+
+## Branding and relevance of generated visuals
+
+- **Still prompts come from the vetted script** (`StillPromptBuilder`): the video's title and topic
+  (first sentence of the description), the scene's own voice-over and caption, and the routine's
+  `visual.url_or_prompt` as the scene to depict, plus the brand style (`OpenAiStillSource::STYLE`:
+  navy `#071a33`, blue `#145490`, green `#8cc854`, no text, no logos). The thumbnail prompt is the
+  title + topic + `thumbnail_prompt`.
+- **The logo is never drawn by the model.** The Shotstack template (`TimelineBuilder`) puts the
+  AICOUNTLY corner mark (the official logo on a white plate — `CoverBranding::badgePng`, served from
+  Reach's video media store) top-right on **every scene** in both 16:9 vlogs and 9:16 Shorts; the
+  vlog intro card and every end card carry the full logo, the end card adds the CTA and
+  `aicountly.com` (brand green). Title cards are navy text on the brand's soft green panel
+  (`#eaf8e6`). If the badge cannot be made the plain logo URL is used, so no render goes out unbranded.
+- **The YouTube thumbnail** gets the corner mark composited into the image itself (it is shown
+  outside the video); the asset detail says when the logo could not be applied and why.

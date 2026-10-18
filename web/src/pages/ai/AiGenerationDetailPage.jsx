@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { getGeneration, cancelGeneration } from '../../services/aiService.js';
 import AiGenerationBadge from '../../components/ai/AiGenerationBadge.jsx';
 import { ROUTES } from '../../constants/routes.js';
+import { formatDateTime } from '../../utils/formatDate';
 
 export default function AiGenerationDetailPage() {
   const { uuid } = useParams();
@@ -68,11 +69,11 @@ export default function AiGenerationDetailPage() {
             <dt>Requested By</dt>
             <dd>{request?.requested_actor_type}</dd>
             <dt>Created</dt>
-            <dd>{request?.created_at?.slice(0, 19)}</dd>
+            <dd>{formatDateTime(request?.created_at)}</dd>
             {request?.completed_at && (
               <>
                 <dt>Completed</dt>
-                <dd>{request.completed_at?.slice(0, 19)}</dd>
+                <dd>{formatDateTime(request.completed_at)}</dd>
               </>
             )}
           </dl>

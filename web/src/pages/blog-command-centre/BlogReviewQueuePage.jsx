@@ -28,7 +28,7 @@ function firstImage(item, version) {
 }
 
 /**
- * Verification Queue — blogs awaiting human approval with preview thumbnails.
+ * Verification Queue — blogs in review (older non-routine items and anything Gemini held) with preview thumbnails.
  */
 export function BlogReviewQueuePage() {
   const [items, setItems] = useState([]);

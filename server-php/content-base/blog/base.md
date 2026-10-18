@@ -1,10 +1,9 @@
 # AICOUNTLY Blog Base
 
-This file is the strategy base for all autonomous blog generation (API route
-and Claude routine). It is **edited only in git** — the cPanel copy is
-overwritten by every deploy (`rsync --delete`), so never edit it on the
-server. The Reach console renders it read-only under
-Blog Command Centre → Roadmap → Content Base.
+This file is the strategy base for the Claude routines that write blogs. It
+is edited in git (the server copy is replaced on every deploy). The Reach
+console shows it under Quality Centre → Content Base, and routines read it
+from `GET v1/automation/content-base` (`base_markdown`).
 
 ## Who we write for
 
@@ -37,10 +36,15 @@ accounting, gst, income-tax, tds-tcs, audit, financial-reporting,
 company-law, payroll-hr, product-guides, product-updates,
 ai-finance-compliance, business-operations
 
-## Index workflow
+## Topics (the living content base)
 
-`index.json` is the queue of upcoming blogs. Each entry's `brief_prompt` is a
-short creative brief — the model has its own wisdom; the prompt sets scope,
-angle and must-cover points only. The daily Claude base-revision routine
-updates this file from product-repo changes and marks published entries.
-Statuses: `planned` → `drafting` → `published` | `retired`.
+`index.json` (and the KB / community seed files) are only the **seed
+baseline**. Reach imports them hourly into its database, where the topics
+actually live: the routines take the next topics from
+`GET v1/automation/content-base/next`, add new ones from real product changes
+with `POST …/propose` and report with `POST …/produced`. Each entry's
+`brief_prompt` is a short creative brief — it sets scope, angle and
+must-cover points only. Statuses (set by Reach from its own pipeline):
+`planned` → `queued` → `produced` → `published` | `retired`. Editing a seed
+here changes a topic only while it is still planned; progress is never reset
+by a deploy.

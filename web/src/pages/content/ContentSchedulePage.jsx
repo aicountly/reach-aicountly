@@ -5,7 +5,7 @@ import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { usePermission } from '../../hooks/usePermission';
-import { formatDateTime } from '../../utils/formatDate';
+import { formatDateTime, fromDateTimeInputValue, getDisplayTimeZone, timeZoneLabel } from '../../utils/formatDate';
 
 export function ContentSchedulePage() {
   const { id } = useParams();
@@ -15,7 +15,7 @@ export function ContentSchedulePage() {
   const [targets, setTargets]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
-  const [form, setForm]           = useState({ publication_target_id: '', scheduled_at: '', timezone: 'UTC' });
+  const [form, setForm]           = useState({ publication_target_id: '', scheduled_at: '', timezone: getDisplayTimeZone() });
   const [saving, setSaving]       = useState(false);
 
   const load = useCallback(async () => {
@@ -38,8 +38,12 @@ export function ContentSchedulePage() {
     if (!form.publication_target_id || !form.scheduled_at) return;
     setSaving(true);
     try {
-      await contentService.createSchedule(id, form);
-      setForm({ publication_target_id: '', scheduled_at: '', timezone: 'UTC' });
+      await contentService.createSchedule(id, {
+        ...form,
+        scheduled_at: fromDateTimeInputValue(form.scheduled_at),
+        timezone: getDisplayTimeZone(),
+      });
+      setForm({ publication_target_id: '', scheduled_at: '', timezone: getDisplayTimeZone() });
       load();
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
@@ -65,7 +69,7 @@ export function ContentSchedulePage() {
           {schedules.map((s) => (
             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
               <div>
-                <div style={{ fontSize: 13 }}>{formatDateTime(s.scheduled_at)} ({s.timezone})</div>
+                <div style={{ fontSize: 13 }}>{formatDateTime(s.scheduled_at)}</div>
                 <div style={{ fontSize: 11, color: '#6b7280' }}>Target #{s.publication_target_id} · {s.schedule_status}</div>
               </div>
               {s.cancelled_at === null && (
@@ -89,7 +93,7 @@ export function ContentSchedulePage() {
               </select>
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Scheduled At</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Scheduled At ({timeZoneLabel()})</label>
               <input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm((f) => ({ ...f, scheduled_at: e.target.value }))}
                 style={{ width: '100%', borderRadius: 4, border: '1px solid #d1d5db', padding: '7px 10px', fontSize: 13 }} />
             </div>

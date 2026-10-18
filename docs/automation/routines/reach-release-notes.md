@@ -29,6 +29,15 @@ change you can see in the product's git history or code.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=release_note
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use avoid_reasons.release_note to steer clear of what Gemini rejected recently.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
+
 1. GET https://reach.aicountly.org/api/v1/automation/release-plan
    - If data.enabled is false, stop and report "release-note automation is off".
    - data.products is in priority order: the launch apps first (books, notes,
@@ -119,6 +128,19 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
         - 429: today's limit in Reach is used — stop the whole run.
         - 5xx or network error: retry once after 60 seconds, then skip.
 
-3. Finish with a table: product | version | result (published URL, rejected
-   + reasons, pending, skipped + why). Do not change any repository.
+3. Help-centre follow-up (optional, at most 5 topics per run). For each NEW user
+   task you put under "New" in a note today, propose a knowledge-base topic so the
+   KB routine documents it: POST
+   https://reach.aicountly.org/api/v1/automation/content-base/propose
+   {"type":"kb","items":[{"key":"kb-<product_slug>-<task>","title":"How to <task>
+   in <App>","product_slug":"<product_slug>","category":"how_to","brief":"<what
+   the user can now do and on which screen>","evidence":[{"repo":"aicountly/<repo>",
+   "commits":["<sha7>"],"file":"<path>","note":"<what it shows>"}]}],
+   "routine_run_id":"<this session id>"}. Results "exists"/"duplicate" are fine.
+   Only for changes you saw in the diff — never invent one. (KB topics exist for
+   the products with a KB cadence; others answer "invalid" — skip them.)
+
+4. Finish with a table: product | version | result (published URL, rejected
+   + reasons, pending, skipped + why), plus the KB topics proposed. Do not change
+   any repository.
 ```

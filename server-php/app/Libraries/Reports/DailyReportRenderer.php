@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Libraries\Reports;
 
+use App\Libraries\Support\DisplayTime;
+
 /**
  * Turns a DailyReportBuilder summary into an email: inline-styled HTML (mail
  * clients strip <style>) and a plain-text part. Pure — no I/O.
@@ -37,16 +39,24 @@ final class DailyReportRenderer
     {
         $s = $summary['sections'];
         $body = '';
-        $body .= self::section('What to do today', self::todoHtml($s['todo'] ?? []));
+        $body .= self::section('Today at a glance', self::todoHtml($s['todo'] ?? []));
+        if (isset($s['plan'])) {
+            $body .= self::section('Plan vs achieved (yesterday)', \App\Libraries\Bot\Plan\PlanReportSection::html($s['plan']));
+        }
         $body .= self::section('Search (Google Search Console)', self::searchHtml($s['search'] ?? []));
         $body .= self::section('Website traffic (GA4)', self::trafficHtml($s['traffic'] ?? []));
         $body .= self::section('SEO Tracker', self::trackerHtml($s['seo_tracker'] ?? []));
         $body .= self::section('Content published (last 24h)', self::contentHtml($s['content'] ?? []));
         $body .= self::section('AI vetting (last 24h)', self::vettingHtml($s['vetting'] ?? []));
+        $body .= self::section('Cover images', self::coversHtml($s['covers'] ?? []));
         $body .= self::section('Pipeline health', self::pipelineHtml($s['pipeline'] ?? []));
+        $body .= self::section('Social inbox (last 24h)', self::socialInboxHtml($s['social_inbox'] ?? []));
+        if (! empty($s['routines']['health'])) {
+            $body .= self::section('Claude routines (last activity)', self::routinesHtml($s['routines']));
+        }
 
         $title = 'Daily analytics report — ' . self::e(self::longDate((string) $summary['report_date']));
-        $meta  = 'Generated ' . self::e((string) $summary['generated_at']) . ' (' . self::e((string) $summary['timezone']) . ')';
+        $meta  = 'Generated ' . self::e(self::generatedAt($summary));
 
         return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $title . '</title></head>'
             . '<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:' . self::C_TEXT . ';">'
@@ -68,11 +78,16 @@ final class DailyReportRenderer
         $s   = $summary['sections'];
         $out = [];
         $out[] = 'AICOUNTLY daily analytics report — ' . self::longDate((string) $summary['report_date']);
-        $out[] = 'Generated ' . $summary['generated_at'] . ' (' . $summary['timezone'] . ')';
+        $out[] = 'Generated ' . self::generatedAt($summary);
         $out[] = '';
-        $out[] = '== What to do today ==';
+        $out[] = '== Today at a glance ==';
         foreach (($s['todo']['items'] ?? []) as $i => $item) {
             $out[] = ($i + 1) . '. ' . $item;
+        }
+
+        if (isset($s['plan'])) {
+            $out[] = '';
+            array_push($out, ...\App\Libraries\Bot\Plan\PlanReportSection::text($s['plan']));
         }
 
         $out[] = '';
@@ -145,6 +160,17 @@ final class DailyReportRenderer
             foreach ($v['top_reject_reasons'] as $r) {
                 $out[] = sprintf('  - %s (%d)', $r['reason'], $r['count']);
             }
+            if (! empty($v['quality'])) {
+                $out[] = self::qualityLine($v['quality']);
+            }
+        }
+
+        $out[] = '';
+        $out[] = '== Cover images ==';
+        $c = $s['covers'] ?? [];
+        $out[] = isset($c['line']) ? (string) $c['line'] : self::noteOf($c);
+        if (! empty($c['last_error']) && (int) ($c['failed'] ?? 0) > 0) {
+            $out[] = '  Last error: ' . mb_substr((string) $c['last_error'], 0, 200);
         }
 
         $out[] = '';
@@ -159,10 +185,86 @@ final class DailyReportRenderer
             $out[] = 'Email: ' . $p['email'];
         }
 
+        $out[] = '';
+        $out[] = '== Social inbox (last 24h) ==';
+        foreach (self::socialInboxLines($s['social_inbox'] ?? []) as $line) {
+            $out[] = $line;
+        }
+        if (! empty($s['routines']['health'])) {
+            $out[] = '';
+            $out[] = '== Claude routines (last activity) ==';
+            foreach ($s['routines']['health'] as $type => $h) {
+                $out[] = sprintf('%s (%s): %s%s', $h['routine'], str_replace('_', ' ', (string) $type),
+                    $h['last_activity_at'] === null ? 'never seen' : $h['hours_since'] . ' h ago',
+                    $h['state'] === 'stale' || $h['state'] === 'never_seen' ? ' — quiet' : ($h['state'] === 'off' ? ' — switched off' : ''));
+            }
+        }
+
         return implode("\n", $out) . "\n";
     }
 
     // ── section renderers ──────────────────────────────────────────────────
+
+    /** @param array<string, mixed> $i */
+    private static function socialInboxLines(array $i): array
+    {
+        if (empty($i['configured']) || ! isset($i['received'])) {
+            return [self::noteOf($i)];
+        }
+        $c   = $i['by_classification'] ?? [];
+        $out = [sprintf('Read %d · replies posted %d · Flow tickets %d · leads %d · reply failures %d · complaints waiting for Flow %d',
+            $i['received'], $i['replies_sent'], $i['tickets'], $i['leads'], $i['reply_failures'], $i['waiting_for_flow'])];
+        if ($c !== []) {
+            $out[] = 'By type: ' . implode(', ', array_map(static fn ($k, $n) => str_replace('_', ' ', (string) $k) . ' ' . $n, array_keys($c), $c));
+        }
+        foreach ($i['high_severity'] ?? [] as $h) {
+            $out[] = sprintf('  HIGH: %s @%s — %s%s', $h['network'], $h['author_handle'] ?? '?', $h['summary'] ?? '', ! empty($h['ticket_number']) ? ' (' . $h['ticket_number'] . ')' : ' (not lodged yet)');
+        }
+        return $out;
+    }
+
+    /** @param array<string, mixed> $i */
+    private static function socialInboxHtml(array $i): string
+    {
+        if (empty($i['configured']) || ! isset($i['received'])) {
+            return self::note($i);
+        }
+        $tiles = self::tiles([
+            ['Read', (string) $i['received'], null, false],
+            ['Replies posted', (string) $i['replies_sent'], null, false],
+            ['Flow tickets', (string) $i['tickets'], null, false],
+            ['Leads', (string) $i['leads'], null, false],
+        ]);
+        $rows = [];
+        foreach (($i['by_classification'] ?? []) as $k => $n) {
+            $rows[] = [str_replace('_', ' ', (string) $k), (string) $n];
+        }
+        $rows[] = ['Reply failures', (string) $i['reply_failures']];
+        $rows[] = ['Complaints waiting for Flow', (string) $i['waiting_for_flow']];
+        $high = '';
+        if (! empty($i['high_severity'])) {
+            $high = '<div style="font-size:13px;font-weight:600;margin:14px 0 4px;">High severity</div>'
+                . self::table(['Network', 'Author', 'Summary', 'Ticket'], array_map(static fn ($h) => [(string) $h['network'], '@' . ($h['author_handle'] ?? '?'), (string) ($h['summary'] ?? ''), (string) ($h['ticket_number'] ?? 'not lodged yet')], $i['high_severity']));
+        }
+
+        return $tiles . self::table(['Type / signal', 'Count'], $rows) . $high;
+    }
+
+    /** @param array<string, mixed> $r */
+    private static function routinesHtml(array $r): string
+    {
+        $rows = [];
+        foreach ($r['health'] as $type => $h) {
+            $state = match ($h['state']) {
+                'ok' => 'ok', 'off' => 'switched off', 'never_seen' => 'never seen', default => 'quiet',
+            };
+            $rows[] = [(string) $h['routine'], str_replace('_', ' ', (string) $type),
+                $h['last_activity_at'] === null ? '—' : $h['hours_since'] . ' h ago', $state];
+        }
+
+        return self::table(['Routine', 'Content', 'Last activity', 'State'], $rows)
+            . '<div style="font-size:12px;color:' . self::C_MUTED . ';margin-top:8px;">Informational. "Quiet" = no API call or submission for longer than the routine\'s cadence allows (36 h daily, 8 days weekly).</div>';
+    }
 
     /** @param array<string, mixed> $t */
     private static function todoHtml(array $t): string
@@ -292,7 +394,38 @@ final class DailyReportRenderer
         $reasons = $v['top_reject_reasons'] === [] ? '' : '<div style="font-size:13px;font-weight:600;margin:14px 0 4px;">Top reject reasons</div>'
             . self::table(['Reason', 'Count'], array_map(static fn ($r) => [$r['reason'], (string) $r['count']], $v['top_reject_reasons']));
 
-        return $tiles . $reasons;
+        $quality = empty($v['quality']) ? ''
+            : '<div style="font-size:13px;color:' . self::C_MUTED . ';margin-top:12px;">' . self::e(self::qualityLine($v['quality'])) . '</div>';
+
+        return $tiles . $reasons . $quality;
+    }
+
+    /** @param array<string, int> $q */
+    public static function qualityLine(array $q): string
+    {
+        return sprintf(
+            'Content clean-up (automatic, no action needed): %d re-checked · %d failed · %d taken down · %d rewrites queued · %d rewrites open',
+            $q['checked'] ?? 0, $q['failed'] ?? 0, $q['unpublished'] ?? 0, $q['queued_regeneration'] ?? 0, $q['rewrites_open'] ?? 0,
+        );
+    }
+
+    /** @param array<string, mixed> $c */
+    private static function coversHtml(array $c): string
+    {
+        if (! isset($c['line'])) {
+            return self::note($c);
+        }
+        $rows = [
+            ['Generated automatically (24h)', (string) (int) $c['generated']],
+            ['Active covers in the gallery', (string) (int) $c['gallery_active']],
+            ['Deficit (upcoming entries without a cover)', $c['deficit'] === null ? 'unknown' : (string) $c['deficit']],
+            ['Failed generation attempts (24h)', (string) (int) $c['failed']],
+        ];
+        if (! empty($c['last_error']) && (int) $c['failed'] > 0) {
+            $rows[] = ['Last error', mb_substr((string) $c['last_error'], 0, 200)];
+        }
+
+        return self::table(['Signal', 'Value'], $rows);
     }
 
     /** @param array<string, mixed> $p */
@@ -415,6 +548,13 @@ final class DailyReportRenderer
         $short = preg_replace('#^https?://(www\.)?#', '', $url) ?? $url;
 
         return mb_strlen($short) > 70 ? mb_substr($short, 0, 67) . '…' : $short;
+    }
+
+    /** "18-10-2026 08:00 IST" — in the report's own zone (IST), labelled. */
+    private static function generatedAt(array $summary): string
+    {
+        $raw = (string) ($summary['generated_at'] ?? '');
+        return DisplayTime::format($raw, $raw, true, (string) ($summary['timezone'] ?? DisplayTime::DEFAULT_ZONE));
     }
 
     private static function longDate(string $date): string

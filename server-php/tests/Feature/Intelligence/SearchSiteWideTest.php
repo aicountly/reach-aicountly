@@ -65,6 +65,36 @@ final class SearchSiteWideTest extends DatabaseTestCase
         $this->assertSame($distinct, (int) $db->table('reach_search_site_daily')->countAllResults());
     }
 
+    /**
+     * Production (17 Oct): a 90-day backfill-run printed seven real slices and
+     * a bogus eighth `?..? site_rows=0 status=completed`, and status kept
+     * reporting is_backfill_active=true with 0 days remaining — Postgres
+     * returns booleans as 't'/'f' and (bool) 'f' is true.
+     */
+    public function testBackfillStopsAfterTheLastSliceAndClearsTheActiveFlag(): void
+    {
+        ConnectorProviderFactory::useMocks(true);
+        $id  = $this->connection();
+        $svc = SearchConsoleService::make();
+        $svc->initiateBackfill($id, 28);
+
+        $first = $svc->runBackfillChunk($id);
+        $this->assertSame('in_progress', $first['status']);
+        $this->assertNotNull($first['chunk_from']);
+
+        $last = $svc->runBackfillChunk($id);
+        $this->assertSame('completed', $last['status'], 'the final real slice reports completion itself');
+        $this->assertNotNull($last['chunk_from']);
+        $this->assertSame(0, $last['days_remaining']);
+
+        $this->assertSame('inactive', $svc->runBackfillChunk($id)['status'], 'no extra slice after the last one');
+
+        $status = $svc->connectionStatus($id);
+        $cursor = $status['cursor'] ?? $status;
+        $this->assertFalse($cursor['is_backfill_active']);
+        $this->assertSame(0, $cursor['backfill_days_remaining']);
+    }
+
     public function testAggregatesAndPositionBuckets(): void
     {
         $id    = $this->connection();

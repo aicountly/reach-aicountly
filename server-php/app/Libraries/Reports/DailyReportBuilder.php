@@ -19,7 +19,7 @@ use Config\Database;
  * saying so — a section never shows invented or placeholder figures, and one
  * failing source never takes the rest of the report down with it.
  *
- * Sections: search, traffic, seo_tracker, content, vetting, pipeline, todo.
+ * Sections: search, traffic, seo_tracker, content, vetting, covers, pipeline, plan, social_inbox, todo.
  */
 class DailyReportBuilder
 {
@@ -42,6 +42,7 @@ class DailyReportBuilder
         private ?SeoTrackerService $tracker = null,
         private ?\Closure $searchConfigured = null,
         private ?\Closure $emailProviders = null,
+        private ?\Closure $coverStatus = null,
     ) {
         $this->db  = $db ?? Database::connect();
         $this->ga4 ??= new Ga4DailySnapshot();
@@ -73,7 +74,12 @@ class DailyReportBuilder
             'seo_tracker' => $this->guard('seo_tracker', fn () => $this->seoTracker()),
             'content'     => $this->guard('content', fn () => $this->content($window)),
             'vetting'     => $this->guard('vetting', fn () => $this->vetting($window)),
+            'covers'      => $this->guard('covers', fn () => $this->covers($window)),
             'pipeline'    => $this->guard('pipeline', fn () => $this->pipeline($window)),
+            // Bot Plan & Performance: yesterday's plan vs achieved (stored review).
+            'plan'        => $this->guard('plan', fn () => (new \App\Libraries\Bot\Plan\PlanReportSection($this->db))->build($reportDate)),
+            'social_inbox' => $this->guard('social_inbox', fn () => $this->socialInbox($window)),
+            'routines'    => $this->guard('routines', fn () => $this->routines()),
         ];
         $sections['todo'] = ['configured' => true, 'items' => self::todo($sections)];
 
@@ -100,7 +106,7 @@ class DailyReportBuilder
             return [
                 'configured' => $configured,
                 'note'       => $configured
-                    ? 'Search Console is configured but no data has been ingested yet (Google publishes with a ~3 day lag; the ingest runs daily at 04:00 UTC).'
+                    ? 'Search Console is configured but no data has been ingested yet (Google publishes with a ~3 day lag; the ingest runs daily at 09:30 IST (04:00 UTC)).'
                     : 'Not configured — Search Console is not connected. See docs/operations/SEARCH_CONSOLE_SETUP.md.',
             ];
         }
@@ -316,7 +322,50 @@ class DailyReportBuilder
             $top[] = ['reason' => $text, 'count' => $n];
         }
 
-        return ['configured' => true, 'total' => count($rows), 'counts' => $counts, 'by_type' => $byType, 'top_reject_reasons' => $top];
+        return ['configured' => true, 'total' => count($rows), 'counts' => $counts, 'by_type' => $byType, 'top_reject_reasons' => $top,
+                'quality' => $this->quality($window)];
+    }
+
+    /**
+     * Content clean-up / daily safety net (informational): re-vets of stored
+     * content, pages taken down and same-slug rewrites in the queue.
+     *
+     * @param array{start:string, end:string} $window
+     * @return array<string, int>|null
+     */
+    private function quality(array $window): ?array
+    {
+        if (! SchemaGuard::hasTable($this->db, 'reach_content_quality_checks')) {
+            return null;
+        }
+        $summary = (new \App\Libraries\Content\Quality\QualityCheckLog($this->db))->summarySince($window['start']);
+        $open    = (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))->counts();
+
+        return $summary + ['rewrites_open' => array_sum($open)];
+    }
+
+    /**
+     * Cover automation in the report window — replaces the old "please
+     * upload covers" email with one informational line.
+     *
+     * @param array{start:string, end:string} $window
+     * @return array<string, mixed>
+     */
+    private function covers(array $window): array
+    {
+        $s = $this->coverStatus !== null
+            ? ($this->coverStatus)($window)
+            : (new \App\Libraries\Media\CoverGenerationAlertService($this->db))->status($window['start'], $window['end']);
+
+        $s['configured'] = true;
+        $s['line'] = sprintf(
+            'Covers: %d generated automatically (24h), gallery has %d active, deficit %s',
+            (int) $s['generated'],
+            (int) $s['gallery_active'],
+            $s['deficit'] === null ? 'unknown' : (string) $s['deficit'],
+        ) . ((int) $s['failed'] > 0 ? sprintf(' — %d generation attempt(s) failed', (int) $s['failed']) : '');
+
+        return $s;
     }
 
     /**
@@ -364,10 +413,43 @@ class DailyReportBuilder
         return $out;
     }
 
-    // ── "What to do today" ─────────────────────────────────────────────────
+    /**
+     * Stream a — what the social inbox bot read and did in the window.
+     *
+     * @param array{start:string, end:string} $window
+     * @return array<string, mixed>
+     */
+    private function socialInbox(array $window): array
+    {
+        if (! SchemaGuard::hasTable($this->db, 'reach_social_inbox')) {
+            return ['configured' => false, 'note' => 'Social inbox not set up yet (run the migrations).'];
+        }
+        if (! (bool) \App\Libraries\Settings\ReachConfig::get('social.inbox.enabled', true)) {
+            return ['configured' => false, 'note' => 'The social inbox bot is off (social.inbox.enabled).'];
+        }
+
+        return ['configured' => true] + \App\Libraries\Distribution\SocialInbox\SocialInboxService::stats($this->db, $window['start'], $window['end']);
+    }
+
+    /**
+     * Stream 5: when each Claude routine last reached Reach (informational).
+     *
+     * @return array<string, mixed>
+     */
+    private function routines(): array
+    {
+        $health = (new \App\Libraries\Content\Base\RoutineActivity($this->db))->health();
+
+        return ['configured' => true, 'health' => $health, 'stale' => \App\Libraries\Content\Base\RoutineActivity::staleLines($health)];
+    }
+
+    // ── "Today at a glance" ────────────────────────────────────────────────
 
     /**
      * Rule-based, ordered by impact; at most 8 items. Pure so it can be tested.
+     * Observations, not chores: routine content work (rewrites, refreshes,
+     * topics) is the routines' job, so nothing here asks a person to do it.
+     * The only asks left are one-time connections and broken plumbing.
      *
      * @param array<string, array<string, mixed>> $s
      * @return list<string>
@@ -383,20 +465,20 @@ class DailyReportBuilder
             $clicks = (float) ($search['day']['clicks'] ?? 0);
             $base   = (float) ($search['baseline']['clicks'] ?? 0);
             if ($base >= 5 && $clicks < $base * 0.8) {
-                $items[] = sprintf('Search clicks on %s were %d vs a 7-day average of %.1f (%d%%). Check the declined queries below.',
+                $items[] = sprintf('Search clicks on %s were %d vs a 7-day average of %.1f (%d%%); the declined queries are listed below.',
                     $search['date'], (int) $clicks, $base, (int) round(($clicks - $base) / $base * 100));
             }
             foreach (array_slice($search['movers']['declined'] ?? [], 0, 2) as $m) {
-                $items[] = sprintf('Refresh the page ranking for "%s" — it slipped from %.1f to %.1f.', $m['query'], $m['previous_position'], $m['position']);
+                $items[] = sprintf('"%s" slipped from position %.1f to %.1f.', $m['query'], $m['previous_position'], $m['position']);
             }
             $striking = array_filter($search['top_queries'] ?? [], static fn ($q) => ($q['avg_position'] ?? 0) > 3 && ($q['avg_position'] ?? 0) <= 15 && ($q['impressions'] ?? 0) >= 20);
             usort($striking, static fn ($a, $b) => $b['impressions'] <=> $a['impressions']);
             foreach (array_slice($striking, 0, 2) as $q) {
-                $items[] = sprintf('"%s" sits at position %.1f with %d impressions — strengthen that page to push it into the top 3.', $q['dimension_value'], $q['avg_position'], $q['impressions']);
+                $items[] = sprintf('"%s" sits at position %.1f with %d impressions — within reach of the top 3.', $q['dimension_value'], $q['avg_position'], $q['impressions']);
             }
             foreach ($search['top_pages'] ?? [] as $p) {
                 if (($p['impressions'] ?? 0) >= 100 && ($p['ctr'] ?? 1) < 0.01) {
-                    $items[] = sprintf('Rewrite the title/meta description of %s — %d impressions but %.1f%% CTR.', $p['dimension_value'], $p['impressions'], ($p['ctr'] ?? 0) * 100);
+                    $items[] = sprintf('%s has %d impressions but a %.1f%% CTR — its title/meta description draws few clicks.', $p['dimension_value'], $p['impressions'], ($p['ctr'] ?? 0) * 100);
                     break;
                 }
             }
@@ -407,7 +489,7 @@ class DailyReportBuilder
             $items[] = 'Add DataForSEO credentials (Settings → AI & Automation → SEO data) to start tracking positions against competitors.';
         }
         foreach (array_slice($tracker['beaten'] ?? [], 0, 2) as $b) {
-            $items[] = sprintf('%s outranks us for "%s" (#%d vs %s) — plan content for it.', $b['competitor'], $b['keyword'], $b['competitor_rank'],
+            $items[] = sprintf('%s outranks us for "%s" (#%d vs %s).', $b['competitor'], $b['keyword'], $b['competitor_rank'],
                 $b['our_rank'] === null ? 'not in top 100' : '#' . $b['our_rank']);
         }
 
@@ -425,13 +507,34 @@ class DailyReportBuilder
 
         $vet = $s['vetting'] ?? [];
         if (! empty($vet['configured']) && ($vet['counts']['reject'] ?? 0) > ($vet['counts']['approve'] ?? 0) && ($vet['counts']['reject'] ?? 0) > 0) {
-            $items[] = sprintf('Vetting rejected %d draft(s) vs %d approved — review the top reject reasons and adjust the routine prompts.',
+            $items[] = sprintf('Vetting rejected %d draft(s) vs %d approved; the top reject reasons are listed below.',
                 $vet['counts']['reject'], $vet['counts']['approve'] ?? 0);
+        }
+
+        $inbox = $s['social_inbox'] ?? [];
+        if (($inbox['waiting_for_flow'] ?? 0) > 0) {
+            $items[] = sprintf('%d social complaint(s) are waiting to be lodged in Flow — set the Reach → Flow key (Settings → Social inbox) or check Flow is up.', $inbox['waiting_for_flow']);
+        }
+        if (($inbox['reply_failures'] ?? 0) > 0) {
+            $items[] = sprintf('%d social repl(ies) were not accepted by social-api.ai in the last 24 hours — see Social → Inbox for the reasons.', $inbox['reply_failures']);
+        }
+
+        $covers = $s['covers'] ?? [];
+        if (isset($covers['provider_configured']) && ! $covers['provider_configured'] && (int) ($covers['deficit'] ?? 0) > 0) {
+            $items[] = 'Cover images cannot be generated: the OpenAI API key is not set (Settings → AI & Automation). Articles without a suitable gallery cover wait until it is.';
+        } elseif ((int) ($covers['failed'] ?? 0) > 0 && (int) ($covers['generated'] ?? 0) === 0) {
+            $items[] = sprintf('Cover generation failed %d time(s) in 24h and none succeeded%s — check the image model (ai.image.model) and the OpenAI key.',
+                (int) $covers['failed'], ! empty($covers['last_error']) ? ' (last error: ' . mb_substr((string) $covers['last_error'], 0, 140) . ')' : '');
         }
 
         $content = $s['content'] ?? [];
         if (isset($content['total']) && (int) $content['total'] === 0) {
             $items[] = 'Nothing was published in the last 24 hours — check the content automation routines and the publishing queue.';
+        }
+
+        // Informational: a quiet routine (no call or submission for > 36 h).
+        foreach (array_slice($s['routines']['stale'] ?? [], 0, 2) as $line) {
+            $items[] = $line;
         }
 
         if ($items === []) {

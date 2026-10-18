@@ -9,8 +9,9 @@ use App\Libraries\Blog\ContentBaseService;
 use App\Libraries\Content\ContentBaseOverviewService;
 
 /**
- * Read-only console view of the repo-versioned content base. Edits happen in
- * git (rsync --delete would clobber server-side edits on every deploy).
+ * Console view of the living content base (reach_content_base_entries). The
+ * routines add topics and Reach moves them along through
+ * v1/automation/content-base/*; git holds only the seed baseline.
  */
 class ContentBaseController extends BaseApiController
 {
@@ -29,31 +30,32 @@ class ContentBaseController extends BaseApiController
     /** Blog-only view, kept for the Blog Command Centre roadmap tab. */
     public function index()
     {
-        $service = new ContentBaseService();
-        $db      = db_connect();
+        $service  = new ContentBaseService();
+        $overview = (new ContentBaseOverviewService())->overview();
+        $blog     = $overview['surfaces']['blog'] ?? ['entries' => [], 'counts' => []];
 
-        $index   = $service->blogIndex();
-        $entries = [];
-        foreach ((array) ($index['entries'] ?? []) as $entry) {
-            $key = (string) ($entry['key'] ?? '');
-            $candidate = $key !== '' ? $db->table('reach_topic_candidates')
-                ->select('id, status, content_item_id, updated_at')
-                ->where('content_base_key', $key)
-                ->get()->getRowArray() : null;
-
-            $entry['sync'] = $candidate
-                ? ['state' => 'synced', 'candidate_status' => $candidate['status'], 'content_item_id' => $candidate['content_item_id']]
-                : ['state' => 'pending_sync'];
-            $entries[] = $entry;
-        }
+        $entries = array_map(static fn (array $e): array => [
+            'key'              => $e['key'],
+            'content_base_key' => $e['content_base_key'],
+            'title'            => $e['title'],
+            'portfolio_stream' => $e['stream'],
+            'target_date'      => $e['target_date'],
+            'status'           => $e['status'],
+            'status_reason'    => $e['status_reason'],
+            'origin'           => $e['origin'],
+            'brief_prompt'     => $e['prompt'],
+            'sync'             => ['state' => $e['status'], 'content_item_id' => $e['content_item_id']],
+        ], $blog['entries']);
 
         return $this->ok([
             'base_markdown' => $service->baseMarkdown(),
             'base_path'     => $service->basePath(),
-            'index_meta'    => ['version' => $index['version'] ?? null, 'updated_at' => $index['updated_at'] ?? null],
+            'index_meta'    => ['version' => null, 'updated_at' => null],
             'entries'       => $entries,
+            'counts'        => $blog['counts'],
+            'routine'       => $blog['routine'] ?? null,
             'kb_index'      => $service->knowledgeBaseIndex(),
-            'last_sync'     => $service->lastSyncRun(),
+            'last_sync'     => $overview['last_sync'] ?? null,
         ]);
     }
 }

@@ -1,15 +1,13 @@
 import { useRef, useState } from 'react';
+import { displayMonth, formatMonthYear } from '../../utils/formatDate';
 
 function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
 export function ContentCalendarGrid({ items = [], monthOffset = 0, onItemClick, onItemMove }) {
-  const now = new Date();
-  now.setDate(1);
-  now.setMonth(now.getMonth() + monthOffset);
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  // The month on screen is the IST month (ui.timezone), not the browser's.
+  const { year, month } = displayMonth(monthOffset);
   const first = new Date(year, month, 1);
   const startDay = first.getDay(); // 0=Sun
   const total = daysInMonth(year, month);
@@ -114,7 +112,7 @@ export function ContentCalendarGrid({ items = [], monthOffset = 0, onItemClick, 
   return (
     <div>
       <div className="text-sm text-secondary mb-2">
-        {first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        {formatMonthYear(year, month)}
       </div>
       <div className="calendar-grid">
         {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (

@@ -60,8 +60,14 @@ class CoverSweepService
 
             if ($existing) {
                 // Already re-attempted today. Re-arm it if the earlier attempt
-                // died mid-flight; leave a pending/queued one alone.
-                if (in_array((string) $existing['eligibility_status'], ['failed', 'blocked'], true)) {
+                // died mid-flight, or if it finished without a cover and a new
+                // gallery cover has landed since (the hourly autofill stocks
+                // covers through the day — a morning miss must not wait for
+                // tomorrow's key). Leave a pending/queued one alone.
+                $status = (string) $existing['eligibility_status'];
+                $rearm  = in_array($status, ['failed', 'blocked'], true)
+                    || ($status === 'completed' && $this->galleryChangedSince((string) ($existing['updated_at'] ?? '')));
+                if ($rearm) {
                     $this->workBlocks->markEligible((int) $existing['id']);
                     $requeued++;
                     $ids[] = $contentItemId;
@@ -93,6 +99,20 @@ class CoverSweepService
         ];
     }
 
+    /** True when an active gallery cover was added after $since. */
+    private function galleryChangedSince(string $since): bool
+    {
+        if ($since === '') {
+            return false;
+        }
+
+        return $this->db->table('reach_media_gallery_assets')
+            ->where('status', 'active')
+            ->whereIn('kind', \App\Libraries\Media\MediaGalleryAssignmentService::GALLERY_KINDS)
+            ->where('created_at >', $since)
+            ->countAllResults() > 0;
+    }
+
     /**
      * Blog items carrying an unwaived cover_image failure and still without a
      * featured image.
@@ -106,7 +126,8 @@ class CoverSweepService
     {
         $terminal = "'" . implode("','", self::TERMINAL) . "'";
         // Vetted Claude-routine blogs retry their own cover hourly through
-        // RoutineContentPipeline (fresh DALL·E first, then the gallery), and a
+        // RoutineContentPipeline (relevant gallery cover first, then a fresh
+        // GPT Image cover), and a
         // GENERATE_IMAGE block would walk them back into the review chain.
         $routine = \App\Libraries\Database\SchemaGuard::hasTable($this->db, 'reach_routine_submissions')
             ? 'AND NOT EXISTS (SELECT 1 FROM reach_routine_submissions rs WHERE rs.content_item_id = i.id)'

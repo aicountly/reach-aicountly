@@ -214,6 +214,52 @@ class MockCommunityPublisher implements CommunityPublisherInterface
         ]);
     }
 
+    /** @var list<array<string, mixed>> what getMemberQuestions() serves, as aicountly.com would */
+    private array $memberQuestions = [];
+
+    public function getMemberQuestions(string $sinceIso8601, int $afterId = 0, int $limit = 200): array
+    {
+        // Same cursor contract as the receiver: (changed_at, id) after the cursor.
+        $since = strtotime($sinceIso8601) ?: 0;
+        $rows  = array_values(array_filter($this->memberQuestions, static function (array $q) use ($since, $afterId): bool {
+            $at = strtotime((string) $q['changed_at']);
+            return $at > $since || ($at === $since && (int) $q['public_question_id'] > $afterId);
+        }));
+        usort($rows, static fn (array $a, array $b): int => [strtotime((string) $a['changed_at']), $a['public_question_id']] <=> [strtotime((string) $b['changed_at']), $b['public_question_id']]);
+        $page = array_slice($rows, 0, $limit);
+        $last = $page === [] ? null : end($page);
+
+        return $this->record(__FUNCTION__, [$sinceIso8601, $afterId, $limit], [
+            'success'     => true,
+            'questions'   => $page,
+            'next_cursor' => $last === null
+                ? ['since' => gmdate('c', $since), 'after_id' => $afterId]
+                : ['since' => gmdate('c', (int) strtotime((string) $last['changed_at'])), 'after_id' => (int) $last['public_question_id']],
+            'has_more'    => count($rows) > $limit,
+            'request_id'  => 'mock-' . uniqid(),
+        ]);
+    }
+
+    /** Test helper: put a member question on (or update it on) the fake aicountly.com. */
+    public function putMemberQuestion(array $question): void
+    {
+        $question += [
+            'canonical_url'       => 'https://aicountly.com/community/question/q-' . $question['public_question_id'],
+            'body'                => '',
+            'category_slug'       => 'gst',
+            'tags'                => [],
+            'status'              => 'published',
+            'reach_external_id'   => null,
+            'has_official_answer' => false,
+            'has_accepted_answer' => false,
+            'answer_count'        => 0,
+            'created_at'          => gmdate('Y-m-d H:i:s'),
+            'changed_at'          => gmdate('Y-m-d H:i:s'),
+        ];
+        $question['content_checksum'] ??= hash('sha256', $question['title'] . "\n" . $question['body']);
+        $this->memberQuestions[(int) $question['public_question_id']] = $question;
+    }
+
     public function healthCheck(): bool
     {
         return true;

@@ -8,12 +8,16 @@ namespace App\Libraries\Video\Automation\Render;
  * Builds the Shotstack edit (timeline + output) for one pipeline item from
  * its vetted script and the stored voice-overs / visuals.
  *
- * Branded template (AICOUNTLY colours and Montserrat, logo from
- * video.brand.logo_url):
+ * Branded template (AICOUNTLY colours from aicountly.com's aic-brand.css and
+ * Montserrat; the official logo, video.brand.logo_url, default
+ * https://aicountly.com/assests/images/ai-logo.png):
  *   - white canvas; intro card (logo + title, vlog only) and an end card
- *     (logo + CTA + aicountly.com)
+ *     (logo + CTA + aicountly.com) — in both 16:9 and 9:16
  *   - each scene: its screenshot / still full-frame (stills slowly zoom),
- *     or a title card (navy text on white), the voice-over clip, a small logo
+ *     or a title card (navy text on the brand's soft green panel), the
+ *     voice-over clip, and the AICOUNTLY corner mark (logo_badge_url: the
+ *     logo on a white plate, legible over dark stills; the plain logo when
+ *     no badge URL is given)
  *   - lower third from the scene's on_screen_text (blue bar, white text)
  *   - captions burned in from the voice-over (white on navy), the same cues
  *     that go to YouTube as a caption track
@@ -27,6 +31,10 @@ final class TimelineBuilder
     public const BLUE  = '#145490';
     public const GREEN = '#1b7f00';
     public const WHITE = '#ffffff';
+    public const GREEN_SOFT = '#eaf8e6';
+
+    /** The official logo on aicountly.com (assests/images/ai-logo.png). */
+    public const DEFAULT_LOGO_URL = 'https://aicountly.com/assests/images/ai-logo.png';
 
     public const FONT_DISPLAY = 'Montserrat ExtraBold';
     public const FONT_TEXT    = 'Montserrat SemiBold';
@@ -37,7 +45,7 @@ final class TimelineBuilder
             'caption' => ['w' => 1600, 'h' => 120, 'size' => 42, 'position' => 'bottom', 'y' => 0.04],
             'lower'   => ['w' => 1000, 'h' => 84, 'size' => 38, 'position' => 'bottomLeft', 'x' => 0.03, 'y' => 0.17],
             'card'    => ['w' => 1600, 'h' => 560, 'size' => 66],
-            'logo'    => ['scale' => 0.32, 'card_scale' => 0.75],
+            'logo'    => ['scale' => 0.32, 'card_scale' => 0.75, 'badge_scale' => 0.6],
             'shot_fit' => 'cover',
         ],
         'short' => [
@@ -45,7 +53,7 @@ final class TimelineBuilder
             'caption' => ['w' => 960, 'h' => 230, 'size' => 54, 'position' => 'center', 'y' => -0.24],
             'lower'   => ['w' => 980, 'h' => 190, 'size' => 50, 'position' => 'top', 'x' => 0.0, 'y' => -0.09],
             'card'    => ['w' => 940, 'h' => 900, 'size' => 76],
-            'logo'    => ['scale' => 0.42, 'card_scale' => 0.9],
+            'logo'    => ['scale' => 0.42, 'card_scale' => 0.9, 'badge_scale' => 0.7],
             'shot_fit' => 'contain',
         ],
     ];
@@ -59,7 +67,7 @@ final class TimelineBuilder
      * @param list<array{order:int, voice_over_text:string, on_screen_text:string, duration_hint_secs:float,
      *                   visual_kind:string, image_url:?string, image_source:?string,
      *                   audio_url:?string, audio_secs:?float}> $scenes
-     * @param array{logo_url?:?string, music_url?:?string, callback_url?:?string} $opts
+     * @param array{logo_url?:?string, logo_badge_url?:?string, music_url?:?string, callback_url?:?string} $opts
      * @return array{edit: array<string, mixed>, duration: float, cues: list<array{start: float, end: float, text: string}>, scene_starts: array<int, float>}
      */
     public static function build(array $script, array $scenes, array $opts = []): array
@@ -67,6 +75,7 @@ final class TimelineBuilder
         $format = $script['format'] === 'short' ? 'short' : 'vlog';
         $L      = self::LAYOUT[$format];
         $logo   = self::httpsOrNull($opts['logo_url'] ?? null);
+        $badge  = self::httpsOrNull($opts['logo_badge_url'] ?? null);
 
         $tracks = ['logo' => [], 'captions' => [], 'text' => [], 'visual' => [], 'audio' => []];
         $cues   = [];
@@ -104,11 +113,15 @@ final class TimelineBuilder
                     );
                 }
             } else {
-                // Title card: the scene's on-screen text, navy on the white canvas.
-                $tracks['text'][] = self::clip(self::text($scene['on_screen_text'] !== '' ? $scene['on_screen_text'] : $script['title'], $L['card']['w'], $L['card']['h'], self::FONT_DISPLAY, self::NAVY, $L['card']['size']), $t, $len, ['position' => 'center', 'transition' => ['in' => 'fade', 'out' => 'fade']]);
+                // Title card: the scene's on-screen text, navy on the brand's
+                // soft green panel over the white canvas.
+                $tracks['text'][] = self::clip(self::text($scene['on_screen_text'] !== '' ? $scene['on_screen_text'] : $script['title'], $L['card']['w'], $L['card']['h'], self::FONT_DISPLAY, self::NAVY, $L['card']['size'], self::GREEN_SOFT, 1.0), $t, $len, ['position' => 'center', 'transition' => ['in' => 'fade', 'out' => 'fade']]);
             }
 
-            if ($logo !== null) {
+            // Corner mark on every scene, both formats.
+            if ($badge !== null) {
+                $tracks['logo'][] = self::clip(['type' => 'image', 'src' => $badge], $t, $len, ['fit' => 'none', 'scale' => $L['logo']['badge_scale'], 'position' => 'topRight', 'offset' => ['x' => -0.02, 'y' => -0.03]]);
+            } elseif ($logo !== null) {
                 $tracks['logo'][] = self::clip(['type' => 'image', 'src' => $logo], $t, $len, ['fit' => 'none', 'scale' => $L['logo']['scale'], 'position' => 'topRight', 'offset' => ['x' => -0.02, 'y' => -0.03], 'opacity' => 0.95]);
             }
 
@@ -223,6 +236,12 @@ final class TimelineBuilder
     private static function clip(array $asset, float $start, float $length, array $extra = []): array
     {
         return ['asset' => $asset, 'start' => round($start, 3), 'length' => round(max(0.1, $length), 3)] + $extra;
+    }
+
+    /** The configured logo URL when it is https, otherwise the official one — a video never renders unbranded for want of a setting. */
+    public static function logoUrl(?string $configured): string
+    {
+        return self::httpsOrNull(trim((string) $configured)) ?? self::DEFAULT_LOGO_URL;
     }
 
     private static function httpsOrNull(mixed $url): ?string

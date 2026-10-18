@@ -69,6 +69,26 @@ describe('RoadmapCandidatesPage', () => {
     expect(row).toHaveTextContent('problem to product');
   });
 
+  it('does not show Pinned/Locked for Postgres "f" flags and says who writes a selected topic', async () => {
+    mocks.getRoadmapCandidates.mockResolvedValue({
+      items: [{
+        id: 8, title: 'TDS on rent explained', portfolio_stream: 'marketing', status: 'roadmap_selected',
+        is_human_pinned: 'f', is_locked: 'f', content_item_id: null,
+        total_score: 55, trend_7d: null, trend_28d: null, scored_for_date: '2026-10-18',
+      }],
+      total: 1,
+    });
+
+    renderWithAuth(<RoadmapCandidatesPage />, ctx);
+
+    await waitFor(() => expect(screen.getByText('TDS on rent explained')).toBeInTheDocument());
+    const row = screen.getByText('TDS on rent explained').closest('tr');
+    expect(row).not.toHaveTextContent('Pinned');
+    expect(row).not.toHaveTextContent('Locked');
+    expect(row).toHaveTextContent('In the blog routine queue');
+    expect(row).toHaveTextContent('roadmap selected');
+  });
+
   it('surfaces API errors rather than rendering a silent empty table', async () => {
     mocks.getRoadmapCandidates.mockRejectedValue(new Error('permission denied'));
 

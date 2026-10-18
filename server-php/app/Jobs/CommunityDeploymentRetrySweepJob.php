@@ -33,16 +33,28 @@ class CommunityDeploymentRetrySweepJob implements JobHandlerInterface
         $enqueued = 0;
         foreach ($due as $row) {
             $uuid = (string) $row['uuid'];
-            $svc->enqueue(
+            // enqueueOnce, not enqueue: a retry job that finished without
+            // advancing attempt_count (dead letter, invalidated approval) kept
+            // its key, and enqueue() retires a finished job's key and queues a
+            // fresh copy — so the same retry was re-run every five minutes.
+            $jobId = $svc->enqueueOnce(
                 'reach.community_deployment_retry',
                 ['deployment_uuid' => $uuid],
                 [
                     'queue'           => 'community',
                     'idempotency_key' => 'community_deploy_retry_' . $uuid . '_' . (int) ($row['attempt_count'] ?? 0),
                     'enqueued_actor_type' => 'system',
+                    // The deployment row carries its own retry schedule (this
+                    // sweep re-enqueues it when next due). A job-level retry
+                    // only re-reached the same verdict: a dead-lettered
+                    // deployment failed its job five times over. One attempt
+                    // records the failure once.
+                    'max_attempts'        => 1,
                 ]
             );
-            $enqueued++;
+            if ($jobId !== null) {
+                $enqueued++;
+            }
         }
 
         return ['ok' => true, 'due_count' => count($due), 'enqueued' => $enqueued];

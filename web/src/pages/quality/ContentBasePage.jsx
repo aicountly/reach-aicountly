@@ -7,13 +7,14 @@ import { Card } from '../../components/common/Card';
 import { formatDate, formatDateTime } from '../../utils/formatDate';
 
 /**
- * The shared content base — the plan Claude works through for every surface.
+ * The living content base — the topics the Claude routines work through for
+ * blog, knowledge base and community Q&A.
  *
- * This used to be a tab inside the Blog Command Centre roadmap, which made a
- * cross-surface artefact look blog-only: the knowledge-base queue and the
- * community question seeds were in the same repo directory but invisible in
- * the console. Quality Centre is where shared assets live, so the whole base
- * lives here now, one section per surface.
+ * Topics and their progress live in Reach's database. Git holds only the seed
+ * baseline (imported hourly; a deploy adds seeds but never resets progress).
+ * Routines take topics from GET v1/automation/content-base/next, add new ones
+ * with POST …/propose and report with POST …/produced; Reach moves each topic
+ * planned → queued → produced → published from its own pipeline.
  */
 
 const SURFACES = [
@@ -22,21 +23,42 @@ const SURFACES = [
   { id: 'community', icon: MessagesSquare },
 ];
 
-const SYNC = {
-  produced: { label: 'Produced', className: 'badge badge-success' },
-  queued: { label: 'Queued', className: 'badge badge-secondary' },
-  pending_sync: { label: 'Pending sync', className: 'badge badge-warning' },
-  retired: { label: 'Retired', className: 'badge badge-muted' },
+const STATUS = {
+  planned: { label: 'Planned', className: 'badge badge-warning', help: 'Waiting for a routine to write it.' },
+  queued: { label: 'Queued', className: 'badge badge-secondary', help: 'Submitted; Reach is vetting it.' },
+  produced: { label: 'Produced', className: 'badge badge-info', help: 'Approved by vetting; Reach is publishing it.' },
+  published: { label: 'Published', className: 'badge badge-success', help: 'Live on aicountly.com.' },
+  retired: { label: 'Retired', className: 'badge badge-muted', help: 'Dropped.' },
 };
 
-function SyncBadge({ state }) {
-  const sync = SYNC[state] || SYNC.pending_sync;
-  return <span className={sync.className}>{sync.label}</span>;
+function StatusBadge({ status }) {
+  const s = STATUS[status] || STATUS.planned;
+  return <span className={s.className} title={s.help}>{s.label}</span>;
+}
+
+function ago(hours) {
+  if (hours === null || hours === undefined) return 'never';
+  if (hours < 1) return 'under an hour ago';
+  if (hours < 48) return `${Math.round(hours)} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
+
+function RoutineLine({ health }) {
+  if (!health) return null;
+  const quiet = health.state === 'stale' || health.state === 'never_seen';
+  return (
+    <p className={`text-sm ${quiet ? 'text-warning' : 'text-muted'}`} data-testid="routine-line">
+      Routine <code>{health.routine}</code>: last activity {ago(health.hours_since)}
+      {health.last_activity_at ? ` (${formatDateTime(health.last_activity_at)})` : ''}
+      {health.state === 'off' ? ' — automation switched off' : ''}
+      {quiet ? ` — quiet for longer than ${health.threshold_hours} h` : ''}
+    </p>
+  );
 }
 
 function EntryTable({ entries, keyLabel = 'Key' }) {
   if (!entries.length) {
-    return <div className="text-sm text-muted">No entries in this section of the base yet.</div>;
+    return <div className="text-sm text-muted">No topics of this type yet.</div>;
   }
 
   return (
@@ -44,7 +66,7 @@ function EntryTable({ entries, keyLabel = 'Key' }) {
       <table className="data-table">
         <thead>
           <tr>
-            <th>{keyLabel}</th><th>Title</th><th>Stream</th><th>Target</th><th>Status</th><th>Sync</th><th>Prompt</th>
+            <th>{keyLabel}</th><th>Title</th><th>Stream</th><th>Target</th><th>Status</th><th>Origin</th><th>Detail</th>
           </tr>
         </thead>
         <tbody>
@@ -54,9 +76,9 @@ function EntryTable({ entries, keyLabel = 'Key' }) {
               <td>{entry.title}</td>
               <td>{entry.stream || '—'}</td>
               <td>{entry.target_date ? formatDate(entry.target_date) : '—'}</td>
-              <td>{entry.status}</td>
-              <td><SyncBadge state={entry.sync?.state} /></td>
-              <td className="text-sm text-muted" style={{ maxWidth: '28rem' }}>{entry.prompt}</td>
+              <td><StatusBadge status={entry.status} /></td>
+              <td className="text-sm">{entry.origin === 'routine' ? 'Routine' : 'Git seed'}</td>
+              <td className="text-sm text-muted" style={{ maxWidth: '28rem' }}>{entry.status_reason || entry.prompt}</td>
             </tr>
           ))}
         </tbody>
@@ -68,11 +90,13 @@ function EntryTable({ entries, keyLabel = 'Key' }) {
 function CountStrip({ counts }) {
   return (
     <p className="text-sm text-muted">
-      {counts.total} entries · {counts.produced} produced · {counts.queued} queued ·{' '}
-      {counts.pending_sync} pending sync{counts.retired ? ` · ${counts.retired} retired` : ''}
+      {counts.total} topics · {counts.planned} planned · {counts.queued} queued · {counts.produced} produced ·{' '}
+      {counts.published} published{counts.retired ? ` · ${counts.retired} retired` : ''}
     </p>
   );
 }
+
+const EMPTY_COUNTS = { total: 0, planned: 0, queued: 0, produced: 0, published: 0, retired: 0 };
 
 export function ContentBasePage() {
   const [data, setData] = useState(null);
@@ -94,9 +118,10 @@ export function ContentBasePage() {
   if (error) return <Alert variant="danger">{error}</Alert>;
 
   const surfaces = data?.surfaces ?? {};
-  const totals = data?.totals ?? { entries: 0, pending: 0, done: 0 };
+  const totals = data?.totals ?? { entries: 0, published: 0, in_progress: 0, planned: 0 };
   const lastSync = data?.last_sync;
-  const section = surfaces[active] ?? { entries: [], counts: {}, meta: {} };
+  const section = surfaces[active] ?? { entries: [], counts: {} };
+  const stale = data?.stale ?? [];
 
   return (
     <div>
@@ -104,28 +129,39 @@ export function ContentBasePage() {
         <div>
           <h1 className="flex items-center gap-2"><Library size={18} /> Content Base</h1>
           <p className="text-sm text-muted">
-            The shared plan Claude works through — blog, knowledge base and community Q&A.
-            {' '}{totals.entries} entries, {totals.done} produced, {totals.pending} outstanding.
+            The topics the Claude routines write — blog, knowledge base and community Q&A.
+            {' '}{totals.entries} topics: {totals.published} published, {totals.in_progress} in progress, {totals.planned} planned.
           </p>
         </div>
       </div>
 
+      {data?.available === false && <Alert variant="warning">{data.note}</Alert>}
+
       <Alert variant="info">
-        The content base lives in the repo (<code>{data?.base_path || 'server-php/content-base/'}</code>) and is
-        <strong> read-only here</strong>. Edit prompts and upcoming topics in git — every deploy
-        overwrites the server copy (<code>rsync --delete</code>), and the daily Claude routine
-        revises the index from product-repo changes.
+        Updated by the routines daily through the API: they take the next topics
+        (<code>GET v1/automation/content-base/next</code>), add new ones from real product changes
+        (<code>POST …/propose</code>) and report what they wrote (<code>POST …/produced</code>). Reach moves each topic
+        from planned to published from its own vetting and publishing pipeline. The repo
+        (<code>{data?.base_path || 'server-php/content-base/'}</code>) holds only the seed baseline and the strategy
+        below; seeds are imported hourly and a deploy never resets progress.
       </Alert>
+
+      {stale.length > 0 && (
+        <Alert variant="warning">
+          <strong>Quiet routines (informational):</strong>
+          <ul style={{ margin: '0.25rem 0 0 1rem' }}>
+            {stale.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        </Alert>
+      )}
 
       {lastSync ? (
         <p className="text-sm text-muted">
-          Last DB sync: {formatDateTime(lastSync.ran_at)} — {lastSync.created_count} created,{' '}
-          {lastSync.updated_count} updated, {lastSync.retired_count} retired of {lastSync.entries_seen} entries.
+          Last seed import that changed something: {formatDateTime(lastSync.ran_at)} ({lastSync.file_key}) —{' '}
+          {lastSync.created_count} added, {lastSync.updated_count} updated, {lastSync.retired_count} retired of {lastSync.entries_seen} seeds.
         </p>
       ) : (
-        <Alert variant="warning">
-          Never synced — run <code>php spark reach:content-base-sync</code> (also runs post-deploy and daily at 06:00).
-        </Alert>
+        <p className="text-sm text-muted">Seeds not imported yet — the hourly content-base sync imports them (<code>php spark reach:content-base-sync</code> by hand).</p>
       )}
 
       <div className="flex gap-2 mt-4" role="tablist">
@@ -149,13 +185,13 @@ export function ContentBasePage() {
 
       <div className="mt-4">
         <Card
-          title={`${section.label} — ${section.source_file}`}
-          actions={section.meta?.updated_at
-            ? <span className="text-xs text-muted">base updated {formatDate(section.meta.updated_at)}</span>
-            : null}
+          title={section.label || ''}
+          actions={section.activity?.last_proposal_at
+            ? <span className="text-xs text-muted">last routine proposal {formatDateTime(section.activity.last_proposal_at)}</span>
+            : <span className="text-xs text-muted">no routine proposals yet</span>}
         >
-          <CountStrip counts={{ total: 0, produced: 0, queued: 0, pending_sync: 0, retired: 0, ...section.counts }} />
-          {section.meta?.notes && <p className="text-sm text-muted">{section.meta.notes}</p>}
+          <RoutineLine health={section.routine} />
+          <CountStrip counts={{ ...EMPTY_COUNTS, ...section.counts }} />
 
           {active === 'knowledge_base' ? (
             (section.products ?? []).map((product) => (
@@ -163,7 +199,7 @@ export function ContentBasePage() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">{product.product_slug}</h3>
                   <span className="text-xs text-muted">
-                    {product.tier} tier · {product.daily_quota}/day{product.enabled ? '' : ' · disabled'}
+                    {product.tier ? `${product.tier} tier · ` : ''}{product.daily_quota}/day{product.enabled ? '' : ' · no enabled KB cadence (not offered to the routine)'}
                   </span>
                 </div>
                 <EntryTable entries={product.topics ?? []} />

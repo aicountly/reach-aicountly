@@ -1,5 +1,10 @@
-/** YYYY-MM-DD of a Date in the browser's local time zone (not UTC). */
+import { toDateInputValue } from './formatDate';
+
+/**
+ * YYYY-MM-DD of an instant in the display zone (IST, `ui.timezone`) — the
+ * day the API's date-range params mean (LeadOutcomeController reads them as
+ * Asia/Kolkata dates), whatever zone the browser is in.
+ */
 export function localDay(d) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return toDateInputValue(d);
 }

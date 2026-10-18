@@ -5,14 +5,12 @@ namespace App\Libraries\Blog;
 use App\Libraries\Ai\AiGenerationInput;
 use App\Libraries\Ai\Generation\AiGenerationOrchestrator;
 use App\Libraries\Ai\Generation\AiGenerationRequestService;
-use App\Libraries\Ai\Images\ImageGenerationInput;
 use App\Libraries\Ai\Images\ImageProviderRegistry;
 use App\Libraries\Blog\Roadmap\RoadmapOptimizerService;
 use App\Libraries\Blog\Roadmap\RoadmapSignalProvider;
 use App\Libraries\Blog\Roadmap\ScoringWeights;
 use App\Libraries\Blog\Roadmap\TopicScoringService;
 use App\Libraries\Blog\Verification\ClaimExtractor;
-use App\Libraries\Blog\Verification\CrossReviewRouter;
 use App\Libraries\Blog\Verification\FactVerificationService;
 use App\Libraries\Content\SlugBuilder;
 use App\Libraries\ContentVersionService;
@@ -64,6 +62,9 @@ class WorkBlockService
     public const TYPE_UPDATE_SITEMAP       = 'UPDATE_SITEMAP';
     public const TYPE_CHECK_INDEXING       = 'CHECK_INDEXING';
     public const TYPE_SYNC_ANALYTICS       = 'SYNC_ANALYTICS';
+
+    /** Block reason for the retired in-Reach generation/review steps. */
+    public const LEGACY_GENERATION_RETIRED = 'legacy_generation_retired';
 
     private BaseConnection $db;
     private JobService $jobService;
@@ -205,13 +206,17 @@ class WorkBlockService
                 self::TYPE_SCORE_TOPIC       => $this->executeScoreTopic($id, $block),
                 self::TYPE_GENERATE_BRIEF    => $this->executeGenerateBrief($id, $block),
                 self::TYPE_GENERATE_OUTLINE  => $this->executeGenerateOutline($id, $block),
-                self::TYPE_GENERATE_DRAFT    => $this->executeGenerateDraft($id, $block),
+                // Retired 2026-10-18: Reach's own LLM wrote these drafts from a
+                // prompt that never carried the title, and live posts ended up
+                // as generic filler or as text about the "draft_generation"
+                // intent itself. Blogs are written by the Claude blog routine
+                // and vetted by Gemini; these block types fail closed.
+                self::TYPE_GENERATE_DRAFT, self::TYPE_REVISE_CONTENT, self::TYPE_CROSS_REVIEW
+                    => $this->blockOnFlag($id, $blockType, self::LEGACY_GENERATION_RETIRED),
                 self::TYPE_FACT_VERIFY       => $this->executeFactVerify($id, $block),
-                self::TYPE_REVISE_CONTENT    => $this->executeReviseContent($id, $block),
                 self::TYPE_GENERATE_IMAGE    => $this->executeGenerateImage($id, $block),
                 self::TYPE_SEO_OPTIMIZE      => $this->executeSeoOptimize($id, $block),
                 self::TYPE_INTERNAL_LINK     => $this->executeInternalLink($id, $block),
-                self::TYPE_CROSS_REVIEW      => $this->executeCrossReview($id, $block),
                 self::TYPE_HUMAN_REVIEW_GATE => $this->executeHumanReviewGate($id, $block),
                 self::TYPE_SCHEDULE_PUBLISH  => $this->executeSchedulePublish($id, $block),
                 self::TYPE_VERIFY_PUBLICATION=> $this->executeVerifyPublication($id, $block),
@@ -366,6 +371,22 @@ class WorkBlockService
         $candidate   = $candidateId > 0
             ? $this->db->table('reach_topic_candidates')->where('id', $candidateId)->get()->getRowArray()
             : null;
+
+        // Routine hand-off: a roadmap topic is written by the blog routine
+        // (GET v1/automation/content-base/next). A brief block queued before
+        // the hand-off must not create an in-Reach item that would hold the
+        // topic at brief_ready again.
+        if (($block['scope'] ?? null) === 'roadmap' && RoadmapOptimizerService::routineHandoff()) {
+            if ($candidate !== null && empty($candidate['content_item_id']) && in_array($candidate['status'], ['candidate', 'scored', 'roadmap_selected'], true)) {
+                $this->db->table('reach_topic_candidates')->where('id', $candidateId)->update([
+                    'status' => 'roadmap_selected', 'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+            $output = ['superseded' => true, 'reason' => 'routine_handoff: the blog routine writes roadmap topics', 'topic_candidate_id' => $candidateId];
+            $this->markCompleted($id, $output);
+
+            return $output;
+        }
 
         $title = (string) ($input['title'] ?? $candidate['title'] ?? '');
         if ($title === '') {
@@ -555,152 +576,6 @@ class WorkBlockService
     }
 
     /**
-     * Generates a real draft via the existing Phase 3 AI generation stack
-     * (AiGenerationOrchestrator), never a template placeholder. If AI
-     * generation is disabled or no route is configured, the block is left
-     * honestly blocked — it never fabricates draft content.
-     */
-    private function executeGenerateDraft(int $id, array $block): array
-    {
-        if (! $this->flags->isEnabled('ai_generation')) {
-            return $this->blockOnFlag($id, self::TYPE_GENERATE_DRAFT, 'ai_generation_disabled');
-        }
-
-        $contentItemId = (int) ($block['content_item_id'] ?? 0);
-        if ($contentItemId <= 0) {
-            throw new \RuntimeException('GENERATE_DRAFT work block requires content_item_id');
-        }
-
-        $brief = (new ContentBriefModel())->forItem($contentItemId);
-        $item  = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray();
-
-        $stateMachine = new BlogStateMachine($this);
-        $stateMachine->transition($contentItemId, BlogStateMachine::DRAFT_GENERATING, null, ['work_block_id' => $id]);
-
-        $rotation          = new \App\Libraries\Ai\ProviderRotationService($this->db);
-        $preferredProvider = $rotation->preferredNext(\App\Libraries\Ai\ProviderRotationService::SCOPE_BLOG_DRAFT);
-
-        $requests = new AiGenerationRequestService();
-        $request  = $requests->create([
-            'task_type'       => 'draft_generation',
-            'content_type'    => 'blog_post',
-            'content_item_id' => $contentItemId,
-            'parameters'      => [
-                'title'               => $item['title'] ?? '',
-                'primary_keyword'     => $brief['primary_keyword'] ?? ($item['title'] ?? ''),
-                'secondary_keywords'  => $brief['secondary_keywords'] ?? [],
-                'questions_to_answer' => $brief['questions_to_answer'] ?? [],
-                'min_word_count'      => $brief['min_word_count'] ?? 900,
-                'max_word_count'      => $brief['max_word_count'] ?? 1800,
-                'tone'                => $brief['tone'] ?? 'professional, plain-language',
-                'instructions'        => 'Write a complete, accurate blog article of at least 900 words grounded only in the provided context. Return full body_html, body_markdown, and body_plain_text with real sections — never placeholders like "Untitled draft". Use only verifiable claims.',
-                // Strict alternation hint; the actual generator is recorded
-                // after the artifact is accepted (failover-safe).
-                'provider_preference' => $preferredProvider,
-            ],
-        ], ['type' => 'system']);
-
-        (new AiGenerationOrchestrator())->execute((int) $request['id']);
-        $refreshed = $requests->findById((int) $request['id']);
-
-        if ($refreshed['status'] !== 'completed') {
-            $detail = $this->lastAiFailureDetail((int) $request['id']);
-            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
-            return $this->markFailed(
-                $id,
-                self::TYPE_GENERATE_DRAFT,
-                'ai_generation_' . $refreshed['status'] . ($detail !== '' ? ':' . $detail : ''),
-            );
-        }
-
-        $artifact = $this->db->table('reach_ai_generation_artifacts')
-            ->where('generation_request_id', $request['id'])
-            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
-
-        if (! $artifact || ($artifact['schema_validation_status'] ?? '') !== 'passed') {
-            $errors = is_string($artifact['schema_validation_errors'] ?? null)
-                ? $artifact['schema_validation_errors']
-                : json_encode($artifact['schema_validation_errors'] ?? []);
-            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
-            return $this->markFailed(
-                $id,
-                self::TYPE_GENERATE_DRAFT,
-                'schema_validation_failed:' . mb_substr((string) $errors, 0, 180),
-            );
-        }
-
-        $structured = is_string($artifact['structured_output_json'] ?? null)
-            ? json_decode($artifact['structured_output_json'], true)
-            : ($artifact['structured_output_json'] ?? []);
-
-        if (! is_array($structured)
-            || \App\Libraries\Ai\Generation\StructuredOutputCoercer::isStubBody(
-                $structured['body_html'] ?? null,
-                $structured['body_markdown'] ?? null,
-                $structured['body_plain_text'] ?? null,
-                $structured['title'] ?? ($item['title'] ?? null),
-            )
-        ) {
-            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
-            return $this->markFailed(
-                $id,
-                self::TYPE_GENERATE_DRAFT,
-                'stub_or_empty_body:provider returned placeholder/short content instead of a real article',
-            );
-        }
-
-        $plainWords = str_word_count(trim(html_entity_decode(strip_tags((string) (
-            $structured['body_plain_text']
-            ?? $structured['body_html']
-            ?? $structured['body_markdown']
-            ?? ''
-        )), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-        if ($plainWords < 200) {
-            $this->moveDraftGeneratingToFailed($contentItemId, $stateMachine, $id);
-            return $this->markFailed(
-                $id,
-                self::TYPE_GENERATE_DRAFT,
-                "short_body:{$plainWords}_words_need_at_least_200",
-            );
-        }
-
-        $version = (new ContentVersionService())->createVersion($contentItemId, [
-            'title'           => $structured['title']           ?? ($item['title'] ?? ''),
-            'summary'         => $structured['summary']         ?? null,
-            'body_html'       => $structured['body_html']       ?? '',
-            'body_markdown'   => $structured['body_markdown']   ?? null,
-            'body_plain_text' => $structured['body_plain_text'] ?? null,
-        ], ['type' => 'bot', 'service' => 'reach:work_block:generate_draft'], 'AI-generated draft');
-
-        $this->db->table('reach_ai_generation_artifacts')->where('id', $artifact['id'])->update([
-            'content_version_id' => $version['id'],
-        ]);
-
-        $actualGenerator = $this->db->table('reach_ai_generation_runs r')
-            ->join('reach_ai_providers p', 'p.id = r.provider_id')
-            ->select('p.provider_key')
-            ->where('r.generation_request_id', $request['id'])
-            ->orderBy('r.id', 'DESC')->limit(1)->get()->getRowArray();
-        if (! empty($actualGenerator['provider_key'])) {
-            $rotation->recordActual(
-                \App\Libraries\Ai\ProviderRotationService::SCOPE_BLOG_DRAFT,
-                (string) $actualGenerator['provider_key'],
-                (int) $request['id'],
-            );
-        }
-
-        $stateMachine->transition($contentItemId, BlogStateMachine::DRAFT, null, [
-            'work_block_id'       => $id,
-            'content_version_id'  => $version['id'],
-        ]);
-
-        $output = ['content_item_id' => $contentItemId, 'content_version_id' => $version['id'], 'generation_request_id' => $request['id']];
-        $this->markCompleted($id, $output);
-
-        return $output;
-    }
-
-    /**
      * Fact verification is fail-closed: an unavailable verifier never yields a pass,
      * and unsupported high-risk claims force the item into human review.
      *
@@ -849,150 +724,28 @@ class WorkBlockService
     }
 
     /**
-     * Applies Perplexity's findings through the provider that generated the
-     * current version (never Perplexity itself — the verifier stays a pure
-     * judge so fail-closed verification is preserved), producing a new version
-     * that transitions back to DRAFT and re-enters FACT_VERIFY automatically.
+     * Cover image for a fact-verified draft (calendar pipeline and parked
+     * routine items alike) — CoverSelectionService's rule:
      *
-     * @param array<string,mixed> $block
-     * @return array<string,mixed>
-     */
-    private function executeReviseContent(int $id, array $block): array
-    {
-        if (! $this->flags->isEnabled('ai_generation')) {
-            return $this->blockOnFlag($id, self::TYPE_REVISE_CONTENT, 'ai_generation_disabled');
-        }
-
-        $contentItemId    = (int) ($block['content_item_id'] ?? 0);
-        $contentVersionId = (int) ($block['content_version_id'] ?? 0);
-        if ($contentItemId <= 0 || $contentVersionId <= 0) {
-            throw new \RuntimeException('REVISE_CONTENT work block requires content_item_id and content_version_id');
-        }
-
-        $input        = $this->decodeInput($block);
-        $verification = (array) ($input['verification'] ?? []);
-        $attempt      = (int) ($input['attempt'] ?? 1);
-        $unsupported  = array_values((array) ($verification['unsupported'] ?? []));
-
-        $version = $this->db->table('reach_content_versions')->where('id', $contentVersionId)->get()->getRowArray();
-        if (! $version) {
-            throw new \RuntimeException("Content version {$contentVersionId} not found");
-        }
-        $item = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [];
-
-        // Same provider as the generator; a revision is part of the same
-        // "turn" and must not advance the OpenAI/Gemini rotation.
-        $generatorRun = $this->db->table('reach_ai_generation_artifacts a')
-            ->join('reach_ai_generation_runs r', 'r.id = a.generation_run_id')
-            ->join('reach_ai_providers p', 'p.id = r.provider_id')
-            ->select('p.provider_key')
-            ->where('a.content_version_id', $contentVersionId)
-            ->orderBy('a.id', 'DESC')->limit(1)->get()->getRowArray();
-        $generatorKey = (string) ($generatorRun['provider_key'] ?? 'openai');
-
-        $claimLines = [];
-        foreach ($unsupported as $i => $claim) {
-            $text   = is_array($claim) ? (string) ($claim['claim'] ?? json_encode($claim, JSON_UNESCAPED_SLASHES)) : (string) $claim;
-            $reason = is_array($claim) ? (string) ($claim['reason'] ?? $claim['status'] ?? 'unsupported') : 'unsupported';
-            $claimLines[] = ($i + 1) . '. ' . $text . ' — verifier finding: ' . $reason;
-        }
-
-        $requests = new AiGenerationRequestService();
-        $request  = $requests->create([
-            'task_type'       => 'content_revision',
-            'content_type'    => 'blog_post',
-            'content_item_id' => $contentItemId,
-            'parameters'      => [
-                'title'               => $item['title'] ?? '',
-                'provider_preference' => $generatorKey,
-                'revision_attempt'    => $attempt,
-                'instructions'        => "The independent fact verifier (Perplexity) rejected the claims listed below. Revise the article: correct each claim using verifiable facts, or delete it entirely if it cannot be supported. Change NOTHING else — keep structure, tone, headings and all other content identical. Return the complete revised article in the same JSON schema (title, summary, body_html, body_markdown, body_plain_text).\n\nRejected claims:\n" . implode("\n", $claimLines) . "\n\nCurrent article:\n" . mb_substr((string) ($version['body_markdown'] ?: $version['body_html'] ?: $version['body_plain_text']), 0, 24000),
-            ],
-        ], ['type' => 'system']);
-
-        (new AiGenerationOrchestrator())->execute((int) $request['id']);
-        $refreshed = $requests->findById((int) $request['id']);
-
-        if ($refreshed['status'] !== 'completed') {
-            $detail = $this->lastAiFailureDetail((int) $request['id']);
-            return $this->markFailed(
-                $id,
-                self::TYPE_REVISE_CONTENT,
-                'ai_revision_' . $refreshed['status'] . ($detail !== '' ? ':' . $detail : ''),
-            );
-        }
-
-        $artifact = $this->db->table('reach_ai_generation_artifacts')
-            ->where('generation_request_id', $request['id'])
-            ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
-
-        $structured = is_string($artifact['structured_output_json'] ?? null)
-            ? json_decode($artifact['structured_output_json'], true)
-            : ($artifact['structured_output_json'] ?? []);
-
-        if (! is_array($structured) || trim((string) ($structured['body_html'] ?? $structured['body_markdown'] ?? '')) === '') {
-            return $this->markFailed($id, self::TYPE_REVISE_CONTENT, 'revision_returned_empty_body');
-        }
-
-        $newVersion = (new ContentVersionService())->createVersion($contentItemId, [
-            'title'           => $structured['title']           ?? ($version['title'] ?? ''),
-            'summary'         => $structured['summary']         ?? ($version['summary'] ?? null),
-            'body_html'       => $structured['body_html']       ?? '',
-            'body_markdown'   => $structured['body_markdown']   ?? null,
-            'body_plain_text' => $structured['body_plain_text'] ?? null,
-        ], ['type' => 'bot', 'service' => 'reach:work_block:revise_content'], "Fact-revision attempt {$attempt} (verifier findings applied)");
-
-        $this->db->table('reach_ai_generation_artifacts')->where('id', $artifact['id'])->update([
-            'content_version_id' => $newVersion['id'],
-        ]);
-
-        $this->db->table('reach_content_blog_details')
-            ->where('content_item_id', $contentItemId)
-            ->update([
-                'fact_revision_attempts' => $attempt,
-                'updated_at'             => date('Y-m-d H:i:s'),
-            ]);
-
-        // changes_requested -> draft re-enters FACT_VERIFY via NEXT_WORK_BLOCK;
-        // Perplexity re-verification concludes the loop.
-        (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::DRAFT, null, [
-            'work_block_id'      => $id,
-            'content_version_id' => $newVersion['id'],
-            'reason'             => 'fact_revision_applied',
-        ]);
-
-        $output = [
-            'content_item_id'       => $contentItemId,
-            'content_version_id'    => $newVersion['id'],
-            'generation_request_id' => $request['id'],
-            'attempt'               => $attempt,
-            'claims_addressed'      => count($claimLines),
-        ];
-        $this->markCompleted($id, $output);
-
-        return $output;
-    }
-
-    /**
-     * Cover image for a fact-verified draft.
+     *   1. a relevant gallery cover (operator upload or one of Reach's own
+     *      stocked ai_gallery covers), never-used first, branded on the way out;
+     *   2. otherwise a fresh GPT Image cover (ai.image.model) drawn from the
+     *      article's title, summary and headings, branded with the AICOUNTLY
+     *      mark and added to the gallery;
+     *   3. otherwise image_failed with the reason.
      *
-     * Source order is gallery-first, generation-second. Claude-routine items
-     * are assigned a topically matched cover from the curated gallery instead
-     * of spending on AI images; pipeline items generate one via the same
-     * provider family that wrote the text (openai → gpt-image-1, gemini →
-     * Nano Banana Pro), and fall back to the gallery when that leg is
-     * unavailable. The binary is persisted through MediaAssetStore and exposed
-     * as a signed public URL that aicountly.com's HeroImageFetcher can pull.
-     *
-     * BLOG_IMAGE_GENERATION_ENABLED gates the PAID leg only — it used to
-     * return before the gallery branch, so an operator who chose "gallery, not
-     * API" silently got no cover at all.
+     * Generation follows automation.blog.ai_cover (default on) with the
+     * BLOG_IMAGE_GENERATION_ENABLED=false kill switch — the same switch the
+     * routine pipeline uses, so "no human uploads covers" holds for calendar
+     * articles too. Claude-routine items additionally honour
+     * BLOG_ROUTINE_AI_COVER_FALLBACK. OpenAI GPT Image is the provider; Gemini
+     * image only when OpenAI is not configured.
      *
      * Outcome handling (BLOG_REQUIRE_COVER_IMAGE, default on): a cover that
-     * cannot be sourced parks the item for a human instead of walking on to
-     * publication — recordCoverVerdict() writes the cover_image validation and
-     * moves the item into the review queue. With the flag off the old
-     * behaviour returns: warn, chain SEO, publish without a hero.
+     * cannot be sourced parks the item instead of walking on to publication —
+     * recordCoverVerdict() writes the cover_image validation. The hourly cover
+     * sweep re-attempts parked items, and re-arms them as soon as a new cover
+     * lands in the gallery.
      *
      * @param array<string,mixed> $block
      * @return array<string,mixed>
@@ -1002,181 +755,63 @@ class WorkBlockService
         $contentItemId    = (int) ($block['content_item_id'] ?? 0);
         $contentVersionId = (int) ($block['content_version_id'] ?? 0);
 
-        $item    = $contentItemId > 0
-            ? ($this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [])
-            : [];
-        $details = $contentItemId > 0
-            ? ($this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [])
-            : [];
-        $galleryMiss = null;
-        $aiEnabled   = $this->flags->isEnabled('image_generation');
-
-        // Claude-routine drafts try the curated gallery first (rotation-managed),
-        // not AI generation — 12+ blogs/day of AI covers is exactly the spend
-        // the gallery exists to avoid. When no gallery asset is topically
-        // relevant we fall through to AI generation rather than fronting the
-        // article with an unrelated stock photo; that costs one image on the
-        // rare miss instead of every post.
-        //
-        // Pipeline items take the same route whenever the paid leg is switched
-        // off: a curated cover always beats no cover.
-        $galleryFirst = ($details['origin'] ?? 'pipeline') === 'claude_routine' || ! $aiEnabled;
-
-        if ($galleryFirst && $contentItemId > 0) {
-            $output = $this->assignGalleryCover($contentItemId, $item, $details);
-            $aiFallback = $aiEnabled
-                && filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL);
-
-            if (empty($output['image_failed'])) {
-                return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
-            }
-
-            if (! $aiFallback) {
-                return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
-            }
-
-            $galleryMiss = $output;
+        if ($contentItemId <= 0) {
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, ['image_failed' => true, 'reason' => 'no_content_item']);
         }
 
-        if (! $aiEnabled) {
-            // Nothing left to try: no gallery match (or no item to match) and
-            // the paid leg is off by configuration.
-            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
-                'image_failed' => true,
-                'reason'       => 'image_generation_disabled',
-                'gallery_miss' => $galleryMiss,
-            ]));
-        }
+        $item    = $this->db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray() ?? [];
+        $details = $this->db->table('reach_content_blog_details')->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
 
-        $input  = $this->decodeInput($block);
-        $prompt = trim((string) ($input['prompt'] ?? ''));
-        if ($prompt === '' && $contentItemId > 0) {
-            $version = $contentVersionId > 0
-                ? $this->db->table('reach_content_versions')->where('id', $contentVersionId)->get()->getRowArray()
-                : null;
-            // The published category is a sharper theme than the portfolio
-            // stream, so the cover matches what the listing card says.
-            $category = (string) ($this->db->table('reach_blog_publication_profiles')
-                ->select('category')
-                ->where('content_item_id', $contentItemId)
-                ->get()->getRowArray()['category'] ?? '');
-            $prompt = (new \App\Libraries\Ai\Images\CoverPromptBuilder())->build(
-                (string) ($item['title'] ?? ''),
-                (string) ($version['summary'] ?? ''),
-                $category !== '' ? $category : (string) ($details['portfolio_stream'] ?? ''),
-            );
-        }
-        if ($prompt === '') {
-            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
-                'image_failed' => true,
-                'reason'       => 'no_prompt_available',
-                'gallery_miss' => $galleryMiss,
-            ]));
-        }
+        $aiEnabled = \App\Libraries\Automation\Routine\RoutineFlags::enabled('blog.ai_cover');
+        $allowGenerate = $aiEnabled && (($details['origin'] ?? 'pipeline') !== 'claude_routine'
+            || filter_var(env('BLOG_ROUTINE_AI_COVER_FALLBACK', true), FILTER_VALIDATE_BOOL));
 
-        $registry   = new ImageProviderRegistry();
-        $configured = array_keys($registry->configuredProviders());
-        if ($configured === []) {
-            // The paid leg is enabled but unusable. A curated cover is still
-            // better than none, so try the gallery before parking the item.
-            if ($galleryMiss === null && $contentItemId > 0) {
-                $fallback = $this->assignGalleryCover($contentItemId, $item, $details);
-                if (empty($fallback['image_failed'])) {
-                    return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $fallback);
-                }
-                $galleryMiss = $fallback;
-            }
+        $input    = $this->decodeInput($block);
+        $registry = new ImageProviderRegistry();
+        $configured = $registry->configuredProviders();
+        $provider = $configured[\App\Libraries\Ai\Images\OpenAiImageProvider::PROVIDER_KEY]
+            ?? (reset($configured) ?: new \App\Libraries\Ai\Images\OpenAiImageProvider());
 
-            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
-                'image_failed' => true,
-                'reason'       => 'no_image_provider_configured',
-                'gallery_miss' => $galleryMiss,
-            ]));
-        }
+        $selection = (new \App\Libraries\Media\CoverSelectionService(
+            new \App\Libraries\Media\CoverGenerator($provider, $this->db),
+            $this->db,
+        ))->coverFor($contentItemId, [
+            'allow_generate'        => $allowGenerate,
+            'prompt'                => trim((string) ($input['prompt'] ?? '')),
+            'generation_off_reason' => $aiEnabled ? 'routine_ai_cover_fallback_disabled' : 'image_generation_disabled',
+        ]);
 
-        // Same provider family as the text generator.
-        $generatorRun = $contentVersionId > 0 ? $this->db->table('reach_ai_generation_artifacts a')
-            ->join('reach_ai_generation_runs r', 'r.id = a.generation_run_id')
-            ->join('reach_ai_providers p', 'p.id = r.provider_id')
-            ->select('p.provider_key')
-            ->where('a.content_version_id', $contentVersionId)
-            ->orderBy('a.id', 'DESC')->limit(1)->get()->getRowArray() : null;
-        $textProvider = (string) ($generatorRun['provider_key'] ?? '');
-        $imageKeyMap  = ['openai' => 'openai_image', 'gemini' => 'gemini_image'];
-        $requestedKey = (string) ($input['provider'] ?? $imageKeyMap[$textProvider] ?? $block['provider_route'] ?? '');
-        $providerKey  = in_array($requestedKey, $configured, true) ? $requestedKey : $configured[0];
-        $provider     = $registry->get($providerKey);
-
-        $makeInput = static fn (string $model) => new ImageGenerationInput(
-            prompt: $prompt,
-            modelKey: $model,
-            width: (int) ($input['width'] ?? 1536),
-            height: (int) ($input['height'] ?? 1024),
-        );
-
-        try {
-            try {
-                $result = $provider->generateImage($makeInput((string) ($input['model'] ?? '')));
-            } catch (\Throwable $e) {
-                $fallbackModel = trim((string) env('AI_GEMINI_IMAGE_FALLBACK_MODEL', 'gemini-2.5-flash-image'));
-                if ($providerKey === 'gemini_image' && $fallbackModel !== ''
-                    && str_contains(strtolower($e->getMessage()), 'not')  // NOT_FOUND / not available / not supported
-                ) {
-                    $result = $provider->generateImage($makeInput($fallbackModel));
-                } else {
-                    throw $e;
-                }
-            }
-
-            $binary = $this->firstImageBinary($result);
-            if ($binary === null) {
-                throw new \RuntimeException('image_provider_returned_no_usable_image');
-            }
-
-            $store = new \App\Libraries\Media\MediaAssetStore($this->db);
-            $asset = $store->storeBinary($binary, [
-                'kind'             => 'ai_generated',
-                'content_item_id'  => $contentItemId > 0 ? $contentItemId : null,
-                'prompt_used'      => $prompt,
-                'portfolio_stream' => $details['portfolio_stream'] ?? null,
-            ]);
-            $publicUrl = $store->publicUrl($asset);
-
-            if ($contentItemId > 0) {
-                $this->setFeaturedImage($contentItemId, $publicUrl, $this->coverAltText($contentItemId, $item));
-            }
+        if ($selection['ok']) {
+            $this->setFeaturedImage($contentItemId, (string) $selection['url'], $this->coverAltText($contentItemId, $item));
 
             $output = array_filter([
-                'provider_key' => $result->providerKey,
-                'model_key'    => $result->modelKey,
-                'image_count'  => $result->imageCount,
-                'duration_ms'  => $result->durationMs,
-                'asset_id'     => $asset['id'] ?? null,
-                'asset_uuid'   => $asset['asset_uuid'] ?? null,
-                'public_url'   => $publicUrl,
-                'gallery_miss' => $galleryMiss,
+                'gallery_assigned' => $selection['source'] === 'gallery' ? true : null,
+                'generated'        => $selection['source'] === 'generated' ? true : null,
+                'provider_key'     => $selection['source'] === 'generated' ? $provider->getProviderKey() : null,
+                'model_key'        => $selection['model_key'],
+                'asset_id'         => $selection['asset_id'],
+                'asset_uuid'       => $selection['asset_uuid'],
+                'public_url'       => $selection['url'],
+                'relevance_score'  => $selection['relevance_score'],
+                'match_reasons'    => $selection['source'] === 'gallery' ? $selection['match_reasons'] : null,
+                'branded'          => $selection['branded'],
+                'gallery_miss'     => $selection['source'] === 'generated' ? $selection['gallery_miss'] : null,
             ], static fn ($v) => $v !== null);
-        } catch (\Throwable $e) {
-            // The provider failed. Fall back to the gallery before giving up —
-            // a curated cover beats parking the article over a transient 5xx.
-            $fallback = $galleryMiss === null && $contentItemId > 0
-                ? $this->assignGalleryCover($contentItemId, $item, $details)
-                : null;
 
-            if ($fallback !== null && empty($fallback['image_failed'])) {
-                $fallback['generation_error'] = mb_substr($e->getMessage(), 0, 200);
-                $output = $fallback;
-            } else {
-                $output = array_filter([
-                    'image_failed' => true,
-                    'reason'       => mb_substr($e->getMessage(), 0, 200),
-                    'provider_key' => $providerKey,
-                    'gallery_miss' => $galleryMiss ?? $fallback,
-                ], static fn ($v) => $v !== null);
-            }
+            return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
         }
 
-        return $this->finishImageBlock($id, $contentItemId, $contentVersionId, $output);
+        $reason = ! $allowGenerate
+            ? (string) ($aiEnabled ? 'routine_ai_cover_fallback_disabled' : 'image_generation_disabled')
+            : ($configured === [] ? 'no_image_provider_configured' : (string) ($selection['generation_error'] ?? 'generation_failed'));
+
+        return $this->finishImageBlock($id, $contentItemId, $contentVersionId, array_filter([
+            'image_failed'     => true,
+            'reason'           => mb_substr($reason, 0, 200),
+            'gallery_miss'     => $selection['gallery_miss'],
+            'generation_error' => $selection['generation_error'],
+            'provider_key'     => $allowGenerate ? $provider->getProviderKey() : null,
+        ], static fn ($v) => $v !== null));
     }
 
     /**
@@ -1304,46 +939,6 @@ class WorkBlockService
     }
 
     /**
-     * Topically relevant gallery cover (scored against the article's category,
-     * stream, tags and title), least-recently-used among equally relevant
-     * assets, with the reuse cooldown enforced. No relevant asset → reported as
-     * a miss so the caller generates a cover from the article instead of
-     * attaching an unrelated photo.
-     *
-     * @param array<string,mixed> $item
-     * @param array<string,mixed> $details
-     * @return array<string,mixed>
-     */
-    private function assignGalleryCover(int $contentItemId, array $item, array $details): array
-    {
-        try {
-            $assignment = (new \App\Libraries\Media\MediaGalleryAssignmentService($this->db))
-                ->assignFor($contentItemId);
-        } catch (\Throwable $e) {
-            return ['image_failed' => true, 'reason' => 'gallery_assignment_error: ' . mb_substr($e->getMessage(), 0, 160)];
-        }
-
-        if ($assignment === null) {
-            return ['image_failed' => true, 'reason' => 'gallery_no_relevant_cover'];
-        }
-
-        $this->setFeaturedImage(
-            $contentItemId,
-            $assignment['public_url'],
-            $this->coverAltText($contentItemId, $item),
-        );
-
-        return [
-            'gallery_assigned' => true,
-            'asset_id'         => $assignment['asset_id'],
-            'asset_uuid'       => $assignment['asset_uuid'],
-            'public_url'       => $assignment['public_url'],
-            'relevance_score'  => $assignment['relevance_score'],
-            'match_reasons'    => $assignment['match_reasons'],
-        ];
-    }
-
-    /**
      * Alt text that describes the article, not the file — the readiness gate
      * requires it and screen readers depend on it.
      *
@@ -1374,26 +969,6 @@ class WorkBlockService
                 'featured_image_alt'       => mb_substr($alt, 0, 512),
                 'updated_at'               => date('Y-m-d H:i:s'),
             ]);
-    }
-
-    private function firstImageBinary(\App\Libraries\Ai\Images\ImageGenerationResult $result): ?string
-    {
-        foreach ($result->images as $image) {
-            if (! empty($image['b64'])) {
-                $decoded = base64_decode((string) $image['b64'], true);
-                if ($decoded !== false && $decoded !== '') {
-                    return $decoded;
-                }
-            }
-            if (! empty($image['url'])) {
-                $fetched = $this->httpGet((string) $image['url']);
-                if ($fetched !== null && $fetched !== '') {
-                    return $fetched;
-                }
-            }
-        }
-
-        return null;
     }
 
     private function chainSeoOptimize(int $contentItemId, int $contentVersionId): void
@@ -1507,201 +1082,7 @@ class WorkBlockService
         return $output;
     }
 
-    /**
-     * Cross-provider editorial review. Uses CrossReviewRouter to determine
-     * which provider SHOULD review (opposite of the generator). If the AI
-     * route actually resolves to the same provider as the generator, the
-     * block is not silently accepted — it is pushed into a human-review
-     * state and visibly audited, per the cross-provider-review requirement.
-     */
-    private function executeCrossReview(int $id, array $block): array
-    {
-        if ($this->supersededByRoutineVetting($id, (int) ($block['content_item_id'] ?? 0))) {
-            return ['superseded' => true, 'reason' => 'routine_vetting_is_the_review_of_record'];
-        }
-
-        if (! $this->flags->isEnabled('ai_generation')) {
-            return $this->blockOnFlag($id, self::TYPE_CROSS_REVIEW, 'ai_generation_disabled');
-        }
-
-        $contentItemId    = (int) ($block['content_item_id'] ?? 0);
-        $contentVersionId = (int) ($block['content_version_id'] ?? 0);
-        if ($contentItemId <= 0 || $contentVersionId <= 0) {
-            throw new \RuntimeException('CROSS_REVIEW work block requires content_item_id and content_version_id');
-        }
-
-        $generatorRun = $this->db->table('reach_ai_generation_artifacts a')
-            ->join('reach_ai_generation_runs r', 'r.id = a.generation_run_id')
-            ->join('reach_ai_providers p', 'p.id = r.provider_id')
-            ->select('p.provider_key')
-            ->where('a.content_version_id', $contentVersionId)
-            ->orderBy('a.id', 'DESC')->limit(1)->get()->getRowArray();
-
-        $generatorKey = (string) ($generatorRun['provider_key'] ?? 'openai');
-        $router       = new CrossReviewRouter();
-        $expectedReviewer = $router->reviewerFor($generatorKey);
-
-        $requests = new AiGenerationRequestService();
-        $request  = $requests->create([
-            'task_type'       => 'editorial_review',
-            'content_type'    => 'generic',
-            'content_item_id' => $contentItemId,
-            'parameters'      => [
-                'instructions' => 'Review this blog draft for factual consistency, tone and structure. Return JSON with keys approved (boolean) and notes (string).',
-                'generator_provider' => $generatorKey,
-                'expected_reviewer'  => $expectedReviewer,
-                // Route the review to the opposite provider; the same-provider
-                // audit below remains the backstop when no such route exists.
-                'provider_preference' => $expectedReviewer,
-            ],
-        ], ['type' => 'system']);
-
-        (new AiGenerationOrchestrator())->execute((int) $request['id']);
-        $refreshed = $requests->findById((int) $request['id']);
-
-        if ($refreshed['status'] !== 'completed') {
-            // Editorial AI failed/unavailable — still park for human review instead of
-            // leaving the item stuck forever in seo_review with a blocked CROSS_REVIEW.
-            try {
-                (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
-                    'work_block_id' => $id,
-                    'reason'        => 'cross_review_ai_failed_requires_human',
-                ]);
-            } catch (\Throwable) {
-            }
-
-            $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish($contentItemId, $contentVersionId, $id);
-            if ($auto['queued']) {
-                $output = [
-                    'requires_human'        => false,
-                    'reason'                => 'editorial_review_failed_auto_published',
-                    'generation_request_id' => $request['id'],
-                    'auto_publish'          => $auto,
-                ];
-                $this->markCompleted($id, $output);
-
-                return $output;
-            }
-
-            $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
-            $output = [
-                'requires_human'        => true,
-                'reason'                => 'editorial_review_failed',
-                'generation_request_id' => $request['id'],
-                'human_review_gate_id'  => $gateId,
-            ];
-            $this->markCompleted($id, $output);
-
-            return $output;
-        }
-
-        $run = $this->db->table('reach_ai_generation_runs r')
-            ->join('reach_ai_providers p', 'p.id = r.provider_id')
-            ->select('p.provider_key')
-            ->where('r.generation_request_id', $request['id'])
-            ->orderBy('r.id', 'DESC')->limit(1)->get()->getRowArray();
-
-        $actualReviewer = (string) ($run['provider_key'] ?? '');
-
-        if ($actualReviewer !== '' && $actualReviewer === $generatorKey) {
-            // Self-review by the same provider must never be silent: force human review
-            // unless low-risk auto-publish flags are enabled.
-            try {
-                (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
-                    'work_block_id' => $id,
-                    'reason'        => 'cross_review_self_reviewed_requires_human',
-                ]);
-            } catch (\Throwable) {
-            }
-
-            $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish($contentItemId, $contentVersionId, $id);
-            if ($auto['queued']) {
-                $output = [
-                    'generator_provider'   => $generatorKey,
-                    'reviewer_provider'    => $actualReviewer,
-                    'same_provider'        => true,
-                    'requires_human'       => false,
-                    'auto_publish'         => $auto,
-                ];
-                \App\Libraries\AuditLogger::record('blog.cross_review_same_provider_auto_publish', $output);
-                $this->markCompleted($id, $output);
-
-                return $output;
-            }
-
-            $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
-            $output = [
-                'generator_provider' => $generatorKey,
-                'reviewer_provider'  => $actualReviewer,
-                'same_provider'      => true,
-                'requires_human'     => true,
-                'human_review_gate_id' => $gateId,
-            ];
-            \App\Libraries\AuditLogger::record('blog.cross_review_same_provider', $output);
-            $this->markCompleted($id, $output);
-
-            return $output;
-        }
-
-        // Successful cross-provider review: low/medium risk auto-publishes when flags are on;
-        // otherwise park for human approval.
-        try {
-            (new BlogStateMachine($this))->transition($contentItemId, BlogStateMachine::INTERNAL_REVIEW, null, [
-                'work_block_id' => $id,
-                'reason'        => 'cross_review_completed',
-            ]);
-        } catch (\Throwable) {
-        }
-
-        $auto = (new BlogAutoPublishService($this->flags))->tryAutoPublish($contentItemId, $contentVersionId, $id);
-        if ($auto['queued']) {
-            $output = [
-                'generator_provider'    => $generatorKey,
-                'reviewer_provider'     => $actualReviewer,
-                'same_provider'         => false,
-                'generation_request_id' => $request['id'],
-                'auto_publish'          => $auto,
-            ];
-            $this->markCompleted($id, $output);
-
-            return $output;
-        }
-
-        $gateId = $this->ensureHumanReviewGate($contentItemId, $contentVersionId);
-
-        $output = [
-            'generator_provider'    => $generatorKey,
-            'reviewer_provider'     => $actualReviewer,
-            'same_provider'         => false,
-            'generation_request_id' => $request['id'],
-            'human_review_gate_id'  => $gateId,
-            'auto_publish'          => $auto,
-        ];
-        $this->markCompleted($id, $output);
-
-        return $output;
-    }
-
-    private function ensureHumanReviewGate(int $contentItemId, int $contentVersionId): int
-    {
-        $gateKey = "blog-{$contentItemId}-human_review_gate";
-        $gateRow = $this->db->table('reach_work_blocks')->where('idempotency_key', $gateKey)->get()->getRowArray();
-        if ($gateRow) {
-            return (int) $gateRow['id'];
-        }
-
-        return $this->create([
-            'block_type'         => self::TYPE_HUMAN_REVIEW_GATE,
-            'scope'              => 'blog',
-            'content_item_id'    => $contentItemId,
-            'content_version_id' => $contentVersionId > 0 ? $contentVersionId : null,
-            'eligibility_status' => 'eligible',
-            'priority'           => 10,
-            'idempotency_key'    => $gateKey,
-        ]);
-    }
-
-    /**
+        /**
      * Human review gate. When auto-publish flags are on and the item is
      * low/medium risk, auto-approve + enqueue PUBLISH_BLOG instead of parking.
      * High-risk and flag-off paths never auto-approve.
@@ -2458,71 +1839,7 @@ class WorkBlockService
         return $output;
     }
 
-    private function moveDraftGeneratingToFailed(int $contentItemId, BlogStateMachine $stateMachine, int $workBlockId): void
-    {
-        if ($contentItemId <= 0) {
-            return;
-        }
-        try {
-            $stateMachine->transition($contentItemId, BlogStateMachine::FAILED, null, [
-                'work_block_id' => $workBlockId,
-                'reason'        => 'generate_draft_failed',
-            ]);
-        } catch (\Throwable) {
-            // Best-effort — do not mask the original generation failure.
-        }
-    }
-
-    private function lastAiFailureDetail(int $generationRequestId): string
-    {
-        if ($generationRequestId <= 0) {
-            return '';
-        }
-
-        // Prefer schema errors — provider runs often "completed" while request failed validation.
-        if (SchemaGuard::hasTable($this->db, 'reach_ai_generation_artifacts')) {
-            $artifact = $this->db->table('reach_ai_generation_artifacts')
-                ->select('schema_validation_status, schema_validation_errors')
-                ->where('generation_request_id', $generationRequestId)
-                ->orderBy('id', 'DESC')
-                ->limit(1)
-                ->get()
-                ->getRowArray();
-            if ($artifact && ($artifact['schema_validation_status'] ?? '') === 'failed') {
-                $errors = $artifact['schema_validation_errors'] ?? '';
-                if (! is_string($errors)) {
-                    $errors = json_encode($errors);
-                }
-
-                return mb_substr('schema_validation_failed|' . (string) $errors, 0, 220);
-            }
-        }
-
-        if (! SchemaGuard::hasTable($this->db, 'reach_ai_generation_runs')) {
-            return '';
-        }
-
-        $run = $this->db->table('reach_ai_generation_runs')
-            ->select('error_category, redacted_error_message, status')
-            ->where('generation_request_id', $generationRequestId)
-            ->orderBy('id', 'DESC')
-            ->limit(1)
-            ->get()
-            ->getRowArray();
-
-        if (! $run) {
-            return 'no_provider_run';
-        }
-
-        $parts = array_filter([
-            (string) ($run['error_category'] ?? ''),
-            (string) ($run['redacted_error_message'] ?? ''),
-        ]);
-
-        return mb_substr(implode('|', $parts), 0, 180);
-    }
-
-    /**
+            /**
      * @param array<string,mixed> $output
      */
     private function markCompleted(int $id, array $output): void

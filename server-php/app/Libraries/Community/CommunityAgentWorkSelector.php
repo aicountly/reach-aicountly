@@ -4,6 +4,8 @@ namespace App\Libraries\Community;
 
 use App\Enums\CommunityAnswerStatus;
 use App\Enums\CommunityQuestionStatus;
+use App\Libraries\Community\Automation\CommunityInboxPolicy;
+use App\Libraries\Database\SchemaGuard;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
@@ -29,19 +31,35 @@ class CommunityAgentWorkSelector
      */
     public function questionsAwaitingProcessing(int $limit): array
     {
+        // Bounded: a question whose screen has failed MAX_AUTOMATION_FAILURES
+        // times is left to the inbox sweep, which closes it with the reason.
+        $bounded = SchemaGuard::hasColumn($this->db(), 'reach_community_questions', 'automation_failures')
+            ? ' AND q.automation_failures < ' . CommunityInboxPolicy::MAX_AUTOMATION_FAILURES
+            : '';
+
         $rows = $this->db()->query(
             'SELECT q.id
                FROM reach_community_questions q
               WHERE NOT EXISTS (
                         SELECT 1 FROM reach_community_question_classifications c WHERE c.question_id = q.id
                     )
-                AND q.status NOT IN (?, ?)
+                AND q.status NOT IN (?, ?)' . $bounded . '
               ORDER BY q.id ASC
               LIMIT ?',
             [CommunityQuestionStatus::Archived->value, CommunityQuestionStatus::DuplicateMerged->value, $limit]
         )->getResultArray();
 
         return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
+
+    /** Count a failed intake screen against the question (see questionsAwaitingProcessing). */
+    public function recordProcessingFailure(int $questionId): void
+    {
+        if (! SchemaGuard::hasColumn($this->db(), 'reach_community_questions', 'automation_failures')) {
+            return;
+        }
+        $this->db()->table('reach_community_questions')->where('id', $questionId)
+            ->set('automation_failures', 'automation_failures + 1', false)->update();
     }
 
     /**

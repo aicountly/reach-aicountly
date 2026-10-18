@@ -7,7 +7,7 @@ import { blogCommandCentreService } from '../../services/blogCommandCentreServic
 import { ROUTES } from '../../constants/routes';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
-import { formatDate } from '../../utils/formatDate';
+import { formatDate, toDate, toDateInputValue, todayInputValue } from '../../utils/formatDate';
 
 const OK_STATUSES = ['OK', 'CONNECTED', 'ENABLED'];
 
@@ -35,10 +35,9 @@ function roadmapStatus(enabled, lastRun) {
   if (lastRun.status === 'skipped' || lastRun.skipped_reason) return 'WARN';
   const runDate = lastRun.run_for_date;
   if (runDate) {
-    const run = new Date(`${runDate}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const ageDays = Math.floor((today - run) / 86400000);
+    // run_for_date is an IST date; compare it with today's IST date.
+    const run = toDate(toDateInputValue(runDate));
+    const ageDays = run ? Math.round((toDate(todayInputValue()) - run) / 86400000) : NaN;
     if (!Number.isNaN(ageDays) && ageDays >= 2) return 'STALE';
   }
   if ((lastRun.candidates_scored ?? 0) === 0 && (lastRun.decisions_created ?? 0) === 0) {

@@ -4,6 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { ReachLayout } from './components/layout/ReachLayout';
 import ControllerGate from './pages/ControllerGate';
 import { DashboardPage } from './pages/DashboardPage';
+import { CommandCentrePage } from './pages/commandCentre/CommandCentrePage';
 
 import {
   BlogLegacyListRedirect,
@@ -12,8 +13,6 @@ import {
   BlogLegacyEditRedirect,
 } from './pages/blog-command-centre/BlogLegacyRedirects.jsx';
 
-import { ContentCalendarPage } from './pages/ContentCalendarPage';
-
 import { CampaignListPage } from './pages/campaigns/CampaignListPage';
 import { CampaignEditorPage } from './pages/campaigns/CampaignEditorPage';
 import { CampaignDetailPage } from './pages/campaigns/CampaignDetailPage';
@@ -21,8 +20,16 @@ import { CampaignDetailPage } from './pages/campaigns/CampaignDetailPage';
 import { LandingListPage } from './pages/landing/LandingListPage';
 import { LandingDetailPage } from './pages/landing/LandingDetailPage';
 
-import { SocialPlannerPage } from './pages/social/SocialPlannerPage';
-import { SocialQueuePage } from './pages/social/SocialQueuePage';
+import SocialAdsLayout from './pages/social/SocialAdsLayout.jsx';
+import SocialAccountsTab, { SocialHubIndex } from './pages/social/SocialAccountsTab.jsx';
+import SocialCalendarTab from './pages/social/SocialCalendarTab.jsx';
+import SocialPerformanceTab from './pages/social/SocialPerformanceTab.jsx';
+import SocialAdsPage from './pages/social/ads/SocialAdsPage.jsx';
+import { ComingSoonPage } from './pages/ComingSoonPage.jsx';
+import { LeadsLayout } from './pages/leads/LeadsLayout.jsx';
+import { AnalyticsLayout } from './pages/reports/AnalyticsLayout.jsx';
+import { LEGACY_REDIRECTS, PLANNED_ROUTES } from './constants/navManifest';
+import { SocialInboxPage } from './pages/social/SocialInboxPage';
 
 import { EmailListPage } from './pages/email/EmailListPage';
 import { EmailDetailPage } from './pages/email/EmailDetailPage';
@@ -42,13 +49,14 @@ import { LeadOutcomesPage } from './pages/leads/LeadOutcomesPage';
 import { BotQueuePage } from './pages/bot/BotQueuePage';
 import { BotReportsPage } from './pages/bot/BotReportsPage';
 import { BotReportDetailPage } from './pages/bot/BotReportDetailPage';
+import { BotPlanPage } from './pages/bot/BotPlanPage';
+import { BotActivitiesPage } from './pages/bot/BotActivitiesPage';
+import { BotAskPage } from './pages/bot/BotAskPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 
 import { MediaGalleryPage } from './pages/quality/MediaGalleryPage.jsx';
 import { ContentBasePage as QualityContentBasePage } from './pages/quality/ContentBasePage.jsx';
 import SeoLayout from './pages/seo-centre/SeoLayout.jsx';
-import BlogSeoLayout from './pages/blog-seo/BlogSeoLayout.jsx';
-import { BlogSeoScaffoldPage } from './pages/blog-seo/BlogSeoScaffoldPage.jsx';
 import { SeoOverviewPage } from './pages/seo-centre/SeoOverviewPage.jsx';
 import { TrackedKeywordsPage } from './pages/seo-centre/TrackedKeywordsPage.jsx';
 import { BacklinksPage } from './pages/seo-centre/BacklinksPage.jsx';
@@ -63,7 +71,6 @@ import { ApiHealthPage } from './pages/admin/ApiHealthPage';
 import { ConsoleSyncPage } from './pages/admin/ConsoleSyncPage';
 import { WorkerStatusPage } from './pages/admin/WorkerStatusPage';
 import { JobMonitorPage } from './pages/admin/JobMonitorPage';
-import { LocalBotReportsPage } from './pages/admin/LocalBotReportsPage';
 
 import { KnowledgeLayout } from './pages/knowledge/KnowledgeLayout';
 import { KnowledgeIndexPage } from './pages/knowledge/KnowledgeIndexPage';
@@ -92,7 +99,6 @@ import { ContentBriefPage }     from './pages/content/ContentBriefPage';
 import { ContentCommentsPage }  from './pages/content/ContentCommentsPage';
 import { ContentValidationsPage } from './pages/content/ContentValidationsPage';
 import { ContentSchedulePage }  from './pages/content/ContentSchedulePage';
-import { DailyPackPage }        from './pages/content/DailyPackPage';
 
 import PublishingLayout          from './pages/publishing/PublishingLayout.jsx';
 
@@ -142,7 +148,6 @@ import AudienceOverviewPage             from './pages/distribution/AudienceOverv
 import AudienceSegmentsPage             from './pages/distribution/AudienceSegmentsPage.jsx';
 import ConsentListPage                  from './pages/distribution/ConsentListPage.jsx';
 import SuppressionPage                  from './pages/distribution/SuppressionPage.jsx';
-import SocialOperationsPage             from './pages/distribution/SocialOperationsPage.jsx';
 import EmailDispatchPage                from './pages/distribution/EmailDispatchPage.jsx';
 import WhatsAppDispatchPage             from './pages/distribution/WhatsAppDispatchPage.jsx';
 import SmsOverviewPage                  from './pages/distribution/SmsOverviewPage.jsx';
@@ -247,7 +252,8 @@ export default function App() {
       <Route path={ROUTES.LOGIN} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
 
       <Route element={<ProtectedRoute><ReachLayout /></ProtectedRoute>}>
-        <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+        <Route path={ROUTES.DASHBOARD} element={<CommandCentrePage />} />
+        <Route path={ROUTES.PIPELINE_DASHBOARD} element={<DashboardPage />} />
 
         <Route path={ROUTES.BLOG_LIST}    element={<BlogLegacyListRedirect />} />
         <Route path={ROUTES.BLOG_NEW}     element={<BlogLegacyNewRedirect />} />
@@ -257,19 +263,19 @@ export default function App() {
         <Route path="/blogs/manage" element={<Navigate to={ROUTES.BLOG_COMMAND_CENTRE} replace />} />
         <Route path="/marketing/blogs" element={<Navigate to={ROUTES.BLOG_COMMAND_CENTRE} replace />} />
 
-        {/* The "SEO and Indexing" section left the Blog Command Centre tab
-            strip for the SEO sidebar block. These live outside the feature
-            flag and outside BlogCommandCentreLayout on purpose: /blog-seo is
-            reachable in both flag states and under seo.view alone, so an old
-            bookmark must resolve there rather than dead-ending at the
-            catch-all or at the BCC layout's blog.view denial. */}
-        <Route path={ROUTES.BCC_SEO} element={<Navigate to={ROUTES.BLOG_SEO} replace />} />
-        <Route path={ROUTES.BCC_SEO_SEARCH} element={<Navigate to={ROUTES.BLOG_SEO_SEARCH} replace />} />
-        <Route path={ROUTES.BCC_SEO_INTERNAL_LINKS} element={<Navigate to={ROUTES.BLOG_SEO_INTERNAL_LINKS} replace />} />
-        <Route path={ROUTES.BCC_SEO_CANNIBALISATION} element={<Navigate to={ROUTES.BLOG_SEO_CANNIBALISATION} replace />} />
-        <Route path={ROUTES.BCC_SEO_SITEMAP} element={<Navigate to={ROUTES.BLOG_SEO_SITEMAP} replace />} />
-        <Route path={ROUTES.BCC_SEO_TECHNICAL} element={<Navigate to={ROUTES.BLOG_SEO_TECHNICAL} replace />} />
-        <Route path={ROUTES.BCC_INDEXING} element={<Navigate to={ROUTES.BLOG_SEO_INDEXING} replace />} />
+        {/* 2026-10 IA: moved / retired routes redirect (constants/navManifest
+            LEGACY_REDIRECTS) — incl. the old Blog SEO and Indexing section and
+            the BCC "SEO and Indexing" tab, both now the SEO Command Centre.
+            These sit outside the BCC feature flag on purpose so old bookmarks
+            resolve in both flag states. */}
+        {LEGACY_REDIRECTS.map((r) => (
+          <Route key={r.from} path={r.from} element={<Navigate to={r.to} replace />} />
+        ))}
+
+        {/* Pages other streams of this release are building; replaced at merge. */}
+        {PLANNED_ROUTES.filter((r) => !r.path.startsWith(`${ROUTES.SOCIAL_HUB}/`)).map((r) => (
+          <Route key={r.path} path={r.path} element={<ComingSoonPage />} />
+        ))}
 
         {/* Blog Command Centre */}
         {isBlogCommandCentreEnabled() && (
@@ -341,8 +347,6 @@ export default function App() {
         </Route>
         )}
 
-        <Route path={ROUTES.CONTENT_CALENDAR_LEGACY} element={<ContentCalendarPage />} />
-
         <Route path={ROUTES.CAMPAIGN_LIST}   element={<CampaignListPage />} />
         <Route path={ROUTES.CAMPAIGN_NEW}    element={<CampaignEditorPage />} />
         <Route path={ROUTES.CAMPAIGN_EDIT}   element={<CampaignEditorPage />} />
@@ -351,8 +355,15 @@ export default function App() {
         <Route path={ROUTES.LANDING_LIST}   element={<LandingListPage />} />
         <Route path={ROUTES.LANDING_DETAIL} element={<LandingDetailPage />} />
 
-        <Route path={ROUTES.SOCIAL_PLANNER} element={<SocialPlannerPage />} />
-        <Route path={ROUTES.SOCIAL_QUEUE}   element={<SocialQueuePage />} />
+        {/* Channels → Social & Ads (replaces the manual Social planner at /social). */}
+        <Route path={ROUTES.SOCIAL_HUB} element={<SocialAdsLayout />}>
+          <Route index element={<SocialHubIndex />} />
+          <Route path="accounts" element={<SocialAccountsTab />} />
+          <Route path="calendar" element={<SocialCalendarTab />} />
+          <Route path="inbox" element={<SocialInboxPage />} />
+          <Route path="performance" element={<SocialPerformanceTab />} />
+          <Route path="ads" element={<SocialAdsPage />} />
+        </Route>
 
         <Route path={ROUTES.EMAIL_LIST}      element={<EmailListPage />} />
         <Route path={ROUTES.EMAIL_DETAIL}    element={<EmailDetailPage />} />
@@ -363,16 +374,23 @@ export default function App() {
         <Route path={ROUTES.KEYWORD_IDEAS}  element={<KeywordIdeasPage />} />
         <Route path={ROUTES.CREATIVE_BRIEFS} element={<CreativeBriefsPage />} />
 
-        <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
-        <Route path={ROUTES.REPORTS} element={<DailyReportsPage />} />
+        <Route element={<AnalyticsLayout />}>
+          <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
+          <Route path={ROUTES.REPORTS} element={<DailyReportsPage />} />
+        </Route>
 
-        <Route path={ROUTES.LEADS}       element={<LeadsPage />} />
-        <Route path={ROUTES.ENGAGE_PUSH} element={<EngagePushPage />} />
-        <Route path={ROUTES.LEAD_OUTCOMES} element={<LeadOutcomesPage />} />
+        <Route element={<LeadsLayout />}>
+          <Route path={ROUTES.LEADS}       element={<LeadsPage />} />
+          <Route path={ROUTES.ENGAGE_PUSH} element={<EngagePushPage />} />
+          <Route path={ROUTES.LEAD_OUTCOMES} element={<LeadOutcomesPage />} />
+        </Route>
 
         <Route path={ROUTES.BOT_QUEUE}          element={<BotQueuePage />} />
         <Route path={ROUTES.BOT_REPORTS}        element={<BotReportsPage />} />
+        <Route path={ROUTES.BOT_ACTIVITIES}     element={<BotActivitiesPage />} />
+        <Route path={ROUTES.BOT_ASK}            element={<BotAskPage />} />
         <Route path={ROUTES.BOT_REPORT_DETAIL}  element={<BotReportDetailPage />} />
+        <Route path={ROUTES.BOT_PLAN}            element={<BotPlanPage />} />
         <Route path={ROUTES.APPROVALS}          element={<ApprovalsPage />} />
 
         <Route path="/knowledge" element={<KnowledgeLayout />}>
@@ -397,7 +415,6 @@ export default function App() {
         <Route path="/content" element={<ContentLayout />}>
           <Route index element={<ContentListPage />} />
           <Route path="new" element={<ContentNewPage />} />
-          <Route path="daily-pack" element={<DailyPackPage />} />
           <Route path=":id" element={<ContentDetailPage />} />
           <Route path=":id/edit" element={<ContentEditorPage />} />
           <Route path=":id/versions" element={<ContentVersionsPage />} />
@@ -405,7 +422,6 @@ export default function App() {
           <Route path=":id/comments" element={<ContentCommentsPage />} />
           <Route path=":id/validations" element={<ContentValidationsPage />} />
           <Route path=":id/schedule" element={<ContentSchedulePage />} />
-          <Route path="calendar" element={<ContentCalendarPage />} />
         </Route>
 
         {/* Phase 4 — Publishing */}
@@ -469,7 +485,6 @@ export default function App() {
           <Route path="audience/consents" element={<ConsentListPage />} />
           <Route path="segments" element={<AudienceSegmentsPage />} />
           <Route path="suppressions" element={<SuppressionPage />} />
-          <Route path="social" element={<SocialOperationsPage />} />
           <Route path="email" element={<EmailDispatchPage />} />
           <Route path="whatsapp" element={<WhatsAppDispatchPage />} />
           <Route path="sms" element={<SmsOverviewPage />} />
@@ -545,18 +560,6 @@ export default function App() {
           <Route path="connections" element={<ConnectorConfigPage />} />
         </Route>
 
-        {/* Blog SEO and Indexing — promoted out of the Blog Command Centre
-            tab strip (its leaves used to redirect into /intelligence/*). */}
-        <Route path={ROUTES.BLOG_SEO} element={<BlogSeoLayout />}>
-          <Route index element={<Navigate to="search-console" replace />} />
-          <Route path="search-console" element={<SearchIntelligencePage />} />
-          <Route path="indexing" element={<IndexNowOperationsPage />} />
-          <Route path="internal-links" element={<BlogSeoScaffoldPage />} />
-          <Route path="cannibalisation" element={<BlogSeoScaffoldPage />} />
-          <Route path="sitemap" element={<SitemapOverviewPage />} />
-          <Route path="technical" element={<BlogSeoScaffoldPage />} />
-        </Route>
-
         <Route path={ROUTES.SETTINGS}          element={<SettingsPage />} />
         <Route path={ROUTES.AUTOMATION_SETTINGS} element={<AutomationSettingsPage />} />
         <Route path={ROUTES.BOT_SETTINGS}      element={<BotSettingsPage />} />
@@ -565,7 +568,6 @@ export default function App() {
         <Route path={ROUTES.CONSOLE_SYNC}      element={<ConsoleSyncPage />} />
         <Route path={ROUTES.WORKER_STATUS}     element={<WorkerStatusPage />} />
         <Route path={ROUTES.JOBS}              element={<JobMonitorPage />} />
-        <Route path={ROUTES.LOCAL_BOT_REPORTS} element={<LocalBotReportsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />

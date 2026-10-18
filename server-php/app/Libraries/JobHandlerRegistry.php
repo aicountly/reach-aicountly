@@ -68,7 +68,9 @@ class JobHandlerRegistry
         $this->handlers['reach.blog_cover_sweep']                    = new BlogCoverSweepJob();
         // Content base + cover gallery (2026-08 automation revamp)
         $this->handlers['reach.content_base_sync']                   = new \App\Jobs\ContentBaseSyncJob();
+        $this->handlers['reach.roadmap_refresh']                     = new \App\Jobs\RoadmapRefreshJob();
         $this->handlers['reach.gallery_deficit_alert']               = new \App\Jobs\GalleryDeficitAlertJob();
+        $this->handlers['reach.cover_gallery_autofill']              = new \App\Jobs\CoverGalleryAutofillJob();
         // Search Console ingestion — writes reach_search_metric_facts, which the
         // SEO snapshot job and every Search Intelligence view read from.
         $this->handlers['reach.search_console_ingest']               = new \App\Jobs\SearchConsoleIngestJob();
@@ -85,6 +87,8 @@ class JobHandlerRegistry
         $this->handlers[DistributionJobTypes::CAMPAIGN_RECONCILE]       = new \App\Jobs\DistributionReconcileJob();
         // social-api.ai: confirm `publishing` posts (published / failed / 30-minute timeout).
         $this->handlers[\App\Libraries\Distribution\SocialPostStatusPoller::JOB_TYPE] = new \App\Jobs\SocialPostPollJob();
+        // Stream a: social inbox bot — comments / DMs → vetted reply, Flow ticket or lead (every 10 minutes).
+        $this->handlers[\App\Libraries\Distribution\SocialInbox\SocialInboxService::JOB_TYPE] = new \App\Jobs\SocialInboxPollJob();
         // Stream F: SEO Tracker (DataForSEO SERP checks) + daily analytics report
         $this->handlers['reach.seo_tracker']                         = new \App\Jobs\SeoTrackerJob();
         $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();
@@ -92,9 +96,15 @@ class JobHandlerRegistry
         $this->handlers['reach.structured_content_sweep']            = new \App\Jobs\StructuredContentSweepJob();
         // Stream C: Claude-routine blog/KB pipeline (vet → approve → cover → publish → verify)
         $this->handlers['reach.routine_content_sweep']               = new \App\Jobs\RoutineContentSweepJob();
+        $this->handlers['reach.content_quality_sweep']               = new \App\Jobs\ContentQualitySweepJob();
+        $this->handlers['reach.engage_push_retry_sweep']             = new \App\Jobs\EngagePushRetrySweepJob();
         // Automated video (queue `video`) — Stream V: one resumable step per job + hourly sweep.
         $this->handlers['reach.video_pipeline_step']  = new \App\Jobs\VideoPipelineStepJob();
         $this->handlers['reach.video_pipeline_sweep'] = new \App\Jobs\VideoPipelineSweepJob();
+        // Bot Plan & Performance: actuals snapshot, review + self-tune, plan regeneration.
+        $this->handlers[\App\Jobs\BotPlanJob::TYPE]  = new \App\Jobs\BotPlanJob();
+        // Stream 9 — "Run now" of a cron command (Bot → Activities); allow-listed by BotActivityRegistry.
+        $this->handlers[\App\Libraries\Bot\BotActivityRegistry::COMMAND_JOB_TYPE] = new \App\Jobs\BotActivityCommandJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

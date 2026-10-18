@@ -20,6 +20,9 @@ final class ReachConfig
 {
     private const ENC_PREFIX = 'v1:';
 
+    /** A Claude Code Routines API trigger ("fire") URL. */
+    public const ROUTINE_FIRE_URL_PATTERN = '#^https://api\.anthropic\.com/v1/claude_code/routines/trig_[A-Za-z0-9_-]{6,120}/fire$#';
+
     /** @var array<string, mixed>|null */
     private static ?array $cache = null;
 
@@ -78,9 +81,29 @@ final class ReachConfig
             'ai.image.quality' => ['group' => 'Images', 'label' => 'Image quality (GPT Image)', 'type' => 'choice', 'env' => 'AI_OPENAI_IMAGE_QUALITY', 'default' => 'medium', 'options' => ['low', 'medium', 'high', 'auto'],
                 'help' => 'Price and detail rise with quality; medium suits blog covers and video stills.'],
 
+            // ── Stream 1 — covers without a human (keep this block contiguous) ──
+            'covers.auto.enabled' => ['group' => 'Images', 'label' => 'Keep the Cover Gallery stocked automatically', 'type' => 'bool', 'default' => true,
+                'help' => 'Every hour Reach generates the covers the upcoming blog index is missing (GPT Image, AICOUNTLY-branded) and adds them to the gallery. BLOG_IMAGE_GENERATION_ENABLED=false in .env also turns it off.'],
+            'covers.auto.daily_limit' => ['group' => 'Images', 'label' => 'Covers generated per day (gallery stocking and refresh)', 'type' => 'int', 'default' => 10,
+                'help' => 'Cost cap for the hourly gallery stocking and reach:covers-refresh. A new article that no gallery cover fits still gets one (it is counted, not blocked).'],
+            'covers.brand.logo_enabled' => ['group' => 'Images', 'label' => 'Put the AICOUNTLY logo on covers', 'type' => 'bool', 'default' => true,
+                'help' => 'Corner mark on a white plate, bottom right. The unbranded original is kept.'],
+            'covers.alerts.enabled' => ['group' => 'Images', 'label' => 'Email when cover generation keeps failing', 'type' => 'bool', 'default' => true,
+                'help' => 'Informational, at most once a day (09:00 UTC), only after repeated failures (provider error or no API key). Daily numbers are in the daily report either way.'],
+            'covers.alerts.recipients' => ['group' => 'Images', 'label' => 'Cover alert recipients', 'type' => 'email_list', 'env' => 'BLOG_GALLERY_ALERT_EMAIL', 'default' => '',
+                'help' => 'Comma-separated. Blank = the daily analytics report recipients.'],
+            'covers.alerts.failure_threshold' => ['group' => 'Images', 'label' => 'Failed cover generations (24 h) before an alert', 'type' => 'int', 'default' => 3],
+            // ── end stream 1 ──
+
             // ── Automation volumes & switches ───────────────────────────────
             'automation.community.enabled' => ['group' => 'Automation', 'label' => 'Community Q&A automation', 'type' => 'bool', 'default' => true],
             'automation.community.daily_limit' => ['group' => 'Automation', 'label' => 'Community Q&A per day', 'type' => 'int', 'default' => 10],
+            // ── Stream 2: Community Question Inbox handling (keep this block contiguous) ──
+            'automation.community.stuck_hours' => ['group' => 'Automation', 'label' => 'Community: hand stuck drafts to the routine after (hours)', 'type' => 'int', 'default' => 6,
+                'help' => 'A question whose old in-Reach draft has not moved for this long is handed to the reach-community-qa routine queue (the draft is archived; nothing public changes).'],
+            'automation.community.triage' => ['group' => 'Automation', 'label' => 'Community: vetting model screens members\' questions', 'type' => 'bool', 'default' => true,
+                'help' => 'The vetting model (community_question rubric) closes spam, abusive, personal-data and off-topic questions with its reason, so they never wait in the inbox.'],
+            // ── end Stream 2 ──
             'automation.blog.enabled' => ['group' => 'Automation', 'label' => 'Blog automation', 'type' => 'bool', 'default' => true],
             'automation.blog.daily_limit' => ['group' => 'Automation', 'label' => 'Blogs per day', 'type' => 'int', 'default' => 6],
             'automation.knowledge_base.enabled' => ['group' => 'Automation', 'label' => 'Knowledge Base automation', 'type' => 'bool', 'default' => true],
@@ -105,6 +128,15 @@ final class ReachConfig
                 'help' => 'KB_AUTO_PUBLISH_ENABLED=false in .env also turns it off.'],
             'automation.vetting.min_compliance_score' => ['group' => 'Blog & KB routines', 'label' => 'Hold for a person below this compliance score (1–10)', 'type' => 'int', 'default' => 5,
                 'help' => 'Gemini scores compliance 1–10. An approved article scored below this — or one Gemini flags HIGH_RISK — is held as high risk instead of auto-publishing. 0 = never hold.'],
+
+            // ── Stream 5: living content base + roadmap hand-off (keep this block contiguous) ──
+            'automation.content_base.stale_hours' => ['group' => 'Blog & KB routines', 'label' => 'Flag a daily routine as quiet after (hours)', 'type' => 'int', 'default' => 36,
+                'help' => 'Informational only: the Content Base page and the daily report say when no routine call or submission for a content type arrived for this long. Weekly routines use 8 days.'],
+            'automation.content_base.propose_daily_limit' => ['group' => 'Blog & KB routines', 'label' => 'New topics a routine may propose per type per day', 'type' => 'int', 'default' => 20,
+                'help' => 'Cap on POST v1/automation/content-base/propose; further proposals that day are refused with limit_reached.'],
+            'automation.roadmap.routine_handoff' => ['group' => 'Blog & KB routines', 'label' => 'Roadmap-selected topics go to the blog routine', 'type' => 'bool', 'default' => true,
+                'help' => 'On: a roadmap CREATE_NEW decision puts the topic first in the blog routine\'s queue (GET v1/automation/content-base/next). Off: the legacy in-Reach brief work blocks (their drafting steps are retired).'],
+            // ── end Stream 5 ──
 
             // ── Reports ─────────────────────────────────────────────────────
             'reports.daily.recipients' => ['group' => 'Reports', 'label' => 'Daily analytics report recipients', 'type' => 'email_list', 'default' => 'pno@aicountly.com',
@@ -151,6 +183,38 @@ final class ReachConfig
                 'help' => 'A JSON object merged into the TikTok entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
             // ── end social-api.ai ──
 
+            // ── Stream a — social inbox bot (comments/DMs → reply / Flow ticket / lead). Keep this block contiguous. ──
+            'social.inbox.enabled' => ['group' => 'Social inbox', 'label' => 'Read comments & messages (social inbox bot)', 'type' => 'bool', 'env' => 'SOCIAL_INBOX_ENABLED', 'default' => true,
+                'help' => 'Every 10 minutes Reach reads new comments and messages on the connected social-api.ai accounts, classifies them with Gemini and answers, lodges complaints in Flow or records sales leads. docs/operations/SOCIAL_API.md → Social inbox bot.'],
+            'social.inbox.auto_reply' => ['group' => 'Social inbox', 'label' => 'Post replies automatically', 'type' => 'bool', 'env' => 'SOCIAL_INBOX_AUTO_REPLY', 'default' => true,
+                'help' => 'Off = messages are still read, classified, lodged in Flow and recorded as leads, but nothing is posted on the networks.'],
+            'social.inbox.platforms' => ['group' => 'Social inbox', 'label' => 'Networks to read', 'type' => 'string', 'default' => 'facebook,instagram,linkedin,x,youtube',
+                'help' => 'Comma-separated: facebook, instagram, linkedin, x, youtube, tiktok. A network without an active social-api.ai account is skipped.'],
+            'social.inbox.daily_reply_cap' => ['group' => 'Social inbox', 'label' => 'Replies per day (all networks)', 'type' => 'int', 'default' => 40,
+                'help' => 'Safety cap (IST day). Messages over the cap wait for the next day; after the age limit below they are left unanswered.'],
+            'social.inbox.min_confidence' => ['group' => 'Social inbox', 'label' => 'Answer only above this classification confidence (%)', 'type' => 'int', 'default' => 70,
+                'help' => 'Below it Reach does not reply (complaints are still lodged in Flow, with the confidence on the ticket).'],
+            'social.inbox.reply_max_age_hours' => ['group' => 'Social inbox', 'label' => 'Do not reply to messages older than (hours)', 'type' => 'int', 'default' => 48],
+            'social.inbox.lookback_hours' => ['group' => 'Social inbox', 'label' => 'First read looks back (hours)', 'type' => 'int', 'default' => 24,
+                'help' => 'How far back the first poll of an account reads. Later polls start just before the newest message already stored.'],
+            'social.inbox.hide_spam' => ['group' => 'Social inbox', 'label' => 'Hide spam / abusive comments', 'type' => 'bool', 'default' => false,
+                'help' => 'Uses the hide endpoint below. Leave off until the first live run confirms social-api.ai supports it; spam is never answered either way.'],
+            'social.inbox.alert_recipients' => ['group' => 'Social inbox', 'label' => 'Immediate alert for high-severity complaints', 'type' => 'email_list', 'default' => '',
+                'help' => 'Legal threats, data/privacy issues, fraud allegations. Blank = the daily report recipients. Everything else is only in the daily report.'],
+            'social.inbox.list_path' => ['group' => 'Social inbox', 'label' => 'social-api.ai inbox list path', 'type' => 'string', 'env' => 'SOCIALAPI_INBOX_LIST_PATH', 'default' => '/inbox',
+                'help' => 'ASSUMPTION until the first live run (docs.social-api.ai/guides/inbox). Relative to the base URL; {account_id} is replaced when present. The social-api.ai live check probes it read-only.'],
+            'social.inbox.reply_path' => ['group' => 'Social inbox', 'label' => 'social-api.ai reply path', 'type' => 'string', 'env' => 'SOCIALAPI_INBOX_REPLY_PATH', 'default' => '/inbox/{id}/reply',
+                'help' => 'ASSUMPTION: POST with {"text": …}; {id} = the message id. Confirm against docs.social-api.ai/guides/inbox.'],
+            'social.inbox.hide_path' => ['group' => 'Social inbox', 'label' => 'social-api.ai hide path', 'type' => 'string', 'env' => 'SOCIALAPI_INBOX_HIDE_PATH', 'default' => '/inbox/{id}/hide',
+                'help' => 'ASSUMPTION: POST, no body. Used only when "Hide spam" is on.'],
+            'ai.vetting.model.social_inbox' => ['group' => 'Social inbox', 'label' => 'Classifier / reply-draft model (Gemini)', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
+            'ai.vetting.model.social_reply' => ['group' => 'Social inbox', 'label' => 'Reply vetting model (Gemini)', 'type' => 'model', 'help' => 'Vets every drafted reply before it is posted. Blank = default vetting model.'],
+            'flow.api_base_url' => ['group' => 'Social inbox', 'label' => 'Flow API base URL', 'type' => 'string', 'env' => 'FLOW_API_BASE_URL', 'default' => 'https://flow.aicountly.org/api', 'format' => 'https_url',
+                'help' => 'Complaints are lodged at {this}/internal/reach/social-tickets.'],
+            'flow.reach_key' => ['group' => 'Social inbox', 'label' => 'Flow key (Reach → Flow)', 'type' => 'secret', 'env' => 'FLOW_REACH_INBOUND_KEY',
+                'help' => 'The same value as FLOW_REACH_INBOUND_KEY in Flow’s server-php/.env (at least 32 characters). Without it complaints wait (“deferred”) and are lodged once it is set.'],
+            // ── end Stream a ──
+
             // ── Distribution (campaign sends: email / SMS / WhatsApp) ───────
             'distribution.batch_size' => ['group' => 'Distribution', 'label' => 'Recipients per dispatch batch', 'type' => 'int', 'default' => 100,
                 'help' => 'Each distribution job sends this many recipients, then queues the next batch.'],
@@ -195,7 +259,8 @@ final class ReachConfig
                 'help' => '"stage" (free, watermarked) or "v1" (production, billed).'],
             'video.music.url' => ['group' => 'Video', 'label' => 'Background music URL (optional)', 'type' => 'string',
                 'help' => 'A royalty-free MP3 you are licensed to use, reachable over HTTPS. Blank = no music.'],
-            'video.brand.logo_url' => ['group' => 'Video', 'label' => 'Logo URL for videos', 'type' => 'string', 'default' => 'https://aicountly.com/assests/images/ai-logo.png'],
+            'video.brand.logo_url' => ['group' => 'Video', 'label' => 'Logo URL for videos', 'type' => 'string', 'default' => 'https://aicountly.com/assests/images/ai-logo.png',
+                'help' => 'The official AICOUNTLY logo on aicountly.com. Used on the intro/end cards; every scene also carries the corner mark (this logo on a white plate). Blank or non-https = the official logo.'],
             'video.youtube.client_id' => ['group' => 'Video', 'label' => 'YouTube OAuth client ID', 'type' => 'string', 'env' => 'YOUTUBE_CLIENT_ID',
                 'help' => 'Google Cloud → APIs & Services → Credentials → OAuth client (Web application).'],
             'video.youtube.client_secret' => ['group' => 'Video', 'label' => 'YouTube OAuth client secret', 'type' => 'secret', 'env' => 'YOUTUBE_CLIENT_SECRET'],
@@ -205,6 +270,28 @@ final class ReachConfig
                 'help' => 'public, unlisted or private. Until Google verifies the OAuth app, YouTube locks API uploads to private.'],
             'video.youtube.category_id' => ['group' => 'Video', 'label' => 'YouTube category id', 'type' => 'string', 'default' => '28',
                 'help' => '28 = Science & Technology, 27 = Education.'],
+
+            // ── Stream IST: display timezone (keep this block contiguous) ──
+            'ui.timezone' => ['group' => 'Display', 'label' => 'Time zone for times shown in Reach', 'type' => 'choice', 'default' => 'Asia/Kolkata',
+                'options' => ['Asia/Kolkata', 'UTC', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York'],
+                'help' => 'Every time on screen, in the daily report email, notifications, CLI output and CSV exports is shown in this zone (Asia/Kolkata = IST). Stored values and API/JSON fields stay UTC. Reload Reach after changing it.'],
+            // ── end Stream IST ──
+
+            // ── Bot Plan & Performance (stream 8) ───────────────────────────
+            'bot.self_tune.enabled' => ['group' => 'Automation', 'label' => 'Bot self-tuning (Plan & Performance)', 'type' => 'bool', 'default' => true,
+                'help' => 'On: after each daily review the bot lowers targets that cannot be reached (and restores them), retries stuck drafts and safe failed jobs, and steers the routine briefing towards topics that perform — within hard bounds, every change logged on Bot → Plan & Performance. Off: nothing is applied; the log shows what it would have done.'],
+
+            // ── Stream 9: bot actions — Run now + Ask the bot (keep this block contiguous) ──
+            'bot.command.routine_fire_url' => ['group' => 'Bot commands', 'label' => 'reach-command routine: API trigger URL', 'type' => 'string', 'env' => 'BOT_COMMAND_ROUTINE_FIRE_URL', 'format' => 'routine_fire_url',
+                'help' => 'claude.ai → Routines → reach-command → Add another trigger → API → copy the URL (https://api.anthropic.com/v1/claude_code/routines/trig_…/fire). Bot → Ask the bot and Run now for Claude routines fire it. Setup: docs/operations/BOT_ACTIONS.md.'],
+            'bot.command.routine_token' => ['group' => 'Bot commands', 'label' => 'reach-command routine: API trigger token', 'type' => 'secret', 'env' => 'BOT_COMMAND_ROUTINE_TOKEN',
+                'help' => 'The token claude.ai shows once when you generate it for that API trigger (starts with sk-ant-oat01-). Stored encrypted; never shown again. Regenerating it in claude.ai invalidates the old one — paste the new one here.'],
+            'automation.social.enabled' => ['group' => 'Bot commands', 'label' => 'Accept routine social posts (v1/automation/social-posts)', 'type' => 'bool', 'default' => true,
+                'help' => 'Off: social posts submitted by routines are refused (HTTP 429). Posts are Gemini-vetted and published through social-api.ai.'],
+            'automation.social.daily_limit' => ['group' => 'Bot commands', 'label' => 'Routine social posts per day (outside owner commands)', 'type' => 'int', 'default' => 6,
+                'help' => 'Submissions per IST day not tied to an owner command. Each submission may target several networks. Posts made for an owner command count against that command (10 at most) instead.'],
+            'ai.vetting.model.social_post' => ['group' => 'Bot commands', 'label' => 'Social post vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
+            // ── end bot actions ──
         ];
     }
 
@@ -414,6 +501,9 @@ final class ReachConfig
         $format = (string) (self::registry()[$key]['format'] ?? '');
         if ($format === 'https_url' && $str !== '' && (! preg_match('#^https://[^\s/?\#]+#i', $str) || filter_var($str, FILTER_VALIDATE_URL) === false)) {
             throw new \InvalidArgumentException("{$key} must be an https:// URL.");
+        }
+        if ($format === 'routine_fire_url' && $str !== '' && ! preg_match(self::ROUTINE_FIRE_URL_PATTERN, $str)) {
+            throw new \InvalidArgumentException("{$key} must be a Claude routine API trigger URL: https://api.anthropic.com/v1/claude_code/routines/trig_…/fire");
         }
         if ($format === 'account_id' && $str !== '' && ! preg_match('/^[A-Za-z0-9._:@\-]{1,200}$/', $str)) {
             throw new \InvalidArgumentException("{$key}: not a valid account id (letters, digits and . _ : @ - only).");

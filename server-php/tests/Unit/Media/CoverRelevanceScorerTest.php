@@ -103,13 +103,53 @@ class CoverRelevanceScorerTest extends CIUnitTestCase
         $this->assertSame(7, $ranked[0]['asset']['id'], 'LRU order must survive equal relevance');
     }
 
-    public function testStreamMatchAloneClearsTheFloor(): void
+    /**
+     * Regression (18 Oct 2026): a stream match used to clear the floor on its
+     * own (weight 4 ≥ floor 3). Every routine blog is stream "marketing", so any
+     * marketing-tagged image could front any article. The stream still ranks
+     * relevant covers, but it can never make an irrelevant one relevant.
+     */
+    public function testStreamMatchAloneNeverClearsTheFloor(): void
     {
         $keywords = $this->scorer->articleKeywords('Payroll Month-End Checklist');
-        $result   = $this->scorer->score($this->asset(3, [], 'payroll'), $keywords, '', 'payroll');
+        $result   = $this->scorer->score($this->asset(3, [], 'marketing'), $keywords, '', 'marketing');
 
-        $this->assertGreaterThanOrEqual(CoverRelevanceScorer::DEFAULT_MIN_SCORE, $result['score']);
         $this->assertContains('portfolio_stream', $result['reasons']);
+        $this->assertSame(0, $result['topical']);
+        $this->assertSame([], $this->scorer->rank([$this->asset(3, [], 'marketing')], $keywords, '', 'marketing'));
+    }
+
+    public function testOneSharedGenericWordIsNotEnough(): void
+    {
+        // "TDS return checklist" vs a GSTR-3B cover share only "return".
+        $keywords = $this->scorer->articleKeywords('TDS return checklist');
+        $ranked   = $this->scorer->rank([$this->asset(4, ['gstr', '3b', 'return'])], $keywords);
+
+        $this->assertSame([], $ranked);
+    }
+
+    public function testACoverStockedForTheEntryWinsByKey(): void
+    {
+        $keywords = $this->scorer->articleKeywords('MSME-1 half-yearly return');
+        $stocked  = $this->asset(5, ['msme']) + ['source_key' => 'msme-1-half-yearly'];
+        $other    = $this->asset(6, ['msme', 'half', 'yearly']);
+        $ranked   = $this->scorer->rank([$other, $stocked], $keywords, '', '', null, 'msme-1-half-yearly');
+
+        $this->assertSame(5, $ranked[0]['asset']['id']);
+        $this->assertContains('source_key', $ranked[0]['reasons']);
+    }
+
+    public function testTheFloorCannotBeLoweredBelowTheDefault(): void
+    {
+        putenv('MEDIA_GALLERY_MIN_RELEVANCE=3');
+        $_ENV['MEDIA_GALLERY_MIN_RELEVANCE'] = '3';
+        try {
+            $this->assertSame(CoverRelevanceScorer::DEFAULT_MIN_SCORE, CoverRelevanceScorer::minScore());
+            $this->assertFalse(CoverRelevanceScorer::allowUnmatchedFallback());
+        } finally {
+            putenv('MEDIA_GALLERY_MIN_RELEVANCE');
+            unset($_ENV['MEDIA_GALLERY_MIN_RELEVANCE']);
+        }
     }
 
     public function testKeywordOverlapOnAssetTagsCounts(): void

@@ -40,6 +40,15 @@ final class DailyReportRendererTest extends CIUnitTestCase
         $this->assertSame('AICOUNTLY daily report — Sat 17 Oct 2026', DailyReportRenderer::subject($s));
     }
 
+    public function testGeneratedTimeIsShownInIstWithItsLabel(): void
+    {
+        $s = self::summary([]);
+        $s['generated_at'] = '2026-10-17 02:30:00+00:00'; // stored/serialised in UTC
+        $this->assertStringContainsString('Generated 17-10-2026 08:00 IST', DailyReportRenderer::html($s));
+        $this->assertStringContainsString("Generated 17-10-2026 08:00 IST\n", DailyReportRenderer::text($s));
+        $this->assertStringNotContainsString('+00:00', DailyReportRenderer::text($s));
+    }
+
     public function testSearchSectionRendersDayAgainstBaseline(): void
     {
         $s = self::summary(['search' => [
@@ -82,6 +91,31 @@ final class DailyReportRendererTest extends CIUnitTestCase
         $this->assertStringContainsString('top 3', $joined);
         $this->assertStringContainsString('Vyapar outranks us for "tally alternative" (#2 vs not in top 100)', $joined);
         $this->assertStringContainsString('3 job(s) are dead-lettered', $joined);
+    }
+
+    public function testTodoItemsAreObservationsNotChores(): void
+    {
+        $joined = implode("\n", DailyReportBuilder::todo([
+            'search' => [
+                'configured' => true, 'date' => '2026-10-14',
+                'day' => ['clicks' => 50], 'baseline' => ['clicks' => 100.0],
+                'movers' => ['declined' => [['query' => 'gst invoice format', 'position' => 14.0, 'previous_position' => 6.0]]],
+                'top_queries' => [['dimension_value' => 'gst billing software', 'avg_position' => 6.4, 'impressions' => 800, 'clicks' => 4]],
+                'top_pages' => [['dimension_value' => 'https://aicountly.com/x', 'impressions' => 500, 'ctr' => 0.004, 'clicks' => 2]],
+            ],
+            'seo_tracker' => ['configured' => true, 'beaten' => [['keyword' => 'tally alternative', 'competitor' => 'Vyapar', 'competitor_rank' => 2, 'our_rank' => null]]],
+            'vetting' => ['configured' => true, 'counts' => ['approve' => 1, 'reject' => 4]],
+        ]));
+
+        foreach (['Refresh the page', 'strengthen that page', 'Rewrite the title', 'plan content', 'adjust the routine prompts'] as $chore) {
+            $this->assertStringNotContainsString($chore, $joined, 'routine content work is not a person\'s to-do');
+        }
+    }
+
+    public function testTheContentCleanUpLineIsInformational(): void
+    {
+        $line = DailyReportRenderer::qualityLine(['checked' => 9, 'failed' => 2, 'unpublished' => 1, 'queued_regeneration' => 2, 'rewrites_open' => 3]);
+        $this->assertSame('Content clean-up (automatic, no action needed): 9 re-checked · 2 failed · 1 taken down · 2 rewrites queued · 3 rewrites open', $line);
     }
 
     public function testTodoAsksForMissingConnections(): void

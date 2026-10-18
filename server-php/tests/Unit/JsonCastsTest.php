@@ -32,6 +32,8 @@ final class JsonCastsTest extends CIUnitTestCase
         'Libraries/Video/Automation/VideoAutomationService.php'             => ['metadata'],           // query builder (reach_approvals)
         'Libraries/Video/Automation/VideoPipelineRunner.php'                => ['media_refs', 'hashtags'], // query builder (reach_social_posts)
         'Libraries/Distribution/SocialPublisherService.php'                 => ['provider_response_json', 'media_refs', 'hashtags'], // query builder (reach_social_posts)
+        'Libraries/Video/Automation/VideoSocialDistributor.php'             => ['media_refs', 'hashtags'], // query builder (reach_social_posts)
+        'Libraries/Automation/Social/AutomationSocialPostService.php'       => ['media_refs', 'hashtags', 'metadata'], // query builder (reach_social_posts, reach_approvals)
     ];
 
     public function testTolerantCast(): void

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { listAttributionConversions } from '../../services/intelligenceService.js';
+import { formatDate } from '../../utils/formatDate';
 
 export default function UnattributedLeadsPage() {
   const [rows, setRows] = useState([]);
@@ -72,7 +73,7 @@ export default function UnattributedLeadsPage() {
                 <tr key={l.id || l.uuid}>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{l.uuid?.slice?.(0, 8) || l.id}</td>
                   <td>{l.lead_id ?? '—'}</td>
-                  <td>{l.converted_at?.slice?.(0, 10) || '—'}</td>
+                  <td>{formatDate(l.converted_at)}</td>
                   <td>{l.confidence_state || '—'}</td>
                   <td>{l.matching_method || '—'}</td>
                 </tr>

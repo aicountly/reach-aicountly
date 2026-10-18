@@ -32,7 +32,7 @@ See `server-php/.env.example`. In short:
 | AI keys | `AI_OPENAI_API_KEY`, `AI_GEMINI_API_KEY`, `AI_PERPLEXITY_API_KEY` — fallbacks; the keys can instead be saved (encrypted) in Settings → AI & Automation, which takes precedence. `REACH_SETTINGS_KEY` (optional, else `JWT_SECRET`) encrypts them. See `docs/automation/AI_VETTING.md`. |
 | Channels | social tokens, `EMAIL_API_KEY`, `SMS_*`, `WHATSAPP_*` |
 | Analytics | `GA4_*`, `SEARCH_CONSOLE_*`, `CONTENT_ANALYTICS_*`, `INDEXNOW_*` |
-| Switches | `BLOG_*_ENABLED`, `KB_AUTO_PUBLISH_ENABLED`, `BLOG_GALLERY_ALERT_EMAIL` — for Claude-routine blogs/KB the switches live in Settings → AI & Automation; an explicit `BLOG_AUTO_PUBLISH_ENABLED`, `BLOG_PUBLIC_PUBLISHER_ENABLED`, `BLOG_IMAGE_GENERATION_ENABLED` or `KB_AUTO_PUBLISH_ENABLED` = `false` is a hard kill-switch (see `docs/automation/CLAUDE_ROUTINES.md`). `KB_AUTO_APPROVE` is no longer read for routine items. |
+| Switches | `BLOG_*_ENABLED`, `KB_AUTO_PUBLISH_ENABLED`, `BLOG_GALLERY_ALERT_EMAIL` (now the env fallback of the `covers.alerts.recipients` setting) — for Claude-routine blogs/KB the switches live in Settings → AI & Automation; an explicit `BLOG_AUTO_PUBLISH_ENABLED`, `BLOG_PUBLIC_PUBLISHER_ENABLED`, `BLOG_IMAGE_GENERATION_ENABLED` or `KB_AUTO_PUBLISH_ENABLED` = `false` is a hard kill-switch (see `docs/automation/CLAUDE_ROUTINES.md`). `KB_AUTO_APPROVE` is no longer read for routine items. |
 
 ---
 
@@ -46,11 +46,11 @@ Every variable below is still read by the code. It is absent from
 | Variable | Default | Effect |
 |---|---|---|
 | `BLOG_REQUIRE_COVER_IMAGE` | `true` | No blog publishes without a suitable cover; a miss parks it in `internal_review`. Set false to publish with a blank listing tile. |
-| `MEDIA_GALLERY_MIN_RELEVANCE` | `3` | Score an asset must clear to be considered suitable |
-| `MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK` | `false` | True assigns any free cover when nothing matches — the "GST article, landscape photo" failure. Leave false. |
+| `MEDIA_GALLERY_MIN_RELEVANCE` | `6` | Topical score a gallery cover must reach to be reused (values below 6 are ignored; a portfolio-stream match alone never counts) |
+| `MEDIA_GALLERY_ALLOW_UNMATCHED_FALLBACK` | — | Retired 18 Oct 2026 and ignored: on a miss Reach generates a cover instead of attaching an unrelated one. |
 | `MEDIA_GALLERY_REUSE_COOLDOWN_DAYS` | `30` | Gap before a cover may front another blog |
-| `MEDIA_GALLERY_LOOKAHEAD_DAYS` | `14` | Deficit horizon for the cover shortfall report |
-| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Allow one generated cover on a gallery miss (needs `BLOG_IMAGE_GENERATION_ENABLED`) |
+| `MEDIA_GALLERY_LOOKAHEAD_DAYS` | `14` | Deficit horizon for the hourly gallery autofill and the report |
+| `BLOG_ROUTINE_AI_COVER_FALLBACK` | `true` | Claude-routine items: generate a cover on a gallery miss (generation itself follows `automation.blog.ai_cover`; `BLOG_IMAGE_GENERATION_ENABLED=false` kills it) |
 | `REACH_PUBLIC_BASE_URL` | `REACH_APP_URL` | Host for signed media URLs, when media is served from a different origin |
 
 ### Fact verification and roadmap
@@ -132,6 +132,10 @@ surface, not the environment.
 | `SOCIALAPI_ACCOUNT_<PLATFORM>` | fallback for `social.socialapi.account.<platform>` (youtube, instagram, facebook, linkedin, x, tiktok); blank = the single active account |
 | `SOCIALAPI_PLATFORM_DATA_<PLATFORM>` | fallback for `social.socialapi.platform_data.<platform>` (JSON object) |
 | `VIDEO_YOUTUBE_PUBLISHER` | `social_api` — fallback for `video.youtube.publisher` (`social_api` \| `direct`) |
+| `SOCIAL_INBOX_ENABLED` / `SOCIAL_INBOX_AUTO_REPLY` | `true` / `true` — fallbacks for `social.inbox.enabled` / `social.inbox.auto_reply` (social inbox bot, SOCIAL_API.md § "Social inbox bot") |
+| `SOCIALAPI_INBOX_LIST_PATH` / `_REPLY_PATH` / `_HIDE_PATH` | `/inbox`, `/inbox/{id}/reply`, `/inbox/{id}/hide` — fallbacks for `social.inbox.*_path` (**assumed** social-api.ai paths; confirm with the live check) |
+| `FLOW_API_BASE_URL` | `https://flow.aicountly.org/api` — fallback for `flow.api_base_url` (complaints → Flow tickets) |
+| `FLOW_REACH_INBOUND_KEY` | empty — fallback for the secret `flow.reach_key`; must equal Flow's `FLOW_REACH_INBOUND_KEY` (≥ 32 chars). Without it complaints are kept `deferred` |
 
 See `CAMPAIGN_READINESS.md` for the per-channel requirements.
 

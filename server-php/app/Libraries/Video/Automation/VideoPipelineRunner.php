@@ -6,8 +6,6 @@ namespace App\Libraries\Video\Automation;
 
 use App\Libraries\AuditLogger;
 use App\Libraries\Automation\SystemApprover;
-use App\Libraries\Distribution\Jobs\DistributionJobTypes;
-use App\Libraries\Distribution\Providers\ChannelProviderFactory;
 use App\Libraries\Distribution\Providers\ProviderNotConfiguredException;
 use App\Libraries\Distribution\Providers\SocialApi\SocialApiException;
 use App\Libraries\Distribution\SocialPostStatusPoller;
@@ -15,12 +13,14 @@ use App\Libraries\Distribution\SocialPublisherService;
 use App\Models\Distribution\CampaignDeliveryAttemptModel;
 use App\Models\Distribution\CampaignDispatchModel;
 use App\Models\Distribution\CampaignOperationalMetricsModel;
+use App\Libraries\Media\CoverBranding;
 use App\Libraries\Media\VideoMediaStore;
 use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Video\Automation\Render\CaptionBuilder;
 use App\Libraries\Video\Automation\Render\TimelineBuilder;
 use App\Libraries\Video\Automation\Tts\Mp3Duration;
 use App\Libraries\Video\Automation\Visuals\ImageNormalizer;
+use App\Libraries\Video\Automation\Visuals\StillPromptBuilder;
 use App\Libraries\Video\Automation\YouTube\YouTubeMetadata;
 use App\Libraries\Video\Automation\YouTube\YouTubePublisherMode;
 use Config\Services;
@@ -68,7 +68,8 @@ final class VideoPipelineRunner
 
     public const STEPS = ['tts', 'visuals', 'render_submit', 'render_poll', 'youtube_upload', 'youtube_extras', 'social'];
 
-    public const SOCIAL_CHANNELS = ['instagram', 'facebook', 'linkedin'];
+    /** The default social offer for a Short (VideoSocialDistributor::DEFAULT_CHANNELS). */
+    public const SOCIAL_CHANNELS = VideoSocialDistributor::DEFAULT_CHANNELS;
 
     private VideoPipelineRepository $repo;
     private VideoMediaStore $media;
@@ -219,12 +220,17 @@ final class VideoPipelineRunner
 
             $ref = (string) $scene['visual']['url_or_prompt'];
             try {
+                // A still illustrates what this scene says: the prompt is built
+                // from the video's title/topic and the scene's own voice-over and
+                // caption (StillPromptBuilder), not just the routine's short note.
+                $stillPrompt = $source === 'screenshot' ? null : StillPromptBuilder::forScene($script, $scene);
                 $raw = $source === 'screenshot'
                     ? VideoProviders::screenshots()->capture($ref, $w, $h)
-                    : VideoProviders::stills()->generate($ref, $short ? 'portrait' : 'landscape');
+                    : VideoProviders::stills()->generate((string) $stillPrompt, $short ? 'portrait' : 'landscape');
                 $img   = ImageNormalizer::toJpeg($raw, $w, $h);
                 $media = $this->media->store($img['bytes'], $img['mime'], ['item_id' => $id, 'width' => $img['width'], 'height' => $img['height']]);
-                $this->repo->updateAsset((int) $asset['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $asset['attempts'] + 1, 'detail' => $source === 'screenshot' ? $ref : 'DALL·E still']);
+                $this->repo->updateAsset((int) $asset['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $asset['attempts'] + 1,
+                    'detail' => $source === 'screenshot' ? $ref : mb_substr('GPT Image still: ' . $stillPrompt, 0, 1000)]);
             } catch (VideoProviderException|\RuntimeException $e) {
                 $transient = $e instanceof VideoProviderException && $e->kind === VideoProviderException::TRANSIENT;
                 $attempts  = (int) $asset['attempts'] + 1;
@@ -248,9 +254,16 @@ final class VideoPipelineRunner
                 $pending++;
             } else {
                 try {
-                    $img   = ImageNormalizer::toJpeg(VideoProviders::stills()->generate($prompt, 'landscape'), 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
+                    $img   = ImageNormalizer::toJpeg(VideoProviders::stills()->generate(StillPromptBuilder::forThumbnail($script), 'landscape'), 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
+                    // The thumbnail is shown outside the video, so it carries
+                    // the AICOUNTLY mark itself (bottom-right corner plate).
+                    $branded = (new CoverBranding())->apply($img['bytes']);
+                    if ($branded['branded']) {
+                        $img = ImageNormalizer::toJpeg($branded['bytes'], 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
+                    }
                     $media = $this->media->store($img['bytes'], $img['mime'], ['item_id' => $id, 'width' => 1280, 'height' => 720]);
-                    $this->repo->updateAsset((int) $thumb['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $thumb['attempts'] + 1, 'detail' => 'DALL·E thumbnail']);
+                    $this->repo->updateAsset((int) $thumb['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $thumb['attempts'] + 1,
+                        'detail' => 'GPT Image thumbnail' . ($branded['branded'] ? ', AICOUNTLY logo' : ' (logo not applied: ' . $branded['reason'] . ')')]);
                 } catch (VideoProviderException|\RuntimeException $e) {
                     $attempts = (int) $thumb['attempts'] + 1;
                     if ($e instanceof VideoProviderException && $e->kind === VideoProviderException::TRANSIENT && $attempts < 3) {
@@ -279,7 +292,8 @@ final class VideoPipelineRunner
 
         $scenes = $this->resolvedScenes($item);
         $build  = TimelineBuilder::build($script, $scenes, [
-            'logo_url'     => (string) ReachConfig::get('video.brand.logo_url'),
+            'logo_url'       => TimelineBuilder::logoUrl((string) ReachConfig::get('video.brand.logo_url')),
+            'logo_badge_url' => $this->logoBadgeUrl(),
             'music_url'    => (string) ReachConfig::get('video.music.url'),
             'callback_url' => self::callbackUrl((string) $item['uuid']),
         ]);
@@ -562,8 +576,8 @@ final class VideoPipelineRunner
                 $this->repo->update($id, ['thumbnail_status' => 'skipped', 'captions_status' => 'skipped']);
                 $this->repo->addWarning($id, 'Published through social-api.ai: Reach did not set a custom thumbnail or a separate caption track (no documented social-api.ai field; captions are burned into the video). Add them in YouTube Studio if needed.');
             }
-            return $item['format'] === 'short'
-                ? ['next' => 'social', 'detail' => 'Offering the Short to social channels.']
+            return VideoSocialDistributor::offersSocial($item)
+                ? ['next' => 'social', 'detail' => 'Offering the video to social channels.']
                 : ['next' => 'done', 'detail' => 'Published on YouTube (social-api.ai).'];
         }
         $videoId = (string) $item['youtube_video_id'];
@@ -590,65 +604,30 @@ final class VideoPipelineRunner
             }
         }
 
-        return $item['format'] === 'short'
-            ? ['next' => 'social', 'detail' => 'Offering the Short to social channels.']
+        return VideoSocialDistributor::offersSocial($item)
+            ? ['next' => 'social', 'detail' => 'Offering the video to social channels.']
             : ['next' => 'done', 'detail' => 'Published on YouTube.'];
     }
 
     /** @return array{next: string, delay?: int, detail: string} */
     private function stepSocial(array $item): array
     {
-        $id = (int) $item['id'];
-        if ((array) $item['social_post_ids_json'] !== []) {
+        $channels = VideoSocialDistributor::channelsFor($item);
+        if ($channels === []) {
+            return ['next' => 'done', 'detail' => 'Published on YouTube; no social networks were chosen for this video.'];
+        }
+        $done = (new VideoSocialDistributor($this->repo))->distribute($item, $channels);
+
+        $queued = array_values(array_map(static fn ($r) => $r['channel'], array_filter($done, static fn ($r) => in_array($r['action'], ['queued', 'requeued'], true))));
+        $manual = array_values(array_map(static fn ($r) => $r['channel'], array_filter($done, static fn ($r) => in_array($r['action'], ['manual_queue', 'not_ready'], true))));
+        $already = array_filter($done, static fn ($r) => $r['action'] === 'already_offered');
+
+        if ($queued === [] && $manual === [] && $already !== []) {
             return ['next' => 'done', 'detail' => 'Published on YouTube; social posts already created.'];
         }
-
-        $script   = $item['script_json'];
-        $db       = $this->repo->db();
-        $botId    = SystemApprover::userId();
-        $tenantId = (int) (env('REACH_DEFAULT_TENANT_ID') ?: 1);
-        $hashtags = array_slice(array_values(array_filter(array_map(static fn ($t) => '#' . preg_replace('/[^\p{L}\p{N}]+/u', '', (string) $t), (array) $script['tags']), static fn ($t) => mb_strlen($t) > 1)), 0, 5);
-        $watch    = (string) ($item['youtube_url'] ?? '');
-        $text     = trim($script['title']) . "\n\n" . mb_substr(trim((string) $script['description']), 0, 280)
-            . "\n\n" . trim((string) $script['cta_text']) . ($watch !== '' ? "\nWatch: " . $watch : '');
-        $media    = array_values(array_filter([
-            $watch !== '' ? ['type' => 'video', 'kind' => 'youtube_short', 'url' => $watch] : null,
-            $item['render_url'] ? ['type' => 'video', 'kind' => 'mp4', 'url' => $item['render_url'], 'note' => 'Rendered 9:16 MP4 — hosted by Shotstack for about 24 hours after rendering.', 'rendered_at' => $item['rendered_at']] : null,
-        ]));
-
-        $ids = [];
-        $queued = [];
-        foreach (self::SOCIAL_CHANNELS as $channel) {
-            $ready = ChannelProviderFactory::socialPublisherReadyFor($channel);
-            $now   = gmdate('Y-m-d H:i:s');
-            $db->table('reach_social_posts')->insert([
-                'channel'         => $channel,
-                'content'         => $text,
-                'media_refs'      => json_encode($media, JSON_UNESCAPED_SLASHES),
-                'hashtags'        => json_encode($hashtags, JSON_UNESCAPED_UNICODE),
-                // Without a publisher that can post on this channel they wait in the manual queue.
-                'status'          => $ready ? 'approved' : 'manual_queue',
-                'approval_status' => 'approved',
-                'approved_by'     => $botId,
-                'approved_at'     => $now,
-                'bot_generated'   => true,
-                'created_by'      => $botId,
-                'tenant_id'       => $tenantId,
-                'created_at'      => $now,
-                'updated_at'      => $now,
-            ]);
-            $postId = (int) $db->insertID();
-            $ids[]  = $postId;
-            if ($ready) {
-                Services::jobService()->enqueue(DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL, ['post_id' => $postId, 'tenant_id' => $tenantId], ['queue' => 'distribution', 'enqueued_actor_type' => 'system']);
-                $queued[] = $channel;
-            }
-        }
-        $this->repo->update($id, ['social_post_ids_json' => $ids]);
-
         $detail = $queued === []
             ? 'Published on YouTube; social posts are in the manual queue (no social publisher is connected).'
-            : 'Published on YouTube; social posts queued for ' . implode(', ', $queued) . '.';
+            : 'Published on YouTube; social posts queued for ' . implode(', ', $queued) . '.' . ($manual !== [] ? ' In the manual queue (no account): ' . implode(', ', $manual) . '.' : '');
         return ['next' => 'done', 'detail' => $detail];
     }
 
@@ -741,6 +720,35 @@ final class VideoPipelineRunner
             $this->repo->update($id, [$column => 'failed']);
             $this->repo->addWarning($id, "{$label} not set on YouTube: " . mb_substr($e->getMessage(), 0, 300)
                 . ($column === 'thumbnail_status' && $e->kind === VideoProviderException::AUTH ? ' (custom thumbnails need a phone-verified channel)' : ''));
+        }
+    }
+
+    /**
+     * Signed URL of the AICOUNTLY corner mark (official logo on a white
+     * rounded plate, CoverBranding::badgePng) the template lays over every
+     * scene, so the logo stays legible on dark stills as well as light
+     * screenshots. Stored once (no item, never purged) and re-signed per
+     * render. Null when it cannot be made — the template then uses the plain
+     * logo URL, so a render is never lost to branding.
+     */
+    private function logoBadgeUrl(): ?string
+    {
+        try {
+            $png = (new CoverBranding())->badgePng(320);
+            if ($png === null) {
+                return null;
+            }
+            $existing = \Config\Database::connect()->table('reach_video_media')
+                ->where('checksum_sha256', hash('sha256', $png))
+                ->where('item_id IS NULL', null, false)
+                ->get()->getRowArray();
+            $media = $existing ?: $this->media->store($png, 'image/png', ['width' => 320]);
+
+            return $this->media->signedUrl($media);
+        } catch (\Throwable $e) {
+            log_message('warning', 'Video: logo badge unavailable, using the plain logo: ' . $e->getMessage());
+
+            return null;
         }
     }
 

@@ -12,7 +12,22 @@ import { Pagination } from '../../components/common/Pagination';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDateTime } from '../../utils/formatDate';
 
-const STATUS_OPTIONS = ['', 'pending', 'processing', 'completed', 'failed', 'dead_letter', 'cancelled'];
+const STATUS_OPTIONS = ['', 'pending', 'processing', 'completed', 'skipped', 'dead_letter,failed', 'dead_letter', 'failed', 'cancelled'];
+
+const STATUS_LABELS = { 'dead_letter,failed': 'failed (dead letter)' };
+
+/**
+ * Narrowing filters the dashboard deep-links with. The API applies the same
+ * predicates the dashboard counted with (JobQueueInsights), so a tile's number
+ * and this list agree.
+ */
+const FLAG_FILTERS = {
+  ready:     'Ready to run now',
+  scheduled: 'Scheduled for later',
+  running:   'Running (live lease)',
+  stalled:   'Stalled (lease expired)',
+  retrying:  'Retrying after a failure',
+};
 
 function fmt(dt) { return dt ? formatDateTime(dt) : '—'; }
 
@@ -27,6 +42,10 @@ export function JobMonitorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const status = searchParams.get('status') ?? '';
   const queue  = searchParams.get('queue') ?? '';
+  const jobType = searchParams.get('job_type') ?? '';
+  const sinceHours = searchParams.get('since_hours') ?? '';
+  const flags = Object.keys(FLAG_FILTERS).filter((k) => searchParams.get(k) === '1');
+  const flagKey = flags.join(',');
 
   const setFilter = (key, value) => {
     const next = new URLSearchParams(searchParams);
@@ -44,11 +63,15 @@ export function JobMonitorPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    jobService.list({ page, limit, status, queue })
+    const params = { page, limit, status, queue };
+    if (jobType) params.job_type = jobType;
+    if (sinceHours) params.since_hours = sinceHours;
+    flagKey.split(',').filter(Boolean).forEach((k) => { params[k] = '1'; });
+    jobService.list(params)
       .then((d) => { setRows(d.items || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, limit, status, queue]);
+  }, [page, limit, status, queue, jobType, sinceHours, flagKey]);
   useEffect(load, [load]);
 
   const retryJob = async (id) => {
@@ -74,14 +97,14 @@ export function JobMonitorPage() {
     { key: 'scheduled_at', label: 'Scheduled', render: (r) => fmt(r.scheduled_at || r.available_at) },
     { key: 'started_at', label: 'Started', render: (r) => fmt(r.started_at) },
     { key: 'completed_at', label: 'Completed', render: (r) => fmt(r.completed_at) },
-    { key: 'error', label: 'Error', render: (r) => r.error_message ? (
-      <span className="text-danger text-xs" title={r.error_message}>
+    { key: 'error', label: 'Error / reason', render: (r) => r.error_message ? (
+      <span className={r.status === 'skipped' ? 'text-muted text-xs' : 'text-danger text-xs'} title={r.error_message}>
         {r.error_message.length > 60 ? r.error_message.slice(0, 60) + '…' : r.error_message}
       </span>
     ) : '—' },
     { key: 'actions', label: '', render: (r) => (
       <div className="flex gap-2">
-        {canRetry && ['failed', 'dead_letter', 'cancelled'].includes(r.status) && (
+        {canRetry && ['failed', 'dead_letter', 'cancelled', 'skipped'].includes(r.status) && (
           <button className="btn btn-secondary btn-sm" onClick={() => retryJob(r.id)}>
             <RotateCcw size={12} /> Retry
           </button>
@@ -101,7 +124,8 @@ export function JobMonitorPage() {
         <div>
           <h1>Job monitor</h1>
           <p className="text-sm text-muted">
-            Reach async job queue (Postgres). Reserve → process → complete / retry / dead-letter.
+            Reach async job queue (Postgres). Reserve → process → complete / skip / retry / dead-letter.
+            Skipped means the integration is not configured — not a failure.
           </p>
         </div>
         <button className="btn btn-secondary" onClick={load}><RefreshCw size={13}/> Refresh</button>
@@ -110,17 +134,43 @@ export function JobMonitorPage() {
       <FilterBar>
         <select value={status} onChange={(e) => setFilter('status', e.target.value)}>
           {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s ? s.replace(/_/g, ' ') : 'All statuses'}</option>
+            <option key={s} value={s}>{s ? (STATUS_LABELS[s] || s.replace(/_/g, ' ')) : 'All statuses'}</option>
           ))}
+          {status && !STATUS_OPTIONS.includes(status) && <option value={status}>{status}</option>}
         </select>
+        <input
+          value={jobType}
+          onChange={(e) => setFilter('job_type', e.target.value)}
+          placeholder="Job type (e.g. reach.seo_tracker)"
+          aria-label="Job type"
+          style={{ minWidth: 220 }}
+        />
         <input
           value={queue}
           onChange={(e) => setFilter('queue', e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); load(); } }}
-          placeholder="Queue name (e.g. default, marketing_bot)"
+          placeholder="Queue name (e.g. default, blog)"
           style={{ minWidth: 220 }}
         />
       </FilterBar>
+
+      {(sinceHours || flags.length > 0) && (
+        <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+          {sinceHours && (
+            <button type="button" className="badge badge-secondary" onClick={() => setFilter('since_hours', '')}
+                    aria-label={`Clear last ${sinceHours} hours filter`}>
+              Last {sinceHours} h ✕
+            </button>
+          )}
+          {flags.map((k) => (
+            <button key={k} type="button" className="badge badge-secondary" onClick={() => setFilter(k, '')}
+                    aria-label={`Clear ${FLAG_FILTERS[k]} filter`}>
+              {FLAG_FILTERS[k]} ✕
+            </button>
+          ))}
+          <span className="text-xs text-muted">{total} matching job{total === 1 ? '' : 's'}</span>
+        </div>
+      )}
 
       {error &&  <Alert variant="danger">{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}

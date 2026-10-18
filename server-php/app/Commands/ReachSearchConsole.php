@@ -67,7 +67,7 @@ class ReachSearchConsole extends BaseCommand
             };
 
             CLI::write(json_encode(
-                ['action' => $action, 'ts' => gmdate('c'), 'result' => $payload],
+                ['action' => $action, 'ts' => gmdate('c'), 'ts_ist' => \App\Libraries\Support\DisplayTime::format(time()), 'result' => $payload],
                 JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT,
             ));
 
@@ -268,7 +268,10 @@ class ReachSearchConsole extends BaseCommand
         $slices  = [];
         for ($i = 0; $i < 40; $i++) {
             $chunk = $service->runBackfillChunk($connectionId);
-            if (($chunk['status'] ?? '') === 'inactive') {
+            // 'inactive', or a completion with no slice left to read (a
+            // cursor with 0 days remaining): nothing was ingested, so it is
+            // not a slice and must not be printed as one.
+            if (($chunk['status'] ?? '') === 'inactive' || ! isset($chunk['chunk_from'])) {
                 break;
             }
             $slices[] = [

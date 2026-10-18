@@ -10,8 +10,11 @@ use App\Libraries\Ai\Images\OpenAiImageProvider;
 use App\Libraries\Video\Automation\VideoProviderException;
 
 /**
- * DALL·E (OpenAI images API, model from ai.image.model) stills for scenes
- * and the YouTube thumbnail. Brand guidance is appended to every prompt.
+ * GPT Image (OpenAI images API, model from ai.image.model) stills for scenes
+ * and the YouTube thumbnail. The prompt comes from StillPromptBuilder (the
+ * scene's own words + the video topic); brand guidance is appended to every
+ * prompt. The logo is never drawn by the model — the render template overlays
+ * the AICOUNTLY corner mark and the thumbnail gets it composited.
  */
 final class OpenAiStillSource implements StillImageSource
 {

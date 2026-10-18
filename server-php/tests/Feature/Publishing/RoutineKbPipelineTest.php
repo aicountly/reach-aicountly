@@ -127,6 +127,44 @@ final class RoutineKbPipelineTest extends DatabaseTestCase
         $this->assertSame('Billing', $envelope['payload']['product'] ?? null, 'launch apps get their real name');
     }
 
+    public function testALiveArticleGeminiRejectsIsWithdrawnAndRewrittenAtTheSameSlug(): void
+    {
+        $ingest = (new KnowledgeBaseDraftIngestService())->ingestKbDraft($this->payload());
+        $this->gemini = [$this->verdict('approve')];
+        $row = $this->pipeline()->process($ingest['submission_id']);
+        (new PublicationDeploymentService())->processDeployment((int) $row['deployment_id']);
+        $row = $this->pipeline()->process($ingest['submission_id']);
+        $this->assertSame(RoutineSubmissions::LIVE, $row['status'], json_encode($row));
+        $itemId = (int) $ingest['content_item_id'];
+
+        $this->gemini = [$this->verdict('reject', [], ['OFF_TOPIC: the steps describe a different product.'])];
+        $vetting = new ContentVettingService(function (): array {
+            return array_shift($this->gemini) ?? ['status' => 503, 'body' => '{}'];
+        });
+        $report = (new \App\Libraries\Content\Quality\ContentRevetService($vetting))->run(['types' => ['knowledge_base'], 'scope' => 'live']);
+        $this->assertSame('unpublished+queued_regeneration', $report['items'][0]['action'], json_encode($report));
+
+        $next = (new \App\Libraries\Content\Quality\RegenerationQueue())->claimNext('knowledge_base');
+        $this->assertSame('billing', $next['product_slug']);
+        $this->assertSame('billing-create-first-invoice', $next['slug']);
+
+        $rewrite = (new KnowledgeBaseDraftIngestService())->ingestKbDraft($this->payload([
+            'regeneration_id' => $next['regeneration_id'], 'content_base_key' => 'kb-any-new-key',
+            'steps' => [['title' => 'Open Billing', 'text' => 'Open Billing from the app launcher.'], 'Choose New invoice.', 'Save and share the invoice.'],
+        ]));
+        $this->assertSame($itemId, $rewrite['content_item_id']);
+        $this->assertSame('billing-create-first-invoice', $rewrite['slug']);
+
+        $this->gemini = [$this->verdict('approve')];
+        $row = $this->pipeline()->process((int) $rewrite['submission_id']);
+        (new PublicationDeploymentService())->processDeployment((int) $row['deployment_id']);
+        $row = $this->pipeline()->process((int) $rewrite['submission_id']);
+        $this->assertSame(RoutineSubmissions::LIVE, $row['status'], json_encode($row));
+        $db = Database::connect();
+        $this->assertSame('published', $db->table('reach_content_items')->where('id', $itemId)->get()->getRowArray()['workflow_status']);
+        $this->assertSame('live', $db->table('reach_content_regenerations')->where('id', $next['regeneration_id'])->get()->getRowArray()['status']);
+    }
+
     public function testRejectedOrUnvettedArticlesAreNotPublished(): void
     {
         $this->gemini = [$this->verdict('reject', [], ['Describes a screen that does not exist'])];

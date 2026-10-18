@@ -29,15 +29,15 @@ Search Console), also see
   **CRITICAL:** Blog automation enqueues on the `blog` queue (and
   publishing on `publishing`, Community Q&A on `community`, and every
   email/notification job — the 08:00 IST daily analytics report, the
-  approval digest, due-date reminders, the cover-gallery alert — on
+  approval digest, due-date reminders, the cover-generation failure alert — on
   `notifications`). A worker that does not list a queue **never** processes
   its jobs; they sit `pending` with nothing reporting it. Until 2026-10 the
   documented cron line omitted `notifications`, so none of those emails ever
   went out.
 
-  > Note: the distribution stream may add a `distribution` queue. If it
-  > does, append it to every `--queue=` list in this file
-  > (`…,community,notifications,distribution`).
+  > Bot queue dispatches (Bot → Queue) run on `default`. They used to go to a
+  > `marketing_bot` queue that no documented worker drained, so they stayed
+  > queued for ever; migration `2026-10-18-230001` moved the stranded ones.
 
 - **Blog dispatch (enqueue eligible work blocks):**
   ```
@@ -58,10 +58,42 @@ Search Console), also see
   ```
   php spark reach:schedule
   ```
-  - Recovers leases past their `lease_expires_at` back to `pending`.
-  - Prunes completed / dead-lettered / cancelled jobs older than N days
-    (default 14, adjust with `--prune-days=`).
-  - Enqueues Phase 2 daily housekeeping jobs.
+  - Recovers leases past their `lease_expires_at` back to `pending` — or to
+    `dead_letter` when the job has used all its attempts (a job that keeps
+    killing its worker is no longer re-run for ever).
+  - Prunes finished jobs: completed / skipped / cancelled after
+    `--prune-days` (default **7**), dead_letter / failed after
+    `--prune-failed-days` (default **14**), at most 5 000 rows per tick.
+  - Enqueues the timetable below — each job once per period, attributed to
+    the `system` actor.
+
+- **Job queue report (paste this when asking for help):**
+  ```
+  php spark reach:jobs-report            # last 24 h
+  php spark reach:jobs-report --hours=6
+  php spark reach:jobs-report --json     # the dashboard's raw figures
+  ```
+  Prints completed / failed / skipped in the window, what is queued now (and
+  the oldest wait), retrying / running / stalled jobs, every failing job type
+  with its count and **latest error**, and each queue's backlog — flagging a
+  queue whose ready jobs have waited 15+ minutes with nothing finished on it
+  in an hour (a queue missing from `--queue=`). Exit code 1 when anything
+  failed or is stalled, so it can back a monitor. Same figures as the
+  dashboard's *Job queue — last 24 h* card.
+
+### Job outcomes
+
+| Status | Meaning | Retried? |
+|--------|---------|----------|
+| `completed` | The handler ran. | — |
+| `skipped` | Did not run **by design**: the integration is not configured or switched off (no Gemini key for AI Insights, no Search Console connection, no DataForSEO login, no gallery-alert address, …). The reason is in the error column. Not a failure. | No — retry it from the Job Monitor after configuring. |
+| `pending` + error | A failed attempt waiting for its backoff (15 s, 30 s, 1 min, … capped at 1 h). | Yes, until `max_attempts` (default 5). |
+| `dead_letter` | Failed `max_attempts` times — or at once when a retry cannot help: bad payload, record gone, no handler registered for the job type, a community deployment already dead-lettered. | No. |
+
+Handlers signal a skip by throwing `App\Libraries\JobSkippedException` or by
+returning a top-level `status` of `skipped` / `not_configured` / `disabled` /
+`not_migrated`; a terminal failure by throwing `NonRetryableJobException`
+(see `App\Libraries\JobRunner`).
 
 - **One-shot diagnose (run in cPanel Terminal):**
   ```
@@ -106,7 +138,9 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 
 # Every 5 minutes — Community Q&A housekeeping (scheduled publish, deployment
-# retries, re-vetting routine submissions left pending by unavailable vetting).
+# retries, re-vetting routine submissions left pending by unavailable vetting,
+# pulling members' questions from aicountly.com/community, and settling the
+# Question Inbox: published / duplicate / auto-closed / routine queue).
 */5 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
 
 # Every 30 minutes — community intake housekeeping: seed curation, intake
@@ -123,24 +157,31 @@ period, not sixty times.
 
 | When | Job | Queue | Key |
 |------|-----|-------|-----|
-| every hour | `reach.blog_cover_sweep` | blog | `blog-cover-sweep-<Y-m-d-H>` |
+| every hour | `reach.cover_gallery_autofill` — generates the covers the upcoming blog index is missing (GPT Image, AICOUNTLY logo), capped by `covers.auto.daily_limit` | blog | `cover-gallery-autofill-<Y-m-d-H>` |
+| every hour | `reach.blog_cover_sweep` — re-attempts parked articles (re-armed when a new cover lands) | blog | `blog-cover-sweep-<Y-m-d-H>` |
 | every hour | `reach.content_due_date_reminder`, `reach.content_overdue_escalation` | notifications | `<type>-<Y-m-d-H>` |
 | every hour | `reach.content_schedule_readiness` | default | `content-schedule-readiness-<Y-m-d-H>` |
-| 03:00 | `reach.content_refresh_detection` | default | per day |
-| **04:00** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
-| 05:00 | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |
-| 06:00 | `reach.content_base_sync` | default | per day |
-| 07:00 | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
-| 08:00 | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
-| 09:00 | `reach.gallery_deficit_alert` | notifications | per day |
+| 01:00 UTC (06:30 IST) | `reach.content_quality_sweep` — re-vets what went live in the last 48 h; a Gemini reject withdraws the page and queues a same-slug rewrite (`reach:content-revet` by hand) | publishing | `content-quality-sweep-<date>` |
+| 03:00 UTC (08:30 IST) | `reach.content_refresh_detection` | default | per day |
+| **04:00 UTC (09:30 IST)** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
+| 05:00 UTC (10:30 IST) | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |
+| every hour | `reach.content_base_sync` — import content-base seeds, release roadmap topics stuck in the retired in-house drafting, reconcile topic statuses | default | `content-base-sync-<Y-m-d-H>` |
+| 01:00 IST (19:30 UTC) | `reach.roadmap_refresh` — rescore the roadmap for the IST date unless the 00:30 IST optimiser cron already completed a run | default | `roadmap-refresh-<IST date>` |
+| 07:00 UTC (12:30 IST) | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
+| 08:00 UTC (13:30 IST) | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
+| 09:00 UTC (14:30 IST) | `reach.gallery_deficit_alert` — informational email **only** when cover generation keeps failing (`covers.alerts.*`); the deficit itself is a line in the daily report | notifications | per day |
 | 06:00 IST (00:30 UTC) | `reach.seo_tracker` — DataForSEO SERP checks, capped by `seo.tracker.max_keywords_per_day`; a no-op without credentials | default | `seo-tracker-<IST date>` |
 | 08:00 IST (02:30 UTC) | `reach.daily_analytics_report` — email to `reports.daily.recipients`; never re-sent for a date already sent | notifications | `daily-report-<IST date>` |
+| 01:00 IST (19:30 UTC) | `reach.bot_plan` mode `daily` — snapshot yesterday's actuals (and the 4 days before, which may still change), review the last 7 days (variance, root causes, lessons), self-tune within bounds (`bot.self_tune.enabled`), regenerate every plan period; `php spark reach:bot-plan` by hand | default | `bot-plan-daily-<IST date>` |
+| every other hour (IST) | `reach.bot_plan` mode `refresh` — regenerate the plans only; a new version is stored only when a number changed | default | `bot-plan-refresh-<IST date>-<IST hour>` |
+
+Run any of these (and the cron commands above, and the Claude routines) now from **Bot → Activities** in Reach — it queues the same job / runs the same command; see [`BOT_ACTIONS.md`](BOT_ACTIONS.md).
 
 Run or re-run by hand:
 
 ```bash
 php spark reach:search-console ingest            # GSC incremental window now
-php spark reach:search-console backfill --days=90 # then let the 04:00 job walk it (14 days/run)
+php spark reach:search-console backfill --days=90 # then let the 04:00 UTC (09:30 IST) job walk it (14 days/run)
 php spark reach:daily-report                     # build + store today's report (no email)
 php spark reach:daily-report --send              # build + email to reports.daily.recipients
 php spark reach:daily-report --date=2026-10-17 --send --to=you@aicountly.com
@@ -154,8 +195,9 @@ report's pipeline-health section names them, e.g. "email via itwalk_api, fallbac
 
 Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
 Daily jobs handled by `reach:schedule` (no extra cron lines needed):
-05:00 SEO rank/backlink snapshots · 06:00 content-base sync ·
-09:00 cover-gallery deficit email.
+05:00 UTC (10:30 IST) SEO rank/backlink snapshots · hourly content-base sync ·
+09:00 UTC (14:30 IST) cover-generation failure alert (sent only on repeated failures). Times shown in the UI, emails and CLI are IST —
+[`TIMEZONES.md`](TIMEZONES.md).
 Every 5 minutes `reach:schedule` also enqueues `reach.routine_content_sweep`
 (default queue), which carries Claude-routine blog/KB submissions forward —
 re-vetting with Gemini after an outage, hourly cover retries, publishing and
@@ -249,10 +291,13 @@ weekly cron:
 8. **Community answers stuck before publication** (`draft_requested`,
    `validation_failed`, `draft_generated`, review queues): these are left over
    from the old in-Reach drafting, which `community:agents-run` no longer does.
-   `php spark community:legacy-drafts` lists them; `--clear --confirm`
-   archives them so their questions appear in the routine's
-   `community-plan` open questions again. Routine submissions themselves are
-   tracked in Community → Automated feed.
+   `community:schedule` archives any that has not moved for
+   `automation.community.stuck_hours` (default 6) and hands its question to the
+   routine queue (`GET v1/automation/community/pending`) on its own; the
+   Question Inbox's **Handled by** column shows it. `php spark
+   community:legacy-drafts` still lists them and `--clear --confirm` does the
+   same at once. Routine submissions themselves are tracked in Community →
+   Automated feed.
 9. **Daily report `failed`:** open Reach → Reports; the row's error says why
    (usually `EMAIL_API_KEY is not configured`). Fix the env, then "Send now"
    (super admin) or `php spark reach:daily-report --send`.

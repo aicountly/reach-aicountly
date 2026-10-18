@@ -84,6 +84,13 @@ final class CommunityQaPayloadTest extends CIUnitTestCase
             'provenance'  => ['generated_by_model' => 'claude-sonnet'],
         ]);
         $this->assertSame('member-answer:c0a8b4de-7f3e-4b8a-9c1d-2e5f6a7b8c9d', $in['external_key']);
+        $this->assertTrue($in['key_defaulted'], 'a defaulted key may move on to :2 after an answer that was not published');
+        $this->assertFalse(CommunityQaPayload::memberAnswer([
+            'question_id'  => 'C0A8B4DE-7F3E-4B8A-9C1D-2E5F6A7B8C9D',
+            'external_key' => 'my-key',
+            'answer_html'  => '<p>Record it as an expense paid from petty cash, with the voucher attached.</p>',
+            'provenance'   => ['generated_by_model' => 'claude-sonnet'],
+        ])['key_defaulted']);
 
         $this->expectException(InvalidArgumentException::class);
         CommunityQaPayload::memberAnswer(['question_id' => '42', 'answer_html' => '<p>x</p>']);

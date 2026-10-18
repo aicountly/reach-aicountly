@@ -64,6 +64,7 @@ class ReachWork extends BaseCommand
 
         $svc      = Services::jobService();
         $registry = Services::jobHandlers();
+        $runner   = new \App\Libraries\JobRunner($svc, $registry);
         $processed = 0;
 
         $this->log('worker.start', [
@@ -118,19 +119,15 @@ class ReachWork extends BaseCommand
                 'request_id' => $jobRequestId,
             ]);
 
-            try {
-                $result = $registry->execute($row, $workerId);
-                $svc->markCompleted($jobId, $result);
-                $this->log('job.completed', ['job_id' => $jobId, 'job_type' => $row['job_type'], 'request_id' => $jobRequestId]);
-            } catch (Throwable $e) {
-                $svc->markFailed($jobId, $e->getMessage());
-                $this->log('job.failed', [
-                    'job_id'     => $jobId,
-                    'job_type'   => $row['job_type'],
-                    'error'      => $e->getMessage(),
-                    'request_id' => $jobRequestId,
-                ]);
-            }
+            // JobRunner records completed / skipped / retry / dead letter.
+            $outcome = $runner->run($row, $workerId);
+            $this->log('job.' . $outcome['outcome'], array_filter([
+                'job_id'     => $jobId,
+                'job_type'   => $row['job_type'],
+                'error'      => $outcome['error'] ?? null,
+                'reason'     => $outcome['reason'] ?? null,
+                'request_id' => $jobRequestId,
+            ], static fn ($v) => $v !== null));
 
             $processed++;
             if ($once || ($limit > 0 && $processed >= $limit)) {
@@ -146,6 +143,7 @@ class ReachWork extends BaseCommand
     {
         $ctx['event'] = $event;
         $ctx['ts']    = gmdate('c');
+        $ctx['ts_ist'] = \App\Libraries\Support\DisplayTime::format(time());
         CLI::write(json_encode($ctx, JSON_UNESCAPED_SLASHES));
     }
 }

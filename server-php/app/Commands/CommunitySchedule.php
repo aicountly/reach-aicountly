@@ -3,6 +3,8 @@
 namespace App\Commands;
 
 use App\Enums\CommunityAnswerStatus;
+use App\Libraries\Community\Automation\CommunityInboxAutomationService;
+use App\Libraries\Community\Automation\CommunityMemberQuestionFeedService;
 use App\Libraries\Community\Automation\CommunityQaAutomationService;
 use App\Libraries\Community\OfficialAnswerPublishingService;
 use CodeIgniter\CLI\BaseCommand;
@@ -27,6 +29,9 @@ use App\Libraries\Database\SchemaGuard;
  * retrying/reconciling already-known records, never selecting new content
  * to act on. Due scheduled publishes are published here (lifecycle promise),
  * and routine Q&A submissions left pending by unavailable vetting are retried.
+ * The Question Inbox is settled too (CommunityInboxAutomationService): it
+ * creates no content, it only records who handles each question and closes
+ * the ones the desks will not answer, with the reason.
  *
  * Every enqueue below carries an idempotency_key derived from the current
  * time bucket so that overlapping or backed-up cron ticks cannot fan out
@@ -43,16 +48,22 @@ class CommunitySchedule extends BaseCommand
     public function run(array $params): int
     {
         $svc    = Services::jobService();
-        $bucket = date('Y-m-d-H-i');           // per-minute bucket → safe even if cron overlaps
+        // Five-minute bucket, enqueued once per key in any state
+        // (JobService::enqueueOnce): the documented cron is */5, but a host
+        // that runs this every minute must not quintuple the sweeps, and a
+        // finished sweep must not be re-queued by a second run in its slot.
+        $bucket = date('Y-m-d-H-') . str_pad((string) (intdiv((int) date('i'), 5) * 5), 2, '0', STR_PAD_LEFT);
         $hour   = (int) date('H');
         $today  = date('Y-m-d');
 
         $enqueuedIds = [];
         $publishedDue = $this->publishDueScheduledAnswers();
         $automation   = $this->sweepAutomationSubmissions();
+        $memberFeed   = $this->pullMemberQuestions();
+        $inbox        = $this->sweepInbox();
 
         // Every tick: sweep deployments whose backoff window has elapsed.
-        $enqueuedIds['deployment_retry_sweep'] = $svc->enqueue(
+        $enqueuedIds['deployment_retry_sweep'] = $svc->enqueueOnce(
             'reach.community_deployment_retry_sweep',
             [],
             [
@@ -63,7 +74,7 @@ class CommunitySchedule extends BaseCommand
         );
 
         // Every tick: pull the public site's change feed and log drift.
-        $enqueuedIds['sync_changes'] = $svc->enqueue(
+        $enqueuedIds['sync_changes'] = $svc->enqueueOnce(
             'reach.community_sync_changes',
             [],
             [
@@ -75,8 +86,8 @@ class CommunitySchedule extends BaseCommand
 
         // Every 15 minutes: reconcile all published answers against the
         // public site's checksums (heavier than the change-feed pull above).
-        if ((int) date('i') % 15 === 0) {
-            $enqueuedIds['reconciliation'] = $svc->enqueue(
+        if ((int) date('i') % 15 < 5) {
+            $enqueuedIds['reconciliation'] = $svc->enqueueOnce(
                 'reach.community_publication_reconciliation',
                 [],
                 [
@@ -90,7 +101,7 @@ class CommunitySchedule extends BaseCommand
         // Once per day at 02:00: roll up yesterday's analytics into the cache.
         if ($hour === 2) {
             $yesterday = date('Y-m-d', strtotime('-1 day'));
-            $enqueuedIds['analytics_reconciliation'] = $svc->enqueue(
+            $enqueuedIds['analytics_reconciliation'] = $svc->enqueueOnce(
                 'reach.community_analytics_reconciliation',
                 ['date' => $yesterday],
                 [
@@ -107,6 +118,8 @@ class CommunitySchedule extends BaseCommand
             'enqueued'       => $enqueuedIds,
             'scheduled_publish' => $publishedDue,
             'automation_sweep'  => $automation,
+            'member_questions'  => $memberFeed,
+            'inbox_sweep'       => $inbox,
         ], JSON_UNESCAPED_SLASHES));
 
         return 0;
@@ -132,6 +145,51 @@ class CommunitySchedule extends BaseCommand
         } catch (Throwable $e) {
             log_message('error', 'community automation sweep failed: ' . $e->getMessage());
             return ['retried' => 0, 'error' => substr($e->getMessage(), 0, 200)];
+        }
+    }
+
+    /**
+     * Members' questions asked on aicountly.com/community (signed pull of the
+     * receiver's member-questions listing) into intake, so the routine
+     * answers them on their own thread; edits and deletes follow.
+     *
+     * @return array<string, mixed>
+     */
+    private function pullMemberQuestions(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! SchemaGuard::hasColumn($db, 'reach_community_questions', 'source_checksum')) {
+                return ['skipped' => 'migration_pending'];
+            }
+
+            return (new CommunityMemberQuestionFeedService(null, $db))->sync();
+        } catch (Throwable $e) {
+            log_message('error', 'community member-question pull failed: ' . $e->getMessage());
+            return ['error' => substr($e->getMessage(), 0, 200)];
+        }
+    }
+
+    /**
+     * The Question Inbox: mark answered questions published, close duplicates
+     * and questions the desks will not answer (with the reason), hand stuck
+     * legacy drafts to the routine queue, and screen a few member questions
+     * with the vetting model. Idempotent; nothing here waits on a person.
+     *
+     * @return array<string, mixed>
+     */
+    private function sweepInbox(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! SchemaGuard::hasColumn($db, 'reach_community_questions', 'handled_by')) {
+                return ['skipped' => 'migration_pending'];
+            }
+
+            return (new CommunityInboxAutomationService($db))->sweep();
+        } catch (Throwable $e) {
+            log_message('error', 'community inbox sweep failed: ' . $e->getMessage());
+            return ['error' => substr($e->getMessage(), 0, 200)];
         }
     }
 

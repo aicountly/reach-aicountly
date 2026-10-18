@@ -7,6 +7,7 @@ import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { ROUTES } from '../../constants/routes';
 import { isBlogLegacyCreateDisabled } from '../../constants/blogFeatureFlags';
+import { fromDateTimeInputValue, timeZoneLabel, toDateTimeInputValue } from '../../utils/formatDate';
 
 const EMPTY = {
   title: '', slug: '', excerpt: '', content: '', category: '', tags: '',
@@ -37,7 +38,7 @@ export function BlogEditorPage() {
         ...EMPTY,
         ...d,
         tags: toStringField(d.tags),
-        scheduled_at: d.scheduled_at ? d.scheduled_at.substring(0, 16) : '',
+        scheduled_at: toDateTimeInputValue(d.scheduled_at),
       }))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -53,7 +54,7 @@ export function BlogEditorPage() {
       const payload = {
         ...form,
         tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-        scheduled_at: form.scheduled_at ? form.scheduled_at.replace('T', ' ') + ':00' : null,
+        scheduled_at: fromDateTimeInputValue(form.scheduled_at),
       };
       const saved = isNew
         ? await blogService.create(payload)
@@ -175,7 +176,7 @@ export function BlogEditorPage() {
           </Card>
 
           <Card title="Scheduling">
-            <label className="text-xs text-secondary">Scheduled at</label>
+            <label className="text-xs text-secondary">Scheduled at ({timeZoneLabel()})</label>
             <input type="datetime-local" value={form.scheduled_at} onChange={set('scheduled_at')} />
           </Card>
 

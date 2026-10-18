@@ -133,13 +133,14 @@ final class RoutineBlogPipelineTest extends DatabaseTestCase
                 if ($this->fail) {
                     throw new \RuntimeException('HTTP 500 from images API');
                 }
-                $img = imagecreatetruecolor(64, 40);
-                imagefilledrectangle($img, 0, 0, 63, 39, imagecolorallocate($img, 20, 140, 90));
+                // A real cover size: CoverGenerator rejects tiny images.
+                $img = imagecreatetruecolor(1536, 1024);
+                imagefilledrectangle($img, 0, 0, 1535, 1023, imagecolorallocate($img, 20, 140, 90));
                 ob_start();
                 imagepng($img);
                 $png = (string) ob_get_clean();
 
-                return new ImageGenerationResult([['b64' => base64_encode($png), 'url' => null, 'mime' => 'image/png']], 'openai_image', 'dall-e-3', null, 5, 1);
+                return new ImageGenerationResult([['b64' => base64_encode($png), 'url' => null, 'mime' => 'image/png']], 'openai_image', 'gpt-image-2.5-flare', null, 5, 1);
             }
         };
     }

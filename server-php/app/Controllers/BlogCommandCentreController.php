@@ -271,7 +271,8 @@ class BlogCommandCentreController extends BaseApiController
         return [
             'generation_enabled'   => $flags->isEnabled('ai_generation'),
             'verification_enabled' => $flags->isEnabled('fact_verification'),
-            'images_enabled'       => $flags->isEnabled('image_generation'),
+            // The cover block's own switch (automation.blog.ai_cover, BLOG_IMAGE_GENERATION_ENABLED kill switch).
+            'images_enabled'       => \App\Libraries\Automation\Routine\RoutineFlags::enabled('blog.ai_cover'),
             'text'                 => $text,
             'image'                => $image,
         ];
@@ -416,6 +417,18 @@ class BlogCommandCentreController extends BaseApiController
             ->limit($limit, $offset)
             ->get()
             ->getResultArray();
+
+        // Postgres booleans come back as "t"/"f"; "f" is truthy in the
+        // console, which showed every candidate as Pinned + Locked.
+        foreach ($rows as &$row) {
+            foreach (['is_locked', 'is_human_pinned', 'evidence_ready'] as $flag) {
+                if (array_key_exists($flag, $row)) {
+                    $row[$flag] = \App\Libraries\Support\PgBoolean::isTrue($row[$flag]);
+                }
+            }
+            $row['in_routine_queue'] = ($row['status'] ?? '') === 'roadmap_selected' && empty($row['content_item_id']);
+        }
+        unset($row);
 
         return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }

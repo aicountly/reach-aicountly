@@ -438,7 +438,27 @@ class AiGenerationOrchestrator
         }
 
         $params = json_decode($request['request_parameters_json'] ?? '{}', true);
-        return 'Generate a ' . ($request['content_type'] ?? 'piece of content') . ' based on the grounding context provided. ' . ($params['instructions'] ?? '');
+        $params = is_array($params) ? $params : [];
+
+        // The fallback once named only the content type, never the topic: a
+        // blog request produced an article about "the grounding context" or
+        // the "draft_generation" intent instead of its title. Name the topic,
+        // and forbid writing about the request itself.
+        $topic = array_filter([
+            'Title'              => trim((string) ($params['title'] ?? '')),
+            'Primary keyword'    => trim((string) ($params['primary_keyword'] ?? '')),
+            'Secondary keywords' => implode(', ', array_map('strval', (array) ($params['secondary_keywords'] ?? []))),
+            'Questions to answer'=> implode(' | ', array_map('strval', (array) ($params['questions_to_answer'] ?? []))),
+        ], static fn (string $v) => $v !== '');
+        $lines = [];
+        foreach ($topic as $label => $value) {
+            $lines[] = "{$label}: {$value}";
+        }
+
+        return 'Write ' . ($request['content_type'] ?? 'content') . ' for AICOUNTLY readers'
+            . ($lines !== [] ? " on exactly this topic:\n" . implode("\n", $lines) . "\n" : '. ')
+            . 'The text must be about that topic only. Never describe this request, its task, intent, context or pipeline, and never mention being an AI. '
+            . (string) ($params['instructions'] ?? '');
     }
 
     /**

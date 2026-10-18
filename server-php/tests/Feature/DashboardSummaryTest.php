@@ -140,36 +140,104 @@ final class DashboardSummaryTest extends ApiTestCase
 
         $social = $this->fetchSummary()['social'];
 
-        $this->assertSame(3, $social['queue'], '2 content items + 1 legacy manual_queue');
+        // queue is what the Social queue page lists (legacy approved /
+        // scheduled / manual_queue); Content Studio items are content_queue.
+        $this->assertSame(1, $social['queue'], 'the legacy manual_queue row the page shows');
+        $this->assertSame(2, $social['content_queue'], 'scheduled + approved content items');
         $this->assertSame(2, $social['posted'], 'live content item + legacy posted');
         $this->assertSame(5, $social['total']);
     }
 
-    public function testBotTileIncludesGenericJobRunner(): void
+    private function seedJob(string $status, array $extra = []): int
     {
         $db = \Config\Database::connect();
-
-        $db->table('reach_marketing_bot_queue')->insert([
-            'action'     => 'blog_ideas',
-            'status'     => 'running',
+        $db->table('reach_jobs')->insert(array_merge([
+            'job_type'   => 'blog.generate',
+            'queue'      => 'default',
+            'status'     => $status,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
+        ], $extra));
+
+        return (int) $db->insertID();
+    }
+
+    /**
+     * Regression: the Bot activity card showed lifetime totals of reach_jobs
+     * (QUEUE COMPLETED 70 447 / FAILED 19 684) plus the bot queue counted on
+     * top of its own jobs. The queue block is now 24-hour windows and live
+     * states, from reach_jobs alone.
+     */
+    public function testJobQueueBlockCountsTheLast24HoursAndLiveStates(): void
+    {
+        $old = date('Y-m-d H:i:s', strtotime('-3 days'));
+
+        $this->seedJob('completed', ['completed_at' => date('Y-m-d H:i:s')]);
+        $this->seedJob('completed', ['completed_at' => $old, 'updated_at' => $old]);  // history: not counted
+        $this->seedJob('dead_letter', ['completed_at' => date('Y-m-d H:i:s'), 'job_type' => 'reach.content_overdue_escalation', 'error_message' => 'column ci.created_by does not exist']);
+        $this->seedJob('dead_letter', ['completed_at' => $old, 'updated_at' => $old]);
+        $this->seedJob('skipped', ['completed_at' => date('Y-m-d H:i:s'), 'error_message' => 'not configured']);
+        $this->seedJob('pending', ['available_at' => date('Y-m-d H:i:s', strtotime('-20 minutes')), 'queue' => 'marketing_bot']);
+        $this->seedJob('pending', ['available_at' => date('Y-m-d H:i:s', strtotime('+2 hours'))]);
+        $this->seedJob('pending', ['available_at' => date('Y-m-d H:i:s'), 'attempts' => 2, 'error_message' => 'HTTP 503', 'job_type' => 'reach.seo_tracker']);
+        $this->seedJob('processing', ['lease_expires_at' => date('Y-m-d H:i:s', strtotime('+4 minutes'))]);
+        $this->seedJob('processing', ['lease_expires_at' => date('Y-m-d H:i:s', strtotime('-10 minutes'))]);
+
+        // A bot dispatch has a queue row AND a job — it must count once.
+        \Config\Database::connect()->table('reach_marketing_bot_queue')->insert([
+            'action' => 'blog_ideas', 'status' => 'running',
+            'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
-        foreach (['processing', 'processing', 'completed', 'dead_letter'] as $status) {
-            $db->table('reach_jobs')->insert([
-                'job_type'   => 'blog.generate',
-                'status'     => $status,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+        $data = $this->fetchSummary();
+        $jobs = $data['jobs'];
+
+        $this->assertSame(24, $jobs['window_hours']);
+        $this->assertSame(1, $jobs['completed'], 'only the completion inside 24 h');
+        $this->assertSame(1, $jobs['failed'], 'only the dead letter inside 24 h');
+        $this->assertSame(1, $jobs['skipped']);
+        $this->assertSame(2, $jobs['queued'], 'ready now (incl. the retry)');
+        $this->assertSame(1, $jobs['scheduled'], 'available later');
+        $this->assertSame(1, $jobs['retrying']);
+        $this->assertSame(1, $jobs['running'], 'live lease only — the bot queue row is not added');
+        $this->assertSame(1, $jobs['stalled'], 'expired lease');
+        $this->assertGreaterThanOrEqual(1150, $jobs['oldest_queued_secs']);
+
+        $types = array_column($jobs['failing_types'], null, 'job_type');
+        $this->assertSame(1, $types['reach.content_overdue_escalation']['failed']);
+        $this->assertSame('column ci.created_by does not exist', $types['reach.content_overdue_escalation']['last_error']);
+        $this->assertSame(1, $types['reach.seo_tracker']['retrying']);
+
+        $queues = array_column($jobs['queues'], null, 'queue');
+        $this->assertTrue($queues['marketing_bot']['undrained'], 'ready 20 min, nothing finished on it');
+        $this->assertFalse($queues['default']['undrained']);
+
+        $this->assertArrayNotHasKey('queue_completed', $data['bot'], 'lifetime totals are gone');
+    }
+
+    /** The number on each tile and the Job Monitor list it opens must agree. */
+    public function testJobMonitorFiltersReturnTheRowsEachFigureCounted(): void
+    {
+        $old = date('Y-m-d H:i:s', strtotime('-3 days'));
+        $this->seedJob('completed', ['completed_at' => date('Y-m-d H:i:s')]);
+        $this->seedJob('completed', ['completed_at' => $old, 'updated_at' => $old]);
+        $this->seedJob('dead_letter', ['completed_at' => date('Y-m-d H:i:s'), 'job_type' => 'x.fail']);
+        $this->seedJob('failed', ['completed_at' => date('Y-m-d H:i:s'), 'job_type' => 'x.fail']);
+        $this->seedJob('processing', ['lease_expires_at' => date('Y-m-d H:i:s', strtotime('-10 minutes'))]);
+        $this->seedJob('pending', ['available_at' => date('Y-m-d H:i:s', strtotime('-5 minutes'))]);
+
+        $summary = $this->fetchSummary()['jobs'];
+        $headers = $this->authAs('super_admin');
+
+        foreach (['completed', 'failed', 'stalled', 'queued', 'running', 'skipped'] as $figure) {
+            $res  = $this->withHeaders($headers)->call('GET', 'v1/jobs?' . $summary['filters'][$figure]);
+            $body = json_decode((string) $res->getJSON(), true);
+            $this->assertSame($summary[$figure], $body['data']['total'], "{$figure}: tile and list disagree");
         }
 
-        $bot = $this->fetchSummary()['bot'];
-
-        $this->assertSame(3, $bot['queue_running'], '1 bot queue + 2 jobs processing');
-        $this->assertSame(1, $bot['queue_completed']);
-        $this->assertSame(1, $bot['queue_failed'], 'dead_letter counts as failed');
+        $type = $summary['failing_types'][0];
+        $res  = $this->withHeaders($headers)->call('GET', 'v1/jobs?' . $type['filters']);
+        $this->assertSame($type['failed'], json_decode((string) $res->getJSON(), true)['data']['total']);
     }
 
     public function testUpcomingCalendarMergesScheduledContentAndLegacyItems(): void
@@ -197,6 +265,72 @@ final class DashboardSummaryTest extends ApiTestCase
         $this->assertSame($nextWeek, $upcoming[1]['date']);
     }
 
+    /**
+     * Regression: "Content — scheduled 7" while "Upcoming calendar: No
+     * upcoming items". The seven were publish_queued (no date at all), and
+     * blogs scheduled through a publication deployment carried their date
+     * only on the deployment.
+     */
+    public function testScheduledTileAndCalendarAgree(): void
+    {
+        $db       = \Config\Database::connect();
+        $nextWeek = date('Y-m-d', strtotime('+7 days'));
+
+        // Stuck in the publish queue: publishing, not scheduled.
+        $this->seedContentItem('blog', 'publish_queued');
+
+        // Scheduled through a deployment (blog SCHEDULE_PUBLISH path).
+        $viaDeployment = $this->seedContentItem('blog', 'scheduled');
+        $db->table('reach_publication_connections')->insert([
+            'connection_key' => 'dash-test-' . bin2hex(random_bytes(3)),
+            'display_name'   => 'Dash test',
+            'enabled'        => true,
+        ]);
+        $connectionId = (int) $db->insertID();
+        $db->table('reach_content_versions')->insert(['content_item_id' => $viaDeployment, 'title' => 'v1']);
+        $versionId = (int) $db->insertID();
+        $db->table('reach_publication_deployments')->insert([
+            'content_item_id' => $viaDeployment,
+            'content_version_id' => $versionId,
+            'connection_id'   => $connectionId,
+            'operation'       => 'schedule',
+            'status'          => 'queued',
+            'idempotency_key' => 'dash-' . bin2hex(random_bytes(4)),
+            'scheduled_at'    => $nextWeek . ' 10:00:00',
+        ]);
+
+        // Counted as scheduled but with no future date.
+        $this->seedContentItem('blog', 'scheduled');
+        $this->seedContentItem('knowledge_base', 'ready_for_publication', ['scheduled_at' => date('Y-m-d', strtotime('-3 days')) . ' 09:00:00']);
+
+        $data = $this->fetchSummary();
+
+        $this->assertSame(3, $data['content']['scheduled'], 'publish_queued is not scheduled');
+        $this->assertSame(1, $data['blog']['pending_publishing']);
+
+        $this->assertCount(1, $data['calendar_upcoming']);
+        $this->assertSame('deployment', $data['calendar_upcoming'][0]['source']);
+        $this->assertSame($nextWeek, $data['calendar_upcoming'][0]['date']);
+
+        $this->assertSame(2, $data['calendar_overdue']['count'], 'scheduled = upcoming + overdue/undated');
+        $reasons = array_column($data['calendar_overdue']['items'], 'reason');
+        sort($reasons);
+        $this->assertSame(['date_passed', 'no_date'], $reasons);
+    }
+
+    public function testCampaignRunningCountsActiveCampaigns(): void
+    {
+        $db = \Config\Database::connect();
+        foreach (['active', 'dispatching', 'draft'] as $status) {
+            $db->table('reach_campaigns')->insert([
+                'name' => 'C ' . $status, 'campaign_type' => 'email', 'status' => $status,
+                'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $this->assertSame(2, $this->fetchSummary()['campaigns']['running']);
+    }
+
     public function testSidebarCountsUseTheSameSources(): void
     {
         $this->seedContentItem('blog', 'draft');
@@ -210,7 +344,7 @@ final class DashboardSummaryTest extends ApiTestCase
         $data = json_decode((string) $response->getJSON(), true)['data'];
 
         $this->assertSame(2, $data['blog']);
-        $this->assertSame(1, $data['social_queue']);
+        $this->assertSame(0, $data['social_queue'], 'a content item is not in the Social queue page');
         $this->assertArrayHasKey('approvals', $data);
         $this->assertArrayHasKey('leads_pending_push', $data);
     }

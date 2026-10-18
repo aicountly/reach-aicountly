@@ -94,7 +94,10 @@ class MarketingBotService
             'user_id'  => $userId,
             'queue_id' => $queueId,
         ], [
-            'queue'               => 'marketing_bot',
+            // `default`: no documented worker drains a `marketing_bot` queue,
+            // so dispatches enqueued there sat pending for ever (migration
+            // 2026-10-18-230001 moves the stranded ones).
+            'queue'               => 'default',
             'enqueued_by_user_id' => $userId,
             'enqueued_actor_type' => 'human',
             'request_id'          => $requestId,

@@ -2,6 +2,7 @@ export const ROUTES = {
   LOGIN: '/login',
 
   DASHBOARD: '/',
+  PIPELINE_DASHBOARD: '/dashboard/pipeline',
 
   BLOG_LIST:    '/blog',
   BLOG_NEW:     '/blog/new',
@@ -18,8 +19,17 @@ export const ROUTES = {
   LANDING_LIST:   '/landing',
   LANDING_DETAIL: '/landing/:id',
 
+  // Channels → Social & Ads hub (2026-10 IA). /social used to be the manual
+  // "Social planner" and /social/queue the manual posting queue; both retired
+  // (the queue redirects to the hub calendar).
   SOCIAL_PLANNER: '/social',
   SOCIAL_QUEUE:   '/social/queue',
+  SOCIAL_HUB:         '/social',
+  SOCIAL_ACCOUNTS:    '/social/accounts',
+  SOCIAL_CALENDAR:    '/social/calendar',
+  SOCIAL_PERFORMANCE: '/social/performance',
+  SOCIAL_ADS:         '/social/ads',   // paid-ads register (ads stream); placeholder until merged
+  SOCIAL_INBOX:       '/social/inbox', // social inbox bot (comments/DMs → replies, Flow tickets)
 
   EMAIL_LIST:    '/email',
   EMAIL_DETAIL:  '/email/:id',
@@ -39,6 +49,10 @@ export const ROUTES = {
   ENGAGE_PUSH:  '/leads/engage-push',
   LEAD_OUTCOMES: '/leads/outcomes',
 
+  // Overview → Bot plan (page owned by the bot-plan stream).
+  BOT_PLAN:     '/bot/plan',
+  BOT_ACTIVITIES: '/bot/activities', // "Run now" (bot stream)
+  BOT_ASK:      '/bot/ask',          // "Ask the bot" (bot stream)
   BOT_QUEUE:    '/bot/queue',
   BOT_REPORTS:  '/bot/reports',
   BOT_REPORT_DETAIL: '/bot/reports/:id',
@@ -175,6 +189,7 @@ export const ROUTES = {
   // Centre. Was the Blog Command Centre's "SEO and Indexing" tab, which
   // deep-linked out to Intelligence and ejected the operator from the BCC
   // chrome; these leaves now render in place under their own sub-nav.
+  // 2026-10: merged into the SEO Command Centre; these now only redirect.
   BLOG_SEO: '/blog-seo',
   BLOG_SEO_SEARCH: '/blog-seo/search-console',
   BLOG_SEO_INDEXING: '/blog-seo/indexing',

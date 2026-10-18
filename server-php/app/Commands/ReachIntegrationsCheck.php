@@ -6,6 +6,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Settings\LiveIntegrationCheck;
+use App\Libraries\Support\DisplayTime;
 use App\Libraries\Video\Automation\VideoProviders;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -58,6 +59,7 @@ class ReachIntegrationsCheck extends BaseCommand
         }
 
         $report = (new LiveIntegrationCheck(VideoProviders::http()))->run($targets, $renderTest, $progress);
+        LiveIntegrationCheck::remember($report);
 
         if ($json) {
             CLI::write((string) json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
@@ -65,6 +67,7 @@ class ReachIntegrationsCheck extends BaseCommand
             foreach (self::lines($report) as $line) {
                 CLI::write($line);
             }
+            CLI::write('Checked ' . DisplayTime::format($report['ran_at'] ?? time()) . '.');
         }
 
         return $report['ok'] ? 0 : 1;

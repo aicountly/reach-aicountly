@@ -1,4 +1,12 @@
-export function ReachLogo({ height = 32 }) {
+export function ReachLogo({ height = 32, compact = false }) {
+  if (compact) {
+    return (
+      <svg width={height} height={height} viewBox="0 0 40 40" role="img" aria-label="Reach">
+        <rect width="40" height="40" rx="8" fill="#25b003" />
+        <text x="20" y="27" textAnchor="middle" fontFamily="Nunito, sans-serif" fontSize="22" fontWeight="800" fill="#ffffff">R</text>
+      </svg>
+    );
+  }
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
       <svg width={height} height={height} viewBox="0 0 40 40" aria-hidden>

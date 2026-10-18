@@ -24,6 +24,7 @@ final class RoutineFlags
         'blog.enabled'           => ['automation.blog.enabled', []],
         'blog.auto_publish'      => ['automation.blog.auto_publish', ['BLOG_AUTO_PUBLISH_ENABLED', 'BLOG_PUBLIC_PUBLISHER_ENABLED']],
         'blog.ai_cover'          => ['automation.blog.ai_cover', ['BLOG_IMAGE_GENERATION_ENABLED']],
+        'covers.auto'            => ['covers.auto.enabled', ['BLOG_IMAGE_GENERATION_ENABLED']],
         'knowledge_base.enabled' => ['automation.knowledge_base.enabled', []],
         'knowledge_base.auto_publish' => ['automation.knowledge_base.auto_publish', ['KB_AUTO_PUBLISH_ENABLED']],
     ];

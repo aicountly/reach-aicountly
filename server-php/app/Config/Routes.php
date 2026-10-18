@@ -124,6 +124,10 @@ $routes->group('v1', static function ($routes) {
     // ---------------------------------------------------------------------
     $routes->group('automation', ['filter' => 'automation-token'], static function ($routes) {
         $routes->get('content-base',    'Api\\V1\\Content\\AutomationIngestController::contentBase');
+        // Stream 5 — living content base: next topics, proposals, produced (no git pushes).
+        $routes->get('content-base/next',      'Api\\V1\\Automation\\ContentBaseAutomationController::next');
+        $routes->post('content-base/propose',  'Api\\V1\\Automation\\ContentBaseAutomationController::propose');
+        $routes->post('content-base/produced', 'Api\\V1\\Automation\\ContentBaseAutomationController::produced');
         $routes->get('gallery/status',  'Api\\V1\\Content\\AutomationIngestController::galleryStatus');
         $routes->get('link-registry',   'Api\\V1\\Content\\AutomationIngestController::linkRegistry');
         $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');
@@ -138,6 +142,10 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community-plan',     'Api\\V1\\Community\\CommunityAutomationController::plan');
         $routes->post('community-qa',      'Api\\V1\\Community\\CommunityAutomationController::storeQa');
         $routes->post('community-answers', 'Api\\V1\\Community\\CommunityAutomationController::storeAnswer');
+        // Stream 2 — the Question Inbox's routine queue (answer by id, or decline with a reason).
+        $routes->get('community/pending',                       'Api\\V1\\Community\\CommunityAutomationController::pending');
+        $routes->post('community/pending/(:segment)/answer',    'Api\\V1\\Community\\CommunityAutomationController::answerPending/$1');
+        $routes->post('community/pending/(:segment)/decline',   'Api\\V1\\Community\\CommunityAutomationController::declinePending/$1');
         // Stream D — release notes ("What's new") + workflow guides (vetted, auto-published).
         $routes->get('release-plan',     'Api\\V1\\Automation\\StructuredContentController::releasePlan');
         $routes->get('workflow-plan',    'Api\\V1\\Automation\\StructuredContentController::workflowPlan');
@@ -145,9 +153,22 @@ $routes->group('v1', static function ($routes) {
         $routes->post('workflow-guides', 'Api\\V1\\Automation\\StructuredContentController::storeWorkflowGuide');
         // ── Stream C: blog + KB routines (Gemini-vetted, auto-published) ──
         $routes->get('blog-plan',       'Api\\V1\\Content\\AutomationIngestController::blogPlan');
+        // ── Stream 4 (content clean-up): rewrites of failed items, same slug ──
+        $routes->get('regenerate/next', 'Api\\V1\\Content\\AutomationIngestController::regenerateNext');
         // Stream V — automated video (reach-video routine): script in → vetting → pipeline.
         $routes->post('video-scripts',  'Api\\V1\\Video\\VideoAutomationController::storeScript');
         $routes->get('video-plan',      'Api\\V1\\Video\\VideoAutomationController::plan');
+        // Bot Plan & Performance: lessons the routines read before writing.
+        $routes->get('plan/briefing',   'Api\\V1\\Bot\\PlanBriefingController::briefing');
+        // Stream 9 — reach-command routine (owner commands, docs/automation/routines/reach-command.md),
+        // social posts (Gemini-vetted, published via social-api.ai) and video distribution.
+        $routes->get('commands/(:segment)',           'Api\\V1\\Automation\\BotCommandAutomationController::showCommand/$1');
+        $routes->post('commands/(:segment)/report',   'Api\\V1\\Automation\\BotCommandAutomationController::report/$1');
+        $routes->post('social-posts',                 'Api\\V1\\Automation\\BotCommandAutomationController::storeSocialPost');
+        $routes->get('social-posts/(:segment)',       'Api\\V1\\Automation\\BotCommandAutomationController::showSocialPost/$1');
+        $routes->get('videos/(:segment)',             'Api\\V1\\Automation\\BotCommandAutomationController::showVideo/$1');
+        $routes->post('videos/(:segment)/distribute', 'Api\\V1\\Automation\\BotCommandAutomationController::distributeVideo/$1');
+        // end Stream 9
     });
 
     // ---------------------------------------------------------------------
@@ -182,6 +203,7 @@ $routes->group('v1', static function ($routes) {
         // Dashboard
         $routes->get('dashboard/summary', 'Api\\V1\\DashboardController::summary', ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/counts',  'Api\\V1\\DashboardController::counts',  ['filter' => 'permission:dashboard.view']);
+        $routes->get('dashboard/command-centre', 'Api\\V1\\DashboardController::commandCentre', ['filter' => 'permission:dashboard.view']);
 
         // Blog
         $routes->get('blog/posts',                        'Api\\V1\\BlogController::index',          ['filter' => 'permission:blog.view']);
@@ -235,6 +257,23 @@ $routes->group('v1', static function ($routes) {
         $routes->post('campaigns/(:num)/approve',  'Api\\V1\\CampaignController::approve/$1',    ['filter' => 'permission:campaign.approve']);
         $routes->post('campaigns/(:num)/status',   'Api\\V1\\CampaignController::setStatus/$1',  ['filter' => 'permission:campaign.dispatch']);
 
+        // Social & Ads → Ads: paid campaigns placed by hand in each ads manager
+        // (no ads API). Readable by campaign or social staff; the summary also
+        // by dashboard viewers (dashboard / plan tiles).
+        $routes->get('ads/meta',                         'Api\\V1\\AdsController::meta',            ['filter' => 'permission:campaign.view,social.view']);
+        $routes->get('ads/summary',                      'Api\\V1\\AdsController::summary',         ['filter' => 'permission:campaign.view,social.view,dashboard.view']);
+        $routes->get('ads/campaigns',                    'Api\\V1\\AdsController::index',           ['filter' => 'permission:campaign.view,social.view']);
+        $routes->post('ads/campaigns',                   'Api\\V1\\AdsController::store',           ['filter' => 'permission:campaign.create,social.create']);
+        $routes->post('ads/campaigns/launch-plan',       'Api\\V1\\AdsController::launchPlan',      ['filter' => 'permission:campaign.create,social.create']);
+        $routes->get('ads/campaigns/(:num)',             'Api\\V1\\AdsController::show/$1',         ['filter' => 'permission:campaign.view,social.view']);
+        $routes->put('ads/campaigns/(:num)',             'Api\\V1\\AdsController::update/$1',       ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->delete('ads/campaigns/(:num)',          'Api\\V1\\AdsController::destroy/$1',      ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->get('ads/campaigns/(:num)/results',     'Api\\V1\\AdsController::results/$1',      ['filter' => 'permission:campaign.view,social.view']);
+        $routes->put('ads/campaigns/(:num)/results',     'Api\\V1\\AdsController::saveResult/$1',   ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->delete('ads/results/(:num)',            'Api\\V1\\AdsController::deleteResult/$1', ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->post('ads/import',                      'Api\\V1\\AdsController::import',          ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->post('ads/utm-link',                    'Api\\V1\\AdsController::utmLink',         ['filter' => 'permission:campaign.view,social.view']);
+
         // Landing pages
         $routes->get('landing-pages',           'Api\\V1\\LandingPageController::index',      ['filter' => 'permission:campaign.view']);
         $routes->post('landing-pages',          'Api\\V1\\LandingPageController::store',      ['filter' => 'permission:campaign.create']);
@@ -252,6 +291,10 @@ $routes->group('v1', static function ($routes) {
         $routes->post('social/posts/(:num)/reject',      'Api\\V1\\SocialPostController::reject/$1',    ['filter' => 'permission:social.approve']);
         $routes->post('social/posts/(:num)/mark-posted', 'Api\\V1\\SocialPostController::markPosted/$1',['filter' => 'permission:social.dispatch']);
         $routes->get('social/queue',                     'Api\\V1\\SocialQueueController::index',       ['filter' => 'permission:social.view']);
+        // Stream a — social inbox bot (comments / DMs read from social-api.ai)
+        $routes->get('social/inbox',                     'Api\\V1\\SocialInboxController::index',       ['filter' => 'permission:social.view']);
+        $routes->get('social/inbox/summary',             'Api\\V1\\SocialInboxController::summary',     ['filter' => 'permission:social.view']);
+        $routes->post('social/inbox/(:num)/retry',       'Api\\V1\\SocialInboxController::retry/$1',    ['filter' => 'permission:social.dispatch']);
 
         // Email + WhatsApp campaigns
         $routes->get('email/campaigns',                    'Api\\V1\\EmailCampaignController::index',        ['filter' => 'permission:email.view']);
@@ -318,6 +361,15 @@ $routes->group('v1', static function ($routes) {
         $routes->post('bot/queue/(:num)/reject',  'Api\\V1\\MarketingBotController::rejectItem/$1',   ['filter' => ['permission:approval.decide', 'throttle:approval']]);
         $routes->get('bot/reports',               'Api\\V1\\BotReportController::index',              ['filter' => 'permission:bot.view']);
         $routes->get('bot/reports/(:num)',        'Api\\V1\\BotReportController::show/$1',            ['filter' => 'permission:bot.view']);
+        // Bot Plan & Performance (plan per period; plan vs achieved, causes, self-tune log)
+        $routes->get('bot/plan',                  'Api\\V1\\Bot\\BotPlanController::plan',          ['filter' => 'permission:bot.view']);
+        $routes->get('bot/performance',           'Api\\V1\\Bot\\BotPlanController::performance',   ['filter' => 'permission:bot.view']);
+        // Stream 9 — bot actions: Run now for every bot activity, and owner commands (Ask the bot).
+        $routes->get('bot/activities',                  'Api\\V1\\Bot\\BotActivityController::index', ['filter' => 'permission:bot.view,bot.run,settings.view']);
+        $routes->post('bot/activities/(:segment)/run',  'Api\\V1\\Bot\\BotActivityController::run/$1', ['filter' => ['permission:bot.run,settings.manage', 'throttle:bot_run']]);
+        $routes->get('bot/commands',                    'Api\\V1\\Bot\\BotCommandController::index', ['filter' => 'permission:bot.view,bot.command,settings.manage']);
+        $routes->post('bot/commands',                   'Api\\V1\\Bot\\BotCommandController::store', ['filter' => ['permission:bot.command,settings.manage', 'throttle:bot_command']]);
+        // end Stream 9
 
         // Approvals
         $routes->get('approvals',              'Api\\V1\\ApprovalController::index',       ['filter' => 'permission:approval.view']);

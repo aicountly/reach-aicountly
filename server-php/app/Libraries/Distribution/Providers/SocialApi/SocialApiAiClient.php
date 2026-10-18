@@ -208,6 +208,121 @@ final class SocialApiAiClient
         return SocialApiPostResult::parse($res->status, $json, $this->redactor);
     }
 
+    // ── unified inbox (comments + messages) ─────────────────────────────────
+    //
+    // ASSUMPTIONS (docs.social-api.ai/guides/inbox could not be read from this
+    // build; confirm with `reach:integrations-check --only=social_api`, which
+    // probes the list endpoint read-only, and the first live run):
+    //   list   GET  {list_path}?account_id=&since=<RFC 3339>&limit=&cursor=
+    //               ({account_id} in the path is substituted instead of the query)
+    //   reply  POST {reply_path} with {"text": "…"}            ({id} = the message id)
+    //   hide   POST {hide_path}                                  (no body)
+    // The paths are settings (social.inbox.*_path) so a different
+    // layout needs no code change. Answers are parsed by SocialInboxParser.
+
+    public const INBOX_LIST_PATH  = '/inbox';
+    public const INBOX_REPLY_PATH = '/inbox/{id}/reply';
+    public const INBOX_HIDE_PATH  = '/inbox/{id}/hide';
+
+    /**
+     * GET the inbox list (retried on 5xx / network like every GET).
+     *
+     * @param array<string, scalar|null> $query
+     * @return array<string, mixed>|list<mixed> the decoded body
+     * @throws SocialApiException non-2xx (404 → kind permanent, httpStatus 404), or a 2xx that is not JSON
+     */
+    public function inbox(array $query = [], string $pathTemplate = self::INBOX_LIST_PATH): array
+    {
+        $path = self::path($pathTemplate, self::INBOX_LIST_PATH);
+        if (str_contains($path, '{account_id}')) {
+            $path = str_replace('{account_id}', rawurlencode((string) ($query['account_id'] ?? '')), $path);
+            unset($query['account_id']);
+        }
+        $query = array_filter($query, static fn ($v) => $v !== null && $v !== '');
+        $res   = $this->get($path . ($query !== [] ? (str_contains($path, '?') ? '&' : '?') . http_build_query($query, '', '&', PHP_QUERY_RFC3986) : ''));
+        $json  = $this->decode($res);
+        if (! $res->ok()) {
+            throw $this->error('inbox list (GET ' . $path . ')', $res, $json);
+        }
+        if ($json === [] && trim($res->body) !== '' && trim($res->body) !== '[]' && trim($res->body) !== '{}') {
+            $this->log('GET ' . $path . ' answered HTTP ' . $res->status . ' with a body that is not JSON.');
+            throw new SocialApiException('social-api.ai answered the inbox list with something that is not JSON. Nothing was assumed.', SocialApiException::UNRECOGNISED, $res->status);
+        }
+        return $json;
+    }
+
+    /**
+     * POST a reply to one inbox item. Never retried (a retry could post twice).
+     *
+     * @return array{accepted: bool, http_status: int, reply_id: ?string, kind: ?string, error_code: ?string, message: ?string, unknown_outcome: bool, response: array<string, mixed>}
+     */
+    public function replyToInboxItem(string $messageId, string $text, string $pathTemplate = self::INBOX_REPLY_PATH, ?string $idempotencyKey = null): array
+    {
+        $extra = [];
+        if ($idempotencyKey !== null && $idempotencyKey !== '') {
+            $extra['Idempotency-Key'] = substr(hash('sha256', $idempotencyKey), 0, 40);
+        }
+        $path = str_replace('{id}', rawurlencode($messageId), self::path($pathTemplate, self::INBOX_REPLY_PATH));
+        $res  = $this->request('POST', $path, (string) json_encode(['text' => $text], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $extra);
+
+        return $this->actionResult('reply', $path, $res);
+    }
+
+    /**
+     * POST hide for one inbox item. Never retried.
+     *
+     * @return array{accepted: bool, http_status: int, reply_id: ?string, kind: ?string, error_code: ?string, message: ?string, unknown_outcome: bool, response: array<string, mixed>}
+     */
+    public function hideInboxItem(string $messageId, string $pathTemplate = self::INBOX_HIDE_PATH): array
+    {
+        $path = str_replace('{id}', rawurlencode($messageId), self::path($pathTemplate, self::INBOX_HIDE_PATH));
+
+        return $this->actionResult('hide', $path, $this->request('POST', $path, '{}'));
+    }
+
+    /**
+     * A configured path template, or the default when it is blank or unsafe
+     * (must be relative to the base URL: start with "/", no scheme, no "..").
+     */
+    public static function path(string $template, string $default): string
+    {
+        $t = trim($template);
+        if ($t === '' || ! str_starts_with($t, '/') || str_contains($t, '..') || str_contains($t, '://') || preg_match('/\s/', $t)) {
+            return $default;
+        }
+        return $t;
+    }
+
+    /** @return array{accepted: bool, http_status: int, reply_id: ?string, kind: ?string, error_code: ?string, message: ?string, unknown_outcome: bool, response: array<string, mixed>} */
+    private function actionResult(string $what, string $path, HttpResponse $res): array
+    {
+        $json = $this->decode($res);
+        $safe = (array) $this->redactor->value($json);
+        if ($res->ok()) {
+            $body = isset($json['data']) && is_array($json['data']) ? $json['data'] + $json : $json;
+            $id   = $body['id'] ?? $body['reply_id'] ?? $body['message_id'] ?? $body['comment_id'] ?? ($body['reply']['id'] ?? null);
+            $ok   = ! (isset($body['success']) && $body['success'] === false) && ! (isset($body['ok']) && $body['ok'] === false);
+            if (! $ok) {
+                $err = SocialApiException::errorOf($json);
+                return ['accepted' => false, 'http_status' => $res->status, 'reply_id' => null, 'kind' => SocialApiException::REJECTED, 'error_code' => $err['code'],
+                    'message' => $this->redactor->string("social-api.ai answered {$what} with HTTP {$res->status} but success=false" . ($err['message'] ? ': ' . $err['message'] : '') . '.'), 'unknown_outcome' => false, 'response' => $safe];
+            }
+            return ['accepted' => true, 'http_status' => $res->status, 'reply_id' => is_scalar($id) && (string) $id !== '' ? mb_substr((string) $id, 0, 191) : null, 'kind' => null, 'error_code' => null, 'message' => null, 'unknown_outcome' => false, 'response' => $safe];
+        }
+        $e = $this->error($what . ' (POST ' . $path . ')', $res, $json);
+
+        return [
+            'accepted'        => false,
+            'http_status'     => $res->status,
+            'reply_id'        => null,
+            'kind'            => $e->kind,
+            'error_code'      => $e->errorCode,
+            'message'         => $e->getMessage() . ($e->kind === SocialApiException::TRANSIENT ? ' The outcome is unknown — check the network before answering again.' : ''),
+            'unknown_outcome' => $e->kind === SocialApiException::TRANSIENT,
+            'response'        => $safe,
+        ];
+    }
+
     /**
      * Fetch a media source (e.g. the rendered MP4) into a local file, streamed.
      * No Reach credentials are sent.

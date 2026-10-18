@@ -148,8 +148,8 @@ describe('QuestionWorkspacePage', () => {
     expect(detail('Source')).toBe('manual');
     expect(detail('Risk')).toBe('high');
     expect(detail('Triage score')).toBe('49.500');
-    // 12:00 UTC is the 10th in any zone within ±11h; the time is local.
-    expect(detail('Received')).toMatch(/^10-07-2026 \d{2}:\d{2}$/);
+    // 12:00 UTC, shown in IST whatever the browser zone.
+    expect(detail('Received')).toBe('10-07-2026 17:30 IST');
     expect(screen.getByText(QUESTION.body)).toBeInTheDocument();
   });
 

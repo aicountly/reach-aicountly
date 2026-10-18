@@ -17,12 +17,13 @@ use App\Libraries\Publishing\KnowledgeBase\KnowledgeBaseDraftIngestService;
 /**
  * Endpoints for the Claude Code routines (X-Automation-Token authenticated).
  *
- *   GET  v1/automation/content-base    what to write next + strategy base
+ *   GET  v1/automation/content-base    strategy base, topic counts, routine activity
  *   GET  v1/automation/gallery/status  cover deficit + per-entry prompts
  *   GET  v1/automation/kb-plan         today's per-product KB quotas
  *   GET  v1/automation/blog-plan       quota, existing titles, priority topics, links
  *   POST v1/automation/blog-drafts     submit a marketing blog draft (Gemini vets it)
  *   POST v1/automation/kb-drafts       submit a KB article draft (Gemini vets it)
+ *   GET  v1/automation/regenerate/next failed item to rewrite first (same slug)
  *
  * A submitted draft is stored, then vetted, approved and queued for
  * publication in the same request where possible; the response says how far
@@ -34,9 +35,19 @@ class AutomationIngestController extends BaseApiController
     public function contentBase()
     {
         $service = new ContentBaseService();
+        $entries = new \App\Libraries\Content\Base\ContentBaseEntries();
+        $living  = [];
+        if ($entries->available()) {
+            foreach (\App\Libraries\Content\Base\ContentBaseEntries::TYPES as $type) {
+                $living[$type] = ['counts' => $entries->counts($type)] + $entries->activity($type);
+            }
+        }
 
         return $this->ok([
             'base_markdown' => $service->baseMarkdown(),
+            'note'          => 'Topics and their progress live in Reach (not git). Read GET v1/automation/content-base/next?type=blog|kb|community, add topics with POST v1/automation/content-base/propose, report with POST v1/automation/content-base/produced. blog_index is the git seed baseline only.',
+            'living'        => $living,
+            'routines'      => (new \App\Libraries\Content\Base\RoutineActivity())->health(),
             'blog_index'    => $service->blogIndex(),
             'last_sync'     => $service->lastSyncRun(),
         ]);
@@ -68,6 +79,23 @@ class AutomationIngestController extends BaseApiController
     public function blogPlan()
     {
         return $this->ok((new BlogPlanService())->plan());
+    }
+
+    /**
+     * GET v1/automation/regenerate/next?type=blog|knowledge_base — the blog
+     * and KB routines call this first. Returns (and claims for two hours) the
+     * oldest item whose text failed vetting and must be rewritten on the same
+     * topic and slug, or `item: null` when there is none.
+     */
+    public function regenerateNext()
+    {
+        $type = (string) ($this->request->getGet('type') ?? 'blog');
+        if (! in_array($type, ['blog', 'knowledge_base'], true)) {
+            return $this->fail('type must be blog or knowledge_base', 422);
+        }
+        $queue = new \App\Libraries\Content\Quality\RegenerationQueue();
+
+        return $this->ok(['item' => $queue->claimNext($type), 'open' => $queue->counts()]);
     }
 
     public function storeBlogDraft()

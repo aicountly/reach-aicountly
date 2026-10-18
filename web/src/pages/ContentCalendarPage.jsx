@@ -6,7 +6,7 @@ import { Card } from '../components/common/Card';
 import { Loader } from '../components/common/Loader';
 import { Alert } from '../components/common/Alert';
 import { Modal } from '../components/common/Modal';
-import { toDateInputValue, todayInputValue } from '../utils/formatDate';
+import { displayMonth, toDateInputValue, todayInputValue } from '../utils/formatDate';
 
 const KINDS = ['blog', 'social', 'email', 'whatsapp', 'campaign', 'webinar', 'other'];
 
@@ -40,13 +40,10 @@ export function ContentCalendarPage() {
   const [deleting, setDeleting] = useState(false);
 
   const monthRange = useMemo(() => {
-    const now = new Date();
-    now.setDate(1);
-    now.setMonth(now.getMonth() + offset);
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const { year, month: monthIndex } = displayMonth(offset);
+    const month = String(monthIndex + 1).padStart(2, '0');
     const from = `${year}-${month}-01`;
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const lastDay = new Date(year, monthIndex + 1, 0).getDate();
     const to = `${year}-${month}-${String(lastDay).padStart(2,'0')}`;
     return { from, to };
   }, [offset]);

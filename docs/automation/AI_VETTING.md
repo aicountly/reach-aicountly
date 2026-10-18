@@ -60,3 +60,13 @@ An approved draft that the vetting model itself scores below
 `automation.vetting.min_compliance_score` for compliance, or flags with a reason starting
 `HIGH_RISK:`, is held for a person instead of publishing. See
 [`CLAUDE_ROUTINES.md`](CLAUDE_ROUTINES.md).
+
+## Publish gate and re-vetting
+
+No blog version publishes unless the vetting model approved that exact version
+(`App\Libraries\Blog\BlogPublishVetGate`, called by `PublicationDeploymentService` for every
+blog publish/schedule and again at send time). Routine approvals already carry the run; anything
+else is vetted on the spot. Every rubric rejects a body that does not deliver its title, generic
+filler and text about how the content was produced (reasons start with `OFF_TOPIC:`).
+`php spark reach:content-revet` re-vets stored and live content; see
+`docs/operations/REACH_BLOG_PUBLISHING_OPERATIONS.md` → "Content clean-up".

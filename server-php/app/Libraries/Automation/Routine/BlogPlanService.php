@@ -14,9 +14,10 @@ use Config\Database;
  * article: today's remaining quota, what already exists (for de-duplication),
  * the priority areas and the internal links it may use.
  *
- * Topic supply does not depend on content-base/blog/index.json: the routine
- * proposes its own topic and content key. Index entries still planned are
- * offered as optional suggestions only.
+ * Topic supply: `index_suggestions` carries the head of the unified
+ * next-topic queue (GET v1/automation/content-base/next?type=blog — roadmap
+ * selections and content-base topics, each with its content_base_key). The
+ * routine takes the first one that fits, or proposes its own topic.
  */
 class BlogPlanService
 {
@@ -58,7 +59,7 @@ class BlogPlanService
                 'links'     => (new LinkRegistryService($this->db))->excerpt(150),
             ],
             'rules' => [
-                'Propose your own topic. Send a new content_base_key per article, e.g. blog-' . $now->format('Ymd') . '-<short-slug>.',
+                'Take the first fitting topic from index_suggestions and submit under its content_base_key; otherwise propose your own topic with a new content_base_key, e.g. blog-' . $now->format('Ymd') . '-<short-slug>.',
                 'Do not repeat or closely paraphrase any title in existing_titles; a duplicate title or slug is refused with HTTP 409.',
                 'HTTP 429 means today\'s quota is used: stop the run.',
                 'Every date in compliance_calendar is a statutory default — confirm current extensions before stating one.',
@@ -91,29 +92,27 @@ class BlogPlanService
         ], $rows);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * The first topics of the unified next-topic queue (regeneration →
+     * roadmap-selected → content base), each with the content_base_key to
+     * submit under. Optional: the routine may still propose its own topic.
+     *
+     * @return list<array<string, mixed>>
+     */
     private function indexSuggestions(): array
     {
         try {
-            $index = (new ContentBaseService($this->db))->blogIndex();
-        } catch (\Throwable) {
+            $entries = new \App\Libraries\Content\Base\ContentBaseEntries($this->db);
+            if (! $entries->available()) {
+                return [];
+            }
+            $entries->reconcile('blog');
+
+            return (new \App\Libraries\Content\Base\RoutineTopicQueue($this->db, $entries))->next('blog', 5)['items'];
+        } catch (\Throwable $e) {
+            log_message('error', '[BlogPlanService] next topics unavailable: ' . $e->getMessage());
+
             return [];
         }
-
-        $out = [];
-        foreach ((array) ($index['entries'] ?? []) as $entry) {
-            $key = (string) ($entry['key'] ?? '');
-            if ($key === '' || strtolower((string) ($entry['status'] ?? 'planned')) !== 'planned') {
-                continue;
-            }
-            if ($this->db->table('reach_content_items')->where('content_base_key', $key)->countAllResults() > 0
-                || $this->db->table('reach_topic_candidates')->where('content_base_key', $key)->where('content_item_id IS NOT NULL', null, false)->countAllResults() > 0
-            ) {
-                continue;
-            }
-            $out[] = array_intersect_key($entry, array_flip(['key', 'title', 'slug_hint', 'product_slug', 'portfolio_stream', 'funnel_stage', 'search_intent', 'seed_keyword', 'brief_prompt', 'cover_prompt']));
-        }
-
-        return $out;
     }
 }

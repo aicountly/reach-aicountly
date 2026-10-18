@@ -7,7 +7,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
-import { formatDateTime } from '../../utils/formatDate';
+import { formatDateTime, fromDateTimeInputValue, timeZoneLabel } from '../../utils/formatDate';
 
 const EMPTY = {
   subject: '', from_email: '', from_name: '',
@@ -37,7 +37,7 @@ export function EmailListPage() {
       await emailService.create({
         ...form,
         audience_filter: form.audience_filter ? { segment: form.audience_filter } : null,
-        scheduled_at: form.scheduled_at ? form.scheduled_at.replace('T', ' ') + ':00' : null,
+        scheduled_at: fromDateTimeInputValue(form.scheduled_at),
       });
       setOpen(false); setForm(EMPTY); load();
     } catch (e) { setError(e.message); }
@@ -87,7 +87,7 @@ export function EmailListPage() {
           <div><label className="text-xs text-secondary">Audience segment (label)</label><input value={form.audience_filter} onChange={(e) => setForm({...form, audience_filter: e.target.value})} /></div>
           <div><label className="text-xs text-secondary">Body (HTML)</label><textarea rows={8} value={form.body_html} onChange={(e) => setForm({...form, body_html: e.target.value})} /></div>
           <div><label className="text-xs text-secondary">Plain text body (fallback)</label><textarea rows={3} value={form.body_text} onChange={(e) => setForm({...form, body_text: e.target.value})} /></div>
-          <div><label className="text-xs text-secondary">Scheduled at</label><input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({...form, scheduled_at: e.target.value})} /></div>
+          <div><label className="text-xs text-secondary">Scheduled at ({timeZoneLabel()})</label><input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({...form, scheduled_at: e.target.value})} /></div>
         </div>
       </Modal>
     </div>

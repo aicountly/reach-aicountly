@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { formatDate, toDateInputValue } from '../../utils/formatDate';
 
 export default function PublishingCalendarPage() {
   const [scheduled, setScheduled] = useState([]);
@@ -17,8 +18,8 @@ export default function PublishingCalendarPage() {
   if (error) return <p className="text-error">{error}</p>;
 
   const grouped = (Array.isArray(scheduled) ? scheduled : []).reduce((acc, item) => {
-    const raw = item?.scheduled_at;
-    const date = raw ? String(raw).split(/[T ]/)[0] : 'Unscheduled';
+    // Grouped by the IST day of the moment (not the UTC prefix of the string).
+    const date = toDateInputValue(item?.scheduled_at) || 'Unscheduled';
     acc[date] = acc[date] ?? [];
     acc[date].push(item);
     return acc;
@@ -35,7 +36,7 @@ export default function PublishingCalendarPage() {
       ) : (
         Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => (
           <section key={date} className="calendar-group">
-            <h2 className="calendar-group__date">{date}</h2>
+            <h2 className="calendar-group__date">{date === 'Unscheduled' ? date : formatDate(date)}</h2>
             <ul className="calendar-group__list">
               {items.map(item => (
                 <li key={item.id} className="calendar-group__item">

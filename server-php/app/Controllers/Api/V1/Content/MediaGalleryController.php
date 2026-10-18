@@ -122,8 +122,16 @@ class MediaGalleryController extends BaseApiController
         $store    = new MediaAssetStore($db);
         $checksumBefore = $db->table('reach_media_gallery_assets')->countAllResults();
 
+        // Covers carry the AICOUNTLY corner mark; the unbranded upload is kept.
+        // If branding cannot run (no GD) the upload is stored as sent and
+        // branded on first assignment instead.
+        $branded = (new \App\Libraries\Media\CoverBranding())->apply($binary);
+
         try {
-            $asset = $store->storeBinary($binary, [
+            $asset = $store->storeBinary($branded['bytes'], [
+                'provenance'       => 'operator_upload',
+                'branded'          => $branded['branded'],
+                'original_binary'  => $branded['branded'] ? $binary : null,
                 'kind'             => 'gallery_upload',
                 'prompt_used'      => trim((string) $this->request->getPost('prompt_used')) ?: null,
                 'category_tags'    => $tags,

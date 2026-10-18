@@ -55,7 +55,26 @@ class AutomationTokenFilter implements FilterInterface
         }
     }
 
+    /**
+     * Records that a routine reached Reach (per content type and endpoint) so
+     * the console and the daily report can tell a quiet routine from a busy
+     * one. Never affects the response.
+     */
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
     {
+        try {
+            $status = $response->getStatusCode();
+            if ($status === 401 || $status === 503) {
+                return null;
+            }
+            $class = \App\Libraries\Content\Base\RoutineActivity::classify($request->getUri()->getPath(), null);
+            if ($class !== null) {
+                (new \App\Libraries\Content\Base\RoutineActivity())->record($class[0], $class[1], $request->getMethod(), $status);
+            }
+        } catch (\Throwable $e) {
+            log_message('warning', '[AutomationTokenFilter] activity not recorded: ' . $e->getMessage());
+        }
+
+        return null;
     }
 }

@@ -36,8 +36,21 @@ describe('PublishingCalendarPage grouping', () => {
     renderWithAuth(<PublishingCalendarPage />, ctx);
     await waitFor(() => {
       const dateHeaders = document.querySelectorAll('.calendar-group__date');
-      expect(dateHeaders[0].textContent).toBe('2026-08-01');
-      expect(dateHeaders[1].textContent).toBe('2026-09-01');
+      expect(dateHeaders[0].textContent).toBe('01-08-2026');
+      expect(dateHeaders[1].textContent).toBe('01-09-2026');
+    });
+  });
+
+  it('groups by the IST day, not the UTC date prefix', async () => {
+    // 20:00 UTC on 1 Aug is 01:30 IST on 2 Aug.
+    api.get.mockResolvedValueOnce([
+      { id: 1, content_type: 'blog', content_title: 'Late Post', status: 'scheduled', scheduled_at: '2026-08-01T20:00:00Z' },
+      { id: 2, content_type: 'blog', content_title: 'Naive UTC Post', status: 'scheduled', scheduled_at: '2026-08-01 19:00:00' },
+    ]);
+    renderWithAuth(<PublishingCalendarPage />, ctx);
+    await waitFor(() => {
+      const dateHeaders = [...document.querySelectorAll('.calendar-group__date')].map((h) => h.textContent);
+      expect(dateHeaders).toEqual(['02-08-2026']);
     });
   });
 

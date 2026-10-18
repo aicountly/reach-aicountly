@@ -471,6 +471,11 @@ class OfficialAnswerPublishingService
             'answer_id'    => $answerId,
             'canonical_url' => $result['canonical_url'] ?? null,
         ], $actorId);
+
+        // The question used to stay at draft_requested for good once its
+        // answer went live, so the Question Inbox listed published questions
+        // as still waiting. Never throws: the publication stands either way.
+        \App\Libraries\Community\Automation\CommunityInboxAutomationService::markPublishedForAnswer($answerId);
     }
 
     private function handlePublishFailure(int $deploymentId, int $answerId, string $priorStatus, array $result): void

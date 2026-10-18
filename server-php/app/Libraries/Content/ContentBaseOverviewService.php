@@ -5,37 +5,32 @@ declare(strict_types=1);
 namespace App\Libraries\Content;
 
 use App\Libraries\Blog\ContentBaseService;
+use App\Libraries\Content\Base\ContentBaseEntries;
+use App\Libraries\Content\Base\ContentBaseSync;
+use App\Libraries\Content\Base\RoutineActivity;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
 /**
- * Surface-neutral read of the whole content base.
+ * Console view of the living content base (Quality Centre → Content Base):
+ * blog, knowledge base and community Q&A topics from
+ * reach_content_base_entries, each with the status Reach derived from its own
+ * pipeline, plus when each routine last reached Reach.
  *
- * The base in `server-php/content-base/` has always covered three surfaces —
- * blog, knowledge base and community Q&A — but the only console view of it
- * was a tab inside the Blog Command Centre roadmap, so it read as a blog
- * artefact. The knowledge-base index was returned raw and the community seeds
- * were not surfaced at all: an operator could not answer "what has Claude got
- * queued for the KB?" without opening git.
+ * The page used to read the git files and compare their seed keys with the
+ * pipeline: a topic counted as "produced" as soon as any item existed (even an
+ * idea Reach's retired drafting left at brief_ready), KB articles written
+ * under the routine's own keys never counted at all, and the "base updated"
+ * date was the date someone last edited a JSON file. Now:
+ *   status   planned · queued · produced · published · retired (one vocabulary)
+ *   origin   seed (git baseline) · routine (proposed through the API)
+ *   routines last call / submission per content type, flagged when quiet
  *
- * This service answers that question for every surface in one shape, each
- * entry carrying the same `sync` verdict so the console can show one table per
- * surface instead of three bespoke ones.
- *
- * Sync keys differ per surface because each pipeline owns its own inbox:
- *   blog      — reach_topic_candidates.content_base_key → roadmap → content item
- *   knowledge — reach_content_items.content_base_key (content_type=knowledge_base)
- *   community — reach_community_questions.external_question_id
- *
- * Read-only by construction. The files are git-owned and rsynced on deploy
- * with `--delete`; anything written here would be destroyed by the next
- * deploy, so nothing writes.
+ * Reading the page imports the seeds when the table is empty and reconciles
+ * statuses (both idempotent), so what it shows is current.
  */
 class ContentBaseOverviewService
 {
-    /** Entries whose status marks them as no longer wanted. */
-    private const RETIRED = ['retired', 'archived', 'dropped'];
-
     private BaseConnection $db;
     private ContentBaseService $base;
 
@@ -45,247 +40,144 @@ class ContentBaseOverviewService
         $this->base = $base ?? new ContentBaseService($this->db);
     }
 
-    /**
-     * The whole base, one section per surface.
-     *
-     * @return array<string,mixed>
-     */
+    /** @return array<string,mixed> */
     public function overview(): array
     {
-        $blog      = $this->blogSection();
-        $knowledge = $this->knowledgeSection();
-        $community = $this->communitySection();
+        $entries = new ContentBaseEntries($this->db, $this->base);
+        $health  = (new RoutineActivity($this->db))->health();
 
-        return [
-            'base_path'     => $this->base->basePath(),
-            'base_markdown' => $this->base->baseMarkdown(),
-            'last_sync'     => $this->base->lastSyncRun(),
-            'surfaces'      => [
-                'blog'           => $blog,
-                'knowledge_base' => $knowledge,
-                'community'      => $community,
-            ],
-            'totals' => [
-                'entries' => $blog['counts']['total'] + $knowledge['counts']['total'] + $community['counts']['total'],
-                'pending' => $blog['counts']['pending'] + $knowledge['counts']['pending'] + $community['counts']['pending'],
-                'done'    => $blog['counts']['done'] + $knowledge['counts']['done'] + $community['counts']['done'],
-            ],
-        ];
-    }
-
-    // ----------------------------------------------------------------- blog
-
-    /** @return array<string,mixed> */
-    private function blogSection(): array
-    {
-        $index   = $this->base->blogIndex();
-        $entries = [];
-
-        foreach ((array) ($index['entries'] ?? []) as $entry) {
-            $key       = trim((string) ($entry['key'] ?? ''));
-            $candidate = $key !== ''
-                ? $this->db->table('reach_topic_candidates')
-                    ->select('id, status, content_item_id, updated_at')
-                    ->where('content_base_key', $key)
-                    ->get()->getRowArray()
-                : null;
-
-            $entries[] = [
-                'key'          => $key,
-                'title'        => (string) ($entry['title'] ?? ''),
-                'status'       => (string) ($entry['status'] ?? 'planned'),
-                'target_date'  => (string) ($entry['target_date'] ?? ''),
-                'stream'       => (string) ($entry['portfolio_stream'] ?? ''),
-                'product_slug' => (string) ($entry['product_slug'] ?? ''),
-                'prompt'       => (string) ($entry['brief_prompt'] ?? ''),
-                'sync'         => $this->verdict(
-                    retired: $this->isRetired((string) ($entry['status'] ?? '')),
-                    produced: $candidate !== null && ! empty($candidate['content_item_id']),
-                    tracked: $candidate !== null,
-                    detail: $candidate ? ['candidate_status' => $candidate['status'], 'content_item_id' => $candidate['content_item_id']] : [],
-                ),
+        if (! $entries->available()) {
+            return [
+                'available'     => false,
+                'note'          => 'The content base table is not migrated on this server — run php spark migrate.',
+                'base_markdown' => $this->base->baseMarkdown(),
+                'surfaces'      => [],
+                'routines'      => $health,
+                'totals'        => ['entries' => 0, 'published' => 0, 'in_progress' => 0, 'planned' => 0, 'done' => 0, 'pending' => 0],
             ];
         }
+        if ($entries->isEmpty()) {
+            (new ContentBaseSync($this->db))->run();
+        }
+        $entries->reconcile();
+
+        $surfaces = [
+            'blog'           => $this->section($entries, 'blog', 'Blog', 'blog/index.json', $health['blog'] ?? null),
+            'knowledge_base' => $this->knowledgeSection($entries, $health['knowledge_base'] ?? null),
+            'community'      => $this->section($entries, 'community', 'Community Q&A', 'community/question-seeds.json', $health['community'] ?? null),
+        ];
+
+        $totals = ['entries' => 0, 'published' => 0, 'in_progress' => 0, 'planned' => 0];
+        foreach ($surfaces as $s) {
+            $totals['entries']     += $s['counts']['total'];
+            $totals['published']   += $s['counts']['published'];
+            $totals['in_progress'] += $s['counts']['queued'] + $s['counts']['produced'];
+            $totals['planned']     += $s['counts']['planned'];
+        }
+        $totals['done']    = $totals['published'];
+        $totals['pending'] = $totals['planned'] + $totals['in_progress'];
 
         return [
-            'label'       => 'Blog',
-            'source_file' => 'blog/index.json',
-            'meta'        => $this->meta($index),
-            'entries'     => $entries,
-            'counts'      => $this->counts($entries),
+            'available'     => true,
+            'base_path'     => $this->base->basePath(),
+            'base_markdown' => $this->base->baseMarkdown(),
+            'last_sync'     => $this->lastSeedImport(),
+            'routines'      => $health,
+            'stale'         => RoutineActivity::staleLines($health),
+            'surfaces'      => $surfaces,
+            'totals'        => $totals,
         ];
     }
 
-    // ------------------------------------------------------------ knowledge
+    /** @return array<string,mixed> */
+    private function section(ContentBaseEntries $entries, string $type, string $label, string $seedFile, ?array $health): array
+    {
+        $rows = array_map(fn (array $r): array => $this->row($r), $entries->all($type));
+
+        return [
+            'label'     => $label,
+            'seed_file' => $seedFile,
+            'source_file' => $seedFile,
+            'routine'   => $health,
+            'activity'  => $entries->activity($type),
+            'entries'   => $rows,
+            'counts'    => $entries->counts($type),
+        ];
+    }
 
     /**
-     * KB topics are grouped per product, and each product carries its own
-     * daily quota, so the section keeps that grouping rather than flattening
-     * it into a topic list that loses the cadence.
+     * KB topics stay grouped per product with its daily cadence.
      *
      * @return array<string,mixed>
      */
-    private function knowledgeSection(): array
+    private function knowledgeSection(ContentBaseEntries $entries, ?array $health): array
     {
-        $index    = $this->base->knowledgeBaseIndex();
+        $section  = $this->section($entries, 'knowledge_base', 'Knowledge base', 'knowledge-base/index.json', $health);
         $cadence  = $this->cadenceBySlug();
-        $entries  = [];
         $products = [];
+        foreach ($section['entries'] as $row) {
+            $products[(string) $row['product_slug']][] = $row;
+        }
 
-        foreach ((array) ($index['products'] ?? []) as $product) {
-            $slug   = trim((string) ($product['product_slug'] ?? ''));
-            $topics = [];
-
-            foreach ((array) ($product['topics'] ?? []) as $topic) {
-                $key  = trim((string) ($topic['key'] ?? ''));
-                $item = $key !== ''
-                    ? $this->db->table('reach_content_items')
-                        ->select('id, workflow_status, publication_status')
-                        ->where('content_base_key', $key)
-                        ->where('deleted_at IS NULL', null, false)
-                        ->get()->getRowArray()
-                    : null;
-
-                $row = [
-                    'key'          => $key,
-                    'title'        => (string) ($topic['title'] ?? ''),
-                    'status'       => (string) ($topic['status'] ?? 'planned'),
-                    'target_date'  => (string) ($topic['target_date'] ?? ''),
-                    'stream'       => $slug,
-                    'product_slug' => $slug,
-                    'prompt'       => (string) ($topic['brief_prompt'] ?? $topic['prompt'] ?? ''),
-                    'sync'         => $this->verdict(
-                        retired: $this->isRetired((string) ($topic['status'] ?? '')),
-                        produced: $item !== null,
-                        tracked: $item !== null,
-                        detail: $item ? ['content_item_id' => (int) $item['id'], 'workflow_status' => $item['workflow_status']] : [],
-                    ),
-                ];
-
-                $topics[]  = $row;
-                $entries[] = $row;
+        $out = [];
+        foreach ($products as $slug => $topics) {
+            $counts = array_fill_keys(ContentBaseEntries::STATUSES, 0);
+            foreach ($topics as $t) {
+                $counts[$t['status']]++;
             }
-
-            $products[] = [
+            $out[] = [
                 'product_slug' => $slug,
-                'tier'         => (string) ($cadence[$slug]['tier'] ?? $product['tier'] ?? ''),
+                'tier'         => (string) ($cadence[$slug]['tier'] ?? ''),
                 'daily_quota'  => (int) ($cadence[$slug]['daily_quota'] ?? 0),
                 'enabled'      => (bool) ($cadence[$slug]['enabled'] ?? false),
                 'topics'       => $topics,
-                'counts'       => $this->counts($topics),
+                'counts'       => ['total' => count($topics)] + $counts,
             ];
         }
+        usort($out, static fn (array $a, array $b): int => [$a['enabled'] ? 0 : 1, -$a['daily_quota'], $a['product_slug']]
+            <=> [$b['enabled'] ? 0 : 1, -$b['daily_quota'], $b['product_slug']]);
+        $section['products'] = $out;
 
-        return [
-            'label'       => 'Knowledge base',
-            'source_file' => 'knowledge-base/index.json',
-            'meta'        => $this->meta($index),
-            'products'    => $products,
-            'entries'     => $entries,
-            'counts'      => $this->counts($entries),
-        ];
+        return $section;
     }
-
-    // ------------------------------------------------------------ community
-
-    /** @return array<string,mixed> */
-    private function communitySection(): array
-    {
-        $seeds   = $this->base->communityQuestionSeeds();
-        $entries = [];
-
-        foreach ((array) ($seeds['seeds'] ?? []) as $seed) {
-            $key      = trim((string) ($seed['key'] ?? ''));
-            $question = $key !== ''
-                ? $this->db->table('reach_community_questions')
-                    ->select('id, status, category')
-                    ->where('external_question_id', $key)
-                    ->get()->getRowArray()
-                : null;
-
-            $entries[] = [
-                'key'          => $key,
-                'title'        => (string) ($seed['question'] ?? ''),
-                'status'       => (string) ($seed['status'] ?? 'planned'),
-                'target_date'  => (string) ($seed['target_date'] ?? ''),
-                'stream'       => (string) ($seed['category'] ?? ''),
-                'product_slug' => (string) ($seed['product_slug'] ?? ''),
-                'prompt'       => (string) ($seed['context'] ?? ''),
-                'sync'         => $this->verdict(
-                    retired: $this->isRetired((string) ($seed['status'] ?? '')),
-                    produced: $question !== null,
-                    tracked: $question !== null,
-                    detail: $question ? ['question_id' => (int) $question['id'], 'question_status' => $question['status']] : [],
-                ),
-            ];
-        }
-
-        return [
-            'label'       => 'Community Q&A',
-            'source_file' => 'community/question-seeds.json',
-            'meta'        => $this->meta($seeds),
-            'entries'     => $entries,
-            'counts'      => $this->counts($entries),
-        ];
-    }
-
-    // -------------------------------------------------------------- helpers
 
     /**
-     * One vocabulary for "where is this entry up to", so the console renders
-     * the same badge on every surface.
-     *
-     * @param array<string,mixed> $detail
+     * @param array<string,mixed> $r
      * @return array<string,mixed>
      */
-    private function verdict(bool $retired, bool $produced, bool $tracked, array $detail): array
-    {
-        $state = match (true) {
-            $retired  => 'retired',
-            $produced => 'produced',
-            $tracked  => 'queued',
-            default   => 'pending_sync',
-        };
-
-        return ['state' => $state] + $detail;
-    }
-
-    private function isRetired(string $status): bool
-    {
-        return in_array(strtolower(trim($status)), self::RETIRED, true);
-    }
-
-    /**
-     * @param list<array<string,mixed>> $entries
-     * @return array<string,int>
-     */
-    private function counts(array $entries): array
-    {
-        $counts = ['total' => count($entries), 'produced' => 0, 'queued' => 0, 'pending_sync' => 0, 'retired' => 0];
-
-        foreach ($entries as $entry) {
-            $state = (string) ($entry['sync']['state'] ?? 'pending_sync');
-            $counts[$state] = ($counts[$state] ?? 0) + 1;
-        }
-
-        $counts['done']    = $counts['produced'];
-        $counts['pending'] = $counts['queued'] + $counts['pending_sync'];
-
-        return $counts;
-    }
-
-    /**
-     * @param array<string,mixed> $file
-     * @return array<string,mixed>
-     */
-    private function meta(array $file): array
+    private function row(array $r): array
     {
         return [
-            'version'    => $file['version'] ?? null,
-            'updated_at' => $file['updated_at'] ?? null,
-            'notes'      => $file['notes'] ?? null,
-            'readable'   => $file !== [],
+            'key'             => (string) $r['entry_key'],
+            'content_base_key'=> (string) ($r['content_key'] ?: $r['entry_key']),
+            'title'           => (string) $r['title'],
+            'status'          => (string) $r['status'],
+            'status_reason'   => $r['status_reason'],
+            'origin'          => (string) $r['origin'],
+            'target_date'     => (string) ($r['target_date'] ?? ''),
+            'stream'          => (string) ($r['category'] ?? ''),
+            'product_slug'    => (string) ($r['product_slug'] ?? ''),
+            'prompt'          => (string) ($r['brief'] ?? ''),
+            'attempts'        => (int) $r['attempts'],
+            'content_item_id' => $r['content_item_id'] !== null ? (int) $r['content_item_id'] : null,
+            'question_id'     => $r['community_question_id'] !== null ? (int) $r['community_question_id'] : null,
+            'updated_at'      => $r['updated_at'],
+            // Kept for older consoles that read sync.state.
+            'sync'            => ['state' => (string) $r['status']],
         ];
+    }
+
+    /** @return array<string,mixed>|null the newest seed import that changed something */
+    private function lastSeedImport(): ?array
+    {
+        try {
+            return $this->db->table('reach_content_base_sync_runs')
+                ->whereIn('file_key', ['seed_blog', 'seed_knowledge_base', 'seed_community', 'blog_index'])
+                ->orderBy('id', 'DESC')->limit(1)
+                ->get()->getRowArray() ?: null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @return array<string, array<string,mixed>> */
@@ -300,7 +192,7 @@ class ContentBaseOverviewService
             $out[(string) $row['product_slug']] = [
                 'tier'        => $row['tier'],
                 'daily_quota' => (int) $row['daily_quota'],
-                'enabled'     => (bool) $row['enabled'],
+                'enabled'     => \App\Libraries\Support\PgBoolean::isTrue($row['enabled']),
             ];
         }
 

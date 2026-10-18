@@ -51,6 +51,10 @@ final class NotificationJobsTest extends ApiTestCase
         $this->assertSame(1, $job->handle([], $ctx)['escalated']);
         $this->assertSame(0, $job->handle([], $ctx)['escalated'], 'The next hourly run does not repeat it.');
         $this->assertSame(1, (int) Database::connect()->table('reach_notifications')->where('entity_id', $id)->countAllResults());
+
+        // The due DATE reads as dd-mm-yyyy, never shifted a day by a zone.
+        $message = (string) Database::connect()->table('reach_notifications')->where('entity_id', $id)->get()->getRowArray()['message'];
+        $this->assertStringContainsString('(was due ' . date('d-m-Y', strtotime('-2 days')) . ')', $message);
     }
 
     public function testReportCountsContentPublishedInTheWindow(): void
