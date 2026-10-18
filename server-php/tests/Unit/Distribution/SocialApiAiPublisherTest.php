@@ -262,7 +262,7 @@ final class SocialApiAiPublisherTest extends CIUnitTestCase
         $this->assertSame([['source_type' => 'media_id', 'media_id' => 'med_1']], $body['media']);
         $this->assertSame('GST in 60 seconds #Shorts', $body['title']);
         $this->assertSame('Description', $body['text']);
-        $this->assertSame([['account_id' => 'acc_yt']], $body['targets']);
+        $this->assertSame([['account_id' => 'acc_yt', 'visibility' => 'public']], $body['targets'], 'social-api.ai defaults YouTube to private');
     }
 
     public function testRejectedMediaStopsBeforeAnyPost(): void
@@ -343,6 +343,37 @@ final class SocialApiAiPublisherTest extends CIUnitTestCase
         $this->setVideoEnv(['SOCIALAPI_PLATFORM_DATA_LINKEDIN' => '[1,2]']);
         $pub->publish(self::message(), 'linkedin');
         $this->assertArrayNotHasKey('platform_data', self::body($http), 'a stored value that is not an object is ignored, not sent');
+    }
+
+    public function testYouTubeVisibilityGoesOnTheTargetAndDefaultsToPublic(): void
+    {
+        // social-api.ai's own dashboard sends {targets:[{account_id, visibility:"public"}]} and
+        // defaults to private, so Reach always sends a visibility for YouTube targets.
+        $pub = $this->publisher($this->http());
+
+        $b = $pub->postBody(self::message('v'), 'youtube', 'acc_yt', ['med_1']);
+        $this->assertSame([['account_id' => 'acc_yt', 'visibility' => 'public']], $b['targets']);
+        $this->assertArrayNotHasKey('platform_data', $b);
+
+        $this->setVideoEnv(['SOCIALAPI_YOUTUBE_VISIBILITY' => 'unlisted']);
+        $this->assertSame('unlisted', $pub->postBody(self::message('v'), 'youtube', 'acc_yt', ['med_1'])['targets'][0]['visibility']);
+
+        $this->setVideoEnv(['SOCIALAPI_YOUTUBE_VISIBILITY' => 'everyone']);
+        $this->assertSame('public', $pub->postBody(self::message('v'), 'youtube', 'acc_yt', ['med_1'])['targets'][0]['visibility'], 'an invalid value falls back to public');
+
+        $this->assertSame([['account_id' => 'acc_li']], $pub->postBody(self::message(), 'linkedin', 'acc_li', [])['targets'], 'no visibility invented for other networks');
+    }
+
+    public function testPerTargetOptionsAreMergedButCannotChangeTheAccount(): void
+    {
+        $pub = $this->publisher($this->http());
+        $this->setVideoEnv(['SOCIALAPI_TARGET_OPTIONS_YOUTUBE' => '{"category_id":"28","made_for_kids":false,"account_id":"acc_evil","visibility":"private"}']);
+
+        $t = $pub->postBody(self::message('v'), 'youtube', 'acc_yt', ['med_1'])['targets'][0];
+        $this->assertSame('acc_yt', $t['account_id'], 'the resolved account always wins');
+        $this->assertSame('28', $t['category_id']);
+        $this->assertFalse($t['made_for_kids']);
+        $this->assertSame('public', $t['visibility'], 'the visibility setting wins over target options');
     }
 
     public function testHashtagsAreAppendedOnceAndTheIdempotencyKeyIsSent(): void

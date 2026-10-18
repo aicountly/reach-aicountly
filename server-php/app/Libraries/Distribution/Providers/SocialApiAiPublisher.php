@@ -116,7 +116,7 @@ class SocialApiAiPublisher implements SocialPublisherInterface
         if ($title !== '') {
             $body['title'] = mb_substr($title, 0, $platform === 'youtube' ? 100 : 255);
         }
-        $body['targets'] = [['account_id' => $accountId]];
+        $body['targets'] = [self::target($platform, $accountId)];
         if ($mediaIds !== []) {
             $body['media'] = array_map(static fn (string $id): array => ['source_type' => 'media_id', 'media_id' => $id], $mediaIds);
         }
@@ -138,6 +138,25 @@ class SocialApiAiPublisher implements SocialPublisherInterface
         }
 
         return $body;
+    }
+
+    /**
+     * One targets[] entry. Per-network options live on the target, not in platform_data:
+     * social-api.ai's own dashboard sends YouTube visibility as targets[].visibility, and
+     * its default is private, so Reach always sends the configured visibility for YouTube.
+     *
+     * @return array<string, mixed>
+     */
+    public static function target(string $platform, string $accountId): array
+    {
+        $target = ReachConfig::jsonObject('social.socialapi.target_options.' . $platform);
+        if ($platform === 'youtube') {
+            $visibility = strtolower(trim((string) ReachConfig::get('social.socialapi.youtube.visibility', 'public')));
+            $target['visibility'] = in_array($visibility, ['public', 'unlisted', 'private'], true) ? $visibility : 'public';
+        }
+        $target['account_id'] = $accountId;
+
+        return ['account_id' => $accountId] + $target;
     }
 
     public function getStatus(string $providerPostId): ProviderStatus
