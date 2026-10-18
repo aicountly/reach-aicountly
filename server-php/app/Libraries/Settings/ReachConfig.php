@@ -98,6 +98,12 @@ final class ReachConfig
             // ── Automation volumes & switches ───────────────────────────────
             'automation.community.enabled' => ['group' => 'Automation', 'label' => 'Community Q&A automation', 'type' => 'bool', 'default' => true],
             'automation.community.daily_limit' => ['group' => 'Automation', 'label' => 'Community Q&A per day', 'type' => 'int', 'default' => 10],
+            // ── Stream 2: Community Question Inbox handling (keep this block contiguous) ──
+            'automation.community.stuck_hours' => ['group' => 'Automation', 'label' => 'Community: hand stuck drafts to the routine after (hours)', 'type' => 'int', 'default' => 6,
+                'help' => 'A question whose old in-Reach draft has not moved for this long is handed to the reach-community-qa routine queue (the draft is archived; nothing public changes).'],
+            'automation.community.triage' => ['group' => 'Automation', 'label' => 'Community: vetting model screens members\' questions', 'type' => 'bool', 'default' => true,
+                'help' => 'The vetting model (community_question rubric) closes spam, abusive, personal-data and off-topic questions with its reason, so they never wait in the inbox.'],
+            // ── end Stream 2 ──
             'automation.blog.enabled' => ['group' => 'Automation', 'label' => 'Blog automation', 'type' => 'bool', 'default' => true],
             'automation.blog.daily_limit' => ['group' => 'Automation', 'label' => 'Blogs per day', 'type' => 'int', 'default' => 6],
             'automation.knowledge_base.enabled' => ['group' => 'Automation', 'label' => 'Knowledge Base automation', 'type' => 'bool', 'default' => true],

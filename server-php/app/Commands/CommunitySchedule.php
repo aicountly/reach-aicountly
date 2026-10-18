@@ -3,6 +3,8 @@
 namespace App\Commands;
 
 use App\Enums\CommunityAnswerStatus;
+use App\Libraries\Community\Automation\CommunityInboxAutomationService;
+use App\Libraries\Community\Automation\CommunityMemberQuestionFeedService;
 use App\Libraries\Community\Automation\CommunityQaAutomationService;
 use App\Libraries\Community\OfficialAnswerPublishingService;
 use CodeIgniter\CLI\BaseCommand;
@@ -27,6 +29,9 @@ use App\Libraries\Database\SchemaGuard;
  * retrying/reconciling already-known records, never selecting new content
  * to act on. Due scheduled publishes are published here (lifecycle promise),
  * and routine Q&A submissions left pending by unavailable vetting are retried.
+ * The Question Inbox is settled too (CommunityInboxAutomationService): it
+ * creates no content, it only records who handles each question and closes
+ * the ones the desks will not answer, with the reason.
  *
  * Every enqueue below carries an idempotency_key derived from the current
  * time bucket so that overlapping or backed-up cron ticks cannot fan out
@@ -54,6 +59,8 @@ class CommunitySchedule extends BaseCommand
         $enqueuedIds = [];
         $publishedDue = $this->publishDueScheduledAnswers();
         $automation   = $this->sweepAutomationSubmissions();
+        $memberFeed   = $this->pullMemberQuestions();
+        $inbox        = $this->sweepInbox();
 
         // Every tick: sweep deployments whose backoff window has elapsed.
         $enqueuedIds['deployment_retry_sweep'] = $svc->enqueueOnce(
@@ -111,6 +118,8 @@ class CommunitySchedule extends BaseCommand
             'enqueued'       => $enqueuedIds,
             'scheduled_publish' => $publishedDue,
             'automation_sweep'  => $automation,
+            'member_questions'  => $memberFeed,
+            'inbox_sweep'       => $inbox,
         ], JSON_UNESCAPED_SLASHES));
 
         return 0;
@@ -136,6 +145,51 @@ class CommunitySchedule extends BaseCommand
         } catch (Throwable $e) {
             log_message('error', 'community automation sweep failed: ' . $e->getMessage());
             return ['retried' => 0, 'error' => substr($e->getMessage(), 0, 200)];
+        }
+    }
+
+    /**
+     * Members' questions asked on aicountly.com/community (signed pull of the
+     * receiver's member-questions listing) into intake, so the routine
+     * answers them on their own thread; edits and deletes follow.
+     *
+     * @return array<string, mixed>
+     */
+    private function pullMemberQuestions(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! SchemaGuard::hasColumn($db, 'reach_community_questions', 'source_checksum')) {
+                return ['skipped' => 'migration_pending'];
+            }
+
+            return (new CommunityMemberQuestionFeedService(null, $db))->sync();
+        } catch (Throwable $e) {
+            log_message('error', 'community member-question pull failed: ' . $e->getMessage());
+            return ['error' => substr($e->getMessage(), 0, 200)];
+        }
+    }
+
+    /**
+     * The Question Inbox: mark answered questions published, close duplicates
+     * and questions the desks will not answer (with the reason), hand stuck
+     * legacy drafts to the routine queue, and screen a few member questions
+     * with the vetting model. Idempotent; nothing here waits on a person.
+     *
+     * @return array<string, mixed>
+     */
+    private function sweepInbox(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! SchemaGuard::hasColumn($db, 'reach_community_questions', 'handled_by')) {
+                return ['skipped' => 'migration_pending'];
+            }
+
+            return (new CommunityInboxAutomationService($db))->sweep();
+        } catch (Throwable $e) {
+            log_message('error', 'community inbox sweep failed: ' . $e->getMessage());
+            return ['error' => substr($e->getMessage(), 0, 200)];
         }
     }
 

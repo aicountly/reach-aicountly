@@ -26,6 +26,7 @@ class QuestionController extends BaseApiController
         $status  = $this->request->getGet('status');
         $spaceId = $this->request->getGet('space_id');
         $sort    = $this->request->getGet('sort');
+        $handler = $this->request->getGet('handled_by');
         $empty   = [
             'data' => [],
             'meta' => [
@@ -46,8 +47,9 @@ class QuestionController extends BaseApiController
             // the space filter spaceId, so it was silently ignored.
             $result = $this->repo->listForInbox(
                 filters: array_filter([
-                    'status'   => $status,
-                    'space_id' => $spaceId,
+                    'status'     => $status,
+                    'handled_by' => $handler,
+                    'space_id'   => $spaceId,
                     'sort'     => $sort,
                 ]),
                 page: $page,

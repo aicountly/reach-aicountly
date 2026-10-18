@@ -10,7 +10,7 @@ namespace App\Libraries\Ai\Vetting;
  */
 final class Rubrics
 {
-    public const TYPES = ['community', 'blog', 'knowledge_base', 'release_note', 'workflow_guide', 'video_script', 'social_reply', 'social_post'];
+    public const TYPES = ['community', 'community_question', 'blog', 'knowledge_base', 'release_note', 'workflow_guide', 'video_script', 'social_reply', 'social_post'];
 
     private const COMMON = <<<'TXT'
 You are the final editor for AICOUNTLY, an Indian accounting and business software company
@@ -69,6 +69,26 @@ Reject when the question or answer is abusive, hateful, sexual, harassing, spam/
 third party, contains personal data, or is unrelated to business, accounting, tax or AICOUNTLY.
 The question is published too: fix its grammar and spelling lightly, keep the asker's voice and
 meaning, remove any personal data (or reject if it cannot be removed).
+TXT,
+            // The inbox screen (CommunityInboxAutomationService): a member's
+            // question only, before the community-qa routine writes an answer.
+            // There is no answer to judge yet; the decision is whether the desks
+            // should answer this question at all.
+            'community_question' => <<<'TXT'
+CONTENT: a question a member asked on the AICOUNTLY community (aicountly.com/community). There is
+no answer yet. Decide only whether an AICOUNTLY desk should answer it publicly.
+- "approve": a genuine question about business, accounting, bookkeeping, Indian GST, income tax,
+  TDS/TCS, company law, payroll, audit, banking for businesses, or using AICOUNTLY apps — even if
+  it is short, informal, badly spelt, or asks about the member's own situation (the desk then gives
+  the general rule and suggests a CA). Return final = the question unchanged.
+- "revise": the same as approve when only light grammar or spelling fixes are needed; final = the
+  lightly corrected question in the asker's own words. Never change its meaning.
+- "reject": spam or promotion for a third party; abusive, hateful, sexual or harassing content;
+  personal data of a real person (names with PAN/Aadhaar/phone/email/account numbers) that cannot
+  simply be dropped; a request to evade tax, fake invoices, backdate or hide income; or a question
+  unrelated to business, accounting, tax or AICOUNTLY. Give the reason in one short sentence.
+Rejecting closes the question for good, so reject only for those reasons, never because the
+question is hard, vague or already common.
 TXT,
             'blog' => <<<'TXT'
 CONTENT: a marketing/educational blog article for aicountly.com.

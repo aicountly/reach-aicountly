@@ -19,7 +19,7 @@ the Gemini vetting run is the verification of record.
 |---|---|---|---|---|
 | `reach-blog` | [`routines/reach-blog.md`](routines/reach-blog.md) | `30 3-14 * * *` | hourly 09:00–20:00 | 1 per run, stops at `automation.blog.daily_limit` (6/day) |
 | `reach-kb` | [`routines/reach-kb.md`](routines/reach-kb.md) | `30 4,10 * * *` | 10:00 and 16:00 | up to 5 per run → `automation.knowledge_base.daily_limit` (10/day) |
-| `reach-community-qa` | [`routines/reach-community-qa.md`](routines/reach-community-qa.md) | `30 2-14/2 * * *` | every 2 h 08:00–20:00 | member questions first, then up to 3 FAQs per run → `automation.community.daily_limit` (10/day) |
+| `reach-community-qa` | [`routines/reach-community-qa.md`](routines/reach-community-qa.md) | `30 2-14/2 * * *` | every 2 h 08:00–20:00 | Question Inbox queue first (`community/pending`), then FAQs; up to 3 per run → `automation.community.daily_limit` (10/day) |
 | `reach-release-notes` | [`routines/reach-release-notes.md`](routines/reach-release-notes.md) | `30 15 * * *` | 21:00 | one note per product with user-visible changes since its last note |
 | `reach-workflow-guides` | [`routines/reach-workflow-guides.md`](routines/reach-workflow-guides.md) | `30 0 * * 1` | Monday 06:00 | refreshes / adds launch-app workflow guides |
 | `reach-growth-strategy` | [`routines/reach-growth-strategy.md`](routines/reach-growth-strategy.md) | `30 12 * * 0` | Sunday 18:00 | weekly strategy memo from AI Insights + AI visibility |
@@ -69,6 +69,9 @@ Endpoints the routines use:
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | community quota, open questions, recent titles, topic mix |
 | `POST https://reach.aicountly.org/api/v1/automation/community-qa` | submit a desk FAQ (question + answer) for vetting and publishing |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | submit the desk's answer to an open member question |
+| `GET  https://reach.aicountly.org/api/v1/automation/community/pending` | the Question Inbox's routine queue (answered first, before new FAQs) |
+| `POST https://reach.aicountly.org/api/v1/automation/community/pending/{id}/answer` | the desk's answer to one queued inbox question |
+| `POST https://reach.aicountly.org/api/v1/automation/community/pending/{id}/decline` | the routine cannot answer it; Reach closes it with the reason |
 | `GET  https://reach.aicountly.org/api/v1/automation/release-plan` | per product: repo, last published version + git ref, next versions |
 | `POST https://reach.aicountly.org/api/v1/automation/release-notes` | submit a release note (Gemini-vetted, auto-published) |
 | `GET  https://reach.aicountly.org/api/v1/automation/workflow-plan` | per launch app: published guides + last-updated dates |

@@ -75,10 +75,11 @@ final class CommunityQaPayload
             throw new InvalidArgumentException('question_id is required: the question UUID from community-plan open_questions.');
         }
 
-        $key = self::externalKey($in['external_key'] ?? null, false) ?? ('member-answer:' . $questionId);
+        $explicit = self::externalKey($in['external_key'] ?? null, false);
 
         return [
-            'external_key'  => $key,
+            'external_key'  => $explicit ?? ('member-answer:' . $questionId),
+            'key_defaulted' => $explicit === null,
             'question_uuid' => $questionId,
         ] + self::answer($in, $sanitizer);
     }
