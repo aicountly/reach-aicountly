@@ -114,4 +114,15 @@ final class SocialInboxParserTest extends CIUnitTestCase
         $i = SocialInboxParser::item(['id' => '1', 'text' => 't', 'permalink' => 'javascript:alert(1)', 'url' => 'http://insecure.example/x']);
         $this->assertNull($i['post_url']);
     }
+
+    public function testSkeletonShowsStructureButNoValues(): void
+    {
+        $json = ['object' => 'list', 'results' => null, 'page' => ['items' => [['id' => 'c_123', 'body' => 'my PAN is ABCDE1234F', 'likes' => 3, 'author' => ['name' => 'Asha']]], 'has_more' => false]];
+        $s    = SocialInboxParser::skeleton($json);
+
+        $this->assertSame('{object: string, results: null, page: {items: list(1) of {id: string, body: string, likes: int, author: {name: string}}, has_more: bool}}', $s);
+        foreach (['c_123', 'ABCDE1234F', 'Asha', 'list"'] as $leak) {
+            $this->assertStringNotContainsString($leak, $s);
+        }
+    }
 }

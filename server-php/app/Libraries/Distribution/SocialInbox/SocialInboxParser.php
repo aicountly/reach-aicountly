@@ -222,6 +222,38 @@ final class SocialInboxParser
      * @param array<string, mixed>|list<mixed> $json
      * @return array{0: ?list<mixed>, 1: array<string, mixed>|list<mixed>}
      */
+    /**
+     * The structure of an answer with every value replaced by its type — key
+     * names, nesting and list lengths only, never message text, names or ids —
+     * so an unrecognised inbox answer can be read off the live check safely.
+     *
+     * @param mixed $value
+     */
+    public static function skeleton($value, int $depth = 0): string
+    {
+        if (is_array($value)) {
+            if ($depth >= 6) {
+                return array_is_list($value) ? 'list(' . count($value) . ')' : 'object';
+            }
+            if (array_is_list($value)) {
+                return $value === [] ? 'list(0)' : 'list(' . count($value) . ') of ' . self::skeleton($value[0], $depth + 1);
+            }
+            $parts = [];
+            foreach (array_slice($value, 0, 20, true) as $k => $v) {
+                $parts[] = mb_substr((string) $k, 0, 40) . ': ' . self::skeleton($v, $depth + 1);
+            }
+            return '{' . implode(', ', $parts) . (count($value) > 20 ? ', …' : '') . '}';
+        }
+
+        return match (true) {
+            $value === null  => 'null',
+            is_bool($value)  => 'bool',
+            is_int($value)   => 'int',
+            is_float($value) => 'float',
+            default          => 'string',
+        };
+    }
+
     private static function locateList(array $json): array
     {
         if (array_is_list($json)) {
