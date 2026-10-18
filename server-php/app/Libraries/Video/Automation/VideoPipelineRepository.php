@@ -58,10 +58,11 @@ class VideoPipelineRepository
      * @param array<string, mixed> $script
      * @param array<string, mixed> $submitted
      */
-    public function create(array $script, array $submitted): int
+    public function create(array $script, array $submitted, array $extra = []): int
     {
         $now = gmdate('Y-m-d H:i:s');
-        $this->db->table('reach_video_pipeline_items')->insert($this->encode([
+        // $extra: bot_command_id / social_channels_json (owner-command videos, stream 9).
+        $this->db->table('reach_video_pipeline_items')->insert($this->encode(array_filter($extra, static fn ($v) => $v !== null) + [
             'external_key'   => $script['external_key'],
             'format'         => $script['format'],
             'title'          => $script['title'],
@@ -95,7 +96,8 @@ class VideoPipelineRepository
     }
 
     /**
-     * Today's submissions for a format (IST calendar day), rejected ones excluded.
+     * Today's routine submissions for a format (IST calendar day), rejected ones
+     * and owner-command videos excluded.
      */
     public function countToday(string $format, bool $includeRejected = false): int
     {
@@ -104,6 +106,11 @@ class VideoPipelineRepository
             ->where('format', $format)
             ->where('created_at >=', $from)
             ->where('created_at <', $to);
+        // Videos made for an owner command do not use the routine's daily quota
+        // (column from migration 2026-10-18-290001; absent until it has run).
+        if (\App\Libraries\Database\SchemaGuard::hasColumn($this->db, 'reach_video_pipeline_items', 'bot_command_id')) {
+            $q->where('bot_command_id IS NULL', null, false);
+        }
         if (! $includeRejected) {
             $q->where('status !=', 'rejected');
         }

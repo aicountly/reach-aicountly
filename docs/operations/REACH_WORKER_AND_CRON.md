@@ -136,6 +136,8 @@ period, not sixty times.
 | 06:00 IST (00:30 UTC) | `reach.seo_tracker` — DataForSEO SERP checks, capped by `seo.tracker.max_keywords_per_day`; a no-op without credentials | default | `seo-tracker-<IST date>` |
 | 08:00 IST (02:30 UTC) | `reach.daily_analytics_report` — email to `reports.daily.recipients`; never re-sent for a date already sent | notifications | `daily-report-<IST date>` |
 
+Run any of these (and the cron commands above, and the Claude routines) now from **Bot → Activities** in Reach — it queues the same job / runs the same command; see [`BOT_ACTIONS.md`](BOT_ACTIONS.md).
+
 Run or re-run by hand:
 
 ```bash

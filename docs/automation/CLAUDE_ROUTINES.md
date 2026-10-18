@@ -24,6 +24,7 @@ the Gemini vetting run is the verification of record.
 | `reach-workflow-guides` | [`routines/reach-workflow-guides.md`](routines/reach-workflow-guides.md) | `30 0 * * 1` | Monday 06:00 | refreshes / adds launch-app workflow guides |
 | `reach-growth-strategy` | [`routines/reach-growth-strategy.md`](routines/reach-growth-strategy.md) | `30 12 * * 0` | Sunday 18:00 | weekly strategy memo from AI Insights + AI visibility |
 | `reach-base-revision` | below | `30 2 * * *` | 08:00 | optional — topic supply no longer depends on it |
+| `reach-command` | [`routines/reach-command.md`](routines/reach-command.md) | none — **API trigger** | on demand | one owner command per fire (Bot → Ask the bot; Run now for the routines above) — setup in [`BOT_ACTIONS.md`](../operations/BOT_ACTIONS.md) |
 
 To install a routine, open a session bound to the environment and ask Claude to
 "Create a Routine named `<name>` with cron `<cron>`, fresh session per fire,
@@ -63,6 +64,12 @@ Endpoints the routines use:
 | `POST https://reach.aicountly.org/api/v1/automation/workflow-guides` | submit a workflow guide (Gemini-vetted, auto-published) |
 | `GET  https://reach.aicountly.org/api/v1/automation/insights-digest` | AI Insights + AI visibility digest for the strategy routine |
 | `POST https://reach.aicountly.org/api/v1/automation/strategy-memos` | store the weekly strategy memo |
+| `GET  https://reach.aicountly.org/api/v1/automation/commands/{id}` | reach-command: the owner command as Reach stored it (verify before acting) |
+| `POST https://reach.aicountly.org/api/v1/automation/commands/{id}/report` | reach-command: report status (in_progress / completed / partial / failed), summary, links |
+| `POST https://reach.aicountly.org/api/v1/automation/social-posts` | a social post (text, link, hashtags, https media) — Gemini-vetted, published via social-api.ai |
+| `GET  https://reach.aicountly.org/api/v1/automation/social-posts/{uuid}` | that submission's decision and per-network post status |
+| `GET  https://reach.aicountly.org/api/v1/automation/videos/{uuid}` | a pipeline video's status and its social posts |
+| `POST https://reach.aicountly.org/api/v1/automation/videos/{uuid}/distribute` | offer a published video to more social networks now |
 
 Responses the routines act on: **201** stored (and usually vetted already —
 see `pipeline.status`), **200** `already_ingested` (content key reused),

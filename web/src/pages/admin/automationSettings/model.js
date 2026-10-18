@@ -70,6 +70,10 @@ export const SECTION_META = {
     id: 'distribution', icon: Send,
     description: 'Batch sizes, send caps and compliance for email, SMS and WhatsApp campaign sends.',
   },
+  'Bot commands': {
+    id: 'bot-commands', icon: Bot,
+    description: 'The reach-command Claude routine behind Bot → Ask the bot (API trigger URL and token), and routine social posts.',
+  },
   Video: {
     id: 'video', icon: Video, checks: ['shotstack', 'youtube', 'tts'],
     liveChecks: [{ targets: ['shotstack', 'youtube', 'tts'], label: 'Check video services', requiresManage: true }],

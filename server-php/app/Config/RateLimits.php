@@ -57,6 +57,20 @@ final class RateLimits
                 'scope'       => 'user',
                 'audit_after' => 3,
             ],
+            // Stream 9 — bot actions. Per-activity cooldowns and the routine's
+            // own hourly cap are enforced in BotActivityService / BotCommandService.
+            'bot_run' => [
+                'limit'       => 20,
+                'window_secs' => 60,
+                'scope'       => 'user',
+                'audit_after' => 3,
+            ],
+            'bot_command' => [
+                'limit'       => 6,
+                'window_secs' => 60,
+                'scope'       => 'user',
+                'audit_after' => 3,
+            ],
         ];
     }
 }

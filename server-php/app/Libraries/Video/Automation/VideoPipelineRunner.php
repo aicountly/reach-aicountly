@@ -6,8 +6,6 @@ namespace App\Libraries\Video\Automation;
 
 use App\Libraries\AuditLogger;
 use App\Libraries\Automation\SystemApprover;
-use App\Libraries\Distribution\Jobs\DistributionJobTypes;
-use App\Libraries\Distribution\Providers\ChannelProviderFactory;
 use App\Libraries\Distribution\Providers\ProviderNotConfiguredException;
 use App\Libraries\Distribution\Providers\SocialApi\SocialApiException;
 use App\Libraries\Distribution\SocialPostStatusPoller;
@@ -68,7 +66,8 @@ final class VideoPipelineRunner
 
     public const STEPS = ['tts', 'visuals', 'render_submit', 'render_poll', 'youtube_upload', 'youtube_extras', 'social'];
 
-    public const SOCIAL_CHANNELS = ['instagram', 'facebook', 'linkedin'];
+    /** The default social offer for a Short (VideoSocialDistributor::DEFAULT_CHANNELS). */
+    public const SOCIAL_CHANNELS = VideoSocialDistributor::DEFAULT_CHANNELS;
 
     private VideoPipelineRepository $repo;
     private VideoMediaStore $media;
@@ -562,8 +561,8 @@ final class VideoPipelineRunner
                 $this->repo->update($id, ['thumbnail_status' => 'skipped', 'captions_status' => 'skipped']);
                 $this->repo->addWarning($id, 'Published through social-api.ai: Reach did not set a custom thumbnail or a separate caption track (no documented social-api.ai field; captions are burned into the video). Add them in YouTube Studio if needed.');
             }
-            return $item['format'] === 'short'
-                ? ['next' => 'social', 'detail' => 'Offering the Short to social channels.']
+            return VideoSocialDistributor::offersSocial($item)
+                ? ['next' => 'social', 'detail' => 'Offering the video to social channels.']
                 : ['next' => 'done', 'detail' => 'Published on YouTube (social-api.ai).'];
         }
         $videoId = (string) $item['youtube_video_id'];
@@ -590,65 +589,30 @@ final class VideoPipelineRunner
             }
         }
 
-        return $item['format'] === 'short'
-            ? ['next' => 'social', 'detail' => 'Offering the Short to social channels.']
+        return VideoSocialDistributor::offersSocial($item)
+            ? ['next' => 'social', 'detail' => 'Offering the video to social channels.']
             : ['next' => 'done', 'detail' => 'Published on YouTube.'];
     }
 
     /** @return array{next: string, delay?: int, detail: string} */
     private function stepSocial(array $item): array
     {
-        $id = (int) $item['id'];
-        if ((array) $item['social_post_ids_json'] !== []) {
+        $channels = VideoSocialDistributor::channelsFor($item);
+        if ($channels === []) {
+            return ['next' => 'done', 'detail' => 'Published on YouTube; no social networks were chosen for this video.'];
+        }
+        $done = (new VideoSocialDistributor($this->repo))->distribute($item, $channels);
+
+        $queued = array_values(array_map(static fn ($r) => $r['channel'], array_filter($done, static fn ($r) => in_array($r['action'], ['queued', 'requeued'], true))));
+        $manual = array_values(array_map(static fn ($r) => $r['channel'], array_filter($done, static fn ($r) => in_array($r['action'], ['manual_queue', 'not_ready'], true))));
+        $already = array_filter($done, static fn ($r) => $r['action'] === 'already_offered');
+
+        if ($queued === [] && $manual === [] && $already !== []) {
             return ['next' => 'done', 'detail' => 'Published on YouTube; social posts already created.'];
         }
-
-        $script   = $item['script_json'];
-        $db       = $this->repo->db();
-        $botId    = SystemApprover::userId();
-        $tenantId = (int) (env('REACH_DEFAULT_TENANT_ID') ?: 1);
-        $hashtags = array_slice(array_values(array_filter(array_map(static fn ($t) => '#' . preg_replace('/[^\p{L}\p{N}]+/u', '', (string) $t), (array) $script['tags']), static fn ($t) => mb_strlen($t) > 1)), 0, 5);
-        $watch    = (string) ($item['youtube_url'] ?? '');
-        $text     = trim($script['title']) . "\n\n" . mb_substr(trim((string) $script['description']), 0, 280)
-            . "\n\n" . trim((string) $script['cta_text']) . ($watch !== '' ? "\nWatch: " . $watch : '');
-        $media    = array_values(array_filter([
-            $watch !== '' ? ['type' => 'video', 'kind' => 'youtube_short', 'url' => $watch] : null,
-            $item['render_url'] ? ['type' => 'video', 'kind' => 'mp4', 'url' => $item['render_url'], 'note' => 'Rendered 9:16 MP4 — hosted by Shotstack for about 24 hours after rendering.', 'rendered_at' => $item['rendered_at']] : null,
-        ]));
-
-        $ids = [];
-        $queued = [];
-        foreach (self::SOCIAL_CHANNELS as $channel) {
-            $ready = ChannelProviderFactory::socialPublisherReadyFor($channel);
-            $now   = gmdate('Y-m-d H:i:s');
-            $db->table('reach_social_posts')->insert([
-                'channel'         => $channel,
-                'content'         => $text,
-                'media_refs'      => json_encode($media, JSON_UNESCAPED_SLASHES),
-                'hashtags'        => json_encode($hashtags, JSON_UNESCAPED_UNICODE),
-                // Without a publisher that can post on this channel they wait in the manual queue.
-                'status'          => $ready ? 'approved' : 'manual_queue',
-                'approval_status' => 'approved',
-                'approved_by'     => $botId,
-                'approved_at'     => $now,
-                'bot_generated'   => true,
-                'created_by'      => $botId,
-                'tenant_id'       => $tenantId,
-                'created_at'      => $now,
-                'updated_at'      => $now,
-            ]);
-            $postId = (int) $db->insertID();
-            $ids[]  = $postId;
-            if ($ready) {
-                Services::jobService()->enqueue(DistributionJobTypes::CAMPAIGN_DISPATCH_SOCIAL, ['post_id' => $postId, 'tenant_id' => $tenantId], ['queue' => 'distribution', 'enqueued_actor_type' => 'system']);
-                $queued[] = $channel;
-            }
-        }
-        $this->repo->update($id, ['social_post_ids_json' => $ids]);
-
         $detail = $queued === []
             ? 'Published on YouTube; social posts are in the manual queue (no social publisher is connected).'
-            : 'Published on YouTube; social posts queued for ' . implode(', ', $queued) . '.';
+            : 'Published on YouTube; social posts queued for ' . implode(', ', $queued) . '.' . ($manual !== [] ? ' In the manual queue (no account): ' . implode(', ', $manual) . '.' : '');
         return ['next' => 'done', 'detail' => $detail];
     }
 

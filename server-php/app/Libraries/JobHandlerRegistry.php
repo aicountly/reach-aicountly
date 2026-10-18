@@ -95,6 +95,8 @@ class JobHandlerRegistry
         // Automated video (queue `video`) — Stream V: one resumable step per job + hourly sweep.
         $this->handlers['reach.video_pipeline_step']  = new \App\Jobs\VideoPipelineStepJob();
         $this->handlers['reach.video_pipeline_sweep'] = new \App\Jobs\VideoPipelineSweepJob();
+        // Stream 9 — "Run now" of a cron command (Bot → Activities); allow-listed by BotActivityRegistry.
+        $this->handlers[\App\Libraries\Bot\BotActivityRegistry::COMMAND_JOB_TYPE] = new \App\Jobs\BotActivityCommandJob();
     }
 
     public function register(string $jobType, JobHandlerInterface $handler): void

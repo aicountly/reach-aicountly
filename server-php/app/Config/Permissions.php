@@ -69,6 +69,10 @@ final class Permissions
     public const BOT_VIEW      = 'bot.view';
     public const BOT_DISPATCH  = 'bot.dispatch';
     public const BOT_CONFIGURE = 'bot.configure';
+    /** Run any bot activity now (Bot → Activities). */
+    public const BOT_RUN       = 'bot.run';
+    /** Send an owner command to the reach-command Claude Routine (Bot → Ask the bot). */
+    public const BOT_COMMAND   = 'bot.command';
 
     /** Jobs */
     public const JOB_VIEW   = 'job.view';
@@ -499,7 +503,7 @@ final class Permissions
             ],
             'lead'        => [self::LEAD_VIEW, self::LEAD_MANAGE, self::LEAD_EXPORT],
             'approval'    => [self::APPROVAL_VIEW, self::APPROVAL_DECIDE, self::APPROVAL_OVERRIDE],
-            'bot'         => [self::BOT_VIEW, self::BOT_DISPATCH, self::BOT_CONFIGURE],
+            'bot'         => [self::BOT_VIEW, self::BOT_DISPATCH, self::BOT_CONFIGURE, self::BOT_RUN, self::BOT_COMMAND],
             'job'         => [self::JOB_VIEW, self::JOB_RETRY, self::JOB_CANCEL],
             'settings'    => [self::SETTINGS_VIEW, self::SETTINGS_MANAGE],
             'integration' => [self::INTEGRATION_VIEW, self::INTEGRATION_MANAGE],

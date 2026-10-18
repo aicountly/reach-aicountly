@@ -148,6 +148,15 @@ $routes->group('v1', static function ($routes) {
         // Stream V — automated video (reach-video routine): script in → vetting → pipeline.
         $routes->post('video-scripts',  'Api\\V1\\Video\\VideoAutomationController::storeScript');
         $routes->get('video-plan',      'Api\\V1\\Video\\VideoAutomationController::plan');
+        // Stream 9 — reach-command routine (owner commands, docs/automation/routines/reach-command.md),
+        // social posts (Gemini-vetted, published via social-api.ai) and video distribution.
+        $routes->get('commands/(:segment)',           'Api\\V1\\Automation\\BotCommandAutomationController::showCommand/$1');
+        $routes->post('commands/(:segment)/report',   'Api\\V1\\Automation\\BotCommandAutomationController::report/$1');
+        $routes->post('social-posts',                 'Api\\V1\\Automation\\BotCommandAutomationController::storeSocialPost');
+        $routes->get('social-posts/(:segment)',       'Api\\V1\\Automation\\BotCommandAutomationController::showSocialPost/$1');
+        $routes->get('videos/(:segment)',             'Api\\V1\\Automation\\BotCommandAutomationController::showVideo/$1');
+        $routes->post('videos/(:segment)/distribute', 'Api\\V1\\Automation\\BotCommandAutomationController::distributeVideo/$1');
+        // end Stream 9
     });
 
     // ---------------------------------------------------------------------
@@ -318,6 +327,12 @@ $routes->group('v1', static function ($routes) {
         $routes->post('bot/queue/(:num)/reject',  'Api\\V1\\MarketingBotController::rejectItem/$1',   ['filter' => ['permission:approval.decide', 'throttle:approval']]);
         $routes->get('bot/reports',               'Api\\V1\\BotReportController::index',              ['filter' => 'permission:bot.view']);
         $routes->get('bot/reports/(:num)',        'Api\\V1\\BotReportController::show/$1',            ['filter' => 'permission:bot.view']);
+        // Stream 9 — bot actions: Run now for every bot activity, and owner commands (Ask the bot).
+        $routes->get('bot/activities',                  'Api\\V1\\Bot\\BotActivityController::index', ['filter' => 'permission:bot.view,bot.run,settings.view']);
+        $routes->post('bot/activities/(:segment)/run',  'Api\\V1\\Bot\\BotActivityController::run/$1', ['filter' => ['permission:bot.run,settings.manage', 'throttle:bot_run']]);
+        $routes->get('bot/commands',                    'Api\\V1\\Bot\\BotCommandController::index', ['filter' => 'permission:bot.view,bot.command,settings.manage']);
+        $routes->post('bot/commands',                   'Api\\V1\\Bot\\BotCommandController::store', ['filter' => ['permission:bot.command,settings.manage', 'throttle:bot_command']]);
+        // end Stream 9
 
         // Approvals
         $routes->get('approvals',              'Api\\V1\\ApprovalController::index',       ['filter' => 'permission:approval.view']);
