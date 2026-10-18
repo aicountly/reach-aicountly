@@ -13,9 +13,9 @@ class ChannelProviderFactory
 {
     /**
      * Social publisher selection:
-     *   - SOCIAL_PROVIDER=socialapi, or the `social.socialapi.api_key` secret is
-     *     set (and SOCIAL_PROVIDER is unset) → SocialApiAiPublisher, which is a
-     *     fail-closed placeholder until the socialapi.ai API is implemented;
+     *   - SOCIAL_PROVIDER=socialapi (or social_api), or the `social.socialapi.api_key`
+     *     secret is set (and SOCIAL_PROVIDER is unset) → SocialApiAiPublisher
+     *     (social-api.ai: posts and YouTube videos);
      *   - unset / mock → MockSocialPublisher (refuses in production);
      *   - anything else → LogicException.
      */
@@ -24,7 +24,7 @@ class ChannelProviderFactory
         $provider = self::env('SOCIAL_PROVIDER');
         $apiKey   = self::socialApiKey();
 
-        if ($provider === 'socialapi' || ($provider === '' && $apiKey !== null)) {
+        if (in_array($provider, ['socialapi', 'social_api', 'social-api'], true) || ($provider === '' && $apiKey !== null)) {
             return new SocialApiAiPublisher((string) $apiKey, self::socialApiBaseUrl());
         }
 
@@ -38,9 +38,10 @@ class ChannelProviderFactory
     }
 
     /**
-     * Whether a post on $platform would really be published right now. False in
-     * production until a real social adapter exists — callers route such posts
-     * to the manual queue instead of pretending they will go out.
+     * Whether a post on $platform would really be published right now. For
+     * social-api.ai: the key is set and an account for that platform resolves
+     * (setting override, or the single active account). Callers route other
+     * posts to the manual queue instead of pretending they will go out.
      */
     public static function socialPublisherReadyFor(string $platform): bool
     {
@@ -51,6 +52,9 @@ class ChannelProviderFactory
         }
         if (!$publisher->isEnabled()) {
             return false;
+        }
+        if ($publisher instanceof SocialApiAiPublisher) {
+            return $publisher->readiness($platform)['ok'];
         }
         $platforms = (array) ($publisher->getCapabilities()['platforms'] ?? []);
 

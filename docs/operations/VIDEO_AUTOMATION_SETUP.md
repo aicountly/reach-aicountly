@@ -13,20 +13,58 @@ routine ──POST v1/automation/video-scripts──▶ validate ─▶ Gemini v
   visuals        product screenshots (Worker) / DALL·E stills / title cards + DALL·E thumbnail
   render_submit  Shotstack timeline (branded template, captions burned in) → render
   render_poll    Shotstack status (the render callback brings the poll forward)
-  youtube_upload resumable upload, streamed from Shotstack's MP4 in 8 MB chunks
-  youtube_extras thumbnails.set + captions.insert (SRT from the script)
+  youtube_upload video.youtube.publisher = social_api (default): MP4 → social-api.ai media store
+                 → POST /v1/posts to the YouTube account → polled until social-api.ai reports it
+                 published;   = direct: resumable upload, streamed from Shotstack's MP4 in 8 MB chunks
+  youtube_extras direct only: thumbnails.set + captions.insert (SRT from the script)
   social         Shorts only: Instagram Reels / Facebook / LinkedIn posts in Reach's social queue
-  done           status `published` with the real YouTube video id and URL
+  done           status `published` with the YouTube video id and URL
 ```
+
+**Two ways to YouTube** (`video.youtube.publisher`, Settings → AI & Automation → Social):
+
+| | `social_api` (default) | `direct` (fallback) |
+|---|---|---|
+| Needs | social-api.ai key + the AICOUNTLY YouTube channel connected in social-api.ai (§ 0) | Google Cloud project, OAuth client, connected channel (§ 3–4) |
+| Google verification / YouTube audit | not needed — social-api.ai's YouTube app is verified | needed, or uploads stay private |
+| Privacy, category | `social.socialapi.platform_data.youtube` (keys from docs.social-api.ai) | `video.youtube.privacy`, `video.youtube.category_id` |
+| Custom thumbnail, caption track | not set (warning on the item; captions are burned in) | `thumbnails.set`, `captions.insert` |
+| `published` when | social-api.ai reports the YouTube target published | YouTube returned the video id |
+
+Each item records the path it started on (`youtube_publisher`), so changing the setting never
+mixes the two for one video. Video → Pipeline and Video → Operations show the active path and
+whether it is ready.
 
 Reach → **Video → Pipeline** shows every item's step and status, the vetting decision and
 reasons, warnings, a preview link to the render and the YouTube link, and has the
 **Connect YouTube channel** button. **Video → Operations** shows what is configured.
 
-States are honest: `blocked` = an operator must act (missing key, channel not connected or
-access revoked) — blocked items are retried hourly and released immediately when a channel is
+States are honest: `blocked` = an operator must act (missing key, channel / account not connected
+or access revoked) — blocked items are retried hourly and released immediately when a channel is
 connected; `failed` = a step cannot succeed (the reason is shown; **Retry** is on the item);
-`published` only after YouTube returned the video id.
+`published` only after YouTube returned the video id (direct) or social-api.ai reported the
+YouTube post published (social_api).
+
+## 0. social-api.ai (default YouTube path)
+
+1. In social-api.ai connect the AICOUNTLY YouTube channel (and the Instagram / Facebook / LinkedIn
+   accounts the Shorts are offered to) and create an API key.
+2. Settings → AI & Automation → **Social**: paste the key; leave *How videos reach YouTube* on
+   `social_api`; set *account id: YouTube* only if more than one YouTube account is connected.
+   Optional: *platform_data for YouTube posts* — the YouTube options (privacy, category,
+   made-for-kids…) as a JSON object copied **exactly** from docs.social-api.ai → Platforms →
+   YouTube. Reach does not guess these keys; with none set, social-api.ai's defaults apply.
+3. Run `php spark reach:integrations-check --only=social_api` (or **Check social-api.ai** on that
+   card): it must list the YouTube account as the one “posts go to”.
+4. Per video: Reach streams Shotstack's MP4 to a temp file on the server, uploads it to
+   social-api.ai's presigned URL, verifies it, then creates the YouTube post (title = video title
+   with `#Shorts` for Shorts, text = the description with chapters and CTA, `publish_now`). The
+   step re-checks every ~45 s; social-api.ai has 30 minutes to report it published, otherwise the
+   item fails with `publishing.delivery.timeout` (it may still appear — check YouTube Studio before
+   pressing Retry; social-api.ai refuses an identical post within 24 h).
+5. Sections 3 and 4 (Google Cloud, Connect YouTube channel) are only needed for `direct`.
+
+Details and every assumption about social-api.ai's answers: [SOCIAL_API.md](SOCIAL_API.md).
 
 ## 1. Shotstack (rendering)
 
@@ -58,7 +96,9 @@ connected; `failed` = a step cannot succeed (the reason is shown; **Retry** is o
   working vetting model scripts wait as `pending_vetting` and are re-vetted hourly — they are
   never rendered unvetted.
 
-## 3. Google Cloud — YouTube Data API v3 and OAuth
+## 3. Google Cloud — YouTube Data API v3 and OAuth (direct upload only)
+
+Skip this section and § 4 when `video.youtube.publisher = social_api` (the default).
 
 1. <https://console.cloud.google.com> → create (or pick) a project, e.g. `aicountly-reach`.
 2. **APIs & Services → Library → YouTube Data API v3 → Enable.**
@@ -92,7 +132,7 @@ connected; `failed` = a step cannot succeed (the reason is shown; **Retry** is o
 5. The YouTube channel must be **phone-verified** (youtube.com/verify) for custom thumbnails;
    without it `thumbnails.set` is refused and Reach records a warning (YouTube picks a frame).
 
-## 4. Connect the channel in Reach
+## 4. Connect the channel in Reach (direct upload only)
 
 Reach → **Video** → **Connect YouTube channel** (needs `video_connections.manage`) → sign in with
 the Google account that owns the AICOUNTLY channel → allow → you return to Reach → Video with
@@ -112,10 +152,12 @@ connect again.
 | `video.shotstack.api_key` (secret) / `video.shotstack.env` | — / stage | renderer |
 | `video.music.url` | blank | optional royalty-free background MP3 (https) |
 | `video.brand.logo_url` | aicountly.com logo | logo used on cards and as a corner mark |
-| `video.youtube.client_id` / `client_secret` (secret) | — | OAuth web client |
-| `video.youtube.refresh_token` (secret) | — | set by Connect |
-| `video.youtube.privacy` | public | public / unlisted / private |
-| `video.youtube.category_id` | 28 | 28 Science & Technology, 27 Education |
+| `video.youtube.publisher` (Social card) | social_api | `social_api` = through social-api.ai, `direct` = Reach's own upload |
+| `social.socialapi.api_key` / `account.youtube` / `platform_data.youtube` (Social card) | — / auto / blank | social-api.ai path (see SOCIAL_API.md) |
+| `video.youtube.client_id` / `client_secret` (secret) | — | OAuth web client (direct only) |
+| `video.youtube.refresh_token` (secret) | — | set by Connect (direct only) |
+| `video.youtube.privacy` | public | public / unlisted / private (direct only) |
+| `video.youtube.category_id` | 28 | 28 Science & Technology, 27 Education (direct only) |
 
 Screenshot scenes use the Worker (`WORKER_BASE_URL`, `WORKER_API_TOKEN`). If it is not
 configured or a capture fails, the scene falls back to a branded title card and the item
@@ -139,6 +181,9 @@ after the script arrives.
 
 ## 7. Quotas
 
+Through social-api.ai, Reach's own Google quota is not used (social-api.ai's plan limits apply;
+a 429 from it retries the step in an hour). For `direct`:
+
 YouTube Data API default quota: **10,000 units per day** per project.
 
 | Call | Units | Per video |
@@ -156,9 +201,10 @@ requesting a quota extension.
 
 Each published Short creates three `reach_social_posts` rows (instagram, facebook, linkedin),
 approved by the System Bot, with the YouTube Shorts URL and Shotstack's 9:16 MP4 URL (valid ~24 h)
-in `media_refs`. They go through the existing social publisher seam: until socialapi.ai is
-integrated it is fail-closed, so the posts wait in Reach’s social manual queue (status `manual_queue`) —
-nothing is marked posted.
+in `media_refs`. A channel whose social-api.ai account resolves gets status `approved` and a
+`distribution.dispatch.social` job: the MP4 is uploaded to social-api.ai and the post goes out
+(`publishing` → `posted` once confirmed). Channels without a resolvable account wait in Reach's
+social manual queue (`manual_queue`) — nothing is marked posted.
 
 ## 9. Development
 
@@ -175,7 +221,10 @@ render that exercises the `text` asset and the Montserrat font) — see
 are behind **Run live checks** on Settings → AI & Automation.
 
 The pipeline is covered by unit tests with scripted HTTP and DB tests with mock providers; it has
-**not** been run against live Shotstack, OpenAI TTS, Google OAuth or YouTube from this build.
+**not** been run against live Shotstack, OpenAI TTS, Google OAuth, YouTube or social-api.ai from
+this build. For the social-api.ai path run `php spark reach:integrations-check --only=social_api`
+after saving the key, and check the first video against SOCIAL_API.md § "Verified vs. assumed"
+(the YouTube link/id in the post status answer, the media verify status words, platform_data).
 Check on the first real run: Shotstack's acceptance of the `text` asset fields and the fonts
 (`Montserrat ExtraBold` / `Montserrat SemiBold`), the `poster` output option, the
 `containsSyntheticMedia` upload flag, and that the Worker exposes `POST v1/screenshot`

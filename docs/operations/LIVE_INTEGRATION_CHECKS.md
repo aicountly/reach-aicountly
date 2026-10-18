@@ -3,7 +3,7 @@
 `php spark reach:integrations-check` calls each third-party service the automation pipelines
 depend on, using the credentials saved in **Settings → AI & Automation** (or their `.env`
 fallbacks), and prints `OK` / `FAIL` with a one-line reason for each. It is the way to prove
-Shotstack, YouTube, DataForSEO, Gemini, OpenAI and OpenAI TTS work **from the Reach server**:
+Shotstack, YouTube, DataForSEO, Gemini, OpenAI, OpenAI TTS and social-api.ai work **from the Reach server**:
 the build and CI have no credentials and cannot reach those hosts.
 
 Code: `server-php/app/Libraries/Settings/LiveIntegrationCheck.php` (shared by the command and
@@ -33,7 +33,7 @@ su -s /bin/bash reachaicountly -c "cd /home/reachaicountly/public_html/api && /u
 
 | Option | Meaning |
 |---|---|
-| `--only=a,b` | Run only these checks: `shotstack`, `youtube`, `dataforseo`, `gemini`, `openai`, `tts`. Default: all. An unknown name exits 2. |
+| `--only=a,b` | Run only these checks: `shotstack`, `youtube`, `dataforseo`, `gemini`, `openai`, `tts`, `social_api`. Default: all. An unknown name exits 2. |
 | `--render-test` | Also submit a 3-second title-card render (Shotstack). Needs the `shotstack` check. |
 | `--json` | Print the report as JSON (`ok`, `passed`, `failed`, `results[]` with `target`, `ok`, `message`, `detail`, `duration_ms`). |
 
@@ -42,7 +42,7 @@ Exit code: **0** every requested check passed · **1** at least one failed · **
 Example output:
 
 ```
-Reach live integration checks — shotstack, youtube, dataforseo, gemini, openai, tts
+Reach live integration checks — shotstack, youtube, dataforseo, gemini, openai, tts, social_api
   OK    shotstack   Key accepted on the stage environment (stage, free/watermarked).
         environment: stage
         billing: stage — renders are free and watermarked
@@ -58,7 +58,13 @@ Reach live integration checks — shotstack, youtube, dataforseo, gemini, openai
   OK    gemini      Connected. Vetting model gemini-2.5-flash is available.
   OK    openai      Connected. Image model dall-e-3 is available.
   OK    tts         Synthesised 17,280 bytes of MP3 (1.1 s) with gpt-4o-mini-tts / coral.
-6 passed, 0 failed.
+  OK    social_api  Key accepted; 4 connected account(s): youtube 1, instagram 1, facebook 1, linkedin 1. Ready to post to: youtube, instagram, facebook, linkedin. Nothing was posted.
+        base_url: https://api.social-api.ai/v1
+        youtube_publisher: social_api
+        accounts.0: youtube “AICOUNTLY” id=acc_… status=active
+        targets.youtube: posts go to acc_… “AICOUNTLY” (auto: the only active account)
+        targets.x: not available — No active X / Twitter account is connected in social-api.ai. …
+7 passed, 0 failed.
 ```
 
 ## What each check does
@@ -72,6 +78,7 @@ Reach live integration checks — shotstack, youtube, dataforseo, gemini, openai
 | `shotstack --render-test` | `POST /edit/{env}/render` with one 3-second `text` clip in the pipeline's font (Montserrat ExtraBold, navy on white, 1280×720 MP4), then `GET /edit/{env}/render/{id}` every 5 s until `done`/`failed` or 180 s. Prints the output URL (Shotstack hosts it ~24 h). | **stage: free, watermarked. v1: billed** (3 s of render) |
 | `youtube` | OAuth token refresh with the saved client id / secret / refresh token (`YouTubeOAuth`), then `channels.list?part=snippet,status&mine=true` (`YouTubeDataClient`). **Never uploads.** | 1 quota unit |
 | `tts` | `POST /v1/audio/speech` for “Reach live check.” with `video.tts.model` / `video.tts.voice`; reports the MP3 size and length. The audio is discarded. | ~17 characters of TTS |
+| `social_api` | `GET {social.socialapi.base_url}/accounts` with `Authorization: Bearer <key>` (no retry). Prints every connected account (platform, name, @username, id, status) and, per platform, the account posts go to (setting override or the single active account) or why none. **Never posts.** | free |
 
 The checks always use the real providers, even if `VIDEO_PIPELINE_MOCKS` is set.
 
@@ -117,3 +124,7 @@ minted during the run). The DataForSEO login and the YouTube client id are not p
 | `YouTube access was revoked or expired (invalid_grant)` | Reconnect the channel in Reach → Video. Unverified OAuth apps in *Testing* mode issue refresh tokens that expire after 7 days. |
 | `Test render timed out after 180 s … render id …` | Shotstack is still working; look the id up in the Shotstack dashboard. |
 | `Test render failed: …` | Shotstack's reason (e.g. a font or asset it could not use). |
+| `social-api.ai rejected the API key (HTTP 401/403)` | Wrong or revoked key (it starts with `sapi_key_`); paste it again in Settings → Social. |
+| `Could not reach social-api.ai at … (network error)` | DNS / TLS / firewall from the server, or a wrong `social.socialapi.base_url`. |
+| `… a shape Reach does not recognise` | `GET /accounts` answered something other than a list of accounts — see SOCIAL_API.md § "Verified vs. assumed" and the `[SocialApiAi]` lines in `writable/logs`. |
+| `targets.<platform>: not available — …` (on an OK line) | The key works but that platform has no active account, or several: connect it in social-api.ai or set `social.socialapi.account.<platform>`. |

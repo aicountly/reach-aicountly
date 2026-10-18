@@ -126,32 +126,33 @@ final class ProductionHonestyTest extends CIUnitTestCase
         $this->assertFalse(ProviderGuard::isProduction());
     }
 
-    // ── socialapi.ai seam ───────────────────────────────────────────────────
+    // ── social-api.ai seam ──────────────────────────────────────────────────
 
-    public function testSocialApiAdapterFailsClosed(): void
+    public function testSocialApiPublisherNeverTrustsAnUnsignedCallbackAndRefusesToWithdraw(): void
     {
-        $publisher = new SocialApiAiPublisher('key', 'https://api.example.test');
-        $this->assertFalse($publisher->isEnabled());
-        $this->assertFalse($publisher->verifyCallback([], '{}'));
-        $this->assertSame('socialapi', $publisher->providerName());
-        $this->assertTrue($publisher->getCapabilities()['pending']);
+        $publisher = new SocialApiAiPublisher('sapi_key_test', 'https://api.example.test/v1');
+        $this->assertTrue($publisher->isEnabled());
+        $this->assertFalse($publisher->verifyCallback([], '{"event":"post.published"}'), 'no webhook receiver: the signature scheme is unknown');
+        $this->assertSame('social_api', $publisher->providerName());
 
-        try {
-            $publisher->publish(self::message('page'), 'linkedin');
-            $this->fail('The pending adapter must never report a post.');
-        } catch (ProviderNotConfiguredException $e) {
-            $this->assertStringContainsString('socialapi.ai adapter pending: API docs required', $e->getMessage());
-        }
         $this->expectException(ProviderNotConfiguredException::class);
-        $publisher->getStatus('x');
+        $publisher->withdraw('post_1');
+    }
+
+    public function testSocialApiPublisherWithoutAKeyIsNotEnabled(): void
+    {
+        $this->assertFalse((new SocialApiAiPublisher('', null))->isEnabled());
     }
 
     public function testFactorySelectsSocialApiWhenTheKeyIsSet(): void
     {
         $this->setEnv('SOCIAL_PROVIDER', null);
-        $this->setEnv('SOCIALAPI_API_KEY', 'sk-test-123');
+        $this->setEnv('SOCIALAPI_API_KEY', 'sapi_key_test_123');
+        \App\Libraries\Video\Automation\VideoProviders::override('http', new \Tests\Support\Video\FakeHttpTransport()); // social-api.ai unreachable
+        \App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts::forget();
         $this->assertInstanceOf(SocialApiAiPublisher::class, ChannelProviderFactory::makeSocialPublisher());
-        $this->assertFalse(ChannelProviderFactory::socialPublisherReadyFor('linkedin'));
+        $this->assertFalse(ChannelProviderFactory::socialPublisherReadyFor('linkedin'), 'no account resolves → not auto-dispatchable');
+        \App\Libraries\Video\Automation\VideoProviders::reset();
     }
 
     public function testFactorySelectsSocialApiByName(): void

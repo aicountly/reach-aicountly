@@ -8,6 +8,13 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Automation\SystemApprover;
 use App\Libraries\Distribution\Jobs\DistributionJobTypes;
 use App\Libraries\Distribution\Providers\ChannelProviderFactory;
+use App\Libraries\Distribution\Providers\ProviderNotConfiguredException;
+use App\Libraries\Distribution\Providers\SocialApi\SocialApiException;
+use App\Libraries\Distribution\SocialPostStatusPoller;
+use App\Libraries\Distribution\SocialPublisherService;
+use App\Models\Distribution\CampaignDeliveryAttemptModel;
+use App\Models\Distribution\CampaignDispatchModel;
+use App\Models\Distribution\CampaignOperationalMetricsModel;
 use App\Libraries\Media\VideoMediaStore;
 use App\Libraries\Settings\ReachConfig;
 use App\Libraries\Video\Automation\Render\CaptionBuilder;
@@ -15,6 +22,7 @@ use App\Libraries\Video\Automation\Render\TimelineBuilder;
 use App\Libraries\Video\Automation\Tts\Mp3Duration;
 use App\Libraries\Video\Automation\Visuals\ImageNormalizer;
 use App\Libraries\Video\Automation\YouTube\YouTubeMetadata;
+use App\Libraries\Video\Automation\YouTube\YouTubePublisherMode;
 use Config\Services;
 
 /**
@@ -26,15 +34,22 @@ use Config\Services;
  *   visuals        screenshots (Worker) / DALL·E stills per scene + thumbnail
  *   render_submit  Shotstack timeline built and submitted (callback + polling)
  *   render_poll    Shotstack status until done / failed
- *   youtube_upload resumable upload, streamed from Shotstack's MP4 in chunks
- *   youtube_extras thumbnails.set + captions.insert (failures are warnings)
+ *   youtube_upload video.youtube.publisher = social_api (default): a `youtube`
+ *                  reach_social_posts row published through social-api.ai
+ *                  (MP4 uploaded to its media store, POST /posts, then polled
+ *                  until social-api.ai reports it published);
+ *                  = direct: Reach's own resumable upload, streamed from
+ *                  Shotstack's MP4 in chunks
+ *   youtube_extras direct only: thumbnails.set + captions.insert (failures are
+ *                  warnings); via social-api.ai both are skipped with a warning
  *   social         Shorts: reach_social_posts for Reels / Facebook / LinkedIn
- *                  through the existing (fail-closed) social publisher
+ *                  through the social publisher (social-api.ai when configured)
  *   done           status `published`, with the real YouTube id and URL
  *
  * Honest states: an item is `blocked` when an operator must act (key missing,
  * channel not connected or revoked), `failed` with the reason when a step
- * cannot succeed, `published` only once YouTube returned the video id.
+ * cannot succeed, `published` only once YouTube returned the video id (direct)
+ * or social-api.ai reported the YouTube post published (social_api).
  */
 final class VideoPipelineRunner
 {
@@ -330,7 +345,16 @@ final class VideoPipelineRunner
     /** @return array{next: string, delay?: int, detail: string} */
     private function stepYouTubeUpload(array $item): array
     {
-        $id  = (int) $item['id'];
+        $id   = (int) $item['id'];
+        $mode = YouTubePublisherMode::forItem($item);
+        if (($item['youtube_publisher'] ?? null) !== $mode) {
+            $this->repo->update($id, ['youtube_publisher' => $mode]);
+            $item['youtube_publisher'] = $mode;
+        }
+        if ($mode === YouTubePublisherMode::SOCIAL_API) {
+            return $this->stepYouTubeViaSocialApi($item);
+        }
+
         $url = (string) ($item['render_url'] ?? '');
         if ($url === '') {
             throw new VideoProviderException('No rendered video to upload.', VideoProviderException::SOURCE_EXPIRED);
@@ -374,10 +398,174 @@ final class VideoPipelineRunner
         return ['next' => 'youtube_extras', 'detail' => 'Uploaded; setting thumbnail and captions.'];
     }
 
+    /**
+     * YouTube through social-api.ai: one `youtube` reach_social_posts row per
+     * item carries the MP4 (title + description from YouTubeMetadata). The
+     * step submits it, then re-runs every minute and reads the post's state
+     * (SocialPostStatusPoller) until it is posted or failed.
+     *
+     * @return array{next: string, delay?: int, detail: string}
+     */
+    private function stepYouTubeViaSocialApi(array $item): array
+    {
+        $id     = (int) $item['id'];
+        $db     = $this->repo->db();
+        $postId = (int) ($item['youtube_social_post_id'] ?? 0);
+        $post   = $postId > 0 ? $db->table('reach_social_posts')->where('id', $postId)->get()->getRowArray() : null;
+
+        if ($post === null || in_array($post['status'], ['approved', 'failed'], true)) {
+            if ($post !== null && $post['status'] === 'failed' && ! empty($post['external_post_id'])) {
+                // social-api.ai took the post and then could not publish it (or not in time).
+                throw new VideoProviderException('YouTube via social-api.ai: ' . ($post['error_message'] ?: 'the post failed') . (! empty($post['provider_error_code']) ? ' [' . $post['provider_error_code'] . ']' : ''), VideoProviderException::PERMANENT);
+            }
+            $url = (string) ($item['render_url'] ?? '');
+            if ($url === '') {
+                throw new VideoProviderException('No rendered video to upload.', VideoProviderException::SOURCE_EXPIRED);
+            }
+            $renderedAt = strtotime((string) $item['rendered_at']);
+            if ($renderedAt !== false && time() - $renderedAt > self::OUTPUT_TTL_SECS) {
+                throw new VideoProviderException('The rendered video is close to expiring at Shotstack; rendering again.', VideoProviderException::SOURCE_EXPIRED);
+            }
+            $postId = $this->youtubePostRow($item, $post);
+
+            try {
+                $result = $this->socialPublisher()->dispatch($postId, (int) $db->table('reach_social_posts')->select('tenant_id')->where('id', $postId)->get()->getRowArray()['tenant_id'], SystemApprover::userId());
+            } catch (ProviderNotConfiguredException $e) {
+                throw VideoProviderException::notConfigured('YouTube via social-api.ai: ' . $e->getMessage());
+            } catch (SocialApiException $e) {
+                throw new VideoProviderException('YouTube via social-api.ai: ' . $e->getMessage(), match ($e->kind) {
+                    SocialApiException::NOT_CONFIGURED => VideoProviderException::NOT_CONFIGURED,
+                    SocialApiException::AUTH           => VideoProviderException::AUTH,
+                    SocialApiException::RATE_LIMIT     => VideoProviderException::QUOTA,
+                    SocialApiException::TRANSIENT      => VideoProviderException::TRANSIENT,
+                    SocialApiException::MEDIA_SOURCE   => VideoProviderException::SOURCE_EXPIRED,
+                    default                            => VideoProviderException::PERMANENT,
+                });
+            }
+            $post = $db->table('reach_social_posts')->where('id', $postId)->get()->getRowArray();
+            if (($post['status'] ?? '') === 'posted') {
+                return $this->youtubePublishedViaSocialApi($item, $post);
+            }
+            $detail = ($result['status'] ?? '') === 'already_dispatched'
+                ? 'A YouTube submission to social-api.ai is already in progress; waiting for it.'
+                : 'Submitted to YouTube through social-api.ai (post ' . ($post['external_post_id'] ?? '?') . '); waiting for it to publish.';
+            return ['next' => 'youtube_upload', 'delay' => self::POLL_DELAY_SECS, 'detail' => $detail];
+        }
+
+        if ($post['status'] === 'publishing') {
+            $poll = (new SocialPostStatusPoller())->pollOne((int) $post['id']);
+            $post = $db->table('reach_social_posts')->where('id', (int) $post['id'])->get()->getRowArray();
+            if ($post['status'] === 'publishing') {
+                return ['next' => 'youtube_upload', 'delay' => self::POLL_DELAY_SECS, 'detail' => 'social-api.ai is publishing to YouTube (' . ($post['provider_status'] ?: 'pending') . ').' . (! empty($poll['poll_error']) ? ' Last status check failed; retrying.' : '')];
+            }
+        }
+        if ($post['status'] === 'posted') {
+            return $this->youtubePublishedViaSocialApi($item, $post);
+        }
+        throw new VideoProviderException('YouTube via social-api.ai: ' . ($post['error_message'] ?: 'the post is ' . $post['status']) . (! empty($post['provider_error_code']) ? ' [' . $post['provider_error_code'] . ']' : ''), VideoProviderException::PERMANENT);
+    }
+
+    /** Create (or refresh, for a retry / re-render) the `youtube` social post that carries this video. */
+    private function youtubePostRow(array $item, ?array $post): int
+    {
+        $db       = $this->repo->db();
+        $resource = YouTubeMetadata::resource($item, (array) $item['render_plan_json']);
+        $now      = gmdate('Y-m-d H:i:s');
+        $fields   = [
+            'title'      => mb_substr((string) $resource['snippet']['title'], 0, 255),
+            'content'    => (string) $resource['snippet']['description'],
+            'media_refs' => json_encode([[
+                'type' => 'video', 'kind' => 'mp4', 'mime' => 'video/mp4', 'url' => $item['render_url'],
+                'note' => 'Rendered MP4 (Shotstack, valid ~24 h after rendering).', 'rendered_at' => $item['rendered_at'],
+            ]], JSON_UNESCAPED_SLASHES),
+            'updated_at' => $now,
+        ];
+        if ($post !== null) {
+            $db->table('reach_social_posts')->where('id', (int) $post['id'])->update($fields);
+            return (int) $post['id'];
+        }
+
+        $botId = SystemApprover::userId();
+        $db->table('reach_social_posts')->insert($fields + [
+            'channel'         => 'youtube',
+            'hashtags'        => json_encode([], JSON_UNESCAPED_UNICODE),
+            'status'          => 'approved',
+            'approval_status' => 'approved',
+            'approved_by'     => $botId,
+            'approved_at'     => $now,
+            'bot_generated'   => true,
+            'created_by'      => $botId,
+            'tenant_id'       => (int) (env('REACH_DEFAULT_TENANT_ID') ?: 1),
+            'created_at'      => $now,
+        ]);
+        $postId = (int) $db->insertID();
+        $this->repo->update((int) $item['id'], ['youtube_social_post_id' => $postId]);
+
+        return $postId;
+    }
+
+    /** @return array{next: string, delay?: int, detail: string} */
+    private function youtubePublishedViaSocialApi(array $item, array $post): array
+    {
+        $id    = (int) $item['id'];
+        $short = $item['format'] === 'short';
+        if (($post['provider'] ?? '') !== \App\Libraries\Distribution\Providers\SocialApiAiPublisher::PROVIDER) {
+            // Development only (the mock social publisher refuses in production): never claim a YouTube link.
+            $this->repo->update($id, ['youtube_video_id' => null, 'youtube_url' => 'mock://social/' . ($post['external_post_id'] ?? $post['id']), 'youtube_privacy' => null]);
+            $this->repo->addWarning($id, 'Published by the development mock social publisher (' . ($post['provider'] ?? '?') . '): nothing is on YouTube.');
+            return ['next' => 'youtube_extras', 'detail' => 'Mock social publisher: nothing was published on YouTube.'];
+        }
+        $url   = (string) ($post['remote_url'] ?? '');
+        $video = self::youtubeIdFromUrl($url);
+        if ($video === null && preg_match('/^[A-Za-z0-9_\-]{6,32}$/', (string) ($post['remote_post_id'] ?? ''))) {
+            $video = (string) $post['remote_post_id'];
+        }
+        if ($url === '' && $video !== null) {
+            $url = YouTubeMetadata::watchUrl($video, $short);
+        }
+        $this->repo->update($id, [
+            'youtube_video_id'      => $video,
+            'youtube_url'           => $url !== '' ? $url : null,
+            'youtube_privacy'       => null,
+            'youtube_upload_url'    => null,
+        ]);
+        if ($url === '') {
+            $this->repo->addWarning($id, 'social-api.ai reported the video published on YouTube but returned no link or video id; find it in YouTube Studio.');
+        }
+        AuditLogger::record('video.youtube.uploaded', ['item_id' => $id, 'video_id' => $video, 'via' => 'social_api', 'social_post_id' => (int) $post['id']], null);
+
+        return ['next' => 'youtube_extras', 'detail' => 'Published on YouTube through social-api.ai.'];
+    }
+
+    public static function youtubeIdFromUrl(string $url): ?string
+    {
+        if ($url === '') {
+            return null;
+        }
+        if (preg_match('#(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/|live/)|youtu\.be/)([A-Za-z0-9_\-]{6,32})#i', $url, $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    private function socialPublisher(): SocialPublisherService
+    {
+        return new SocialPublisherService(new CampaignDispatchModel(), new CampaignDeliveryAttemptModel(), new CampaignOperationalMetricsModel(), new AuditLogger());
+    }
+
     /** @return array{next: string, delay?: int, detail: string} */
     private function stepYouTubeExtras(array $item): array
     {
         $id      = (int) $item['id'];
+        if (YouTubePublisherMode::forItem($item) === YouTubePublisherMode::SOCIAL_API) {
+            if ($item['thumbnail_status'] === null || $item['captions_status'] === null) {
+                $this->repo->update($id, ['thumbnail_status' => 'skipped', 'captions_status' => 'skipped']);
+                $this->repo->addWarning($id, 'Published through social-api.ai: Reach did not set a custom thumbnail or a separate caption track (no documented social-api.ai field; captions are burned into the video). Add them in YouTube Studio if needed.');
+            }
+            return $item['format'] === 'short'
+                ? ['next' => 'social', 'detail' => 'Offering the Short to social channels.']
+                : ['next' => 'done', 'detail' => 'Published on YouTube (social-api.ai).'];
+        }
         $videoId = (string) $item['youtube_video_id'];
         $yt      = VideoProviders::youtube();
 
@@ -420,10 +608,11 @@ final class VideoPipelineRunner
         $botId    = SystemApprover::userId();
         $tenantId = (int) (env('REACH_DEFAULT_TENANT_ID') ?: 1);
         $hashtags = array_slice(array_values(array_filter(array_map(static fn ($t) => '#' . preg_replace('/[^\p{L}\p{N}]+/u', '', (string) $t), (array) $script['tags']), static fn ($t) => mb_strlen($t) > 1)), 0, 5);
+        $watch    = (string) ($item['youtube_url'] ?? '');
         $text     = trim($script['title']) . "\n\n" . mb_substr(trim((string) $script['description']), 0, 280)
-            . "\n\n" . trim((string) $script['cta_text']) . "\nWatch: " . $item['youtube_url'];
+            . "\n\n" . trim((string) $script['cta_text']) . ($watch !== '' ? "\nWatch: " . $watch : '');
         $media    = array_values(array_filter([
-            ['type' => 'video', 'kind' => 'youtube_short', 'url' => $item['youtube_url']],
+            $watch !== '' ? ['type' => 'video', 'kind' => 'youtube_short', 'url' => $watch] : null,
             $item['render_url'] ? ['type' => 'video', 'kind' => 'mp4', 'url' => $item['render_url'], 'note' => 'Rendered 9:16 MP4 — hosted by Shotstack for about 24 hours after rendering.', 'rendered_at' => $item['rendered_at']] : null,
         ]));
 
@@ -437,7 +626,7 @@ final class VideoPipelineRunner
                 'content'         => $text,
                 'media_refs'      => json_encode($media, JSON_UNESCAPED_SLASHES),
                 'hashtags'        => json_encode($hashtags, JSON_UNESCAPED_UNICODE),
-                // Until a real social publisher exists these wait in the manual queue.
+                // Without a publisher that can post on this channel they wait in the manual queue.
                 'status'          => $ready ? 'approved' : 'manual_queue',
                 'approval_status' => 'approved',
                 'approved_by'     => $botId,
@@ -490,7 +679,7 @@ final class VideoPipelineRunner
         switch ($e->kind) {
             case VideoProviderException::NOT_CONFIGURED:
             case VideoProviderException::AUTH:
-                if ($e->kind === VideoProviderException::AUTH && str_starts_with($step, 'youtube')) {
+                if ($e->kind === VideoProviderException::AUTH && str_starts_with($step, 'youtube') && YouTubePublisherMode::forItem($item) === YouTubePublisherMode::DIRECT) {
                     (new YouTubeChannelService($this->repo->db()))->markError($msg);
                 }
                 $this->repo->update($id, ['status' => 'blocked', 'last_error' => mb_substr($msg, 0, 1000), 'step_detail' => 'Blocked: ' . mb_substr($msg, 0, 300)]);

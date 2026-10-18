@@ -85,7 +85,16 @@ class VideoPipelineController extends BaseApiController
             return $this->fail('Only blocked or failed videos can be retried (this one is ' . $item['status'] . ').', 409);
         }
         $repo->resetAssets((int) $item['id']);
-        $repo->update((int) $item['id'], ['status' => 'in_progress', 'last_error' => null, 'step_detail' => 'Retry requested.']);
+        $fields = ['status' => 'in_progress', 'last_error' => null, 'step_detail' => 'Retry requested.'];
+        // A YouTube post social-api.ai took and then failed is history: a retry
+        // submits a fresh post (social-api.ai refuses an identical one within 24 h).
+        if (! empty($item['youtube_social_post_id'])) {
+            $post = $repo->db()->table('reach_social_posts')->select('status, external_post_id')->where('id', (int) $item['youtube_social_post_id'])->get()->getRowArray();
+            if ($post !== null && $post['status'] === 'failed' && ! empty($post['external_post_id'])) {
+                $fields['youtube_social_post_id'] = null;
+            }
+        }
+        $repo->update((int) $item['id'], $fields);
         VideoPipelineRunner::enqueue((int) $item['id'], (string) $item['step']);
         $this->audit('video.pipeline.retry', 'video_pipeline', (int) $item['id'], null, ['status' => $item['status'], 'step' => $item['step']]);
 
@@ -123,6 +132,8 @@ class VideoPipelineController extends BaseApiController
             'youtube_video_id' => $item['youtube_video_id'],
             'youtube_url'      => $item['youtube_url'],
             'youtube_privacy'  => $item['youtube_privacy'],
+            'youtube_publisher' => $item['youtube_publisher'] ?? null,
+            'youtube_social_post_id' => isset($item['youtube_social_post_id']) ? (int) $item['youtube_social_post_id'] : null,
             'thumbnail_status' => $item['thumbnail_status'],
             'captions_status'  => $item['captions_status'],
             'social_post_ids'  => $item['social_post_ids_json'],

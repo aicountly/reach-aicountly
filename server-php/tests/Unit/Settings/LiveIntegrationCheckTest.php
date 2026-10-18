@@ -36,6 +36,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         'YOUTUBE_CLIENT_ID'     => 'client-123.apps.googleusercontent.com',
         'YOUTUBE_CLIENT_SECRET' => 'gocspx-secret-def',
         'YOUTUBE_REFRESH_TOKEN' => '1//refresh-secret-ghi',
+        'SOCIALAPI_API_KEY'     => 'sapi_key_live_secret_xyz',
     ];
 
     private const RENDER_ID = 'd2b46ed6-998a-4d6b-9d91-b8cf0193a655';
@@ -57,7 +58,11 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
             'VIDEO_TTS_MODEL'         => null,
             'VIDEO_TTS_VOICE'         => null,
             'VIDEO_PIPELINE_MOCKS'    => null,
+            'SOCIALAPI_BASE_URL'      => null,
+            'SOCIAL_PROVIDER'         => null,
+            'VIDEO_YOUTUBE_PUBLISHER' => null,
         ]);
+        \App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts::forget();
         $this->slept = [];
         $this->now   = 1_000_000;
     }
@@ -98,7 +103,12 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
                 'id' => 'UC123', 'snippet' => ['title' => 'AICOUNTLY'],
                 'status' => ['privacyStatus' => 'public', 'longUploadsStatus' => 'allowed', 'madeForKids' => false],
             ]]]))
-            ->on('POST', '#^https://api\.openai\.com/v1/audio/speech$#', new HttpResponse(200, Mp3Duration::silentStream(1000), ['content-type' => 'audio/mpeg']));
+            ->on('POST', '#^https://api\.openai\.com/v1/audio/speech$#', new HttpResponse(200, Mp3Duration::silentStream(1000), ['content-type' => 'audio/mpeg']))
+            ->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, [
+                ['id' => 'acc_yt_1', 'name' => 'AICOUNTLY', 'username' => 'aicountly', 'platform' => 'youtube', 'status' => 'active'],
+                ['id' => 'acc_ig_1', 'name' => 'AICOUNTLY', 'username' => 'aicountly.in', 'platform' => 'instagram', 'status' => 'active'],
+                ['id' => 'acc_li_1', 'name' => 'AICOUNTLY', 'platform' => 'linkedin', 'status' => 'expired'],
+            ]));
     }
 
     /** @param array<string, mixed> $report */
@@ -143,7 +153,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         $report = $this->check($http)->run();
 
         $this->assertTrue($report['ok'], json_encode($report));
-        $this->assertSame(6, $report['passed']);
+        $this->assertSame(7, $report['passed']);
         $this->assertSame(0, $report['failed']);
         $r = $this->byTarget($report);
         $this->assertSame(LiveIntegrationCheck::TARGETS, array_keys($r));
@@ -170,6 +180,16 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         $speech = json_decode((string) $http->to('#audio/speech#')[0]['body'], true);
         $this->assertSame(LiveIntegrationCheck::TTS_PHRASE, $speech['input']);
 
+        $this->assertStringContainsString('Key accepted; 3 connected account(s): youtube 1, instagram 1, linkedin 1. Ready to post to: youtube, instagram. Nothing was posted.', $r['social_api']['message']);
+        $this->assertSame('https://api.social-api.ai/v1', $r['social_api']['detail']['base_url']);
+        $this->assertSame('youtube “AICOUNTLY” @aicountly id=acc_yt_1 status=active', $r['social_api']['detail']['accounts'][0]);
+        $this->assertStringContainsString('(not active)', $r['social_api']['detail']['accounts'][2]);
+        $this->assertStringStartsWith('posts go to acc_yt_1 “AICOUNTLY” (auto', $r['social_api']['detail']['targets']['youtube']);
+        $this->assertStringContainsString('not available — No active LinkedIn account', $r['social_api']['detail']['targets']['linkedin']);
+        $this->assertSame('Bearer sapi_key_live_secret_xyz', $http->to('#social-api#')[0]['headers']['Authorization']);
+        $this->assertCount(1, $http->to('#social-api#'), 'one GET /accounts; never a post');
+        $this->assertSame([], array_filter($http->to('#social-api#'), static fn ($r) => $r['method'] !== 'GET'));
+
         $this->assertNoSecrets($report);
     }
 
@@ -190,13 +210,14 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         $report = $this->check($http)->run();
 
         $this->assertFalse($report['ok']);
-        $this->assertSame(6, $report['failed']);
+        $this->assertSame(7, $report['failed']);
         $this->assertSame([], $http->requests);
         $r = $this->byTarget($report);
         $this->assertStringContainsString('Shotstack API key is not set', $r['shotstack']['message']);
         $this->assertStringContainsString('OAuth client is not configured', $r['youtube']['message']);
         $this->assertStringContainsString('OpenAI API key is not set', $r['tts']['message']);
         $this->assertStringContainsString('No credential saved', $r['gemini']['message']);
+        $this->assertStringContainsString('social-api.ai API key is not set', $r['social_api']['message']);
     }
 
     public function testYouTubeWithoutARefreshTokenSaysToConnect(): void
@@ -216,11 +237,12 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
             ->on('GET', '#dataforseo#', FakeHttpTransport::json(401, ['status_code' => 40100, 'status_message' => 'You are not authorized.']))
             ->on('GET', '#shotstack\.io/edit/stage/templates#', FakeHttpTransport::json(403, ['message' => 'Forbidden']))
             ->on('POST', '#oauth2\.googleapis\.com/token#', FakeHttpTransport::json(400, ['error' => 'invalid_grant', 'error_description' => 'Token has been expired or revoked.']))
-            ->on('POST', '#audio/speech#', FakeHttpTransport::json(401, ['error' => ['message' => 'Incorrect API key provided: sk-openai-secret-456']]));
+            ->on('POST', '#audio/speech#', FakeHttpTransport::json(401, ['error' => ['message' => 'Incorrect API key provided: sk-openai-secret-456']]))
+            ->on('GET', '#social-api\.ai/v1/accounts#', FakeHttpTransport::json(401, ['error' => ['code' => 'auth.invalid_key', 'message' => 'Invalid API key sapi_key_live_secret_xyz']]));
 
         $report = $this->check($http)->run();
         $this->assertFalse($report['ok']);
-        $this->assertSame(6, $report['failed']);
+        $this->assertSame(7, $report['failed']);
         $r = $this->byTarget($report);
 
         $this->assertStringContainsString('Shotstack rejected the key for the stage environment (HTTP 403)', $r['shotstack']['message']);
@@ -231,6 +253,8 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         $this->assertStringContainsString('OpenAI rejected the key (HTTP 401)', $r['openai']['message']);
         $this->assertStringContainsString('OpenAI TTS speech failed (HTTP 401)', $r['tts']['message']);
         $this->assertSame('auth', $r['tts']['detail']['kind']);
+        $this->assertStringContainsString('social-api.ai rejected the API key (HTTP 401)', $r['social_api']['message']);
+        $this->assertSame('auth', $r['social_api']['detail']['kind']);
 
         $this->assertNoSecrets($report);
     }
@@ -278,8 +302,10 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
 
         $report = $this->check($http)->run();
         $this->assertFalse($report['ok']);
-        $this->assertSame(6, $report['failed']);
+        $this->assertSame(7, $report['failed']);
         $r = $this->byTarget($report);
+        $this->assertStringContainsString('Could not reach social-api.ai at https://api.social-api.ai/v1 (network error)', $r['social_api']['message']);
+        $this->assertCount(1, $http->to('#social-api#'), 'the live check does not retry');
         foreach (['gemini' => 'Gemini', 'openai' => 'OpenAI', 'dataforseo' => 'DataForSEO', 'shotstack' => 'Shotstack'] as $t => $name) {
             $this->assertSame("Could not reach {$name} (network error: Could not resolve host).", $r[$t]['message'], $t);
         }

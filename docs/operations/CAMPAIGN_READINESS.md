@@ -14,7 +14,7 @@ the message.**
 | Before | Now |
 | --- | --- |
 | `MockSocialPublisher` was the only social publisher and its production guard was a no-op, so production posts were marked `posted` with fake `mock-post-…` ids. | Every mock (email, SMS, WhatsApp, social) throws `ProviderNotConfiguredException` in production (`ProviderGuard`; unset `CI_ENVIRONMENT` counts as production). The post/campaign is recorded `failed` with the reason. |
-| Approving a social post set `approved` (auto-dispatchable) when a `*_API_TOKEN` env var was set — tokens nothing used. | Approval goes to `manual_queue` unless a real publisher for that network exists (`ChannelProviderFactory::socialPublisherReadyFor`). Today: always `manual_queue` in production. |
+| Approving a social post set `approved` (auto-dispatchable) when a `*_API_TOKEN` env var was set — tokens nothing used. | Approval goes to `manual_queue` unless a real publisher for that network exists (`ChannelProviderFactory::socialPublisherReadyFor`): social-api.ai with a key and a resolvable account for that platform. |
 | Email with no `EMAIL_API_KEY` used the mock and still marked the campaign `sent`. | Production refuses to queue the send (HTTP 503 "Email provider not configured…"); nothing changes status. |
 | `SMS_SKIP_SEND` / `WHATSAPP_SKIP_SEND` (both **default true**) returned success without calling the gateway, recorded as `accepted`. | Recorded as `skipped` (new attempt status), the dispatch stops, dispatch + campaign are `failed` with `last_error` naming the switch. |
 | Recipients were hard-coded `list@broadcast` / `broadcast`, falling back to `CAMPAIGN_DISPATCH_TEST_EMAIL/_PHONE`. One "send" per campaign. | Real per-recipient audience (below). Gateways send only to the exact address on the message; no fallback. The test address is only used by the explicit test-send endpoint. |
@@ -186,57 +186,54 @@ States used below and on the readiness page: **ready**, **test_mode**
 - **Audience:** only leads with a `granted` WhatsApp marketing consent (same
   capture gap as SMS).
 
-### Facebook, Instagram, LinkedIn, X/Twitter — blocked on socialapi.ai
+### Facebook, Instagram, LinkedIn, X/Twitter — through social-api.ai
 
-- **State:** `blocked` once `social.socialapi.api_key` is set (Settings → AI &
-  Automation → Social, or env `SOCIALAPI_API_KEY`; optional
-  `social.socialapi.base_url` / `SOCIALAPI_BASE_URL`; `SOCIAL_PROVIDER` unset
-  or `socialapi`), otherwise `not_configured`.
-- `SocialApiAiPublisher` is a **fail-closed placeholder**: every call throws
-  *"socialapi.ai adapter pending: API docs required. Nothing was posted."* and
-  the post is recorded `failed`. Approved posts go to `manual_queue` — post
-  them by hand for launch.
-- The socialapi.ai documentation could not be reached from the build
-  environment, so no request shapes were guessed. Implementing the adapter is a
-  one-file change (`app/Libraries/Distribution/Providers/SocialApiAiPublisher.php`)
-  behind `SocialPublisherInterface` (`publish`, `getStatus`, `withdraw`,
-  `getCapabilities` → `platforms`, `isEnabled`, `verifyCallback`,
-  `providerName`).
+Full setup, request flow and assumptions: [SOCIAL_API.md](SOCIAL_API.md).
 
-### YouTube — not a campaign channel
+- **Provider:** `SocialApiAiPublisher` (social-api.ai), selected when `social.socialapi.api_key`
+  is set (Settings → AI & Automation → Social, or env `SOCIALAPI_API_KEY`; `SOCIAL_PROVIDER`
+  unset or `socialapi`). Base URL `social.socialapi.base_url`, default
+  `https://api.social-api.ai/v1`.
+- **States on the readiness page:**
+  - `ready` — key and base URL set **and** an account for that platform resolves
+    (`social.socialapi.account.<platform>`, or the single active account in social-api.ai's
+    `GET /v1/accounts`, cached 10 minutes); the account id is shown;
+  - `not_configured` — no key (the development mock is in use; in production posts fail closed
+    and approved posts go to `manual_queue`);
+  - `blocked` — key set but no active account / several active accounts (set the id) / the key
+    is refused / social-api.ai unreachable; the reason is shown.
+- **Honest post states:** a dispatched post is `publishing` once social-api.ai accepted it
+  (HTTP 201) and becomes `posted` only when `GET /v1/posts/{id}` reports the target published
+  (`reach.social_post_poll`, every 5 minutes on the `distribution` queue). A failed target is
+  `failed` with social-api.ai's `error.code`; no confirmation within 30 minutes → `failed` with
+  `publishing.delivery.timeout`. 207 / 422 / 400 / 409 are recorded with their codes; the redacted
+  provider response is kept on the post (`provider_response_json`).
+- **Campaign fan-out** (`dispatchVariant`): the variant becomes a `reach_social_posts` row linked
+  by `dispatch_id`; the dispatch stays `dispatching` until the poller settles it
+  (`completed` / `failed`), then the campaign follows.
+- **After saving the key** run `php spark reach:integrations-check --only=social_api` (or
+  **Check social-api.ai** on Settings → Social): it lists the connected accounts and which one each
+  platform posts to. It never posts.
+- **Per-network options** (`platform_data`) are operator JSON copied from docs.social-api.ai →
+  Platforms (`social.socialapi.platform_data.<platform>`); Reach invents no keys.
+- Withdraw/delete is not implemented (no confirmed endpoint) — remove posts in social-api.ai.
 
-Video uploads belong to the separate video pipeline (`VideoProviderFactory`,
-`VIDEO_*` settings), not campaign social posts. Through socialapi.ai it is in
-the same blocked state as the other networks.
+### YouTube — through social-api.ai (default) or direct upload
+
+Videos come from the video pipeline, not campaign posts. With `video.youtube.publisher =
+social_api` (default) each vlog and Short is published to YouTube through social-api.ai as a
+`youtube` `reach_social_posts` row (MP4 uploaded to social-api.ai's media store, title = video
+title, text = description); the video item is `published` only when social-api.ai reports the
+YouTube target published. `direct` keeps Reach's own Google OAuth upload. The YouTube readiness
+row names the active path; Video → Pipeline / Operations show it too. See
+[VIDEO_AUTOMATION_SETUP.md](VIDEO_AUTOMATION_SETUP.md).
 
 ### Google Ads, Meta Ads, LinkedIn Ads — not supported
 
 No ad-platform code exists in Reach (no campaign, audience-sync, spend or
-conversion API). Whether socialapi.ai covers paid ads is **unknown** (docs not
-available). Run paid campaigns directly in each ads manager for launch; UTM
-templates and attribution in Reach still apply to the landing traffic.
-
-## socialapi.ai — what the adapter needs
-
-From the socialapi.ai docs / account, for each of Facebook Pages, Instagram
-Business, LinkedIn (company page + member), X, YouTube:
-
-1. **Auth:** header name and format for the API key; base URL; sandbox vs live.
-2. **List connected accounts/pages** → ids Reach maps to `platform` (and
-   `destination_id`).
-3. **Create post** per network: text limits, link previews, image/video upload
-   (multipart vs. URL, size/format limits, async media processing), hashtags,
-   first comment, per-network options (e.g. Instagram media type, LinkedIn
-   visibility).
-4. **Schedule** (`publish_at`, timezone) and **cancel/delete** a post.
-5. **Status**: polling endpoint and/or **webhook** — event names, payload,
-   signature header and signing scheme (so `verifyCallback` can be real).
-6. **Analytics** per post (impressions, reach, clicks, engagement) and rate
-   limits per account.
-7. **Error model:** rate-limit signalling (429 + `Retry-After`?), permanent vs
-   transient errors, token-expiry/reconnect errors.
-8. **Ads:** does it cover Google Ads / Meta Ads / LinkedIn Ads (campaign
-   create, budget, audiences, reporting)? If not, those stay out of scope.
+conversion API). social-api.ai is used for organic posts and videos only. Run
+paid campaigns directly in each ads manager for launch; UTM templates and
+attribution in Reach still apply to the landing traffic.
 
 ## DPDP Act 2023 (applies to every channel)
 
@@ -281,6 +278,11 @@ page shows `ready`.
 - [ ] One template test to an internal opted-in number succeeds (Infobip shows the message).
 - [ ] Leads have recorded WhatsApp opt-in; STOP handling owner assigned.
 
-**Social** — **no-go for automation**; post the `manual_queue` by hand. Go only after the socialapi.ai adapter is implemented and tested against the live account.
+**Social** (social-api.ai)
+- [ ] Migration `2026-10-18-100001_SocialApiPublishing` applied.
+- [ ] `social.socialapi.api_key` saved; `php spark reach:integrations-check --only=social_api` is OK and lists the expected account for every network you will post to (set `social.socialapi.account.<platform>` where several are connected).
+- [ ] Readiness shows `ready` for each such network.
+- [ ] Any per-network options copied from docs.social-api.ai into `social.socialapi.platform_data.<platform>`.
+- [ ] One test post per network dispatched by hand ends `posted` with a working link (not just `publishing`); the assumptions in SOCIAL_API.md § "Verified vs. assumed" checked against its stored response.
 
 **Ads** — **no-go in Reach**; use each ads manager directly.

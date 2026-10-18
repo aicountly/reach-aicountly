@@ -76,10 +76,9 @@ class SocialPostController extends BaseApiController
         if (! $row) {
             return $this->fail('Social post not found.', 404);
         }
-        // `approved` (auto-dispatchable) only when a real publisher would post
-        // it. The old *_API_TOKEN env checks were never used by any publisher,
-        // so a set token sent posts nowhere. Until the socialapi.ai adapter is
-        // implemented every approved post goes to the manual queue.
+        // `approved` (dispatchable) only when a real publisher would post it:
+        // social-api.ai with a key and a resolvable account for this channel.
+        // Otherwise the approved post goes to the manual queue.
         $status = ChannelProviderFactory::socialPublisherReadyFor((string) ($row['channel'] ?? ''))
             ? 'approved'
             : 'manual_queue';

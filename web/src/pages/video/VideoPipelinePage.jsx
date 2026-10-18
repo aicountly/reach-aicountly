@@ -37,6 +37,8 @@ const CHECK_LABEL = {
   screenshots: 'Screenshot worker (optional)',
   youtube_client: 'YouTube OAuth client',
   youtube_channel: 'YouTube channel connected',
+  social_api_key: 'social-api.ai API key',
+  social_api_youtube_account: 'YouTube account in social-api.ai',
 };
 
 const CONNECT_ERRORS = {
@@ -50,7 +52,7 @@ function statusLabel(status) {
   return String(status ?? '').replace(/_/g, ' ');
 }
 
-function ChannelCard({ status, canManage, onChanged }) {
+function ChannelCard({ status, path, canManage, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -100,7 +102,13 @@ function ChannelCard({ status, canManage, onChanged }) {
             {status.last_error && (<><dt>Last error</dt><dd className="text-error">{status.last_error}</dd></>)}
           </dl>
         )}
-        {status && !status.client_configured && (
+        {path?.mode === 'social_api' && (
+          <p className="muted mt-2">
+            Videos go to YouTube through <strong>social-api.ai</strong> (Settings → AI &amp; Automation → Social).
+            This direct connection is only used when <code>video.youtube.publisher</code> is <code>direct</code>.
+          </p>
+        )}
+        {status && !status.client_configured && path?.mode !== 'social_api' && (
           <p className="muted mt-2">Set the YouTube OAuth client ID and secret in <Link to={ROUTES.AUTOMATION_SETTINGS}>Settings → AI &amp; Automation → Video</Link> first.</p>
         )}
         {error && <p className="text-error mt-2">{error}</p>}
@@ -141,6 +149,14 @@ function ReadinessCard({ status }) {
         <p className="muted mt-2">
           Renderer: {status.render_provider} · Voice: {status.tts?.model} / {status.tts?.voice} · Per day: {status.daily?.vlog} vlog, {status.daily?.short} Short
         </p>
+        {status.youtube_path && (
+          <p className="muted">
+            YouTube via: <strong>{status.youtube_path.label}</strong>{' '}
+            <span className={`badge ${status.youtube_path.ready ? 'badge--success' : 'badge--warning'}`}>{status.youtube_path.ready ? 'ready' : 'not ready'}</span>
+            {status.youtube_path.account?.id && <> · account {status.youtube_path.account.name ? `“${status.youtube_path.account.name}” ` : ''}{status.youtube_path.account.id}</>}
+            {!status.youtube_path.ready && status.youtube_path.reason && <> · {status.youtube_path.reason}</>}
+          </p>
+        )}
         {(status.notes || []).map((n) => <p key={n} className="muted">{n}</p>)}
       </div>
     </section>
@@ -272,7 +288,7 @@ export default function VideoPipelinePage() {
       {connectResult === 'error' && <div className="alert alert-danger mb-4">Could not connect YouTube: {CONNECT_ERRORS[connectReason] ?? connectReason}</div>}
 
       <div className="two-col-grid">
-        <ChannelCard status={channel} canManage={hasPermission('video_connections.manage')} onChanged={load} />
+        <ChannelCard status={channel} path={status?.youtube_path} canManage={hasPermission('video_connections.manage')} onChanged={load} />
         <ReadinessCard status={status} />
       </div>
 

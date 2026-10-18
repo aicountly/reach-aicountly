@@ -127,7 +127,11 @@ surface, not the environment.
 | `SMS_SKIP_SEND` / `WHATSAPP_SKIP_SEND` | `true` — campaign sends are recorded `skipped`, never `sent` |
 | `DISTRIBUTION_POSTAL_ADDRESS` | empty — required before campaign email is sent (or setting `distribution.email.postal_address`) |
 | `CAMPAIGN_DISPATCH_TEST_EMAIL` | empty — default `to` for `POST v1/distribution/email/test/:id` only; never a fallback recipient for campaign sends |
-| `SOCIAL_PROVIDER` | empty → `socialapi` when `social.socialapi.api_key` is set (fail-closed until implemented), else dev mock |
+| `SOCIAL_PROVIDER` | empty → social-api.ai when `social.socialapi.api_key` is set, else dev mock (refused in production); `mock` forces the mock |
+| `SOCIALAPI_API_KEY` / `SOCIALAPI_BASE_URL` | fallbacks for `social.socialapi.api_key` / `social.socialapi.base_url` (default `https://api.social-api.ai/v1`) |
+| `SOCIALAPI_ACCOUNT_<PLATFORM>` | fallback for `social.socialapi.account.<platform>` (youtube, instagram, facebook, linkedin, x, tiktok); blank = the single active account |
+| `SOCIALAPI_PLATFORM_DATA_<PLATFORM>` | fallback for `social.socialapi.platform_data.<platform>` (JSON object) |
+| `VIDEO_YOUTUBE_PUBLISHER` | `social_api` — fallback for `video.youtube.publisher` (`social_api` \| `direct`) |
 
 See `CAMPAIGN_READINESS.md` for the per-channel requirements.
 

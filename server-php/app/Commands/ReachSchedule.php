@@ -177,6 +177,12 @@ class ReachSchedule extends BaseCommand
             $add('reach.routine_content_sweep', ['limit' => 10], 'routine-content-sweep-' . $utc->format('YmdHi'), ['queue' => 'default']);
         }
 
+        // Every 5 minutes: confirm social-api.ai posts that are still `publishing`
+        // (published / failed / 30-minute timeout). Idempotent per 5-minute slot.
+        if ($minute % 5 === 0) {
+            $add('reach.social_post_poll', ['limit' => 25], 'social-post-poll-' . $utc->format('YmdHi'), ['queue' => 'distribution']);
+        }
+
         // Every hour: due-date reminders, overdue escalation, schedule readiness
         $add('reach.content_due_date_reminder', [], "content-due-date-reminder-{$hourKey}", ['queue' => 'notifications']);
         $add('reach.content_overdue_escalation', [], "content-overdue-escalation-{$hourKey}", ['queue' => 'notifications']);

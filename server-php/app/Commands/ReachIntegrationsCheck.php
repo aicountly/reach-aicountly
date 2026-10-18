@@ -12,7 +12,8 @@ use CodeIgniter\CLI\CLI;
 
 /**
  * `php spark reach:integrations-check` — exercise Shotstack, YouTube,
- * DataForSEO, Gemini, OpenAI and OpenAI TTS against the live services with the
+ * DataForSEO, Gemini, OpenAI, OpenAI TTS and social-api.ai (GET /v1/accounts,
+ * never posts) against the live services with the
  * credentials saved in Settings → AI & Automation (or .env). Prints OK/FAIL
  * with a one-line reason per check, never a secret. Exit 0 when every
  * requested check passed, 1 when any failed, 2 on a usage error.
@@ -25,8 +26,8 @@ class ReachIntegrationsCheck extends BaseCommand
 
     protected $group       = 'Reach';
     protected $name        = 'reach:integrations-check';
-    protected $description = 'Live-check Shotstack, YouTube, DataForSEO, Gemini, OpenAI and TTS with the saved credentials.';
-    protected $usage       = 'reach:integrations-check [--only=shotstack,youtube,dataforseo,gemini,openai,tts] [--render-test] [--json]';
+    protected $description = 'Live-check Shotstack, YouTube, DataForSEO, Gemini, OpenAI, TTS and social-api.ai with the saved credentials.';
+    protected $usage       = 'reach:integrations-check [--only=shotstack,youtube,dataforseo,gemini,openai,tts,social_api] [--render-test] [--json]';
     protected $options     = [
         '--only'        => 'Comma-separated checks to run (default: all).',
         '--render-test' => 'Also submit a 3-second title-card render on the configured Shotstack environment and wait for it (stage: free/watermarked; v1: billed).',

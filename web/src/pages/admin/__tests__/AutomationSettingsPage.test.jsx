@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AutomationSettingsPage } from '../AutomationSettingsPage';
+import { jsonObjectError } from '../../../utils/jsonObject';
 import { adminService } from '../../../services/adminService';
 
 vi.mock('../../../services/adminService', () => ({
@@ -90,5 +91,69 @@ describe('AutomationSettingsPage', () => {
     render(<AutomationSettingsPage />);
     await screen.findByLabelText(/Gemini API key/);
     expect(screen.queryByRole('button', { name: /Run live checks/ })).not.toBeInTheDocument();
+  });
+
+  describe('Social (social-api.ai)', () => {
+    const SOCIAL = [
+      { key: 'social.socialapi.base_url', group: 'Social', label: 'social-api.ai API base URL', type: 'string', value: 'https://api.social-api.ai/v1', source: 'default' },
+      { key: 'social.socialapi.api_key', group: 'Social', label: 'social-api.ai API key', type: 'secret', is_set: false, source: 'unset', value: null },
+      { key: 'video.youtube.publisher', group: 'Social', label: 'How videos reach YouTube', type: 'choice', options: ['social_api', 'direct'], value: 'social_api', source: 'default' },
+      { key: 'social.socialapi.account.youtube', group: 'Social', label: 'social-api.ai account id: YouTube', type: 'string', value: '', source: 'unset' },
+      { key: 'social.socialapi.platform_data.youtube', group: 'Social', label: 'platform_data for YouTube posts (JSON)', type: 'json_object', value: '', source: 'default' },
+    ];
+
+    beforeEach(() => {
+      adminService.automationSettings.mockResolvedValue(SOCIAL);
+      adminService.updateAutomationSettings.mockResolvedValue(SOCIAL);
+    });
+
+    it('shows the default base URL, a write-only key and the YouTube publisher choice', async () => {
+      render(<AutomationSettingsPage />);
+      expect(await screen.findByLabelText(/social-api\.ai API base URL/)).toHaveValue('https://api.social-api.ai/v1');
+      expect(screen.getByLabelText(/social-api\.ai API key/)).toHaveAttribute('type', 'password');
+      const select = screen.getByLabelText(/How videos reach YouTube/);
+      expect(select.tagName).toBe('SELECT');
+      expect(select).toHaveValue('social_api');
+      expect(screen.getAllByRole('option').map((o) => o.value)).toEqual(['social_api', 'direct']);
+    });
+
+    it('refuses to save platform_data that is not a JSON object', async () => {
+      render(<AutomationSettingsPage />);
+      const json = await screen.findByLabelText(/platform_data for YouTube/);
+      fireEvent.change(json, { target: { value: '[1, 2]' } });
+      expect(screen.getByRole('alert')).toHaveTextContent('Must be a JSON object');
+      fireEvent.click(screen.getByRole('button', { name: /Save Social/ }));
+      expect(await screen.findByText(/platform_data for YouTube posts \(JSON\): Must be a JSON object/)).toBeInTheDocument();
+      expect(adminService.updateAutomationSettings).not.toHaveBeenCalled();
+
+      fireEvent.change(json, { target: { value: '{"youtube": {"privacy": "unlisted"}}' } });
+      fireEvent.change(screen.getByLabelText(/How videos reach YouTube/), { target: { value: 'direct' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Social/ }));
+      await waitFor(() => expect(adminService.updateAutomationSettings).toHaveBeenCalledWith({
+        'video.youtube.publisher': 'direct',
+        'social.socialapi.platform_data.youtube': '{"youtube": {"privacy": "unlisted"}}',
+      }));
+    });
+
+    it('runs only the social-api.ai live check from the Social card', async () => {
+      adminService.runLiveChecks.mockResolvedValue({
+        ok: true, passed: 1, failed: 0, ran_at: '2026-10-18T09:00:00+00:00',
+        results: [{ target: 'social_api', ok: true, message: 'Key accepted; 1 connected account(s): youtube 1. Ready to post to: youtube. Nothing was posted.', detail: { targets: { youtube: 'posts go to acc_yt' } }, duration_ms: 3 }],
+      });
+      render(<AutomationSettingsPage />);
+      fireEvent.click(await screen.findByRole('button', { name: /Check social-api\.ai/ }));
+      expect(await screen.findByText(/Key accepted; 1 connected account/)).toBeInTheDocument();
+      expect(adminService.runLiveChecks).toHaveBeenCalledWith(['social_api']);
+      expect(screen.getByText('targets.youtube')).toBeInTheDocument();
+    });
+  });
+
+  it('validates JSON objects', () => {
+    expect(jsonObjectError('')).toBeNull();
+    expect(jsonObjectError('{}')).toBeNull();
+    expect(jsonObjectError('{"a":1}')).toBeNull();
+    expect(jsonObjectError('[]')).toMatch(/JSON object/);
+    expect(jsonObjectError('"x"')).toMatch(/JSON object/);
+    expect(jsonObjectError('{oops')).toMatch(/Not valid JSON/);
   });
 });
