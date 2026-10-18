@@ -133,6 +133,20 @@ final class ReachConfig
             'social.socialapi.platform_data.linkedin' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_LINKEDIN', 'label' => 'platform_data for LinkedIn posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → LinkedIn. Blank = none.'],
             'social.socialapi.platform_data.x' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_X', 'label' => 'platform_data for X posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → X. Blank = none.'],
             'social.socialapi.platform_data.tiktok' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_TIKTOK', 'label' => 'platform_data for TikTok posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → TikTok. Blank = none.'],
+            'social.socialapi.youtube.visibility' => ['group' => 'Social', 'label' => 'YouTube visibility', 'type' => 'choice', 'env' => 'SOCIALAPI_YOUTUBE_VISIBILITY', 'default' => 'public', 'options' => ['public', 'unlisted', 'private'],
+                'help' => 'Sent with every YouTube video as targets[].visibility (the field social-api.ai\'s own dashboard sends). social-api.ai\'s default is private, so leave this set.'],
+            'social.socialapi.target_options.youtube' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_YOUTUBE', 'label' => 'Per-target options for YouTube posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the YouTube entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.instagram' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_INSTAGRAM', 'label' => 'Per-target options for Instagram posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the Instagram entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.facebook' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_FACEBOOK', 'label' => 'Per-target options for Facebook posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the Facebook entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.linkedin' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_LINKEDIN', 'label' => 'Per-target options for LinkedIn posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the LinkedIn entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.x' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_X', 'label' => 'Per-target options for X posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the X entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.tiktok' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_TIKTOK', 'label' => 'Per-target options for TikTok posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the TikTok entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
             // ── end social-api.ai ──
 
             // ── Distribution (campaign sends: email / SMS / WhatsApp) ───────

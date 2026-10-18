@@ -158,7 +158,9 @@ final class SocialApiReadinessTest extends CIUnitTestCase
         $mine  = array_values(array_filter($keys, static fn ($k) => str_starts_with($k, 'social.socialapi.') || $k === 'video.youtube.publisher'));
         $first = array_search($mine[0], $keys, true);
         $this->assertSame($mine, array_slice($keys, $first, count($mine)));
-        $this->assertCount(2 + 1 + 6 + 6, $mine);
+        $this->assertCount(2 + 1 + 6 + 6 + 1 + 6, $mine); // + youtube.visibility, target_options.*
+        $this->assertSame('public', ReachConfig::get('social.socialapi.youtube.visibility'));
+        $this->assertSame('private', ReachConfig::validate('social.socialapi.youtube.visibility', 'private'));
 
         $this->assertSame('{"youtube":{"privacy":"unlisted"}}', ReachConfig::validate('social.socialapi.platform_data.youtube', ' {"youtube": {"privacy": "unlisted"}} '));
         $this->assertSame('{}', ReachConfig::validate('social.socialapi.platform_data.youtube', '{}'));
