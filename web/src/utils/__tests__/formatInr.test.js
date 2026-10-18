@@ -18,7 +18,8 @@ describe('formatInr', () => {
 });
 
 describe('localDay', () => {
-  it('formats the local calendar date', () => {
-    expect(localDay(new Date(2026, 9, 7, 23, 30))).toBe('2026-10-07');
+  it('formats the IST calendar date, whatever the browser zone', () => {
+    expect(localDay(new Date(Date.UTC(2026, 9, 7, 17, 0)))).toBe('2026-10-07'); // 22:30 IST
+    expect(localDay(new Date(Date.UTC(2026, 9, 7, 18, 40)))).toBe('2026-10-08'); // 00:10 IST
   });
 });

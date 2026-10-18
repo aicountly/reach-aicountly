@@ -40,6 +40,15 @@ final class DailyReportRendererTest extends CIUnitTestCase
         $this->assertSame('AICOUNTLY daily report — Sat 17 Oct 2026', DailyReportRenderer::subject($s));
     }
 
+    public function testGeneratedTimeIsShownInIstWithItsLabel(): void
+    {
+        $s = self::summary([]);
+        $s['generated_at'] = '2026-10-17 02:30:00+00:00'; // stored/serialised in UTC
+        $this->assertStringContainsString('Generated 17-10-2026 08:00 IST', DailyReportRenderer::html($s));
+        $this->assertStringContainsString("Generated 17-10-2026 08:00 IST\n", DailyReportRenderer::text($s));
+        $this->assertStringNotContainsString('+00:00', DailyReportRenderer::text($s));
+    }
+
     public function testSearchSectionRendersDayAgainstBaseline(): void
     {
         $s = self::summary(['search' => [

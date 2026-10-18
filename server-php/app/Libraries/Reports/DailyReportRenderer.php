@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Libraries\Reports;
 
+use App\Libraries\Support\DisplayTime;
+
 /**
  * Turns a DailyReportBuilder summary into an email: inline-styled HTML (mail
  * clients strip <style>) and a plain-text part. Pure — no I/O.
@@ -46,7 +48,7 @@ final class DailyReportRenderer
         $body .= self::section('Pipeline health', self::pipelineHtml($s['pipeline'] ?? []));
 
         $title = 'Daily analytics report — ' . self::e(self::longDate((string) $summary['report_date']));
-        $meta  = 'Generated ' . self::e((string) $summary['generated_at']) . ' (' . self::e((string) $summary['timezone']) . ')';
+        $meta  = 'Generated ' . self::e(self::generatedAt($summary));
 
         return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $title . '</title></head>'
             . '<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:' . self::C_TEXT . ';">'
@@ -68,7 +70,7 @@ final class DailyReportRenderer
         $s   = $summary['sections'];
         $out = [];
         $out[] = 'AICOUNTLY daily analytics report — ' . self::longDate((string) $summary['report_date']);
-        $out[] = 'Generated ' . $summary['generated_at'] . ' (' . $summary['timezone'] . ')';
+        $out[] = 'Generated ' . self::generatedAt($summary);
         $out[] = '';
         $out[] = '== What to do today ==';
         foreach (($s['todo']['items'] ?? []) as $i => $item) {
@@ -415,6 +417,13 @@ final class DailyReportRenderer
         $short = preg_replace('#^https?://(www\.)?#', '', $url) ?? $url;
 
         return mb_strlen($short) > 70 ? mb_substr($short, 0, 67) . '…' : $short;
+    }
+
+    /** "18-10-2026 08:00 IST" — in the report's own zone (IST), labelled. */
+    private static function generatedAt(array $summary): string
+    {
+        $raw = (string) ($summary['generated_at'] ?? '');
+        return DisplayTime::format($raw, $raw, true, (string) ($summary['timezone'] ?? DisplayTime::DEFAULT_ZONE));
     }
 
     private static function longDate(string $date): string

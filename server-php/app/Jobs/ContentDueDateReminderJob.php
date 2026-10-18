@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Libraries\JobContext;
 use App\Libraries\JobHandlerInterface;
 use App\Libraries\NotificationService;
+use App\Libraries\Support\DisplayTime;
 
 /**
  * Sends reminders to content owners/writers whose items are due within 24 h.
@@ -47,7 +48,7 @@ class ContentDueDateReminderJob implements JobHandlerInterface
                 $notifSvc->dispatch(
                     (int) $a['user_id'],
                     NotificationService::TYPE_REVIEW_DUE,
-                    "Content \"{$item['title']}\" is due on {$item['due_date']}.",
+                    "Content \"{$item['title']}\" is due on " . DisplayTime::date($item['due_date']) . '.',
                     [
                         'entity_type' => 'content_item',
                         'entity_id'   => $item['id'],

@@ -6,6 +6,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Settings\LiveIntegrationCheck;
+use App\Libraries\Support\DisplayTime;
 use App\Libraries\Video\Automation\VideoProviders;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -65,6 +66,7 @@ class ReachIntegrationsCheck extends BaseCommand
             foreach (self::lines($report) as $line) {
                 CLI::write($line);
             }
+            CLI::write('Checked ' . DisplayTime::format($report['ran_at'] ?? time()) . '.');
         }
 
         return $report['ok'] ? 0 : 1;

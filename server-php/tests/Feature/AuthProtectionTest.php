@@ -29,6 +29,7 @@ final class AuthProtectionTest extends ApiTestCase
         $this->assertTrue($body['ok']);
         $this->assertSame('super_admin@test.aicountly.org', $body['data']['email']);
         $this->assertSame('super_admin', $body['data']['role']);
+        $this->assertSame('Asia/Kolkata', $body['data']['ui_timezone'], 'the web renders every time in this zone');
     }
 
     public function testLegacyLoginRouteIsDisabled(): void

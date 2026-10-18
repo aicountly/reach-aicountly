@@ -126,13 +126,13 @@ period, not sixty times.
 | every hour | `reach.blog_cover_sweep` | blog | `blog-cover-sweep-<Y-m-d-H>` |
 | every hour | `reach.content_due_date_reminder`, `reach.content_overdue_escalation` | notifications | `<type>-<Y-m-d-H>` |
 | every hour | `reach.content_schedule_readiness` | default | `content-schedule-readiness-<Y-m-d-H>` |
-| 03:00 | `reach.content_refresh_detection` | default | per day |
-| **04:00** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
-| 05:00 | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |
-| 06:00 | `reach.content_base_sync` | default | per day |
-| 07:00 | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
-| 08:00 | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
-| 09:00 | `reach.gallery_deficit_alert` | notifications | per day |
+| 03:00 UTC (08:30 IST) | `reach.content_refresh_detection` | default | per day |
+| **04:00 UTC (09:30 IST)** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
+| 05:00 UTC (10:30 IST) | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |
+| 06:00 UTC (11:30 IST) | `reach.content_base_sync` | default | per day |
+| 07:00 UTC (12:30 IST) | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
+| 08:00 UTC (13:30 IST) | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
+| 09:00 UTC (14:30 IST) | `reach.gallery_deficit_alert` | notifications | per day |
 | 06:00 IST (00:30 UTC) | `reach.seo_tracker` — DataForSEO SERP checks, capped by `seo.tracker.max_keywords_per_day`; a no-op without credentials | default | `seo-tracker-<IST date>` |
 | 08:00 IST (02:30 UTC) | `reach.daily_analytics_report` — email to `reports.daily.recipients`; never re-sent for a date already sent | notifications | `daily-report-<IST date>` |
 
@@ -140,7 +140,7 @@ Run or re-run by hand:
 
 ```bash
 php spark reach:search-console ingest            # GSC incremental window now
-php spark reach:search-console backfill --days=90 # then let the 04:00 job walk it (14 days/run)
+php spark reach:search-console backfill --days=90 # then let the 04:00 UTC (09:30 IST) job walk it (14 days/run)
 php spark reach:daily-report                     # build + store today's report (no email)
 php spark reach:daily-report --send              # build + email to reports.daily.recipients
 php spark reach:daily-report --date=2026-10-17 --send --to=you@aicountly.com
@@ -154,8 +154,9 @@ report's pipeline-health section names them, e.g. "email via itwalk_api, fallbac
 
 Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
 Daily jobs handled by `reach:schedule` (no extra cron lines needed):
-05:00 SEO rank/backlink snapshots · 06:00 content-base sync ·
-09:00 cover-gallery deficit email.
+05:00 UTC (10:30 IST) SEO rank/backlink snapshots · 06:00 UTC (11:30 IST) content-base sync ·
+09:00 UTC (14:30 IST) cover-gallery deficit email. Times shown in the UI, emails and CLI are IST —
+[`TIMEZONES.md`](TIMEZONES.md).
 Every 5 minutes `reach:schedule` also enqueues `reach.routine_content_sweep`
 (default queue), which carries Claude-routine blog/KB submissions forward —
 re-vetting with Gemini after an outage, hourly cover retries, publishing and

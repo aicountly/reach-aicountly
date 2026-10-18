@@ -67,7 +67,7 @@ class ReachSearchConsole extends BaseCommand
             };
 
             CLI::write(json_encode(
-                ['action' => $action, 'ts' => gmdate('c'), 'result' => $payload],
+                ['action' => $action, 'ts' => gmdate('c'), 'ts_ist' => \App\Libraries\Support\DisplayTime::format(time()), 'result' => $payload],
                 JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT,
             ));
 

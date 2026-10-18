@@ -146,6 +146,7 @@ class ReachWork extends BaseCommand
     {
         $ctx['event'] = $event;
         $ctx['ts']    = gmdate('c');
+        $ctx['ts_ist'] = \App\Libraries\Support\DisplayTime::format(time());
         CLI::write(json_encode($ctx, JSON_UNESCAPED_SLASHES));
     }
 }

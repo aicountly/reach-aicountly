@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Libraries\Settings\ReachConfig;
+use App\Libraries\Support\DisplayTime;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Database;
@@ -45,6 +46,7 @@ class ReachSchedule extends BaseCommand
         $out = json_encode([
             'event'     => 'schedule.tick',
             'ts'        => gmdate('c'),
+            'ts_ist'    => DisplayTime::format(time()),
             'recovered' => $recovered,
             'pruned'    => $pruned,
             'prune_days'=> $days,
@@ -134,7 +136,8 @@ class ReachSchedule extends BaseCommand
 
     /**
      * What this tick should enqueue. Pure, so the timetable is unit-tested.
-     * Hours are UTC (the server clock, App::$appTimezone) unless marked IST.
+     * Hours are UTC (the server clock, App::$appTimezone) unless marked IST;
+     * each comment gives both (IST = UTC + 05:30). docs/operations/TIMEZONES.md
      *
      * @return list<array{type:string, payload:array<string, mixed>, opts:array<string, mixed>}>
      */
@@ -154,12 +157,12 @@ class ReachSchedule extends BaseCommand
             $jobs[] = ['type' => $type, 'payload' => $payload, 'opts' => $opts + ['idempotency_key' => $key]];
         };
 
-        // 08:00 — daily approval digest
+        // 08:00 UTC (13:30 IST) — daily approval digest
         if ($hour === 8) {
             $add('reach.daily_approval_digest', ['date' => $today], "approval-digest-{$today}", ['queue' => 'notifications']);
         }
 
-        // 07:00 — generate tomorrow's marketing pack
+        // 07:00 UTC (12:30 IST) — generate tomorrow's marketing pack
         if ($hour === 7) {
             $tomorrow = $utc->modify('+1 day')->format('Y-m-d');
             $add('reach.daily_marketing_pack', ['date' => $tomorrow], "marketing-pack-{$tomorrow}");
@@ -194,23 +197,23 @@ class ReachSchedule extends BaseCommand
             $add('reach.structured_content_sweep', ['limit' => 20], 'structured-content-sweep-' . $utc->format('YmdHi'), ['queue' => 'publishing']);
         }
 
-        // 03:00 — refresh detection
+        // 03:00 UTC (08:30 IST) — refresh detection
         if ($hour === 3) {
             $add('reach.content_refresh_detection', [], "content-refresh-detection-{$today}");
         }
 
-        // 06:00 — sync repo content-base into topic candidates (idempotent per day)
+        // 06:00 UTC (11:30 IST) — sync repo content-base into topic candidates (idempotent per day)
         if ($hour === 6) {
             $add('reach.content_base_sync', ['date' => $today], "content-base-sync-{$today}");
         }
 
-        // 09:00 — superadmin cover-gallery deficit reminder (skips when no deficit)
+        // 09:00 UTC (14:30 IST) — superadmin cover-gallery deficit reminder (skips when no deficit)
         if ($hour === 9) {
             $add('reach.gallery_deficit_alert', ['date' => $today], "gallery-deficit-{$today}", ['queue' => 'notifications']);
         }
 
-        // 04:00 — pull Search Console facts. Must run before the SEO snapshot at
-        // 05:00, which aggregates exactly the rows this job writes.
+        // 04:00 UTC (09:30 IST) — pull Search Console facts. Must run before the SEO
+        // snapshot at 05:00 UTC, which aggregates exactly the rows this job writes.
         if ($hour === 4) {
             $add('reach.search_console_ingest', ['tenant_id' => 1], "search-console-ingest-{$today}");
         }
@@ -219,18 +222,18 @@ class ReachSchedule extends BaseCommand
         // blocked items, re-queue lost steps (queue `video`).
         $add('reach.video_pipeline_sweep', ['date' => $today, 'hour' => $hour], "video-pipeline-sweep-{$hourKey}", ['queue' => 'video']);
 
-        // 05:00 — SEO rank + backlink snapshots of the freshest ingested day
+        // 05:00 UTC (10:30 IST) — SEO rank + backlink snapshots of the freshest ingested day
         // (Search Console publishes with a ~3 day lag).
         if ($hour === 5) {
             $add('reach.seo_snapshot', ['date' => null], "seo-snapshot-{$today}");
         }
 
-        // 06:00 IST — SEO Tracker SERP checks (DataForSEO; no-op without credentials).
+        // 06:00 IST (00:30 UTC) — SEO Tracker SERP checks (DataForSEO; no-op without credentials).
         if ($istHour === 6) {
             $add('reach.seo_tracker', ['date' => $istDate], "seo-tracker-{$istDate}");
         }
 
-        // 08:00 IST — daily analytics report email (idempotent per IST date).
+        // 08:00 IST (02:30 UTC) — daily analytics report email (idempotent per IST date).
         if ($istHour === 8) {
             $add('reach.daily_analytics_report', ['date' => $istDate], "daily-report-{$istDate}", ['queue' => 'notifications']);
         }

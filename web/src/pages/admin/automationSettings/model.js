@@ -12,6 +12,7 @@ import {
   Bot, Eye, FileBarChart, Image, KeyRound, Newspaper, Send, Settings2, Share2, ShieldCheck, TrendingUp, Video,
 } from 'lucide-react';
 import { jsonObjectError } from '../../../utils/jsonObject';
+import { formatDateTime } from '../../../utils/formatDate';
 
 /** Live-check target (POST v1/settings/automation/live-check) → display name. */
 export const CHECK_LABEL = {
@@ -314,11 +315,9 @@ export function detailEntries(detail, prefix = '') {
   });
 }
 
-/** A live-check `ran_at` as local date + time ('' when missing or unreadable). */
+/** A live-check `ran_at` as dd-mm-yyyy HH:mm IST ('' when missing or unreadable). */
 export function formatRanAt(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+  return formatDateTime(iso, '');
 }
 
 /** Pretty-printed JSON text, or null when the text is blank or not JSON. */

@@ -100,7 +100,7 @@ class DailyReportBuilder
             return [
                 'configured' => $configured,
                 'note'       => $configured
-                    ? 'Search Console is configured but no data has been ingested yet (Google publishes with a ~3 day lag; the ingest runs daily at 04:00 UTC).'
+                    ? 'Search Console is configured but no data has been ingested yet (Google publishes with a ~3 day lag; the ingest runs daily at 09:30 IST (04:00 UTC)).'
                     : 'Not configured — Search Console is not connected. See docs/operations/SEARCH_CONSOLE_SETUP.md.',
             ];
         }

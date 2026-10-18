@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo, u
 import { authService } from '../services/authService';
 import { clearControllerSsoHash, readControllerSsoToken } from '../services/controllerSso';
 import { redirectToConsoleLogin, redirectToConsoleLoginAfterSignOut } from '../services/consoleAuth';
+import { setDisplayTimeZone } from '../utils/formatDate';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext(null);
@@ -37,6 +38,8 @@ export function AuthProvider({ children }) {
   const applySession = useCallback((data) => {
     if (!data?.token) throw new Error('Session succeeded but no token was returned');
     localStorage.setItem(TOKEN_KEY, data.token);
+    // ui.timezone (default Asia/Kolkata): every time on screen renders in it.
+    setDisplayTimeZone(data.user?.ui_timezone);
     setUser(data.user);
     setGateReason(null);
     setGateMessage('');
@@ -51,6 +54,7 @@ export function AuthProvider({ children }) {
     }
     try {
       const data = await authService.me();
+      setDisplayTimeZone(data?.ui_timezone);
       setUser(data);
       setGateReason(null);
       setGateMessage('');

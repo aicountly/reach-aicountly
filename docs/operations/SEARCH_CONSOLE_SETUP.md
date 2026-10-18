@@ -88,7 +88,7 @@ php spark reach:search-console status               # cursor + last run
 php spark reach:search-console doctor               # site_wide_latest_date is now set
 ```
 
-Without `backfill-run`, the daily 04:00 UTC `reach.search_console_ingest` job
+Without `backfill-run`, the daily 04:00 UTC (09:30 IST) `reach.search_console_ingest` job
 processes one 14-day slice per day (90 days ≈ 7 days). After that the same job
 keeps the last few days current; no extra cron line is needed — it is
 enqueued by `reach:schedule` (see `REACH_WORKER_AND_CRON.md`).
@@ -119,6 +119,6 @@ and position buckets.
   drops anonymised queries from query-level rows, so these are the figures
   that match the Search Console UI; summing the facts table reads lower.
 - `reach_search_metric_facts` — the blog-mapped subset (unchanged).
-- `reach_seo_rank_snapshots` — 05:00 UTC snapshot of the
+- `reach_seo_rank_snapshots` — 05:00 UTC (10:30 IST) snapshot of the
   `reach_keyword_ideas` (status open / planned / in_progress) for the
   freshest ingested day.

@@ -41,7 +41,7 @@ class ReachEmailProviders extends BaseCommand
         $to = trim((string) ($this->sparkOption('send', $params) ?? ''));
         if ($to !== '') {
             $resend = $this->sparkFlag('resend', $params);
-            $stamp  = gmdate('Y-m-d H:i:s') . ' UTC';
+            $stamp  = \App\Libraries\Support\DisplayTime::format(time());
             $result = $dispatcher->send(
                 $to,
                 'Reach email provider test — ' . $stamp,

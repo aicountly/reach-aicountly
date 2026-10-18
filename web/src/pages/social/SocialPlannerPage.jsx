@@ -10,7 +10,7 @@ import { ChannelBadge } from '../../components/common/ChannelBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
 import { FilterBar } from '../../components/common/FilterBar';
 import { Modal } from '../../components/common/Modal';
-import { formatDateTime } from '../../utils/formatDate';
+import { formatDateTime, fromDateTimeInputValue, timeZoneLabel } from '../../utils/formatDate';
 
 const CHANNELS = ['linkedin','twitter','facebook','instagram','youtube','whatsapp_channel','email_newsletter'];
 
@@ -42,7 +42,7 @@ export function SocialPlannerPage() {
         ...form,
         hashtags:   form.hashtags   ? form.hashtags.split(/[\s,]+/).filter(Boolean) : [],
         media_refs: form.media_refs ? form.media_refs.split(/[\s,]+/).filter(Boolean) : [],
-        scheduled_at: form.scheduled_at ? form.scheduled_at.replace('T', ' ') + ':00' : null,
+        scheduled_at: fromDateTimeInputValue(form.scheduled_at),
       };
       await socialService.create(payload);
       setOpen(false); setForm(EMPTY); load();
@@ -116,7 +116,7 @@ export function SocialPlannerPage() {
             <input value={form.media_refs} onChange={(e) => setForm({...form, media_refs: e.target.value})} />
           </div>
           <div>
-            <label className="text-xs text-secondary">Scheduled at</label>
+            <label className="text-xs text-secondary">Scheduled at ({timeZoneLabel()})</label>
             <input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({...form, scheduled_at: e.target.value})} />
           </div>
         </div>

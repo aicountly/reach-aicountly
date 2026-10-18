@@ -142,6 +142,7 @@ class AuthController extends BaseApiController
             'roles_synced_at' => $row['roles_synced_at'] ?? null,
             'roles_managed_by'=> 'console',
             'controller_apps' => $this->controllerAppsForRequest(),
+            'ui_timezone'     => \App\Libraries\Support\DisplayTime::zoneName(),
         ]);
     }
 
@@ -411,6 +412,7 @@ class AuthController extends BaseApiController
                 'role_slug'       => $roleSlug,
                 'permissions'     => $permissions,
                 'actor_type'      => 'human',
+                'ui_timezone'     => \App\Libraries\Support\DisplayTime::zoneName(),
                 'controller_apps' => $this->normalizeLauncherApps(
                     is_array($identity['controller_apps'] ?? null) ? $identity['controller_apps'] : [],
                 ),

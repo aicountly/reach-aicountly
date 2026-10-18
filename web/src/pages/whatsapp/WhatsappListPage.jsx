@@ -7,7 +7,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
-import { formatDateTime } from '../../utils/formatDate';
+import { formatDateTime, fromDateTimeInputValue, timeZoneLabel } from '../../utils/formatDate';
 
 const EMPTY = { template_name: '', template_params: '', audience_filter: '', scheduled_at: '' };
 
@@ -40,7 +40,7 @@ export function WhatsappListPage() {
         ...form,
         template_params,
         audience_filter: form.audience_filter ? { segment: form.audience_filter } : null,
-        scheduled_at: form.scheduled_at ? form.scheduled_at.replace('T',' ') + ':00' : null,
+        scheduled_at: fromDateTimeInputValue(form.scheduled_at),
       });
       setOpen(false); setForm(EMPTY); load();
     } catch (e) { setError(e.message); }
@@ -85,7 +85,7 @@ export function WhatsappListPage() {
             <textarea rows={5} value={form.template_params} onChange={(e) => setForm({...form, template_params: e.target.value})} placeholder='{"1":"Hi","2":"AICOUNTLY"}' style={{ fontFamily: 'monospace', fontSize: '0.8rem' }} />
           </div>
           <div><label className="text-xs text-secondary">Audience segment (label)</label><input value={form.audience_filter} onChange={(e) => setForm({...form, audience_filter: e.target.value})} /></div>
-          <div><label className="text-xs text-secondary">Scheduled at</label><input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({...form, scheduled_at: e.target.value})} /></div>
+          <div><label className="text-xs text-secondary">Scheduled at ({timeZoneLabel()})</label><input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({...form, scheduled_at: e.target.value})} /></div>
         </div>
       </Modal>
     </div>

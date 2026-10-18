@@ -205,6 +205,12 @@ final class ReachConfig
                 'help' => 'public, unlisted or private. Until Google verifies the OAuth app, YouTube locks API uploads to private.'],
             'video.youtube.category_id' => ['group' => 'Video', 'label' => 'YouTube category id', 'type' => 'string', 'default' => '28',
                 'help' => '28 = Science & Technology, 27 = Education.'],
+
+            // ── Stream IST: display timezone (keep this block contiguous) ──
+            'ui.timezone' => ['group' => 'Display', 'label' => 'Time zone for times shown in Reach', 'type' => 'choice', 'default' => 'Asia/Kolkata',
+                'options' => ['Asia/Kolkata', 'UTC', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York'],
+                'help' => 'Every time on screen, in the daily report email, notifications, CLI output and CSV exports is shown in this zone (Asia/Kolkata = IST). Stored values and API/JSON fields stay UTC. Reload Reach after changing it.'],
+            // ── end Stream IST ──
         ];
     }
 

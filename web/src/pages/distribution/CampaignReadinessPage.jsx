@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { formatDateTime } from '../../utils/formatDate';
 
 /**
  * Campaign readiness — each channel's live status as computed by the API
@@ -120,7 +121,7 @@ export default function CampaignReadinessPage() {
       {!loading && report && (
         <>
           <p className="muted">
-            Environment: {report.environment}{report.production ? ' (production)' : ''} · checked {report.generated_at}
+            Environment: {report.environment}{report.production ? ' (production)' : ''} · checked {formatDateTime(report.generated_at)}
           </p>
           {report.queue && (
             <p className={report.queue.stalled ? 'text-error' : 'muted'}>
