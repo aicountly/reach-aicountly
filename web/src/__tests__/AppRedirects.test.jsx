@@ -58,9 +58,9 @@ describe('App routing after the 2026-10 IA revamp', () => {
     expect(screen.getByRole('navigation', { name: 'Social & Ads navigation' })).toBeInTheDocument();
   });
 
-  it('/social/ads shows the not-connected note until the ads register lands', () => {
+  it('/social/ads is the paid-ads register and says honestly it is not connected to any ads API', () => {
     renderAt('/social/ads');
-    expect(screen.getByTestId('ads-not-connected')).toHaveTextContent('API not connected — campaigns are placed manually');
+    expect(screen.getByTestId('ads-not-connected')).toHaveTextContent('Not connected to the Google Ads, Meta or LinkedIn ads APIs');
   });
 
   it('Leads pages share one Leads & Engage area with tabs', () => {

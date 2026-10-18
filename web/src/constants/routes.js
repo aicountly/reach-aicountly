@@ -56,9 +56,6 @@ export const ROUTES = {
   BOT_QUEUE:    '/bot/queue',
   BOT_REPORTS:  '/bot/reports',
   BOT_REPORT_DETAIL: '/bot/reports/:id',
-  // Stream 9 — Run now for every bot activity; owner commands to the reach-command routine.
-  BOT_ACTIVITIES: '/bot/activities',
-  BOT_ASK: '/bot/ask',
 
   APPROVALS: '/approvals',
 
