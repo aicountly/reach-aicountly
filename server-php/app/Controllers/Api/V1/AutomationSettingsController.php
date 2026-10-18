@@ -72,6 +72,7 @@ class AutomationSettingsController extends BaseApiController
             @set_time_limit(180);
         }
         $report = (new LiveIntegrationCheck(VideoProviders::http(), timeoutCap: 15))->run($targets);
+        LiveIntegrationCheck::remember($report);
 
         $this->audit('settings.automation_live_check', 'settings', null, null, [
             'targets' => $targets,

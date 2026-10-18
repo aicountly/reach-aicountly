@@ -182,6 +182,7 @@ $routes->group('v1', static function ($routes) {
         // Dashboard
         $routes->get('dashboard/summary', 'Api\\V1\\DashboardController::summary', ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/counts',  'Api\\V1\\DashboardController::counts',  ['filter' => 'permission:dashboard.view']);
+        $routes->get('dashboard/command-centre', 'Api\\V1\\DashboardController::commandCentre', ['filter' => 'permission:dashboard.view']);
 
         // Blog
         $routes->get('blog/posts',                        'Api\\V1\\BlogController::index',          ['filter' => 'permission:blog.view']);
