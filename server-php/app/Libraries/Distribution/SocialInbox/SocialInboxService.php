@@ -125,8 +125,9 @@ final class SocialInboxService
         if ($this->client === null || $this->accounts === null) {
             return ['status' => 'not_configured', 'reason' => 'social-api.ai API key is not set (Settings → Social, or SOCIALAPI_API_KEY). Nothing was read.'];
         }
-        $out  = ['status' => 'ok', 'accounts' => [], 'fetched' => 0, 'stored' => 0, 'own' => 0, 'dropped' => 0, 'errors' => []];
-        $path = (string) ReachConfig::get('social.inbox.list_path', SocialApiAiClient::INBOX_LIST_PATH);
+        $out   = ['status' => 'ok', 'accounts' => [], 'fetched' => 0, 'stored' => 0, 'own' => 0, 'dropped' => 0, 'errors' => []];
+        $paths = SocialApiAiClient::listPaths((string) ReachConfig::get('social.inbox.list_path', SocialApiAiClient::INBOX_LIST_PATH));
+        $dead  = []; // a path that answered 404 / an unknown shape answers every account the same way
 
         foreach (self::platforms() as $platform) {
             $chk = $this->accounts->check($platform);
@@ -140,46 +141,60 @@ final class SocialInboxService
                 continue;
             }
             $accountId = (string) $chk['account']['id'];
-            $since     = $this->since($platform, $accountId);
-            $cursor    = null;
             $stored    = 0;
             $fatal     = false;
-            for ($page = 0; $page < self::MAX_PAGES; $page++) {
-                try {
-                    $json = $this->client->inbox(['account_id' => $accountId, 'since' => $since, 'limit' => self::PAGE_LIMIT, 'cursor' => $cursor], $path);
-                } catch (SocialApiException $e) {
-                    $out['status'] = 'error';
-                    $out['errors'][$platform] = self::pollError($e, $path);
-                    $fatal = $e->httpStatus === 404 || $e->kind === SocialApiException::AUTH;
-                    break;
+            $sinceUsed = [];
+            foreach ($paths as $path) {
+                if (isset($dead[$path])) {
+                    continue;
                 }
-                $parsed = SocialInboxParser::page($json, $platform, $accountId);
-                if (! $parsed['recognised']) {
-                    $out['status'] = 'error';
-                    $out['errors'][$platform] = 'social-api.ai answered the inbox list with a shape Reach does not recognise (top-level keys: ' . implode(', ', $parsed['keys']) . '). Nothing was stored.';
-                    $this->log('warning', 'GET ' . $path . ': unrecognised inbox shape, keys ' . implode(', ', $parsed['keys']));
-                    $fatal = true;
-                    break;
-                }
-                if ($parsed['skipped'] !== []) {
-                    $out['dropped'] += count($parsed['skipped']);
-                    $this->log('warning', 'GET ' . $path . ' (' . $platform . '): ' . implode('; ', array_slice($parsed['skipped'], 0, 5)));
-                }
-                foreach ($parsed['items'] as $item) {
-                    $out['fetched']++;
-                    if ($item['is_own'] || $item['is_deleted']) {
-                        $out['own'] += $item['is_own'] ? 1 : 0;
-                        continue;
+                $kindHint    = SocialApiAiClient::listPathKind($path);
+                $since       = $this->since($platform, $accountId, $kindHint);
+                $sinceUsed[] = $since;
+                $cursor      = null;
+                for ($page = 0; $page < self::MAX_PAGES; $page++) {
+                    try {
+                        $json = $this->client->inbox(['account_id' => $accountId, 'since' => $since, 'limit' => self::PAGE_LIMIT, 'cursor' => $cursor], $path);
+                    } catch (SocialApiException $e) {
+                        $out['status'] = 'error';
+                        $out['errors'][$platform] = self::pollError($e, $path);
+                        if ($e->httpStatus === 404) {
+                            $dead[$path] = true;
+                        }
+                        $fatal = $e->kind === SocialApiException::AUTH;
+                        break;
                     }
-                    $stored += $this->store($item, $platform, $accountId) ? 1 : 0;
+                    $parsed = SocialInboxParser::page($json, $platform, $accountId, $kindHint);
+                    if (! $parsed['recognised']) {
+                        $out['status'] = 'error';
+                        $out['errors'][$platform] = 'social-api.ai answered GET ' . $path . ' with a shape Reach does not recognise (' . SocialInboxParser::skeleton($json) . '). Nothing was stored.';
+                        $this->log('warning', 'GET ' . $path . ': unrecognised inbox shape ' . SocialInboxParser::skeleton($json));
+                        $dead[$path] = true;
+                        break;
+                    }
+                    if ($parsed['skipped'] !== []) {
+                        $out['dropped'] += count($parsed['skipped']);
+                        $this->log('warning', 'GET ' . $path . ' (' . $platform . '): ' . implode('; ', array_slice($parsed['skipped'], 0, 5)));
+                    }
+                    foreach ($parsed['items'] as $item) {
+                        $out['fetched']++;
+                        if ($item['is_own'] || $item['is_deleted']) {
+                            $out['own'] += $item['is_own'] ? 1 : 0;
+                            continue;
+                        }
+                        $stored += $this->store($item, $platform, $accountId) ? 1 : 0;
+                    }
+                    $cursor = $parsed['next'];
+                    if ($cursor === null || $parsed['items'] === []) {
+                        break;
+                    }
                 }
-                $cursor = $parsed['next'];
-                if ($cursor === null || $parsed['items'] === []) {
+                if ($fatal) {
                     break;
                 }
             }
             $out['stored'] += $stored;
-            $out['accounts'][$platform] = isset($out['errors'][$platform]) ? 'error — ' . $out['errors'][$platform] : sprintf('read %s since %s: %d new', $accountId, $since, $stored);
+            $out['accounts'][$platform] = isset($out['errors'][$platform]) ? 'error — ' . $out['errors'][$platform] : sprintf('read %s since %s: %d new', $accountId, $sinceUsed[0] ?? '—', $stored);
             if ($fatal) {
                 break; // the same path / key answers every account the same way
             }
@@ -187,17 +202,35 @@ final class SocialInboxService
         return $out;
     }
 
+    /**
+     * Reply path for one row: a direct message is answered in its conversation
+     * ({thread_id}, falling back to the message id), a comment under itself ({id}).
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function replyPath(array $row): string
+    {
+        if (($row['kind'] ?? '') === 'message') {
+            $t = SocialApiAiClient::path((string) ReachConfig::get('social.inbox.message_reply_path', SocialApiAiClient::INBOX_MESSAGE_REPLY_PATH), SocialApiAiClient::INBOX_MESSAGE_REPLY_PATH);
+            $thread = trim((string) ($row['thread_id'] ?? '')) !== '' ? (string) $row['thread_id'] : (string) ($row['external_id'] ?? '');
+            return str_replace('{thread_id}', rawurlencode($thread), $t);
+        }
+        return (string) ReachConfig::get('social.inbox.reply_path', SocialApiAiClient::INBOX_REPLY_PATH);
+    }
+
     private static function pollError(SocialApiException $e, string $path): string
     {
         if ($e->httpStatus === 404) {
-            return "social-api.ai has no inbox list at {$path} (HTTP 404). That path is an assumption — read docs.social-api.ai/guides/inbox and set social.inbox.list_path.";
+            return "social-api.ai has no inbox list at {$path} (HTTP 404). Check social.inbox.list_path (comma-separated; default /inbox/comments,/inbox/conversations).";
         }
         return $e->getMessage();
     }
 
-    private function since(string $platform, string $accountId): string
+    /** Where to resume reading: per endpoint kind, so new comments never skip older direct messages. */
+    private function since(string $platform, string $accountId, ?string $kindHint = null): string
     {
-        $row = $this->db->query('SELECT MAX(received_at) AS m FROM reach_social_inbox WHERE network = ? AND account_id = ?', [$platform, $accountId])->getRowArray();
+        $kindSql = $kindHint === 'message' ? " AND kind = 'message'" : " AND kind <> 'message'";
+        $row = $this->db->query('SELECT MAX(received_at) AS m FROM reach_social_inbox WHERE network = ? AND account_id = ?' . $kindSql, [$platform, $accountId])->getRowArray();
         $max = isset($row['m']) && $row['m'] !== null ? strtotime((string) $row['m']) : false;
         $ts  = $max !== false ? $max - self::OVERLAP_SECS : ($this->clock)() - max(1, (int) ReachConfig::get('social.inbox.lookback_hours', 24)) * 3600;
 
@@ -463,7 +496,7 @@ final class SocialInboxService
             return ['outcome' => 'skipped', 'fields' => $fields + ['reply_status' => 'skipped', 'reply_text' => $final['text'], 'reply_reason' => (string) $final['reason']]];
         }
 
-        $res = $this->client->replyToInboxItem((string) $row['external_id'], $final['text'], (string) ReachConfig::get('social.inbox.reply_path', SocialApiAiClient::INBOX_REPLY_PATH), 'reach-social-inbox:' . $row['id']);
+        $res = $this->client->replyToInboxItem((string) $row['external_id'], $final['text'], self::replyPath($row), 'reach-social-inbox:' . $row['id']);
         if ($res['accepted']) {
             $this->audit('social.inbox.reply_sent', (int) $row['id'], ['network' => $row['network'], 'classification' => $row['classification'], 'acknowledgement' => $isAck]);
             return ['outcome' => 'sent', 'fields' => $fields + [

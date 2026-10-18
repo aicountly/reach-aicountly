@@ -236,25 +236,30 @@ lodged), `--json`.
    Automation → **Social inbox** → *Flow key* (or `FLOW_REACH_INBOUND_KEY` in Reach's `.env`). Check:
    `php spark reach:social-inbox --flow-check`.
 2. Run `php spark migrate` in Reach (table `reach_social_inbox`).
-3. Run `php spark reach:integrations-check --only=social_api`. It now also GETs the inbox list once.
-   If it says `Inbox list FAILED: GET /inbox is HTTP 404 … These answered: …`, set
-   `social.inbox.list_path` to the right path from docs.social-api.ai/guides/inbox and re-run until it
-   says `Inbox list OK`. Check `item_fields` against the assumptions below.
+3. Run `php spark reach:integrations-check --only=social_api`. It also GETs each inbox list once
+   (`social.inbox.list_path`, default `/inbox/comments,/inbox/conversations`) and should say
+   `Inbox OK`. A 404 names the alternative paths that answer; an answer Reach cannot read is shown as
+   its skeleton (`shape <path>`: key names and types, never values). Check `item fields <path>`
+   against the assumptions below once real comments arrive.
 4. Optionally set `social.inbox.alert_recipients`. Leave `social.inbox.hide_spam` off until the hide
    endpoint is confirmed.
 5. Watch the first run on **Social → Inbox** (or `php spark reach:social-inbox --poll-only --json`
    first, which reads without answering). To read and classify without posting anything for a day,
    turn off *Post replies automatically*.
 
-### Assumed — confirm with the live check and the first run
+### Confirmed live (18 Oct 2026) and still assumed
 
-social-api.ai's inbox guide (docs.social-api.ai/guides/inbox) could not be read from this build. Reach
-parses defensively, logs what it does not understand (`[SocialInbox]` in `writable/logs`) and never
-guesses:
+Confirmed by the first live check: `GET /v1/inbox` is 404; comments are listed at
+`GET /v1/inbox/comments` → `{data, pagination: {has_more}}` and direct messages at
+`GET /v1/inbox/conversations` → `{data, pagination: {has_more, next_cursor}, sync_state,
+last_synced_at}`; an empty list is `data: null`. Item fields are not confirmed yet (both lists were
+empty). Everything below that is not in this paragraph is still an assumption. Reach parses
+defensively, logs what it does not understand (`[SocialInbox]` in `writable/logs`) and never guesses:
 
-1. **List**: `GET /v1/inbox` (setting `social.inbox.list_path`; `{account_id}` in the path is
+1. **List**: every path in `social.inbox.list_path` (comma-separated; `{account_id}` in a path is
    substituted instead of the query) with `account_id`, `since` (RFC 3339), `limit`, `cursor` query
-   parameters. Unknown parameters are assumed to be ignored; Reach also de-duplicates, so a list that
+   parameters. Items from a conversations list count as direct messages unless they carry their own
+   type; Reach resumes each list from its own last item. Unknown parameters are assumed to be ignored; Reach also de-duplicates, so a list that
    ignores `since` / `account_id` only costs reads.
 2. **Shape**: a list, or a list under `data` / `items` / `results` / `messages` / `comments` /
    `conversations` / `threads` / `inbox` (also one level under `data`); conversation objects with a
@@ -266,11 +271,13 @@ guesses:
    `url` | `post.url`, https only), time (`created_at` | `timestamp` | … ISO or epoch s / ms), ours
    (`direction: outbound` | `is_from_me` | `from_me` | …). Next page: `next_cursor` | `cursor` |
    `next` | `pagination.*` | `meta.*` | `paging.cursors.after`; `has_more: false` stops.
-3. **Reply**: `POST /v1/inbox/{id}/reply` with `{"text": "…"}` (setting `social.inbox.reply_path`)
-   for both comments and DMs; any 2xx without `success: false` = accepted; the reply id is read from
+3. **Reply**: comments `POST /v1/inbox/comments/{id}/reply` (setting `social.inbox.reply_path`),
+   direct messages `POST /v1/inbox/conversations/{thread_id}/messages` (setting
+   `social.inbox.message_reply_path`; `{thread_id}` = the conversation id, else the message id), both
+   with `{"text": "…"}`; a wrong path is a failed reply on Social → Inbox, never a second post; any 2xx without `success: false` = accepted; the reply id is read from
    `id` | `reply_id` | `message_id` when present. An `Idempotency-Key` header is sent (harmless if
    ignored). Moving a public complaint to DM is done in words (the acknowledgement asks them to DM or
    e-mail support@) — no DM-initiation endpoint is assumed.
-4. **Hide**: `POST /v1/inbox/{id}/hide` (setting `social.inbox.hide_path`), only with
+4. **Hide**: `POST /v1/inbox/comments/{id}/hide` (setting `social.inbox.hide_path`), only with
    `social.inbox.hide_spam` on.
 5. **Webhooks** for new comments are not used (signature scheme unknown) — Reach polls.
