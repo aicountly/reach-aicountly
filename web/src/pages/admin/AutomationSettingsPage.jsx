@@ -64,7 +64,9 @@ export function AutomationSettingsPage() {
   const [fullReport, setFullReport]   = useState(null);
   const [fullRunning, setFullRunning] = useState(false);
   const [fullFailure, setFullFailure] = useState(null);
-  const [query, setQuery]             = useState('');
+  // `?q=` pre-fills the search (the Ctrl/⌘-K palette deep-links settings this way).
+  const qParam = new URLSearchParams(location.search).get('q');
+  const [query, setQuery]             = useState(qParam ?? '');
   const [collapsed, setCollapsed]     = useState(readCollapsed);
   const [activeId, setActiveId]       = useState(null);
   const [pendingJump, setPendingJump] = useState(null);
@@ -220,6 +222,8 @@ export function AutomationSettingsPage() {
     const left = chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2;
     if (typeof bar.scrollTo === 'function') bar.scrollTo({ left, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   }, [activeId]);
+
+  useEffect(() => { if (qParam != null) setQuery(qParam); }, [qParam]);
 
   // "/" focuses the search box.
   useEffect(() => {

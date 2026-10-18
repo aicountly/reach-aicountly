@@ -8,7 +8,7 @@ const navItems = [
   { to: '/distribution/audience/segments', label: 'Segments' },
   { to: '/distribution/audience/consents', label: 'Consents' },
   { to: '/distribution/suppressions',      label: 'Suppressions' },
-  { to: '/distribution/social',            label: 'Social' },
+  { to: '/social',                        label: 'Social & Ads' }, // its own hub under Channels
   { to: '/distribution/email',             label: 'Email' },
   { to: '/distribution/whatsapp',          label: 'WhatsApp' },
   { to: '/distribution/sms',               label: 'SMS' },
