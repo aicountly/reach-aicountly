@@ -148,9 +148,11 @@ class BlogAutoPublishService
         $systemUserId = $this->ensureSystemBotUserId();
         $approvals    = new BlogContentApprovalService();
 
+        $autoApproved = false;
         if (strtolower((string) ($item['approval_status'] ?? '')) !== 'approved'
             || ! $approvals->verifyForPublication($contentItemId, $versionId)
         ) {
+            $autoApproved = true;
             $approvals->approve(
                 $contentItemId,
                 $versionId,
@@ -158,6 +160,26 @@ class BlogAutoPublishService
                 'standard',
                 'Auto-approved for low/medium-risk publish (BLOG_AUTO_PUBLISH_ENABLED)',
             );
+        }
+
+        // Nothing is queued for publication unless the vetting model approves
+        // this exact version (title ↔ body relevance included).
+        try {
+            (new BlogPublishVetGate())->ensure($contentItemId, $versionId, 'auto_publish');
+        } catch (BlogVetRefused $e) {
+            if ($autoApproved && ! $e->unavailable) {
+                // The approval recorded a moment ago must not outlive the refusal.
+                $approvals->revoke($contentItemId, 'Vetting refused: ' . mb_substr($e->getMessage(), 0, 400), $systemUserId);
+            }
+
+            return [
+                'attempted'          => true,
+                'queued'             => false,
+                'reason'             => ($e->unavailable ? 'vetting_unavailable:' : 'vetting_refused:') . mb_substr($e->getMessage(), 0, 300),
+                'content_item_id'    => $contentItemId,
+                'content_version_id' => $versionId,
+                'system_user_id'     => $systemUserId,
+            ];
         }
 
         $this->completeHumanReviewGates($contentItemId, [

@@ -47,6 +47,12 @@ class AutomationDraftIngestService
      */
     public function ingestBlogDraft(array $payload): array
     {
+        // A rewrite of a queued item (GET v1/automation/regenerate/next) goes
+        // onto the same item and slug instead of creating a new article.
+        if (! empty($payload['regeneration_id'])) {
+            return (new \App\Libraries\Content\Quality\RegenerationIngestService($this->db, $this->submissions))->ingest('blog', $payload);
+        }
+
         $title = trim((string) ($payload['title'] ?? ''));
         if ($title === '' || mb_strlen($title) < 10) {
             throw new \InvalidArgumentException('title is required (10+ chars)');
@@ -223,6 +229,20 @@ class AutomationDraftIngestService
                 if (self::normalizeTitle((string) $row['title']) === $normalized) {
                     $rows[] = $row;
                     break;
+                }
+            }
+        }
+
+        // A topic waiting for its same-slug rewrite is not free for a new article.
+        if ($rows === [] && \App\Libraries\Database\SchemaGuard::hasTable($this->db, 'reach_content_regenerations')) {
+            foreach ($this->db->table('reach_content_regenerations')->select('id, content_item_id, title, slug')
+                ->where('content_type', 'blog')->whereIn('status', ['queued', 'claimed'])->get()->getResultArray() as $regen) {
+                if (($slug !== '' && $slug === $regen['slug']) || self::normalizeTitle((string) $regen['title']) === $normalized) {
+                    throw new RoutineIntakeRefused(
+                        'This topic is queued for a rewrite at its existing URL: fetch GET v1/automation/regenerate/next and submit it with regeneration_id ' . $regen['id'] . '.',
+                        409,
+                        ['regeneration_id' => (int) $regen['id'], 'existing_slug' => $regen['slug'], 'existing_content_item_id' => (int) $regen['content_item_id']],
+                    );
                 }
             }
         }

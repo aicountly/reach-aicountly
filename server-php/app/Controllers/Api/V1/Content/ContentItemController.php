@@ -313,9 +313,10 @@ class ContentItemController extends BaseContentController
 
             return $this->ok([
                 'item'          => $fresh,
-                'work_block_id' => $result['work_block_id'],
-                'from_status'   => $result['from_status'],
-                'message'       => 'Genuine draft generation queued. Run the blog worker (or wait for cron) to produce the full article.',
+                'work_block_id'   => null,
+                'regeneration_id' => $result['regeneration_id'],
+                'from_status'     => $result['from_status'],
+                'message'         => 'Queued for a rewrite: the blog routine writes a new article on this topic and slug, then it is vetted and published automatically.',
             ]);
         } catch (\RuntimeException $e) {
             return $this->fail($e->getMessage(), 422);

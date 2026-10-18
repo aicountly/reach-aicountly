@@ -160,17 +160,28 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $this->assertArrayHasKey('sections', $outlineResult);
 
         // -----------------------------------------------------------------
-        // Step 6: generate a draft through the real provider adapter
-        // (mocked at the provider boundary only — the orchestration,
-        // schema validation and version creation are all real)
+        // Step 6: Reach's own LLM draft step is retired (it wrote live posts
+        // that had nothing to do with their titles). The block must fail
+        // closed; the article arrives the way the Claude blog routine sends
+        // it — a real version on the item.
         // -----------------------------------------------------------------
         $draftBlockId = $this->workBlocks->create([
             'block_type' => WorkBlockService::TYPE_GENERATE_DRAFT,
             'content_item_id' => $contentItemId,
         ]);
         $draftResult = $this->workBlocks->execute($draftBlockId);
-        $this->assertArrayHasKey('content_version_id', $draftResult, 'GENERATE_DRAFT must produce a real content version: ' . json_encode($draftResult));
-        $contentVersionId = (int) $draftResult['content_version_id'];
+        $this->assertTrue($draftResult['blocked'] ?? false, 'GENERATE_DRAFT is retired and must fail closed: ' . json_encode($draftResult));
+        $this->assertSame(WorkBlockService::LEGACY_GENERATION_RETIRED, $draftResult['reason']);
+        $this->assertSame(0, $db->table('reach_content_versions')->where('content_item_id', $contentItemId)->countAllResults());
+
+        $version = (new \App\Libraries\ContentVersionService())->createVersion($contentItemId, [
+            'title'           => 'How to file GST returns on time (E2E acceptance)',
+            'summary'         => 'GST return due dates and a filing routine for small businesses.',
+            'body_html'       => self::fixtureBodyHtml(),
+            'body_plain_text' => strip_tags(self::fixtureBodyHtml()),
+        ], ['type' => 'bot', 'service' => 'reach:automation_ingest:claude'], 'Routine draft');
+        $contentVersionId = (int) $version['id'];
+        (new BlogStateMachine($this->workBlocks))->transition($contentItemId, BlogStateMachine::DRAFT, null, ['content_version_id' => $contentVersionId]);
         $this->assertGreaterThan(0, $contentVersionId);
         $this->assertSame(
             BlogStateMachine::DRAFT,
@@ -198,10 +209,9 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $this->workBlocks->execute($seoBlockId);
 
         // -----------------------------------------------------------------
-        // Step 9: cross-provider editorial review. Only the mock provider is
-        // configured in this test, so the generator and the reviewer
-        // resolve to the SAME provider — the safety net must force human
-        // review rather than silently self-approving.
+        // Step 9: the in-Reach editorial LLM review is retired with the
+        // generator (it never read its own verdict). It fails closed; the
+        // item reaches review the ordinary way.
         // -----------------------------------------------------------------
         $crossReviewBlockId = $this->workBlocks->create([
             'block_type' => WorkBlockService::TYPE_CROSS_REVIEW,
@@ -209,15 +219,17 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
             'content_version_id' => $contentVersionId,
         ]);
         $crossReviewResult = $this->workBlocks->execute($crossReviewBlockId);
-        $this->assertTrue(
-            $crossReviewResult['same_provider'] ?? false,
-            'With only the mock provider configured, cross-review must detect self-review rather than silently pass.',
-        );
-        $this->assertTrue($crossReviewResult['requires_human'] ?? false);
+        $this->assertTrue($crossReviewResult['blocked'] ?? false);
+        $sm = new BlogStateMachine($this->workBlocks);
+        foreach ([BlogStateMachine::SEO_REVIEW, BlogStateMachine::INTERNAL_REVIEW] as $state) {
+            $current = $db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray()['workflow_status'];
+            if ($current !== $state && $sm->canTransition($current, $state)) {
+                $sm->transition($contentItemId, $state, null, []);
+            }
+        }
         $this->assertSame(
             BlogStateMachine::INTERNAL_REVIEW,
             $db->table('reach_content_items')->where('id', $contentItemId)->get()->getRowArray()['workflow_status'],
-            'A same-provider cross-review must force INTERNAL_REVIEW, never auto-approve.',
         );
 
         // -----------------------------------------------------------------
@@ -238,6 +250,9 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         $approval = new BlogContentApprovalService();
         $approvalResult = $approval->approve($contentItemId, $contentVersionId, $approverId, 'standard', 'E2E acceptance approval');
         $this->assertTrue($approval->verifyForPublication($contentItemId, $contentVersionId));
+        // The publish gate: Gemini's approval of this version (stood in for
+        // here; BlogPublishVetGateTest covers the gate itself).
+        $this->markVetted($contentItemId, $contentVersionId);
 
         // -----------------------------------------------------------------
         // Step 14b: cover image. BLOG_IMAGE_GENERATION_ENABLED is off, so the
@@ -657,6 +672,7 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
             ]);
         }
 
+        $this->markVetted($contentItemId, $contentVersionId);
         $pub = new PublicationDeploymentService(new JobService());
 
         $scheduledAt = date('c', strtotime('+2 hours'));
@@ -667,6 +683,21 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         // must be idempotent at the deployment layer, not create a second
         // competing deployment for the same (item, version, operation).
         $this->assertSame($firstId, $secondId, 'A repeated identical schedule request must not create a duplicate deployment.');
+    }
+
+    /** Record the vetting model's approval of this version on its active approval row. */
+    private function markVetted(int $contentItemId, int $contentVersionId): void
+    {
+        $db = Database::connect();
+        $db->table('reach_ai_vetting_runs')->insert([
+            'content_type' => 'blog', 'content_ref' => "blog:{$contentItemId}", 'model' => 'gemini-test',
+            'decision' => 'approve', 'reasons_json' => '[]', 'scores_json' => '{}', 'input_sha256' => str_repeat('a', 64),
+            'latency_ms' => 1, 'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        $runId = (int) $db->insertID();
+        $db->table('reach_blog_content_approvals')->where('content_item_id', $contentItemId)
+            ->where('content_version_id', $contentVersionId)->where('revoked_at IS NULL', null, false)
+            ->update(['vetting_run_id' => $runId]);
     }
 
     /**

@@ -82,6 +82,14 @@ final class ReachScheduleTimetableTest extends CIUnitTestCase
         $this->assertArrayHasKey('reach.seo_snapshot', self::byType('2026-10-17 05:10:00'));
     }
 
+    public function testContentQualitySweepRunsOnceADayBeforeTheReport(): void
+    {
+        $jobs = self::byType('2026-10-17 01:20:00');
+        $this->assertSame('content-quality-sweep-2026-10-17', $jobs['reach.content_quality_sweep']['opts']['idempotency_key']);
+        $this->assertSame('publishing', $jobs['reach.content_quality_sweep']['opts']['queue'], 'a queue the documented worker drains');
+        $this->assertArrayNotHasKey('reach.content_quality_sweep', self::byType('2026-10-17 02:20:00'));
+    }
+
     public function testEveryPlannedJobHasAHandler(): void
     {
         $registry = new \App\Libraries\JobHandlerRegistry();

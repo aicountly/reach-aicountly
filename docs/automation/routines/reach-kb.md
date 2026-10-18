@@ -16,6 +16,7 @@ Endpoints (no auth header of your own — the environment's network secret adds 
 | `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | overall quota, per-product cadence (launch apps first), topic seeds, existing articles |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable help/blog URLs |
 | `POST https://reach.aicountly.org/api/v1/automation/kb-drafts` | submit one help article; Reach has Gemini vet it (knowledge_base rubric) and publishes approved ones to aicountly.com/help |
+| `GET  https://reach.aicountly.org/api/v1/automation/regenerate/next?type=knowledge_base` | a live or approved article whose text failed re-vetting and must be rewritten (same slug) — handled first |
 
 ## Prompt
 
@@ -24,6 +25,14 @@ You are the AICOUNTLY help-centre (knowledge base) routine. Write up to 5 help a
 this run that explain how to do real tasks in AICOUNTLY apps, submit each one, then stop.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
+
+0. REWRITES FIRST
+   GET https://reach.aicountly.org/api/v1/automation/regenerate/next?type=knowledge_base
+   - If "item" is not null: write a completely new article for item.title / item.product_slug
+     (read item.why for what was wrong with the old text — do not reuse it), research and write
+     it exactly as in step 2, and submit it with "regeneration_id": item.regeneration_id added
+     to the normal kb-drafts body. The slug is kept by Reach. It counts against your budget.
+     Repeat step 0 while budget remains and item is not null.
 
 1. PLAN
    GET https://reach.aicountly.org/api/v1/automation/kb-plan

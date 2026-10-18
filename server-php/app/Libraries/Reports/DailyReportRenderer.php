@@ -37,7 +37,7 @@ final class DailyReportRenderer
     {
         $s = $summary['sections'];
         $body = '';
-        $body .= self::section('What to do today', self::todoHtml($s['todo'] ?? []));
+        $body .= self::section('Today at a glance', self::todoHtml($s['todo'] ?? []));
         $body .= self::section('Search (Google Search Console)', self::searchHtml($s['search'] ?? []));
         $body .= self::section('Website traffic (GA4)', self::trafficHtml($s['traffic'] ?? []));
         $body .= self::section('SEO Tracker', self::trackerHtml($s['seo_tracker'] ?? []));
@@ -70,7 +70,7 @@ final class DailyReportRenderer
         $out[] = 'AICOUNTLY daily analytics report — ' . self::longDate((string) $summary['report_date']);
         $out[] = 'Generated ' . $summary['generated_at'] . ' (' . $summary['timezone'] . ')';
         $out[] = '';
-        $out[] = '== What to do today ==';
+        $out[] = '== Today at a glance ==';
         foreach (($s['todo']['items'] ?? []) as $i => $item) {
             $out[] = ($i + 1) . '. ' . $item;
         }
@@ -144,6 +144,9 @@ final class DailyReportRenderer
             $out[] = sprintf('approve %d · revise %d · reject %d', $v['counts']['approve'], $v['counts']['revise'], $v['counts']['reject']);
             foreach ($v['top_reject_reasons'] as $r) {
                 $out[] = sprintf('  - %s (%d)', $r['reason'], $r['count']);
+            }
+            if (! empty($v['quality'])) {
+                $out[] = self::qualityLine($v['quality']);
             }
         }
 
@@ -292,7 +295,19 @@ final class DailyReportRenderer
         $reasons = $v['top_reject_reasons'] === [] ? '' : '<div style="font-size:13px;font-weight:600;margin:14px 0 4px;">Top reject reasons</div>'
             . self::table(['Reason', 'Count'], array_map(static fn ($r) => [$r['reason'], (string) $r['count']], $v['top_reject_reasons']));
 
-        return $tiles . $reasons;
+        $quality = empty($v['quality']) ? ''
+            : '<div style="font-size:13px;color:' . self::C_MUTED . ';margin-top:12px;">' . self::e(self::qualityLine($v['quality'])) . '</div>';
+
+        return $tiles . $reasons . $quality;
+    }
+
+    /** @param array<string, int> $q */
+    public static function qualityLine(array $q): string
+    {
+        return sprintf(
+            'Content clean-up (automatic, no action needed): %d re-checked · %d failed · %d taken down · %d rewrites queued · %d rewrites open',
+            $q['checked'] ?? 0, $q['failed'] ?? 0, $q['unpublished'] ?? 0, $q['queued_regeneration'] ?? 0, $q['rewrites_open'] ?? 0,
+        );
     }
 
     /** @param array<string, mixed> $p */

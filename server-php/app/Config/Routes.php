@@ -145,6 +145,8 @@ $routes->group('v1', static function ($routes) {
         $routes->post('workflow-guides', 'Api\\V1\\Automation\\StructuredContentController::storeWorkflowGuide');
         // ── Stream C: blog + KB routines (Gemini-vetted, auto-published) ──
         $routes->get('blog-plan',       'Api\\V1\\Content\\AutomationIngestController::blogPlan');
+        // ── Stream 4 (content clean-up): rewrites of failed items, same slug ──
+        $routes->get('regenerate/next', 'Api\\V1\\Content\\AutomationIngestController::regenerateNext');
         // Stream V — automated video (reach-video routine): script in → vetting → pipeline.
         $routes->post('video-scripts',  'Api\\V1\\Video\\VideoAutomationController::storeScript');
         $routes->get('video-plan',      'Api\\V1\\Video\\VideoAutomationController::plan');

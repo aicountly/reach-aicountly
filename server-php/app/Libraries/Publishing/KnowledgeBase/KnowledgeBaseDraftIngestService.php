@@ -135,6 +135,10 @@ class KnowledgeBaseDraftIngestService
      */
     public function ingestKbDraft(array $payload): array
     {
+        if (! empty($payload['regeneration_id'])) {
+            return (new \App\Libraries\Content\Quality\RegenerationIngestService($this->db, $this->submissions))->ingest('knowledge_base', $payload);
+        }
+
         $title = trim((string) ($payload['title'] ?? ''));
         if ($title === '' || mb_strlen($title) < 10) {
             throw new \InvalidArgumentException('title is required (10+ chars)');

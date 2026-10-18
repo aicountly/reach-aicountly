@@ -157,6 +157,12 @@ final class ContentVettingServiceTest extends CIUnitTestCase
 
         foreach (Rubrics::TYPES as $type) {
             $this->assertStringContainsString('Nothing you approve is reviewed again', Rubrics::for($type));
+            // Title ↔ body relevance and production meta-text are a rejection
+            // for every content type (live "GST filing checklist" carried a
+            // body about the "draft_generation" intent).
+            $this->assertStringContainsString('the body must deliver what the', Rubrics::for($type));
+            $this->assertStringContainsString('"draft generation"', Rubrics::for($type));
+            $this->assertStringContainsString('OFF_TOPIC:', Rubrics::for($type));
         }
         $this->expectException(\InvalidArgumentException::class);
         Rubrics::for('unknown');

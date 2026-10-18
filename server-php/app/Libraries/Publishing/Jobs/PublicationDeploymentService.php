@@ -5,6 +5,8 @@ namespace App\Libraries\Publishing\Jobs;
 use App\Libraries\AuditLogger;
 use App\Libraries\Blog\BlogContentApprovalService;
 use App\Libraries\Blog\BlogFeatureFlags;
+use App\Libraries\Blog\BlogPublishVetGate;
+use App\Libraries\Blog\BlogVetRefused;
 use App\Libraries\JobService;
 use App\Libraries\Publishing\Blog\BlogPublicationPayloadBuilder;
 use App\Libraries\Publishing\Connector\PublicSitePublisherFactory;
@@ -28,9 +30,11 @@ class PublicationDeploymentService
     private JobService $jobService;
     private BlogFeatureFlags $flags;
     private BlogContentApprovalService $approvals;
+    private ?BlogPublishVetGate $vetGate;
 
-    public function __construct(?JobService $jobService = null, ?BlogFeatureFlags $flags = null, ?BlogContentApprovalService $approvals = null)
+    public function __construct(?JobService $jobService = null, ?BlogFeatureFlags $flags = null, ?BlogContentApprovalService $approvals = null, ?BlogPublishVetGate $vetGate = null)
     {
+        $this->vetGate     = $vetGate;
         $this->db         = \Config\Database::connect();
         $this->classifier = new PublishingErrorClassifier();
         $this->jobService = $jobService ?? new JobService();
@@ -55,7 +59,7 @@ class PublicationDeploymentService
             ->where('id', $contentItemId)->get()->getRowArray();
 
         if (!$item || $item['approval_status'] !== 'approved') {
-            throw new \RuntimeException('Content must be human-approved before publishing');
+            throw new \RuntimeException('Content must be approved before publishing');
         }
 
         if ($item['content_type'] === 'blog') {
@@ -71,6 +75,13 @@ class PublicationDeploymentService
                     );
                 }
             }
+        }
+
+        // Every blog that goes public needs the vetting model's approval of
+        // THIS version (title ↔ body relevance included). Throws
+        // BlogVetRefused (a RuntimeException) with Gemini's reasons.
+        if ($item['content_type'] === 'blog' && in_array($operation, ['publish', 'schedule'], true)) {
+            $this->vetGate()->ensure($contentItemId, $contentVersionId);
         }
 
         $connectionKey = (new \App\Libraries\Publishing\PublicationConnectionService())
@@ -112,7 +123,9 @@ class PublicationDeploymentService
             );
         }
 
-        $idempotencyKey = "reach-{$contentItemId}-v{$contentVersionId}-{$operation}-" . time();
+        // Random suffix: a retry in the same second (refused → re-queued in one
+        // pipeline pass) must not collide with the failed deployment's key.
+        $idempotencyKey = "reach-{$contentItemId}-v{$contentVersionId}-{$operation}-" . time() . '-' . bin2hex(random_bytes(3));
 
         $this->db->table('reach_publication_deployments')->insert([
             'content_item_id'    => $contentItemId,
@@ -138,6 +151,35 @@ class PublicationDeploymentService
         ], $createdBy);
 
         return $deploymentId;
+    }
+
+    /**
+     * Deployments sent before due schedules were published: the receiver
+     * holds them as 'scheduled' (served as 404) and nothing ever flipped them.
+     * Re-queue every due one; processDeployment() now publishes it.
+     *
+     * @return int how many were re-queued
+     */
+    public function releaseDueSchedules(int $limit = 25): int
+    {
+        $rows = $this->db->table('reach_publication_deployments')->select('id, idempotency_key')
+            ->where('operation', 'schedule')->where('status', 'scheduled')
+            ->where('scheduled_at <=', date('Y-m-d H:i:s'))
+            ->orderBy('id', 'ASC')->limit(max(1, $limit))
+            ->get()->getResultArray();
+
+        $n = 0;
+        foreach ($rows as $row) {
+            $this->db->table('reach_publication_deployments')->where('id', $row['id'])->where('status', 'scheduled')
+                ->update(['status' => 'queued', 'updated_at' => date('Y-m-d H:i:s')]);
+            if ($this->db->affectedRows() !== 1) {
+                continue;
+            }
+            $this->enqueuePublicationJob((int) $row['id'], (string) $row['idempotency_key'] . ':due-release', null, true);
+            $n++;
+        }
+
+        return $n;
     }
 
     /**
@@ -195,6 +237,27 @@ class PublicationDeploymentService
             return; // Already processed or cancelled
         }
 
+        // A deployment queued before the publish gate existed (or edited
+        // since) is vetted at send time too; a refusal fails it with the
+        // reason instead of sending unvetted text.
+        if (in_array($deployment['operation'], ['publish', 'schedule'], true)) {
+            $type = (string) ($this->db->table('reach_content_items')->select('content_type')
+                ->where('id', $deployment['content_item_id'])->get()->getRowArray()['content_type'] ?? '');
+            if ($type === 'blog') {
+                try {
+                    $this->vetGate()->ensure((int) $deployment['content_item_id'], (int) $deployment['content_version_id']);
+                } catch (BlogVetRefused $e) {
+                    $this->updateDeploymentStatus($deploymentId, 'failed', [
+                        'error_category' => $e->unavailable ? 'vetting_unavailable' : 'vetting_refused',
+                        'redacted_error' => mb_substr($e->getMessage(), 0, 1000),
+                    ]);
+                    AuditLogger::record('publishing.failed', ['deployment_id' => $deploymentId, 'error_category' => $e->unavailable ? 'vetting_unavailable' : 'vetting_refused']);
+
+                    return;
+                }
+            }
+        }
+
         $this->updateDeploymentStatus($deploymentId, 'sending');
 
         $attemptNumber = ((int) $deployment['attempt_count']) + 1;
@@ -243,8 +306,17 @@ class PublicationDeploymentService
                 $this->updateDeploymentStatus($deploymentId, 'sending', ['public_content_id' => $publicContentId]);
             }
 
-            if ($deployment['operation'] === 'publish' && $publicContentId > 0) {
+            // A schedule deployment's job runs AT scheduled_at (enqueueAt). The
+            // receiver only stores a 'scheduled' status and has nothing that
+            // later flips it to published — so a due schedule must publish
+            // now, or the post sits behind a 404 forever.
+            $dueSchedule = $deployment['operation'] === 'schedule'
+                && (empty($deployment['scheduled_at']) || strtotime((string) $deployment['scheduled_at']) <= time() + 60);
+            if (($deployment['operation'] === 'publish' || $dueSchedule) && $publicContentId > 0) {
                 $response = $publisher->publish($publicContentId, $this->buildEnvelope($deployment, $payload, $checksum, 'publish'));
+                if ($dueSchedule) {
+                    $deployment['operation_effective'] = 'publish';
+                }
             } elseif ($deployment['operation'] === 'schedule' && $publicContentId > 0 && !empty($deployment['scheduled_at'])) {
                 $response = $publisher->schedule(
                     $publicContentId,
@@ -454,8 +526,9 @@ class PublicationDeploymentService
             'duration_ms'  => 0,
         ]);
 
-        $status = $deployment['operation'] === 'publish' ? 'published'
-            : ($deployment['operation'] === 'schedule' ? 'scheduled' : 'accepted');
+        $operation = (string) ($deployment['operation_effective'] ?? $deployment['operation']);
+        $status = $operation === 'publish' ? 'published'
+            : ($operation === 'schedule' ? 'scheduled' : 'accepted');
 
         $this->db->table('reach_publication_deployments')->where('id', $deploymentId)->update([
             'status'             => $status,
@@ -564,10 +637,24 @@ class PublicationDeploymentService
                 return;
             }
             $from = strtolower((string) ($item['workflow_status'] ?? ''));
-            if ($from !== \App\Libraries\Blog\BlogStateMachine::PUBLISHING) {
-                return;
+            // "Publish now" from approved and a due schedule used to leave the
+            // item saying approved/scheduled while the post was live. Walk it
+            // to published; the deployment already happened, so no successor
+            // PUBLISH_BLOG / VERIFY block may be created on the way.
+            $path = match ($from) {
+                \App\Libraries\Blog\BlogStateMachine::PUBLISHING => [\App\Libraries\Blog\BlogStateMachine::PUBLISHED],
+                \App\Libraries\Blog\BlogStateMachine::SCHEDULED  => [\App\Libraries\Blog\BlogStateMachine::PUBLISHED],
+                \App\Libraries\Blog\BlogStateMachine::APPROVED   => [
+                    \App\Libraries\Blog\BlogStateMachine::PUBLISH_QUEUED,
+                    \App\Libraries\Blog\BlogStateMachine::PUBLISHING,
+                    \App\Libraries\Blog\BlogStateMachine::PUBLISHED,
+                ],
+                default => [],
+            };
+            $sm = new \App\Libraries\Blog\BlogStateMachine();
+            foreach ($path as $state) {
+                $sm->transition($contentItemId, $state, null, ['reason' => 'deployment_published', 'skip_successor_work_block' => $state !== \App\Libraries\Blog\BlogStateMachine::PUBLISHED]);
             }
-            (new \App\Libraries\Blog\BlogStateMachine())->transition($contentItemId, \App\Libraries\Blog\BlogStateMachine::PUBLISHED);
         } catch (\Throwable) {
             // Non-fatal bookkeeping only.
         }
@@ -595,6 +682,11 @@ class PublicationDeploymentService
             'deployment_id'  => $deploymentId,
             'error_category' => $errorCategory,
         ]);
+    }
+
+    private function vetGate(): BlogPublishVetGate
+    {
+        return $this->vetGate ??= new BlogPublishVetGate();
     }
 
     private function updateDeploymentStatus(int $deploymentId, string $status, array $extra = []): void

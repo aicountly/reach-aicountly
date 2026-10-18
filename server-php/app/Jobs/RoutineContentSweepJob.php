@@ -18,6 +18,14 @@ class RoutineContentSweepJob implements JobHandlerInterface
 {
     public function handle(array $payload, JobContext $ctx): array
     {
-        return (new RoutineContentPipeline())->sweep((int) ($payload['limit'] ?? 10));
+        $result = (new RoutineContentPipeline())->sweep((int) ($payload['limit'] ?? 10));
+        try {
+            // Due schedules the receiver was only told to "schedule" go out now.
+            $result['due_schedules_released'] = (new \App\Libraries\Publishing\Jobs\PublicationDeploymentService())->releaseDueSchedules();
+        } catch (\Throwable $e) {
+            log_message('error', '[RoutineContentSweep] due-schedule release failed: ' . $e->getMessage());
+        }
+
+        return $result;
     }
 }

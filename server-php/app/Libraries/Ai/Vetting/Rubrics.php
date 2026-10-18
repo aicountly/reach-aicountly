@@ -31,6 +31,11 @@ Always:
 - No disparagement of competitors.
 - No personal data (names with PAN/Aadhaar/phone/email/account numbers) of real people.
 - Write in clear Indian English. Keep HTML limited to the tags already present in the draft.
+- Title, summary and body must be about the same subject, and the body must deliver what the
+  title promises. Reject (do not revise) a draft whose body is generic filler, is about a different
+  topic than its title, or talks about how it was produced — prompts, "draft generation", an
+  "intent", "grounding context", a "content pipeline", "as an AI", placeholders. Start that reason
+  with "OFF_TOPIC:".
 Return reasons as short, specific sentences (what you changed or why you rejected).
 TXT;
 

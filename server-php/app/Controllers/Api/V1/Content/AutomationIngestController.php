@@ -23,6 +23,7 @@ use App\Libraries\Publishing\KnowledgeBase\KnowledgeBaseDraftIngestService;
  *   GET  v1/automation/blog-plan       quota, existing titles, priority topics, links
  *   POST v1/automation/blog-drafts     submit a marketing blog draft (Gemini vets it)
  *   POST v1/automation/kb-drafts       submit a KB article draft (Gemini vets it)
+ *   GET  v1/automation/regenerate/next failed item to rewrite first (same slug)
  *
  * A submitted draft is stored, then vetted, approved and queued for
  * publication in the same request where possible; the response says how far
@@ -68,6 +69,23 @@ class AutomationIngestController extends BaseApiController
     public function blogPlan()
     {
         return $this->ok((new BlogPlanService())->plan());
+    }
+
+    /**
+     * GET v1/automation/regenerate/next?type=blog|knowledge_base — the blog
+     * and KB routines call this first. Returns (and claims for two hours) the
+     * oldest item whose text failed vetting and must be rewritten on the same
+     * topic and slug, or `item: null` when there is none.
+     */
+    public function regenerateNext()
+    {
+        $type = (string) ($this->request->getGet('type') ?? 'blog');
+        if (! in_array($type, ['blog', 'knowledge_base'], true)) {
+            return $this->fail('type must be blog or knowledge_base', 422);
+        }
+        $queue = new \App\Libraries\Content\Quality\RegenerationQueue();
+
+        return $this->ok(['item' => $queue->claimNext($type), 'open' => $queue->counts()]);
     }
 
     public function storeBlogDraft()

@@ -53,6 +53,12 @@ export function BotSettingsPage() {
 
       {saved && <Alert variant="success">Bot settings saved.</Alert>}
 
+      <Alert variant="info">
+        This mode applies to the Marketing Bot tool only. Blogs, knowledge-base articles, community answers, release notes,
+        workflow guides and videos are written by the Claude routines, vetted by Gemini and published automatically —
+        they never wait for an approval here. Their switches and daily limits are in Settings → AI &amp; Automation.
+      </Alert>
+
       <div className="grid grid-2" style={{ alignItems: 'start' }}>
         <Card title="Mode">
           <label className="flex items-center gap-2 mb-3">

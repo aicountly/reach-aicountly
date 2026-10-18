@@ -64,7 +64,7 @@ export function ReadyToPublishPage() {
     setError(null);
     try {
       await contentService.publishItem(item.id, item.current_version_id);
-      setNotice(`Queued publish for “${item.title}”. Check Publishing Attempts while the worker runs.`);
+      setNotice(`Queued publish for “${item.title}” — Gemini approved this version. The worker sends it within a minute.`);
       load();
     } catch (e) {
       setError(e.message);
@@ -81,7 +81,8 @@ export function ReadyToPublishPage() {
         <div>
           <h2 style={{ margin: 0 }}>Ready to Publish</h2>
           <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-            Human-approved blogs. Review or edit the final draft, then publish to the live site.
+            Approved blogs not yet live. Routine articles publish on their own; anything listed here
+            is checked by Gemini against its current text before it goes out, including Publish now.
           </p>
         </div>
       </div>
@@ -91,11 +92,10 @@ export function ReadyToPublishPage() {
 
       {items.length === 0 && !error && (
         <div className="empty-state">
-          <p>No blog items are ready to publish.</p>
+          <p>No approved blogs are waiting.</p>
           <p className="text-sm text-muted">
-            Approve drafts from{' '}
-            <Link to={ROUTES.BCC_VERIFICATION}>Verification Queue</Link>
-            {' '}first. Approved posts will appear here.
+            Routine articles are vetted, approved and published automatically — follow them in{' '}
+            <Link to={ROUTES.BCC_VERIFICATION}>Verification</Link>.
           </p>
         </div>
       )}

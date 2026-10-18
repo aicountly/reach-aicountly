@@ -232,3 +232,31 @@ If a blog post's slug is changed after publication:
 2. A redirect record is created in `reach_content_redirects` (old slug → new slug).
 3. The new canonical URL is used for the update deployment.
 4. The public site (if configured) should serve a 301 redirect from the old URL.
+
+## Content clean-up (re-vetting live and approved content)
+
+Every blog publish is gated by `BlogPublishVetGate` (Gemini must approve the exact version; see
+`docs/automation/CLAUDE_ROUTINES.md`). To clear out content that went out before the gate:
+
+```bash
+php spark reach:content-revet --heuristics-only          # free: list what the cheap checks flag
+php spark reach:content-revet --dry-run --community      # Gemini verdicts, nothing changed
+php spark reach:content-revet                            # apply
+php spark reach:content-revet --ids=1,5                  # just these items
+```
+
+| Item | Verdict | What happens |
+|---|---|---|
+| approved, not live | approve / revise→approve | adopted into the routine pipeline (origin `revet`, no quota): cover, publish, verify |
+| approved, not live | reject / unresolved revise | approval revoked, item `rejected`, queued for a same-slug rewrite |
+| live | reject | withdrawn on aicountly.com (`unpublish`: the receiver answers 410 and keeps the slug), item `unpublished`, queued for a same-slug rewrite |
+| live | revise / approve | recorded only (`flagged_for_owner` for a revise) |
+| any | vetting unavailable | nothing changes |
+
+The blog and KB routines take queued rewrites first (`GET v1/automation/regenerate/next`) and
+submit them with `regeneration_id`; the rewrite becomes a new version of the same item (the
+version history says what it replaced), gets a fresh cover and is republished at the same slug
+(the receiver updates the same public record). Each verdict is stored in
+`reach_content_quality_checks`; the queue is `reach_content_regenerations`. The daily
+`reach.content_quality_sweep` (01:00 UTC) re-vets what went live in the last 48 hours and takes a
+page down only on a Gemini reject; the daily report shows one informational line.

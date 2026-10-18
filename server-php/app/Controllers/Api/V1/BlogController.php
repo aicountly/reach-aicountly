@@ -264,13 +264,16 @@ class BlogController extends BaseApiController
         if (($row['status'] ?? '') !== 'approved' && ($row['status'] ?? '') !== 'scheduled') {
             return $this->fail('Only approved or scheduled blogs can be published.', 422);
         }
-        $this->audit('publish.attempted', 'blog', $id, ['publishing_status' => $row['publishing_status'] ?? null], [
-            'target' => 'aicountly.com',
+        // Retired: this legacy table's publisher POSTs to {AICOUNTLY_SITE_API_BASE_URL}/blog/posts, an
+        // endpoint aicountly.com does not have, and it bypassed the Gemini publish gate. A legacy post
+        // goes live only after `php spark reach:blog-migrate-legacy` moves it into the content
+        // pipeline, where every publish is vetted (BlogPublishVetGate).
+        $this->audit('publish.refused', 'blog', $id, ['publishing_status' => $row['publishing_status'] ?? null], [
+            'reason' => 'legacy_blog_publish_retired',
         ]);
-        // Placeholder publish. Falls back to pending_publishing if not configured.
-        $result = Services::sitePublisher()->publish($row);
-        $this->audit('publish.blog', 'blog', $id, ['publishing_status' => $row['publishing_status'] ?? null], $result);
-        return $this->ok($blog->find($id));
+
+        return $this->fail('Legacy blog posts no longer publish directly. Migrate it with `php spark reach:blog-migrate-legacy`; '
+            . 'it then publishes through the content pipeline after Gemini vets it.', 409);
     }
 
     private function snapshot(int $blogPostId, int $version, string $reason, array $data): void
