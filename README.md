@@ -28,8 +28,8 @@ modes and superadmin approval gates.
     `POST {CONSOLE_API_URL}/portal/audit` with Reach's own key (`CONSOLE_API_TOKEN`,
     capability `audit.write`; console-react-app AUTH_INTEGRATION.md "Central audit").
     Each event is queued in `reach_console_sync_logs` (the outbox), sent at once, and
-    retried until Console has it by cron every 5 minutes:
-    `0,5,10,15,20,25,30,35,40,45,50,55 * * * * cd /path/to/api && php spark reach:console-audit-deliver >> writable/logs/console_audit.log 2>&1`. The command reports each delivery run to Console's Cron Job Monitor as `reach.console_audit_deliver` (`app/Libraries/CronHeartbeat.php`; `CONSOLE_CRON_MONITOR_KEY` in `.env`, console-react-app `docs/CRON_MONITORS.md`); without the key nothing is reported, and a failed report never fails the command.
+    retried until Console has it every 5 minutes by `php spark reach:console-audit-deliver`,
+    which the production deploy schedules (`server-php/bin/ops/jobs.txt`; "Production deployment (cPanel)" step 9). The command reports each delivery run to Console's Cron Job Monitor as `reach.console_audit_deliver` (`app/Libraries/CronHeartbeat.php`; `CONSOLE_CRON_MONITOR_KEY` in `.env`, console-react-app `docs/CRON_MONITORS.md`); without the key nothing is reported, and a failed report never fails the command.
     Console de-duplicates on `external_id` (`reach:audit_logs:<id>`), so a retry never
     doubles an event; failures are logged as `[ConsoleAuditClient] …` and shown on the
     Console Sync Status page.
@@ -107,6 +107,17 @@ npm run dev
 8. On Console (`console.aicountly.org`) set `REACH_BOT_API_URL` to
    `https://reach.aicountly.org/api/v1` and `REACH_BOT_SERVICE_KEY` to the
    same value as Reach's `CONSOLE_INBOUND_TOKEN`.
+9. Scheduled jobs: the **Deploy Production via SSH** workflow runs `api/bin/ops/post-deploy-jobs.sh` on the
+   server (the AICOUNTLY ops kit, identical to console-react-app `ops/estate/kit/bin/ops/`). It writes
+   `CONSOLE_CRON_MONITOR_KEY` (repository secret, sent over SSH on STDIN) into `api/.env` — the only line of `.env`
+   a deploy writes; Console's production refuses the shared `CONSOLE_SERVICE_KEY` for heartbeats — and installs
+   `server-php/bin/ops/jobs.txt` into the deploy user's crontab (block `aicountly-reach jobs`, `flock -n`, log
+   `~/logs/aicountly-reach-console-audit-deliver.log`): `php spark reach:console-audit-deliver` every 5 minutes,
+   reporting itself as `reach.console_audit_deliver`. A hand-pasted `spark reach:console-audit-deliver` line is
+   removed so it never runs twice; the worker / blog / community crons
+   ([docs/operations/REACH_WORKER_AND_CRON.md](docs/operations/REACH_WORKER_AND_CRON.md)) stay hand-installed. No
+   secret: a warning (the job runs, Console shows it OVERDUE). Crontab not writable: the deploy fails. Check on the
+   server: `bash public_html/api/bin/ops/install-jobs.sh --check`.
 
 ## Non-goals
 
