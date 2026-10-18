@@ -5,6 +5,7 @@ namespace App\Libraries;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 use App\Libraries\Database\SchemaGuard;
+use App\Libraries\Jobs\JobQueueInsights;
 
 /**
  * Builds the marketing dashboard summary from the tables that actually hold
@@ -52,7 +53,14 @@ class DashboardSummaryService
 
     private const APPROVED = ['approved'];
 
-    private const SCHEDULED = ['scheduled', 'ready_for_publication', 'publish_queued'];
+    /**
+     * Content with a publish date: `scheduled`, and `ready_for_publication`
+     * (ContentScheduleReadinessJob's state for a schedule whose date came).
+     * `publish_queued` used to be counted here too, so seven blog items stuck
+     * in the publish queue read as "7 scheduled" while the calendar — which
+     * needs a date — showed nothing. They are counted as publishing below.
+     */
+    private const SCHEDULED = ['scheduled', 'ready_for_publication'];
 
     /** Handed to the publisher but not confirmed live yet. */
     private const PUBLISHING = ['publish_queued', 'publishing', 'verification_pending'];
@@ -89,6 +97,7 @@ class DashboardSummaryService
         $approvals = $this->approvals();
         $bot       = $this->bot();
         $content   = $this->contentStudio();
+        $jobs      = (new JobQueueInsights($this->db))->summary(24);
 
         return [
             'blog'              => $blog,
@@ -97,8 +106,10 @@ class DashboardSummaryService
             'leads'             => $leads,
             'approvals'         => $approvals,
             'bot'               => $bot,
+            'jobs'              => $jobs,
             'content'           => $content,
             'calendar_upcoming' => $this->calendarUpcoming(),
+            'calendar_overdue'  => $this->calendarOverdue(),
             'generated_at'      => date('c'),
         ];
     }
@@ -113,16 +124,16 @@ class DashboardSummaryService
         $blog      = $this->blog();
         $social    = $this->social();
         $leads     = $this->leads();
-        $bot       = $this->bot();
         $approvals = $this->approvals();
         $content   = $this->contentStudio();
+        $jobs      = (new JobQueueInsights($this->db))->summary(24);
 
         return [
             'blog'               => $blog['ideas'] + $blog['drafts'] + $blog['in_review'],
             'approvals'          => $approvals['pending'],
             'leads_pending_push' => $leads['pending_push'] + $leads['failed'] + $leads['retry_scheduled'],
             'social_queue'       => $social['queue'],
-            'bot_queue_running'  => $bot['queue_running'],
+            'bot_queue_running'  => (int) ($jobs['running'] ?? 0),
             'content_in_review'  => $content['in_review'],
         ];
     }
@@ -202,12 +213,15 @@ class DashboardSummaryService
         // Distribution dispatches are what actually goes out for a campaign.
         $d = $this->groupCounts('reach_campaign_dispatches', 'status');
 
+        // reach_campaigns has no `running` status (rcs constraint): a live
+        // campaign is `active` or `dispatching`. The tile read 0 for ever and
+        // added dispatch rows (a different entity) on top.
         return [
             'total'            => $this->sum($c),
             'draft'            => $this->pick($c, ['draft']),
-            'pending_approval' => $this->pick($c, ['pending_approval']),
+            'pending_approval' => $this->pick($c, ['pending_approval', 'ready_for_review', 'in_review']),
             'approved'         => $this->pick($c, ['approved']),
-            'running'          => $this->pick($c, ['running']) + $this->pick($d, ['dispatching']),
+            'running'          => $this->pick($c, ['active', 'dispatching', 'running']),
             'paused'           => $this->pick($c, ['paused']),
             'completed'        => $this->pick($c, ['completed']),
             'dispatches_queued' => $this->pick($d, ['queued']),
@@ -223,13 +237,18 @@ class DashboardSummaryService
         $items  = $this->contentCounts('social_post');
         $legacy = $this->groupCounts('reach_social_posts', 'status');
 
+        // `queue` is exactly what the Social queue page lists
+        // (SocialQueueController: reach_social_posts approved / scheduled /
+        // manual_queue). Content Studio social items waiting on a channel are
+        // reported apart as content_queue — the page does not show them.
         return [
             'total'  => $this->sum($items) + $this->sum($legacy),
             'draft'  => $this->pick($items, array_merge(self::IDEAS, self::DRAFTS))
                         + $this->pick($legacy, ['draft']),
             'review' => $this->pick($items, self::IN_REVIEW) + $this->pick($legacy, ['pending_approval']),
-            'queue'  => $this->pick($items, self::CHANNEL_QUEUE)
-                        + $this->pick($legacy, ['approved', 'scheduled', 'manual_queue']),
+            'queue'  => $this->pick($legacy, ['approved', 'scheduled', 'manual_queue']),
+            'publishing'    => $this->pick($legacy, ['publishing']),
+            'content_queue' => $this->pick($items, self::CHANNEL_QUEUE),
             'posted' => $this->pick($items, self::PUBLISHED) + $this->pick($legacy, ['posted']),
             'failed' => $this->pick($items, self::NEEDS_ATTENTION) + $this->pick($legacy, ['failed']),
         ];
@@ -281,25 +300,29 @@ class DashboardSummaryService
     // ----------------------------------------------------------------- bot
 
     /**
-     * The marketing bot's own queue plus the generic job runner that the
-     * automation pipeline enqueues onto (reach_jobs).
+     * The Bot queue (manual bot dispatches) and its reports. Queue figures
+     * for reach_jobs live in `jobs` (JobQueueInsights). These used to be
+     * summed with reach_jobs, which counted every bot dispatch twice (its
+     * queue row and its job) and mixed lifetime totals into "running".
      *
-     * @return array<string, int>
+     * @return array<string, mixed>
      */
     private function bot(): array
     {
         $queue   = $this->groupCounts('reach_marketing_bot_queue', 'status');
-        $jobs    = $this->groupCounts('reach_jobs', 'status');
         $reports = $this->groupCounts('reach_marketing_bot_reports', 'approval_status');
+        $mode    = null;
+        try {
+            $mode = $this->hasTable('reach_bot_settings') ? (new \App\Models\BotSettingModel())->currentMode() : null;
+        } catch (\Throwable) {
+        }
 
         return [
+            'mode'            => $mode,
             'reports_total'   => $this->sum($reports),
             'reports_pending' => $this->pick($reports, ['pending']),
-            'queue_queued'    => $this->pick($queue, ['queued']) + $this->pick($jobs, ['pending']),
-            'queue_running'   => $this->pick($queue, ['running']) + $this->pick($jobs, ['processing']),
-            'queue_completed' => $this->pick($queue, ['completed']) + $this->pick($jobs, ['completed']),
-            'queue_failed'    => $this->pick($queue, ['failed'])
-                                 + $this->pick($jobs, ['failed', 'dead_letter']),
+            'dispatch_queued' => $this->pick($queue, ['queued']),
+            'dispatch_failed' => $this->pick($queue, ['failed']),
         ];
     }
 
@@ -390,12 +413,45 @@ class DashboardSummaryService
                 if (isset($seen[(int) $r['id']])) {
                     continue;
                 }
+                $seen[(int) $r['id']] = true;
                 $rows[] = [
                     'id'        => 'item-' . $r['id'],
                     'title'     => $r['title'],
                     'date'      => substr((string) $r['scheduled_at'], 0, 10),
                     'item_kind' => $r['content_type'],
                     'source'    => 'content',
+                ];
+            }
+        }
+
+        // Blog SCHEDULE_PUBLISH work blocks schedule through
+        // PublicationDeploymentService: the date lives on the deployment, not
+        // on reach_content_items.scheduled_at or a content schedule row, so
+        // those scheduled blogs never reached this feed.
+        if ($this->hasTable('reach_publication_deployments') && $this->hasTable('reach_content_items')) {
+            $deployments = $this->db->query(
+                "SELECT d.id, d.scheduled_at, i.id AS item_id, i.title, i.content_type
+                   FROM reach_publication_deployments d
+                   JOIN reach_content_items i ON i.id = d.content_item_id AND i.deleted_at IS NULL
+                  WHERE d.status IN ('queued', 'scheduled')
+                    AND d.scheduled_at IS NOT NULL
+                    AND d.scheduled_at >= ?
+                  ORDER BY d.scheduled_at ASC
+                  LIMIT ?",
+                [$today . ' 00:00:00', $limit]
+            )->getResultArray();
+
+            foreach ($deployments as $r) {
+                if (isset($seen[(int) $r['item_id']])) {
+                    continue;
+                }
+                $seen[(int) $r['item_id']] = true;
+                $rows[] = [
+                    'id'        => 'deployment-' . $r['id'],
+                    'title'     => $r['title'],
+                    'date'      => substr((string) $r['scheduled_at'], 0, 10),
+                    'item_kind' => $r['content_type'],
+                    'source'    => 'deployment',
                 ];
             }
         }
@@ -423,6 +479,58 @@ class DashboardSummaryService
         usort($rows, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
 
         return array_slice($rows, 0, $limit);
+    }
+
+    /**
+     * Content counted as "scheduled" (SCHEDULED buckets) that the upcoming
+     * feed cannot show: its date has passed, or it has none at all. The
+     * dashboard lists these under the calendar so "7 scheduled" next to
+     * "No upcoming items" is explained instead of contradictory.
+     *
+     * @return array{count:int, items:list<array<string, mixed>>}
+     */
+    private function calendarOverdue(int $limit = 10): array
+    {
+        if (! $this->hasTable('reach_content_items')) {
+            return ['count' => 0, 'items' => []];
+        }
+
+        $hasSchedules   = $this->hasTable('reach_content_schedules');
+        $hasDeployments = $this->hasTable('reach_publication_deployments');
+        $dates = ['i.scheduled_at'];
+        if ($hasSchedules) {
+            $dates[] = "(SELECT MAX(s.scheduled_at) FROM reach_content_schedules s
+                          WHERE s.content_item_id = i.id AND s.cancelled_at IS NULL
+                            AND s.schedule_status IN ('pending','approved','ready','executing'))";
+        }
+        if ($hasDeployments) {
+            $dates[] = "(SELECT MAX(d.scheduled_at) FROM reach_publication_deployments d
+                          WHERE d.content_item_id = i.id AND d.status IN ('queued','scheduled'))";
+        }
+        $placeholders = implode(',', array_fill(0, count(self::SCHEDULED), '?'));
+
+        $rows = $this->db->query(
+            "SELECT * FROM (
+                SELECT i.id, i.title, i.content_type, i.workflow_status,
+                       GREATEST(" . implode(', ', $dates) . ") AS due_at
+                  FROM reach_content_items i
+                 WHERE i.deleted_at IS NULL AND i.workflow_status IN ({$placeholders})
+             ) x
+             WHERE x.due_at IS NULL OR x.due_at < ?
+             ORDER BY x.due_at ASC NULLS FIRST, x.id ASC",
+            array_merge(self::SCHEDULED, [date('Y-m-d') . ' 00:00:00'])
+        )->getResultArray();
+
+        $items = array_map(static fn (array $r): array => [
+            'id'              => (int) $r['id'],
+            'title'           => $r['title'],
+            'content_type'    => $r['content_type'],
+            'workflow_status' => $r['workflow_status'],
+            'date'            => $r['due_at'] !== null ? substr((string) $r['due_at'], 0, 10) : null,
+            'reason'          => $r['due_at'] === null ? 'no_date' : 'date_passed',
+        ], array_slice($rows, 0, $limit));
+
+        return ['count' => count($rows), 'items' => $items];
     }
 
     // ------------------------------------------------------------- helpers

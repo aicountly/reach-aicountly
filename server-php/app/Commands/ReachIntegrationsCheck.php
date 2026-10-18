@@ -59,6 +59,7 @@ class ReachIntegrationsCheck extends BaseCommand
         }
 
         $report = (new LiveIntegrationCheck(VideoProviders::http()))->run($targets, $renderTest, $progress);
+        LiveIntegrationCheck::remember($report);
 
         if ($json) {
             CLI::write((string) json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));

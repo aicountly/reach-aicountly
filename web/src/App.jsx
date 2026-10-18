@@ -4,6 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { ReachLayout } from './components/layout/ReachLayout';
 import ControllerGate from './pages/ControllerGate';
 import { DashboardPage } from './pages/DashboardPage';
+import { CommandCentrePage } from './pages/commandCentre/CommandCentrePage';
 
 import {
   BlogLegacyListRedirect,
@@ -249,7 +250,8 @@ export default function App() {
       <Route path={ROUTES.LOGIN} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
 
       <Route element={<ProtectedRoute><ReachLayout /></ProtectedRoute>}>
-        <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+        <Route path={ROUTES.DASHBOARD} element={<CommandCentrePage />} />
+        <Route path={ROUTES.PIPELINE_DASHBOARD} element={<DashboardPage />} />
 
         <Route path={ROUTES.BLOG_LIST}    element={<BlogLegacyListRedirect />} />
         <Route path={ROUTES.BLOG_NEW}     element={<BlogLegacyNewRedirect />} />

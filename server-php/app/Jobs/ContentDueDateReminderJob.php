@@ -36,7 +36,10 @@ class ContentDueDateReminderJob implements JobHandlerInterface
             $assignments = $db->table('reach_content_assignments')
                 ->whereIn('role', ['owner', 'writer'])
                 ->where('content_item_id', $item['id'])
-                ->where('is_active', true)
+                // reach_content_assignments has no is_active column (an ended
+                // assignment carries unassigned_at); reading it failed the job
+                // whenever any item was due.
+                ->where('unassigned_at IS NULL', null, false)
                 ->select('user_id')
                 ->get()
                 ->getResultArray();

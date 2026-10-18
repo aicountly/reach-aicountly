@@ -10,11 +10,13 @@ import { Loader } from '../components/common/Loader';
 import { Alert } from '../components/common/Alert';
 import { ROUTES } from '../constants/routes';
 import { formatDate, formatTime } from '../utils/formatDate';
+import { formatAge } from '../utils/formatAge';
 
 /** Tiles poll so the dashboard tracks the pipeline instead of the page load. */
 const REFRESH_MS = 45_000;
 
 const n = (value) => (typeof value === 'number' ? value : 0);
+
 
 /**
  * Deep-link only when the tile has rows to show.
@@ -40,7 +42,7 @@ function Tile({ label, value, hint, icon: Icon, to }) {
   return to ? <Link to={to} style={{ textDecoration: 'none', color: 'inherit' }}>{body}</Link> : body;
 }
 
-export function DashboardPage() {
+export function DashboardPage({ embedded = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,13 +79,18 @@ export function DashboardPage() {
   const soc     = data.social    || {};
   const leads   = data.leads     || {};
   const appr    = data.approvals || {};
-  const bot     = data.bot       || {};
   const content = data.content   || {};
 
   const inFlight = n(blog.ideas) + n(blog.drafts) + n(blog.in_review);
+  const jobs     = data.jobs || {};
+  const jf       = jobs.filters || {};
+  const jobsLink = (figure) => (jf[figure] ? `${ROUTES.JOBS}?${jf[figure]}` : ROUTES.JOBS);
+  const overdue  = data.calendar_overdue || { count: 0, items: [] };
+  const SCHEDULED_STATUSES = 'scheduled,ready_for_publication';
 
   return (
     <div>
+      {!embedded && (
       <div className="page-header">
         <div>
           <h1>Marketing dashboard</h1>
@@ -98,6 +105,7 @@ export function DashboardPage() {
           </button>
         </div>
       </div>
+      )}
 
       {error && <Alert variant="warning">Live refresh failed ({error}). Showing the last successful read.</Alert>}
 
@@ -106,16 +114,16 @@ export function DashboardPage() {
         <Tile label="Blog — in review"        value={blog.in_review}     hint={`${n(blog.approved)} approved`}      icon={FileText}  to={linkIfAny(blog.in_review, ROUTES.BCC_VERIFICATION, ROUTES.BLOG_COMMAND_CENTRE)} />
         <Tile label="Blog — published"        value={blog.published}     hint={`${n(blog.pending_publishing)} pending publish`} icon={FileText} to={linkIfAny(blog.published, ROUTES.BCC_PUBLISHED, ROUTES.BLOG_COMMAND_CENTRE)} />
         <Tile label="Campaigns — running"     value={camp.running}       hint={`${n(camp.total)} total`}            icon={Megaphone} to={ROUTES.CAMPAIGN_LIST} />
-        <Tile label="Social — queue"          value={soc.queue}          hint={`${n(soc.posted)} posted`}           icon={Share2}    to={ROUTES.SOCIAL_QUEUE} />
+        <Tile label="Social — queue"          value={soc.queue}          hint={`${n(soc.posted)} posted · ${n(soc.publishing)} publishing`} icon={Share2} to={ROUTES.SOCIAL_QUEUE} />
         <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${n(leads.pushed)} pushed`}         icon={Users}     to={ROUTES.ENGAGE_PUSH} />
         <Tile label="Approvals — pending"     value={appr.pending}       hint={`${n(appr.total)} total`}            icon={ShieldCheck} to={ROUTES.APPROVALS} />
-        <Tile label="Bot — running jobs"      value={bot.queue_running}  hint={`${n(bot.queue_queued)} queued · ${n(bot.reports_total)} reports`} icon={Bot} to={linkIfAny(bot.queue_running, `${ROUTES.JOBS}?status=processing`, ROUTES.JOBS)} />
+        <Tile label="Bot — running jobs"      value={jobs.running}       hint={`${n(jobs.queued)} queued · ${n(jobs.stalled)} stalled`} icon={Bot} to={linkIfAny(jobs.running, jobsLink('running'), ROUTES.JOBS)} />
       </div>
 
       <div className="grid grid-4 mt-4">
         <Tile label="Content — in review"    value={content.in_review}    hint={`${n(content.total)} items across all types`} icon={LayoutGrid}    to={ROUTES.CONTENT} />
-        <Tile label="Content — scheduled"    value={content.scheduled}    hint={`${n(content.published)} published`}          icon={CalendarClock} to={ROUTES.CONTENT_CALENDAR} />
-        <Tile label="Blog — needs attention" value={blog.needs_attention} hint={`${n(blog.scheduled)} scheduled`}             icon={ShieldCheck}   to={ROUTES.BLOG_COMMAND_CENTRE} />
+        <Tile label="Content — scheduled"    value={content.scheduled}    hint={`${n(content.scheduled) - n(overdue.count)} upcoming · ${n(overdue.count)} overdue or undated`} icon={CalendarClock} to={linkIfAny(content.scheduled, `${ROUTES.CONTENT}?workflow_status=${SCHEDULED_STATUSES}`, ROUTES.CONTENT)} />
+        <Tile label="Blog — needs attention" value={blog.needs_attention} hint={`${n(blog.pending_publishing)} publishing · ${n(blog.scheduled)} scheduled`} icon={ShieldCheck} to={linkIfAny(blog.needs_attention, `${ROUTES.CONTENT}?content_type=blog&workflow_status=failed,blocked,rejected`, ROUTES.BLOG_COMMAND_CENTRE)} />
         <Tile label="Campaigns — dispatch queue" value={camp.dispatches_queued} hint={`${n(camp.dispatches_failed)} failed`}  icon={Megaphone}     to={ROUTES.CAMPAIGN_LIST} />
       </div>
 
@@ -131,22 +139,51 @@ export function DashboardPage() {
               <span className="badge badge-secondary">{it.item_kind}</span>
             </div>
           ))}
+          {n(overdue.count) > 0 && (
+            <div className="mt-2" data-testid="calendar-overdue">
+              <div className="text-xs font-semibold" style={{ color: 'var(--color-warning)' }}>
+                {overdue.count} scheduled item{overdue.count === 1 ? '' : 's'} with no future date
+              </div>
+              {(overdue.items || []).map((it) => (
+                <Link key={it.id} to={ROUTES.CONTENT_DETAIL.replace(':id', it.id)} className="text-xs" style={{ display: 'block', padding: '0.15rem 0' }}>
+                  {it.title || '(untitled)'} — {it.reason === 'no_date' ? 'no publish date' : `was due ${formatDate(it.date)}`} · {it.workflow_status.replace(/_/g, ' ')}
+                </Link>
+              ))}
+            </div>
+          )}
         </Card>
 
-        <Card title={<span className="flex items-center gap-2"><ListChecks size={14}/> Bot activity</span>}>
+        <Card title={<span className="flex items-center gap-2"><ListChecks size={14}/> Job queue — last {jobs.window_hours || 24} h</span>}>
+          {/* Windows and live states, not lifetime totals; every figure opens
+              the Job Monitor with the same predicates the API counted. */}
           <div className="grid grid-2">
-            <Tile label="Reports total"    value={bot.reports_total}
-                  to={ROUTES.BOT_REPORTS} />
-            <Tile label="Reports pending"  value={bot.reports_pending}
-                  to={linkIfAny(bot.reports_pending, `${ROUTES.BOT_REPORTS}?approval_status=pending`, ROUTES.BOT_REPORTS)} />
-            {/* queue_* sums reach_marketing_bot_queue and reach_jobs; the Job
-                Monitor is the canonical queue surface and the one still in the
-                sidebar, so both land there filtered to the status counted. */}
-            <Tile label="Queue completed"  value={bot.queue_completed}
-                  to={linkIfAny(bot.queue_completed, `${ROUTES.JOBS}?status=completed`, ROUTES.JOBS)} />
-            <Tile label="Queue failed"     value={bot.queue_failed}
-                  to={linkIfAny(bot.queue_failed, `${ROUTES.JOBS}?status=failed`, ROUTES.JOBS)} />
+            <Tile label="Completed (24 h)" value={jobs.completed} to={linkIfAny(jobs.completed, jobsLink('completed'), ROUTES.JOBS)} />
+            <Tile label="Failed (24 h)"    value={jobs.failed}    hint={`${n(jobs.retrying)} retrying · ${n(jobs.skipped)} skipped (not configured)`}
+                  to={linkIfAny(jobs.failed, jobsLink('failed'), ROUTES.JOBS)} />
+            <Tile label="Queued now"       value={jobs.queued}    hint={jobs.oldest_queued_secs != null ? `oldest waiting ${formatAge(jobs.oldest_queued_secs)} · ${n(jobs.scheduled)} later` : `${n(jobs.scheduled)} scheduled for later`}
+                  to={linkIfAny(jobs.queued, jobsLink('queued'), ROUTES.JOBS)} />
+            <Tile label="Stalled"          value={jobs.stalled}   hint="lease expired — worker died mid-job"
+                  to={linkIfAny(jobs.stalled, jobsLink('stalled'), ROUTES.JOBS)} />
           </div>
+          {(jobs.queues || []).filter((q) => q.undrained).map((q) => (
+            <Alert key={q.queue} variant="warning">
+              Queue <code>{q.queue}</code> has {q.queued} job(s) waiting {formatAge(q.oldest_queued_secs)} and nothing finished on it in the last hour — is it in the worker&apos;s <code>--queue=</code> list?
+            </Alert>
+          ))}
+          {(jobs.failing_types || []).length > 0 && (
+            <div className="mt-2">
+              <div className="text-xs font-semibold text-muted">Failing job types (24 h)</div>
+              {jobs.failing_types.map((t) => (
+                <Link key={t.job_type} to={`${ROUTES.JOBS}?${t.filters}`} style={{ display: 'block', padding: '0.3rem 0', borderBottom: '1px solid var(--color-border)', color: 'inherit' }}>
+                  <div className="flex items-center justify-between">
+                    <code className="text-xs">{t.job_type}</code>
+                    <span className="text-xs">{t.failed} failed{t.retrying ? ` · ${t.retrying} retrying` : ''}</span>
+                  </div>
+                  {t.last_error && <div className="text-xs text-danger" title={t.last_error}>{t.last_error.length > 140 ? `${t.last_error.slice(0, 140)}…` : t.last_error}</div>}
+                </Link>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>

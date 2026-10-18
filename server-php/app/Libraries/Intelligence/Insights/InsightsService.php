@@ -56,7 +56,7 @@ final class InsightsService
         if ($key === null || $model === '') {
             $msg = 'AI Insights is not configured: set the Gemini API key (and optionally the AI Insights model) in Settings → AI & Automation.';
             $this->store($trigger, 'failed', $model, ['not_built' => 'AI Insights is not configured.'], null, [], $msg, 0, $userId);
-            throw new InsightsUnavailableException($msg);
+            throw new InsightsNotConfiguredException($msg);
         }
 
         $digest  = $this->builder->build();

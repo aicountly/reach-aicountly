@@ -127,7 +127,7 @@ class CoverGenerationAlertService
 
         $to = $this->recipients();
         if ($to === []) {
-            return ['sent' => false, 'reason' => 'no_recipients'] + $s;
+            return ['status' => 'skipped', 'sent' => false, 'reason' => 'no_recipients'] + $s; // not configured: skipped, not failed
         }
 
         $what = $noKey && ! $failing

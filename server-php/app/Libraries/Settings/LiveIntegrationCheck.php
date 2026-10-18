@@ -141,6 +141,43 @@ final class LiveIntegrationCheck
      * @param callable(string $target, string $line): void|null $progress long-running steps (render polling)
      * @return array{ok: bool, ran_at: string, passed: int, failed: int, results: list<array{target: string, ok: bool, message: string, detail: array<string, mixed>, duration_ms: int}>}
      */
+    /**
+     * Keep the outcome of the last live check (per target: ok / skipped,
+     * message, DataForSEO balance) for the dashboard's health strip and
+     * recommendations. Never stores anything but those fields. Targets not in
+     * this run keep their previous result.
+     *
+     * @param array<string, mixed> $report run()'s result
+     */
+    public static function remember(array $report): void
+    {
+        try {
+            $model = new \App\Models\SettingModel();
+            $prev  = $model->getSetting(\App\Libraries\Dashboard\CommandCentreService::LIVE_CHECK_SETTING);
+            $byTarget = [];
+            foreach ((is_array($prev) ? ($prev['results'] ?? []) : []) as $r) {
+                $byTarget[(string) $r['target']] = $r;
+            }
+            foreach (($report['results'] ?? []) as $r) {
+                $bal = $r['detail']['balance_usd'] ?? null;
+                $byTarget[(string) $r['target']] = array_filter([
+                    'target'  => (string) $r['target'],
+                    'ok'      => (bool) $r['ok'],
+                    'skipped' => ! empty($r['skipped']),
+                    'message' => mb_substr((string) ($r['message'] ?? ''), 0, 300),
+                    'detail'  => is_numeric($bal) ? ['balance_usd' => (float) $bal] : [],
+                    'ran_at'  => $report['ran_at'] ?? gmdate('c'),
+                ], static fn ($v) => $v !== null);
+            }
+            $model->setSetting(\App\Libraries\Dashboard\CommandCentreService::LIVE_CHECK_SETTING, [
+                'ran_at'  => $report['ran_at'] ?? gmdate('c'),
+                'results' => array_values($byTarget),
+            ]);
+        } catch (\Throwable $e) {
+            log_message('warning', 'LiveIntegrationCheck::remember failed: ' . $e->getMessage());
+        }
+    }
+
     public function run(array $targets = [], bool $renderTest = false, ?callable $progress = null): array
     {
         $runAll  = $targets === [];

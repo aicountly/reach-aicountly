@@ -37,8 +37,11 @@ class DailyApprovalDigestJob implements JobHandlerInterface
         $reviewerIds = $db->table('reach_content_assignments')
             ->whereIn('content_item_id', array_column($pending, 'id'))
             ->whereIn('role', ['reviewer', 'subject_matter_reviewer', 'compliance_reviewer'])
-            ->where('is_active', true)
-            ->select('DISTINCT user_id')
+            // No is_active column on assignments (unassigned_at marks the end).
+            ->where('unassigned_at IS NULL', null, false)
+            // select('DISTINCT user_id') was escaped to "DISTINCT" "user_id".
+            ->distinct()
+            ->select('user_id')
             ->get()
             ->getResultArray();
 

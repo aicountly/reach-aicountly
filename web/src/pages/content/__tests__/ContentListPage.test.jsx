@@ -30,4 +30,13 @@ describe('ContentListPage', () => {
       expect(screen.getByRole('button', { name: /new content/i })).toBeInTheDocument();
     });
   });
+
+  // Dashboard tiles open the rows they counted.
+  it('applies workflow_status and content_type from the URL', async () => {
+    renderWithAuth(<ContentListPage />, { ...ctx, route: '/content?workflow_status=scheduled,ready_for_publication&content_type=blog' });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const url = String(global.fetch.mock.calls[0][0]);
+    expect(url).toContain('workflow_status=scheduled%2Cready_for_publication');
+    expect(url).toContain('content_type=blog');
+  });
 });

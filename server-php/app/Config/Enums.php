@@ -61,7 +61,7 @@ class Enums extends BaseConfig
      */
     public array $jobStatus = [
         'pending', 'reserved', 'processing', 'completed',
-        'failed', 'retry_wait', 'dead_letter', 'cancelled',
+        'failed', 'retry_wait', 'dead_letter', 'cancelled', 'skipped',
     ];
 
     /**

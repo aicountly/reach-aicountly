@@ -14,7 +14,9 @@ use App\Libraries\Database\SchemaGuard;
  * `php spark reach:schedule` — housekeeping for the reach_jobs queue.
  *
  *   1. Recover leases that have expired past `lease_expires_at`.
- *   2. Prune completed / dead-letter / cancelled jobs older than N days.
+ *   2. Prune finished jobs: completed / skipped / cancelled after
+ *      --prune-days (default 7), dead_letter / failed after
+ *      --prune-failed-days (default 14); 5 000 rows per tick at most.
  *   3. Self-heal empty AI model routes (blog drafts cannot run without them).
  *
  * Intended to run every minute via cron:
@@ -27,15 +29,29 @@ class ReachSchedule extends BaseCommand
     protected $group       = 'Reach';
     protected $name        = 'reach:schedule';
     protected $description = 'Housekeeping for the reach_jobs queue: recover expired leases and prune old jobs.';
-    protected $usage       = 'reach:schedule [--prune-days=14]';
+    protected $usage       = 'reach:schedule [--prune-days=7] [--prune-failed-days=14]';
 
     public function run(array $params): int
     {
-        $days = max(1, (int) ($this->sparkOption('prune-days', $params, '14') ?? '14'));
+        // Completed jobs are mostly the scheduler's own sweeps (~60 an hour),
+        // so a week is plenty; failures are kept longer for diagnosis.
+        $days       = max(1, (int) ($this->sparkOption('prune-days', $params, '7') ?? '7'));
+        $failedDays = max(1, (int) ($this->sparkOption('prune-failed-days', $params, '14') ?? '14'));
 
         $svc = Services::jobService();
-        $recovered = $svc->recoverExpiredLeases();
-        $pruned    = $svc->pruneOlderThanDays($days);
+        $recovered = 0;
+        $pruned    = 0;
+        // Housekeeping must never stop the timetable below from running.
+        try {
+            $recovered = $svc->recoverExpiredLeases();
+        } catch (\Throwable $e) {
+            log_message('error', 'reach:schedule lease recovery failed: ' . $e->getMessage());
+        }
+        try {
+            $pruned = $svc->pruneOlderThanDays($days, $failedDays);
+        } catch (\Throwable $e) {
+            log_message('error', 'reach:schedule prune failed: ' . $e->getMessage());
+        }
 
         // Dispatch scheduled Phase 2 jobs once per day (idempotent)
         $this->dispatchDailyJobs($svc);
@@ -50,6 +66,7 @@ class ReachSchedule extends BaseCommand
             'recovered' => $recovered,
             'pruned'    => $pruned,
             'prune_days'=> $days,
+            'prune_failed_days' => $failedDays,
             'ai_catalog_seeded' => $aiSeeded,
         ], JSON_UNESCAPED_SLASHES);
         CLI::write($out);
@@ -154,7 +171,7 @@ class ReachSchedule extends BaseCommand
 
         $jobs = [];
         $add  = static function (string $type, array $payload, string $key, array $opts = []) use (&$jobs): void {
-            $jobs[] = ['type' => $type, 'payload' => $payload, 'opts' => $opts + ['idempotency_key' => $key]];
+            $jobs[] = ['type' => $type, 'payload' => $payload, 'opts' => $opts + ['idempotency_key' => $key, 'enqueued_actor_type' => 'system']];
         };
 
         // 08:00 UTC (13:30 IST) — daily approval digest
@@ -273,17 +290,6 @@ class ReachSchedule extends BaseCommand
      */
     private function enqueueOnce(mixed $svc, string $type, array $payload, array $opts): ?int
     {
-        $key = (string) $opts['idempotency_key'];
-        $db  = Database::connect();
-
-        $exists = $db->query(
-            'SELECT 1 FROM reach_jobs WHERE idempotency_key = ? OR LEFT(idempotency_key, ?) = ? LIMIT 1',
-            [$key, strlen($key) + 9, $key . ':retired:']
-        )->getRowArray();
-        if ($exists) {
-            return null;
-        }
-
-        return $svc->enqueue($type, $payload, $opts);
+        return $svc->enqueueOnce($type, $payload, $opts);
     }
 }

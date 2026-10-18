@@ -35,9 +35,9 @@ Search Console), also see
   documented cron line omitted `notifications`, so none of those emails ever
   went out.
 
-  > Note: the distribution stream may add a `distribution` queue. If it
-  > does, append it to every `--queue=` list in this file
-  > (`…,community,notifications,distribution`).
+  > Bot queue dispatches (Bot → Queue) run on `default`. They used to go to a
+  > `marketing_bot` queue that no documented worker drained, so they stayed
+  > queued for ever; migration `2026-10-18-230001` moved the stranded ones.
 
 - **Blog dispatch (enqueue eligible work blocks):**
   ```
@@ -58,10 +58,42 @@ Search Console), also see
   ```
   php spark reach:schedule
   ```
-  - Recovers leases past their `lease_expires_at` back to `pending`.
-  - Prunes completed / dead-lettered / cancelled jobs older than N days
-    (default 14, adjust with `--prune-days=`).
-  - Enqueues Phase 2 daily housekeeping jobs.
+  - Recovers leases past their `lease_expires_at` back to `pending` — or to
+    `dead_letter` when the job has used all its attempts (a job that keeps
+    killing its worker is no longer re-run for ever).
+  - Prunes finished jobs: completed / skipped / cancelled after
+    `--prune-days` (default **7**), dead_letter / failed after
+    `--prune-failed-days` (default **14**), at most 5 000 rows per tick.
+  - Enqueues the timetable below — each job once per period, attributed to
+    the `system` actor.
+
+- **Job queue report (paste this when asking for help):**
+  ```
+  php spark reach:jobs-report            # last 24 h
+  php spark reach:jobs-report --hours=6
+  php spark reach:jobs-report --json     # the dashboard's raw figures
+  ```
+  Prints completed / failed / skipped in the window, what is queued now (and
+  the oldest wait), retrying / running / stalled jobs, every failing job type
+  with its count and **latest error**, and each queue's backlog — flagging a
+  queue whose ready jobs have waited 15+ minutes with nothing finished on it
+  in an hour (a queue missing from `--queue=`). Exit code 1 when anything
+  failed or is stalled, so it can back a monitor. Same figures as the
+  dashboard's *Job queue — last 24 h* card.
+
+### Job outcomes
+
+| Status | Meaning | Retried? |
+|--------|---------|----------|
+| `completed` | The handler ran. | — |
+| `skipped` | Did not run **by design**: the integration is not configured or switched off (no Gemini key for AI Insights, no Search Console connection, no DataForSEO login, no gallery-alert address, …). The reason is in the error column. Not a failure. | No — retry it from the Job Monitor after configuring. |
+| `pending` + error | A failed attempt waiting for its backoff (15 s, 30 s, 1 min, … capped at 1 h). | Yes, until `max_attempts` (default 5). |
+| `dead_letter` | Failed `max_attempts` times — or at once when a retry cannot help: bad payload, record gone, no handler registered for the job type, a community deployment already dead-lettered. | No. |
+
+Handlers signal a skip by throwing `App\Libraries\JobSkippedException` or by
+returning a top-level `status` of `skipped` / `not_configured` / `disabled` /
+`not_migrated`; a terminal failure by throwing `NonRetryableJobException`
+(see `App\Libraries\JobRunner`).
 
 - **One-shot diagnose (run in cPanel Terminal):**
   ```

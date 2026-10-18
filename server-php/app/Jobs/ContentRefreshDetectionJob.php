@@ -30,11 +30,18 @@ class ContentRefreshDetectionJob implements JobHandlerInterface
         $notifSvc = new NotificationService();
 
         // ── Legacy: stale content item detection ─────────────────────────────
+        // The owner column is created_by_user_id: this read `created_by`,
+        // which does not exist, so the job failed (5 attempts, dead letter)
+        // every day since it was scheduled. Blog and knowledge-base items are
+        // left out: their lifecycles belong to BlogStateMachine (refresh via
+        // REFRESH_PENDING) and the routine pipeline, neither of which knows
+        // `refresh_due` — flipping them here would strand them.
         $stale = $db->table('reach_content_items')
             ->where('workflow_status', 'published')
+            ->whereNotIn('content_type', ['blog', 'knowledge_base'])
             ->where('published_at <', date('Y-m-d H:i:s', strtotime('-90 days')))
             ->where('deleted_at IS NULL')
-            ->select('id, title, created_by')
+            ->select('id, title, created_by_user_id AS created_by')
             ->get()
             ->getResultArray();
 
