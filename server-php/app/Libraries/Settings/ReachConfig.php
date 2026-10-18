@@ -36,7 +36,7 @@ final class ReachConfig
             'ai.gemini.api_key' => ['group' => 'AI providers', 'label' => 'Gemini API key', 'type' => 'secret', 'env' => 'AI_GEMINI_API_KEY',
                 'help' => 'Google AI Studio key. Used for vetting, insights and AI-visibility checks.'],
             'ai.openai.api_key' => ['group' => 'AI providers', 'label' => 'OpenAI API key', 'type' => 'secret', 'env' => 'AI_OPENAI_API_KEY',
-                'help' => 'Used for image generation (DALL·E) and AI-visibility checks.'],
+                'help' => 'Used for image generation (GPT Image), the video voice-over and AI-visibility checks.'],
             'ai.perplexity.api_key' => ['group' => 'AI providers', 'label' => 'Perplexity API key', 'type' => 'secret', 'env' => 'AI_PERPLEXITY_API_KEY',
                 'help' => 'Optional. AI-visibility checks.'],
 
@@ -71,10 +71,12 @@ final class ReachConfig
             // ── end Stream H ──
 
             // ── Images ──────────────────────────────────────────────────────
-            'ai.image.model' => ['group' => 'Images', 'label' => 'Image model (OpenAI)', 'type' => 'string', 'env' => 'AI_OPENAI_IMAGE_MODEL', 'default' => 'dall-e-3',
-                'help' => 'e.g. dall-e-3 or gpt-image-1.'],
-            'ai.image.size' => ['group' => 'Images', 'label' => 'Image size', 'type' => 'string', 'default' => '1792x1024',
-                'help' => 'dall-e-3: 1792x1024 / 1024x1024; gpt-image-1: 1536x1024.'],
+            'ai.image.model' => ['group' => 'Images', 'label' => 'Image model (OpenAI)', 'type' => 'string', 'env' => 'AI_OPENAI_IMAGE_MODEL', 'default' => 'gpt-image-2.5-flare',
+                'help' => 'A GPT Image model, e.g. gpt-image-2.5-flare (fast, everyday) or gpt-image-2.5-sunburst. OpenAI removed dall-e-2 / dall-e-3 from the API on 12 May 2026. Run live checks after changing it: it confirms the model is available to the key.'],
+            'ai.image.size' => ['group' => 'Images', 'label' => 'Image size', 'type' => 'string', 'default' => '1536x1024',
+                'help' => 'GPT Image: 1536x1024 (landscape, blog covers), 1024x1024, 1024x1536 (portrait). Other sizes are snapped to the nearest of these.'],
+            'ai.image.quality' => ['group' => 'Images', 'label' => 'Image quality (GPT Image)', 'type' => 'choice', 'env' => 'AI_OPENAI_IMAGE_QUALITY', 'default' => 'medium', 'options' => ['low', 'medium', 'high', 'auto'],
+                'help' => 'Price and detail rise with quality; medium suits blog covers and video stills.'],
 
             // ── Automation volumes & switches ───────────────────────────────
             'automation.community.enabled' => ['group' => 'Automation', 'label' => 'Community Q&A automation', 'type' => 'bool', 'default' => true],
@@ -96,7 +98,7 @@ final class ReachConfig
             // hard kill-switch that these settings cannot override (RoutineFlags).
             'automation.blog.auto_publish' => ['group' => 'Blog & KB routines', 'label' => 'Auto-publish Gemini-approved blogs', 'type' => 'bool', 'default' => true,
                 'help' => 'Off = approved blogs wait for someone to press Publish. BLOG_AUTO_PUBLISH_ENABLED=false or BLOG_PUBLIC_PUBLISHER_ENABLED=false in .env also turns it off.'],
-            'automation.blog.ai_cover' => ['group' => 'Blog & KB routines', 'label' => 'Generate a DALL·E cover for each routine blog', 'type' => 'bool', 'default' => true,
+            'automation.blog.ai_cover' => ['group' => 'Blog & KB routines', 'label' => 'Generate an AI cover image for each routine blog', 'type' => 'bool', 'default' => true,
                 'help' => 'Falls back to the cover gallery when generation fails. BLOG_IMAGE_GENERATION_ENABLED=false in .env also turns it off.'],
             'automation.blog.author_name' => ['group' => 'Blog & KB routines', 'label' => 'Author shown on routine blogs', 'type' => 'string', 'default' => 'AICOUNTLY Editorial Team'],
             'automation.knowledge_base.auto_publish' => ['group' => 'Blog & KB routines', 'label' => 'Auto-publish Gemini-approved help articles', 'type' => 'bool', 'default' => true,
@@ -133,6 +135,20 @@ final class ReachConfig
             'social.socialapi.platform_data.linkedin' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_LINKEDIN', 'label' => 'platform_data for LinkedIn posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → LinkedIn. Blank = none.'],
             'social.socialapi.platform_data.x' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_X', 'label' => 'platform_data for X posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → X. Blank = none.'],
             'social.socialapi.platform_data.tiktok' => ['group' => 'Social', 'env' => 'SOCIALAPI_PLATFORM_DATA_TIKTOK', 'label' => 'platform_data for TikTok posts (JSON)', 'type' => 'json_object', 'default' => '', 'help' => 'Keys from docs.social-api.ai → Platforms → TikTok. Blank = none.'],
+            'social.socialapi.youtube.visibility' => ['group' => 'Social', 'label' => 'YouTube visibility', 'type' => 'choice', 'env' => 'SOCIALAPI_YOUTUBE_VISIBILITY', 'default' => 'public', 'options' => ['public', 'unlisted', 'private'],
+                'help' => 'Sent with every YouTube video as targets[].visibility (the field social-api.ai\'s own dashboard sends). social-api.ai\'s default is private, so leave this set.'],
+            'social.socialapi.target_options.youtube' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_YOUTUBE', 'label' => 'Per-target options for YouTube posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the YouTube entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.instagram' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_INSTAGRAM', 'label' => 'Per-target options for Instagram posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the Instagram entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.facebook' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_FACEBOOK', 'label' => 'Per-target options for Facebook posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the Facebook entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.linkedin' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_LINKEDIN', 'label' => 'Per-target options for LinkedIn posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the LinkedIn entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.x' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_X', 'label' => 'Per-target options for X posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the X entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
+            'social.socialapi.target_options.tiktok' => ['group' => 'Social', 'env' => 'SOCIALAPI_TARGET_OPTIONS_TIKTOK', 'label' => 'Per-target options for TikTok posts (JSON)', 'type' => 'json_object', 'default' => '',
+                'help' => 'A JSON object merged into the TikTok entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
             // ── end social-api.ai ──
 
             // ── Distribution (campaign sends: email / SMS / WhatsApp) ───────

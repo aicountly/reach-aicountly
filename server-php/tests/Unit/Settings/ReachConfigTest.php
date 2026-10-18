@@ -39,7 +39,7 @@ final class ReachConfigTest extends CIUnitTestCase
 
     public function testDefaultsAndEnvFallbacks(): void
     {
-        $this->assertSame('dall-e-3', ReachConfig::get('ai.image.model'));
+        $this->assertSame('gpt-image-2.5-flare', ReachConfig::get('ai.image.model'));
         $this->assertSame('pno@aicountly.com', ReachConfig::get('reports.daily.recipients'));
         $this->assertSame(6, ReachConfig::get('automation.blog.daily_limit'));
         $this->assertSame('gemini-2.5-flash', ReachConfig::vettingModel('community'));

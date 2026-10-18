@@ -98,6 +98,19 @@ none is sent. The setting is validated as a JSON object.
 This means `video.youtube.privacy` and `video.youtube.category_id` (direct-upload settings) are
 **not** sent through social-api.ai — put the equivalent keys in the YouTube platform_data.
 
+## YouTube visibility and per-target options (confirmed 18 Oct 2026)
+
+social-api.ai's own dashboard sends YouTube visibility **on the target**, not in `platform_data`:
+`{"publish_now":true,"targets":[{"account_id":"acc_…","visibility":"public"}],"text":"…"}`, and its
+default visibility is **private**. Reach therefore always sends `targets[].visibility` for YouTube
+from `social.socialapi.youtube.visibility` (`public` | `unlisted` | `private`, default `public`).
+
+Other per-network target fields go in `social.socialapi.target_options.<platform>` (a JSON object
+merged into that platform's `targets[]` entry; it can't change `account_id`, and for YouTube the
+visibility setting wins). To find a field name: in app.social-api.ai → Create Post, set the option,
+open DevTools → Network → Fetch/XHR, save as **Draft**, and read the `posts` request's Payload
+(never copy the Headers tab — it carries your login token).
+
 ## Settings
 
 | Key | Default | Env fallback |

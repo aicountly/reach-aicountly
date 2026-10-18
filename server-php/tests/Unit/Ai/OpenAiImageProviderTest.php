@@ -62,11 +62,11 @@ class OpenAiImageProviderTest extends CIUnitTestCase
         $this->assertSame('1536x1024', $provider->formatSize(1536, 1024));
     }
 
-    public function testResolveModelKeyPrefersInputThenSettingThenDallE3(): void
+    public function testResolveModelKeyPrefersInputThenSettingThenGptImage(): void
     {
         unset($_ENV['AI_OPENAI_IMAGE_MODEL']);
         $provider = new OpenAiImageProvider();
-        $this->assertSame('dall-e-3', $provider->resolveModelKey(''));
+        $this->assertSame('gpt-image-2.5-flare', $provider->resolveModelKey(''), 'dall-e-* left the API on 12 May 2026');
 
         $_ENV['AI_OPENAI_IMAGE_MODEL'] = 'gpt-image-1';
         $provider = new OpenAiImageProvider();
@@ -90,5 +90,13 @@ class OpenAiImageProviderTest extends CIUnitTestCase
 
         $this->assertArrayNotHasKey('response_format', $body);
         $this->assertSame('1536x1024', $body['size']);
+        $this->assertSame('medium', $body['quality']);
+        $this->assertSame('png', $body['output_format']);
+
+        $_ENV['AI_OPENAI_IMAGE_QUALITY'] = 'high';
+        $this->assertSame('high', (new OpenAiImageProvider())->requestBody('gpt-image-2.5-flare', new ImageGenerationInput(prompt: 'x', width: 1024, height: 1024))['quality']);
+        $_ENV['AI_OPENAI_IMAGE_QUALITY'] = 'ultra';
+        $this->assertSame('medium', (new OpenAiImageProvider())->requestBody('gpt-image-2.5-flare', new ImageGenerationInput(prompt: 'x', width: 1024, height: 1024))['quality'], 'an unknown quality falls back to medium');
+        unset($_ENV['AI_OPENAI_IMAGE_QUALITY']);
     }
 }

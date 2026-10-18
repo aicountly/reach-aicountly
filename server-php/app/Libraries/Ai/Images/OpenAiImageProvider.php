@@ -16,7 +16,7 @@ use App\Libraries\Ai\Providers\OpenAiProvider;
  *
  * Reuses the OpenAI key (Settings → AI & Automation, else AI_OPENAI_API_KEY).
  * Model resolution: input modelKey, then the `ai.image.model` setting
- * (AI_OPENAI_IMAGE_MODEL env fallback), then dall-e-3. DALL·E and the
+ * (AI_OPENAI_IMAGE_MODEL env fallback), then gpt-image-2.5-flare (dall-e-* left the API on 12 May 2026). DALL·E and the
  * gpt-image family take different sizes and response options; requestBody()
  * shapes the call for whichever is configured.
  */
@@ -120,7 +120,7 @@ class OpenAiImageProvider implements ImageProviderInterface
 
         $configured = trim((string) ReachConfig::get('ai.image.model', ''));
 
-        return $configured !== '' ? $configured : 'dall-e-3';
+        return $configured !== '' ? $configured : 'gpt-image-2.5-flare';
     }
 
     /**
@@ -164,11 +164,17 @@ class OpenAiImageProvider implements ImageProviderInterface
             ];
         }
 
+        // GPT Image family: base64 is always returned (no response_format); quality and
+        // output_format are its own options.
+        $quality = strtolower(trim((string) ReachConfig::get('ai.image.quality', 'medium')));
+
         return [
-            'model'  => $modelKey,
-            'prompt' => $input->prompt,
-            'size'   => $this->snapSize($size, ['1024x1024', '1536x1024', '1024x1536']),
-            'n'      => max(1, $input->count),
+            'model'         => $modelKey,
+            'prompt'        => $input->prompt,
+            'size'          => $this->snapSize($size, ['1024x1024', '1536x1024', '1024x1536']),
+            'n'             => max(1, $input->count),
+            'quality'       => in_array($quality, ['low', 'medium', 'high', 'auto'], true) ? $quality : 'medium',
+            'output_format' => 'png',
         ];
     }
 
