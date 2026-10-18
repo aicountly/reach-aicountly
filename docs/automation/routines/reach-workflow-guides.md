@@ -116,7 +116,15 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
         - 429: today's limit in Reach is used — stop the whole run.
         - 5xx or network error: retry once after 60 seconds, then skip.
 
-3. Finish with a table: product | slug | action (updated / added / unchanged) |
+3. Help-centre follow-up (optional, at most 5 topics per run): for an important
+   user task you found in the code that is too small for a guide, propose a KB
+   topic: POST https://reach.aicountly.org/api/v1/automation/content-base/propose
+   {"type":"kb","items":[{"key":"kb-<product_slug>-<task>","title":"How to <task>
+   in <App>","product_slug":"<product_slug>","category":"how_to","brief":"...",
+   "evidence":[{"repo":"aicountly/<repo>","commits":["<sha7>"],"file":"<path>",
+   "note":"..."}]}],"routine_run_id":"<this session id>"}. Only what the code shows.
+
+4. Finish with a table: product | slug | action (updated / added / unchanged) |
    result (URL, rejected + reasons, pending, skipped + why). Do not change any
    repository.
 ```

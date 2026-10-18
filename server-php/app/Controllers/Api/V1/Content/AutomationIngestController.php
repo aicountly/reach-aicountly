@@ -17,7 +17,7 @@ use App\Libraries\Publishing\KnowledgeBase\KnowledgeBaseDraftIngestService;
 /**
  * Endpoints for the Claude Code routines (X-Automation-Token authenticated).
  *
- *   GET  v1/automation/content-base    what to write next + strategy base
+ *   GET  v1/automation/content-base    strategy base, topic counts, routine activity
  *   GET  v1/automation/gallery/status  cover deficit + per-entry prompts
  *   GET  v1/automation/kb-plan         today's per-product KB quotas
  *   GET  v1/automation/blog-plan       quota, existing titles, priority topics, links
@@ -35,9 +35,19 @@ class AutomationIngestController extends BaseApiController
     public function contentBase()
     {
         $service = new ContentBaseService();
+        $entries = new \App\Libraries\Content\Base\ContentBaseEntries();
+        $living  = [];
+        if ($entries->available()) {
+            foreach (\App\Libraries\Content\Base\ContentBaseEntries::TYPES as $type) {
+                $living[$type] = ['counts' => $entries->counts($type)] + $entries->activity($type);
+            }
+        }
 
         return $this->ok([
             'base_markdown' => $service->baseMarkdown(),
+            'note'          => 'Topics and their progress live in Reach (not git). Read GET v1/automation/content-base/next?type=blog|kb|community, add topics with POST v1/automation/content-base/propose, report with POST v1/automation/content-base/produced. blog_index is the git seed baseline only.',
+            'living'        => $living,
+            'routines'      => (new \App\Libraries\Content\Base\RoutineActivity())->health(),
             'blog_index'    => $service->blogIndex(),
             'last_sync'     => $service->lastSyncRun(),
         ]);

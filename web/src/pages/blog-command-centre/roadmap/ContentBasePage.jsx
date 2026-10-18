@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { mediaGalleryService } from '../../../services/mediaGalleryService';
 import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { Card } from '../../../components/common/Card';
 import { formatDate, formatDateTime } from '../../../utils/formatDate';
 
-const SYNC_LABELS = {
-  synced: { label: 'Synced', className: 'badge badge--success' },
-  pending_sync: { label: 'Pending sync', className: 'badge badge--warning' },
+const STATUS_LABELS = {
+  planned: { label: 'Planned', className: 'badge badge--warning' },
+  queued: { label: 'Queued', className: 'badge badge--muted' },
+  produced: { label: 'Produced', className: 'badge badge--info' },
+  published: { label: 'Published', className: 'badge badge--success' },
+  retired: { label: 'Retired', className: 'badge badge--muted' },
 };
 
 export function ContentBasePage() {
@@ -34,40 +38,42 @@ export function ContentBasePage() {
   return (
     <div>
       <Alert variant="info">
-        The content base lives in the repo (<code>server-php/content-base/</code>) and is
-        <strong> read-only here</strong>. Edit prompts and upcoming topics in git — every deploy
-        overwrites the server copy (<code>rsync --delete</code>), and the daily Claude routine
-        revises the index from product-repo changes.
+        Blog topics live in Reach and are updated by the routines daily through the API
+        (<code>v1/automation/content-base/next · propose · produced</code>); roadmap-selected topics go
+        first in the blog routine&apos;s queue. Git (<code>server-php/content-base/</code>) holds only the seed
+        baseline, imported hourly. The full view, with knowledge base and community, is under{' '}
+        <Link to="/quality/content-base">Quality Centre → Content Base</Link>.
+        {data?.routine ? ` Last blog routine activity: ${data.routine.last_activity_at ? formatDateTime(data.routine.last_activity_at) : 'never'}.` : ''}
       </Alert>
 
-      <Card title={`Upcoming blog index (${entries.length} entries)`}>
+      <Card title={`Blog topics (${entries.length})`}>
         {lastSync ? (
           <p className="text-sm text-muted">
-            Last DB sync: {formatDateTime(lastSync.ran_at)} — {lastSync.created_count} created, {lastSync.updated_count} updated,
-            {' '}{lastSync.retired_count} retired of {lastSync.entries_seen} entries.
+            Last seed import that changed something: {formatDateTime(lastSync.ran_at)} — {lastSync.created_count} added, {lastSync.updated_count} updated,
+            {' '}{lastSync.retired_count} retired of {lastSync.entries_seen} seeds.
           </p>
         ) : (
-          <Alert variant="warning">Never synced — run <code>php spark reach:content-base-sync</code> (also runs post-deploy and daily at 06:00).</Alert>
+          <p className="text-sm text-muted">Seeds not imported yet — the hourly content-base sync imports them.</p>
         )}
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Key</th><th>Title</th><th>Stream</th><th>Target</th><th>Status</th><th>Sync</th><th>Brief prompt</th>
+                <th>Key</th><th>Title</th><th>Stream</th><th>Target</th><th>Status</th><th>Origin</th><th>Brief / detail</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => {
-                const sync = SYNC_LABELS[entry.sync?.state] || SYNC_LABELS.pending_sync;
+                const status = STATUS_LABELS[entry.status] || STATUS_LABELS.planned;
                 return (
                   <tr key={entry.key}>
                     <td><code>{entry.key}</code></td>
                     <td>{entry.title}</td>
                     <td>{entry.portfolio_stream}</td>
                     <td>{formatDate(entry.target_date)}</td>
-                    <td>{entry.status}</td>
-                    <td><span className={sync.className}>{sync.label}</span></td>
-                    <td className="text-sm text-muted" style={{ maxWidth: '28rem' }}>{entry.brief_prompt}</td>
+                    <td><span className={status.className}>{status.label}</span></td>
+                    <td className="text-sm">{entry.origin === 'routine' ? 'Routine' : 'Git seed'}</td>
+                    <td className="text-sm text-muted" style={{ maxWidth: '28rem' }}>{entry.status_reason || entry.brief_prompt}</td>
                   </tr>
                 );
               })}

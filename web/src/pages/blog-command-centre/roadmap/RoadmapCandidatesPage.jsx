@@ -6,7 +6,18 @@ import { RoadmapEmptyState, TrendCell } from './roadmapShared';
 import { formatScore } from './roadmapFormat';
 import { formatDate } from '../../../utils/formatDate';
 
-const STATUS_OPTIONS = ['', 'candidate', 'scored', 'planned', 'in_production', 'rejected'];
+const STATUS_OPTIONS = ['', 'candidate', 'scored', 'roadmap_selected', 'rejected'];
+
+/** Postgres booleans arrive as "t"/"f" from older API builds; "f" is truthy in JS. */
+function isTrue(value) {
+  return value === true || value === 't' || value === 'true' || value === 1 || value === '1';
+}
+
+function writerCell(row) {
+  if (row.content_item_id) return `Article #${row.content_item_id}`;
+  if (row.status === 'roadmap_selected') return 'In the blog routine queue';
+  return '—';
+}
 const STREAM_OPTIONS = ['', 'marketing', 'product', 'problem_to_product'];
 
 export function RoadmapCandidatesPage() {
@@ -70,7 +81,11 @@ export function RoadmapCandidatesPage() {
         />
       ) : (
         <>
-          <p className="text-muted">{total} candidate{total === 1 ? '' : 's'}</p>
+          <p className="text-muted">
+            {total} candidate{total === 1 ? '' : 's'}. Rescored every night; selected topics go first in the blog
+            routine&apos;s queue (<code>v1/automation/content-base/next</code>). 7d / 28d = change against the score
+            7 / 28 days earlier — empty until a candidate has that much score history.
+          </p>
           <table className="data-table">
             <thead>
               <tr>
@@ -78,9 +93,10 @@ export function RoadmapCandidatesPage() {
                 <th>Stream</th>
                 <th>Status</th>
                 <th>Score</th>
-                <th>7d</th>
-                <th>28d</th>
+                <th title="Score change against 7 days earlier">7d</th>
+                <th title="Score change against 28 days earlier">28d</th>
                 <th>Scored for</th>
+                <th>Writer</th>
               </tr>
             </thead>
             <tbody>
@@ -88,15 +104,16 @@ export function RoadmapCandidatesPage() {
                 <tr key={row.id}>
                   <td>
                     {row.title}
-                    {row.is_human_pinned && <span className="badge badge--info" style={{ marginLeft: '0.5rem' }}>Pinned</span>}
-                    {row.is_locked && <span className="badge badge--muted" style={{ marginLeft: '0.5rem' }}>Locked</span>}
+                    {isTrue(row.is_human_pinned) && <span className="badge badge--info" style={{ marginLeft: '0.5rem' }}>Pinned</span>}
+                    {isTrue(row.is_locked) && <span className="badge badge--muted" style={{ marginLeft: '0.5rem' }}>Locked</span>}
                   </td>
                   <td>{row.portfolio_stream ? row.portfolio_stream.replace(/_/g, ' ') : '—'}</td>
-                  <td>{row.status}</td>
+                  <td>{row.status ? row.status.replace(/_/g, ' ') : '—'}</td>
                   <td>{formatScore(row.total_score)}</td>
                   <td><TrendCell value={row.trend_7d} /></td>
                   <td><TrendCell value={row.trend_28d} /></td>
                   <td>{formatDate(row.scored_for_date)}</td>
+                  <td className="text-sm">{writerCell(row)}</td>
                 </tr>
               ))}
             </tbody>

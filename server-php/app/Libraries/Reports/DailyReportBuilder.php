@@ -79,6 +79,7 @@ class DailyReportBuilder
             // Bot Plan & Performance: yesterday's plan vs achieved (stored review).
             'plan'        => $this->guard('plan', fn () => (new \App\Libraries\Bot\Plan\PlanReportSection($this->db))->build($reportDate)),
             'social_inbox' => $this->guard('social_inbox', fn () => $this->socialInbox($window)),
+            'routines'    => $this->guard('routines', fn () => $this->routines()),
         ];
         $sections['todo'] = ['configured' => true, 'items' => self::todo($sections)];
 
@@ -430,6 +431,18 @@ class DailyReportBuilder
         return ['configured' => true] + \App\Libraries\Distribution\SocialInbox\SocialInboxService::stats($this->db, $window['start'], $window['end']);
     }
 
+    /**
+     * Stream 5: when each Claude routine last reached Reach (informational).
+     *
+     * @return array<string, mixed>
+     */
+    private function routines(): array
+    {
+        $health = (new \App\Libraries\Content\Base\RoutineActivity($this->db))->health();
+
+        return ['configured' => true, 'health' => $health, 'stale' => \App\Libraries\Content\Base\RoutineActivity::staleLines($health)];
+    }
+
     // ── "Today at a glance" ────────────────────────────────────────────────
 
     /**
@@ -517,6 +530,11 @@ class DailyReportBuilder
         $content = $s['content'] ?? [];
         if (isset($content['total']) && (int) $content['total'] === 0) {
             $items[] = 'Nothing was published in the last 24 hours — check the content automation routines and the publishing queue.';
+        }
+
+        // Informational: a quiet routine (no call or submission for > 36 h).
+        foreach (array_slice($s['routines']['stale'] ?? [], 0, 2) as $line) {
+            $items[] = $line;
         }
 
         if ($items === []) {

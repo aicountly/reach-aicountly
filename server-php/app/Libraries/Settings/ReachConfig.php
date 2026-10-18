@@ -123,6 +123,15 @@ final class ReachConfig
             'automation.vetting.min_compliance_score' => ['group' => 'Blog & KB routines', 'label' => 'Hold for a person below this compliance score (1–10)', 'type' => 'int', 'default' => 5,
                 'help' => 'Gemini scores compliance 1–10. An approved article scored below this — or one Gemini flags HIGH_RISK — is held as high risk instead of auto-publishing. 0 = never hold.'],
 
+            // ── Stream 5: living content base + roadmap hand-off (keep this block contiguous) ──
+            'automation.content_base.stale_hours' => ['group' => 'Blog & KB routines', 'label' => 'Flag a daily routine as quiet after (hours)', 'type' => 'int', 'default' => 36,
+                'help' => 'Informational only: the Content Base page and the daily report say when no routine call or submission for a content type arrived for this long. Weekly routines use 8 days.'],
+            'automation.content_base.propose_daily_limit' => ['group' => 'Blog & KB routines', 'label' => 'New topics a routine may propose per type per day', 'type' => 'int', 'default' => 20,
+                'help' => 'Cap on POST v1/automation/content-base/propose; further proposals that day are refused with limit_reached.'],
+            'automation.roadmap.routine_handoff' => ['group' => 'Blog & KB routines', 'label' => 'Roadmap-selected topics go to the blog routine', 'type' => 'bool', 'default' => true,
+                'help' => 'On: a roadmap CREATE_NEW decision puts the topic first in the blog routine\'s queue (GET v1/automation/content-base/next). Off: the legacy in-Reach brief work blocks (their drafting steps are retired).'],
+            // ── end Stream 5 ──
+
             // ── Reports ─────────────────────────────────────────────────────
             'reports.daily.recipients' => ['group' => 'Reports', 'label' => 'Daily analytics report recipients', 'type' => 'email_list', 'default' => 'pno@aicountly.com',
                 'help' => 'Comma-separated. Sent every morning at 08:00 IST.'],

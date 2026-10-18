@@ -13,11 +13,17 @@ Endpoints (no auth header of your own — the environment's network secret adds 
 
 | Call | Purpose |
 |---|---|
-| `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | overall quota, per-product cadence (launch apps first), topic seeds, existing articles |
+| `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | overall quota, per-product cadence (launch apps first), planned topics per product (`pending_topics`, each with its `content_base_key`), existing articles |
 | `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=knowledge_base` | read first: today's plan, yesterday vs plan, top 3 lags with causes and what the bot changed, vetting reasons to avoid, topic mix |
+| `GET  https://reach.aicountly.org/api/v1/automation/content-base/next?type=kb` | the same planned topics as one ordered queue |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable help/blog URLs |
 | `POST https://reach.aicountly.org/api/v1/automation/kb-drafts` | submit one help article; Reach has Gemini vet it (knowledge_base rubric) and publishes approved ones to aicountly.com/help |
 | `GET  https://reach.aicountly.org/api/v1/automation/regenerate/next?type=knowledge_base` | a live or approved article whose text failed re-vetting and must be rewritten (same slug) — handled first |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/produced` | report each topic: `submitted`, or `not_applicable` (+ reason) when the product does not do it |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/propose` | add KB topics for real tasks you found that have no topic yet (needs repo evidence) |
+
+Topics live in Reach's database: the routine never edits files, commits or pushes. Reach moves each
+topic from planned → queued → produced → published as the article is vetted and published.
 
 ## Prompt
 
@@ -56,9 +62,15 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
 
 2. FOR EACH ARTICLE — describe only the real UI
    a) Attach the product's repository (the "repo" field, e.g. aicountly/billing-aicountly)
-      with add_repo and clone it. Pick one concrete task a new user needs (getting started,
-      create/edit/delete a record, settings, an import/export, a common error). Prefer
-      pending_topics if they match real functionality; otherwise propose your own.
+      with add_repo and clone it. Take the product's pending_topics first, in order: each
+      has a content_base_key you MUST submit under (status_reason explains an "-r2" key: an
+      earlier attempt was rejected for that reason — fix it). If a topic's feature is not in
+      the code, do not write it — POST https://reach.aicountly.org/api/v1/automation/content-base/produced
+      {"type":"kb","key":"<topic key>","outcome":"not_applicable","reason":"<what you looked
+      for and where>","routine_run_id":"<this session id>"} and move on. When the product has
+      no pending topics left, pick one concrete task a new user needs (getting started,
+      create/edit/delete a record, settings, an import/export, a common error) and use your
+      own key kb-<product_slug>-<short-task-slug>.
    b) Read the code for that task: the route, the page/component, the form fields, button
       and menu labels, validations and error messages. Use the labels exactly as they appear
       in the UI strings. Never describe a screen, field, button or behaviour you cannot see
@@ -80,7 +92,8 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
         link registry (absolute https:// URLs).
       - seo: slug (lowercase, hyphenated, ≤ 60 chars), meta_title ≤ 60 chars,
         meta_description 120–160 chars
-      - content_base_key: kb-<product_slug>-<short-task-slug>, e.g. kb-billing-create-invoice
+      - content_base_key: the topic's content_base_key, or for your own topic
+        kb-<product_slug>-<short-task-slug>, e.g. kb-billing-create-invoice
       - difficulty_level: beginner | intermediate | advanced
 
 3. SUBMIT each article
@@ -105,7 +118,19 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
    - "already_ingested": that key exists — choose a different task.
    - 422: fix what the error says and resubmit once.
    - 429 (quota used) or 403 (automation off): stop the whole run immediately.
+   After a 201/200 for a planned topic, POST …/content-base/produced {"type":"kb","key":"<topic
+   key>","outcome":"submitted","content_base_key":"<key you sent>","routine_run_id":"<this
+   session id>"} and note the status it returns (Reach's own record).
 
-4. Stop after your budget is used or no real, non-duplicate tasks remain. Report a table:
-   product | title | key | pipeline status.
+4. While you are in a product's code, note real user tasks that have neither a pending topic
+   nor an article in existing_articles (new screens or options in git log --since=30.days).
+   Before stopping, propose them (at most 5 per run): POST
+   https://reach.aicountly.org/api/v1/automation/content-base/propose {"type":"kb","items":[{"key":
+   "kb-<product_slug>-<task>","title":"How to <task> in <App>","product_slug":"<slug>",
+   "category":"how_to","brief":"<the task, screens involved, what changed>","evidence":[{"repo":
+   "aicountly/<repo>","commits":["<sha7>"],"file":"<path>","note":"<what it shows>"}]}],
+   "routine_run_id":"<this session id>"}. Never propose a feature you did not see in the code.
+
+5. Stop after your budget is used or no real, non-duplicate tasks remain. Report a table:
+   product | title | key | pipeline status | topic status.
 ```

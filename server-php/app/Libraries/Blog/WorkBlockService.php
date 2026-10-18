@@ -372,6 +372,22 @@ class WorkBlockService
             ? $this->db->table('reach_topic_candidates')->where('id', $candidateId)->get()->getRowArray()
             : null;
 
+        // Routine hand-off: a roadmap topic is written by the blog routine
+        // (GET v1/automation/content-base/next). A brief block queued before
+        // the hand-off must not create an in-Reach item that would hold the
+        // topic at brief_ready again.
+        if (($block['scope'] ?? null) === 'roadmap' && RoadmapOptimizerService::routineHandoff()) {
+            if ($candidate !== null && empty($candidate['content_item_id']) && in_array($candidate['status'], ['candidate', 'scored', 'roadmap_selected'], true)) {
+                $this->db->table('reach_topic_candidates')->where('id', $candidateId)->update([
+                    'status' => 'roadmap_selected', 'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+            $output = ['superseded' => true, 'reason' => 'routine_handoff: the blog routine writes roadmap topics', 'topic_candidate_id' => $candidateId];
+            $this->markCompleted($id, $output);
+
+            return $output;
+        }
+
         $title = (string) ($input['title'] ?? $candidate['title'] ?? '');
         if ($title === '') {
             throw new \RuntimeException('GENERATE_BRIEF work block requires a topic title');

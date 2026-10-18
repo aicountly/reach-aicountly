@@ -149,11 +149,20 @@ final class BotActivityRegistry
             ],
             'content_base_sync' => [
                 'name' => 'Content-base sync', 'group' => 'Content & publishing', 'kind' => 'job',
-                'description' => 'Ingests server-php/content-base (blog index, KB index, question seeds) into topic candidates.',
-                'cron' => '0 6 * * *', 'schedule' => 'Daily 11:30 IST (06:00 UTC)',
+                'description' => 'Imports the git content-base seeds, releases roadmap topics stuck in the retired in-house drafting and reconciles every topic\'s status from the pipeline.',
+                'cron' => '0 * * * *', 'schedule' => 'Hourly (at :00 UTC, :30 IST)',
                 'job_type' => 'reach.content_base_sync', 'queue' => 'default',
                 'payload' => static fn (\DateTimeImmutable $n): array => ['date' => $utcDay($n)],
                 'link' => '/quality/content-base',
+            ],
+            'roadmap_refresh' => [
+                'name' => 'Roadmap rescore', 'group' => 'Content & publishing', 'kind' => 'job',
+                'description' => 'Rescores the blog roadmap for the IST date (selected topics included) unless the 00:30 IST optimiser cron already ran; CREATE_NEW topics go to the blog routine\'s queue.',
+                'cron' => '30 19 * * *', 'schedule' => 'Daily 01:00 IST (19:30 UTC)',
+                'job_type' => 'reach.roadmap_refresh', 'queue' => 'default',
+                'payload' => static fn (\DateTimeImmutable $n): array => ['date' => $istDay($n)],
+                'cost' => 'No provider calls (database only).',
+                'link' => '/blog-command-centre/roadmap/candidates',
             ],
             'daily_marketing_pack' => [
                 'name' => 'Daily marketing pack', 'group' => 'Content & publishing', 'kind' => 'job',

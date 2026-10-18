@@ -1,4 +1,4 @@
-# Claude Code Routines — blog, knowledge base and base revision
+# Claude Code Routines — blog, knowledge base, community and the living content base
 
 The Claude route runs as **cloud Routines** (Claude Code on the web →
 Routines), all on **Claude Sonnet**. Each firing starts a fresh session in the
@@ -9,7 +9,7 @@ needs them. Cloud Routines fire at most **hourly**.
 The routines only **write**. Reach decides: every submission is vetted by
 **Gemini** (Settings → AI & Automation picks the model; its decision is final,
 no human review), approved under the login-disabled *Reach System Bot*, given
-an AICOUNTLY-branded cover (blogs) and published to aicountly.com. The old two-model rule
+an AICOUNTLY-branded GPT Image cover (blogs) and published to aicountly.com. The old two-model rule
 (Opus writes, a Sonnet subagent fact-checks, Reach requires a
 `verification_report` from a different model) is retired: a
 `verification_report` is still accepted and stored if a routine sends one, but
@@ -23,8 +23,14 @@ the Gemini vetting run is the verification of record.
 | `reach-release-notes` | [`routines/reach-release-notes.md`](routines/reach-release-notes.md) | `30 15 * * *` | 21:00 | one note per product with user-visible changes since its last note |
 | `reach-workflow-guides` | [`routines/reach-workflow-guides.md`](routines/reach-workflow-guides.md) | `30 0 * * 1` | Monday 06:00 | refreshes / adds launch-app workflow guides |
 | `reach-growth-strategy` | [`routines/reach-growth-strategy.md`](routines/reach-growth-strategy.md) | `30 12 * * 0` | Sunday 18:00 | weekly strategy memo from AI Insights + AI visibility |
-| `reach-base-revision` | below | `30 2 * * *` | 08:00 | optional — topic supply no longer depends on it |
+| `reach-content-base` | [`routines/reach-content-base.md`](routines/reach-content-base.md) | `30 2 * * *` | 08:00 | proposes blog / KB / community topics from real product changes via the API; retires seeds that do not match the product |
+| `reach-video` | [`routines/reach-video.md`](routines/reach-video.md) | `30 1 * * *` | 07:00 | one vlog + one Short script per day |
 | `reach-command` | [`routines/reach-command.md`](routines/reach-command.md) | none — **API trigger** | on demand | one owner command per fire (Bot → Ask the bot; Run now for the routines above) — setup in [`BOT_ACTIONS.md`](../operations/BOT_ACTIONS.md) |
+
+`reach-base-revision` (and the August names `reach-blog-hourly`, `reach-kb-daily`) are **retired**:
+delete them if they exist. `reach-base-revision` edited the JSON files and pushed to `main`, which never
+reached the server (the deploy is started by hand and rsyncs with `--delete`); its job is done by
+`reach-content-base` through the API.
 
 To install a routine, open a session bound to the environment and ask Claude to
 "Create a Routine named `<name>` with cron `<cron>`, fresh session per fire,
@@ -52,7 +58,10 @@ Endpoints the routines use:
 | `GET  https://reach.aicountly.org/api/v1/automation/blog-plan` | blog quota left today (`stop`), last 200 titles/slugs for de-duplication, priority topics (launch apps; Indian compliance calendar for the next 30 days), internal links |
 | `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | KB quota, per-product cadence (launch apps first), topic seeds, existing articles |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable URLs for internal links |
-| `GET  https://reach.aicountly.org/api/v1/automation/content-base` | strategy base + legacy blog index (optional) |
+| `GET  https://reach.aicountly.org/api/v1/automation/content-base` | strategy base, topic counts per type, last proposal per type, routine activity |
+| `GET  https://reach.aicountly.org/api/v1/automation/content-base/next?type=blog\|kb\|community` | the next topics in order (blog: roadmap-selected → content base; rewrites come from `regenerate/next`), each with the `content_base_key` to submit under |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/propose` | add topics `{type, items:[{key, title, brief, product_slug?, category?, target_date?, evidence:[…]}], routine_run_id}` |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/produced` | `{type, key, outcome: submitted\|not_applicable, content_base_key?, reason?, routine_run_id}` |
 | `GET  https://reach.aicountly.org/api/v1/automation/gallery/status` | cover-gallery deficit (informational — Reach fills it itself every hour) |
 | `POST https://reach.aicountly.org/api/v1/automation/blog-drafts` | submit a blog draft |
 | `POST https://reach.aicountly.org/api/v1/automation/kb-drafts` | submit a KB draft |
@@ -194,36 +203,35 @@ An env variable that is unset (or `true`) defers to the setting. Older
 `BLOG_AUTO_PUBLISH_ENABLED=false` etc. — delete those lines for routine
 content to publish. `KB_AUTO_APPROVE` is no longer read for routine items.
 
-## Routine 3 — daily base revision (the "how is daily revision possible" answer)
+## The living content base (topics, status, revisions)
 
-> Create a Routine named `reach-base-revision` with cron `30 2 * * *`
-> (UTC = 08:00 IST daily), fresh session per fire, with this prompt:
+Topics live in Reach's database (`reach_content_base_entries`), not in git:
 
-```
-You are the AICOUNTLY content-base curator. Repos reach-aicountly and
-aicountly-com are in this environment; product repos can be attached with
-add_repo when needed.
-
-1. In reach-aicountly, read server-php/content-base/** (blog base + index,
-   knowledge-base index, community question seeds).
-2. Mark entries whose content was published (check
-   GET https://reach.aicountly.org/api/v1/automation/content-base sync states) as
-   status:"published". Optionally keep the blog index topped up with
-   planned entries (the blog routine proposes its own topics, so this is a
-   source of suggestions, not a dependency) with target dates over the next 4 days: derive new
-   topics from the strategy in base.md, seasonal Indian compliance
-   deadlines, and CHANGES in the product repos since yesterday (git log).
-   Each new entry needs key, title, slug_hint, portfolio_stream,
-   product_slug, funnel_stage, search_intent, seed_keyword, target_date,
-   brief_prompt (2-4 sentences), cover_prompt (one visual sentence, no
-   text-in-image).
-3. Similarly add KB topics for genuinely new/changed product functionality
-   and 2-3 fresh community question seeds per week.
-4. Commit to main with message "content-base: daily revision <date>" and
-   push. The next deploy rsyncs it; reach:content-base-sync ingests it
-   post-deploy and daily at 06:00.
-Never delete published entries; retire outdated ones with status:"retired".
-```
+- **Seeds** — `server-php/content-base/{blog/index.json, knowledge-base/index.json,
+  community/question-seeds.json}` are the strategy baseline. `reach.content_base_sync` imports them
+  **hourly** (and after every deploy): new keys become *planned* topics, a seed still planned picks up
+  edits, a seed marked `retired` in git is retired unless it already went further. A deploy never
+  resets progress and nothing a routine added is lost.
+- **Proposals** — routines add topics with `POST …/content-base/propose` (evidence required: the
+  product repo/commit/file they read, or an official source URL; duplicates of a topic or a published
+  title are refused; `automation.content_base.propose_daily_limit` per type per day).
+- **Queue** — writers take `GET …/content-base/next` in order and submit under the item's
+  `content_base_key`; then `POST …/content-base/produced`.
+- **Status** — Reach derives it from its own pipeline, never from a routine's word:
+  `planned` (waiting) → `queued` (submitted, vetting) → `produced` (approved, publishing) →
+  `published` (live on aicountly.com), or `retired` (retired in git, rejected by vetting twice, or
+  reported `not_applicable` by a routine). A topic rejected once comes back *planned* under a fresh
+  key (`<key>-r2`) with the vetting reasons in `status_reason`.
+- **Roadmap** — the nightly optimiser (00:30 IST cron, and `reach.roadmap_refresh` at 01:30 IST if
+  the cron did not run) scores candidates; a `CREATE_NEW` decision puts the topic first in the blog
+  queue (`automation.roadmap.routine_handoff`, default on) instead of creating Reach's own brief/draft
+  work blocks. Selected topics are rescored daily, so "scored for" and the 7d / 28d trends move.
+  Roadmap topics left at `brief_ready` by the retired in-house drafting are archived after 3 idle days
+  and handed to the blog routine (`RoadmapRelease`, audited).
+- **Health** — every authenticated `v1/automation/*` call is recorded per content type
+  (`reach_routine_activity`). Quality Centre → Content Base and the daily report show when each
+  routine last reached Reach and flag one that has been quiet for more than
+  `automation.content_base.stale_hours` (36 h; weekly routines 8 days). Informational only.
 
 ## Volume ramp
 

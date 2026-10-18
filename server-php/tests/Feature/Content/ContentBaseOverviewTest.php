@@ -6,12 +6,12 @@ use Config\Database;
 use Tests\Support\ApiTestCase;
 
 /**
- * The content base feeds three surfaces; the console must show all three.
+ * The content base feeds three surfaces; the console must show all three,
+ * with statuses derived from the pipeline (planned/queued/produced/published/retired).
  *
- * Regression: the only view of the base was a Blog Command Centre roadmap tab
- * that returned blog entries with sync state, the knowledge-base index raw,
- * and the community seeds not at all — so "what has Claude got queued for the
- * KB?" could only be answered by opening git.
+ * Regressions: the KB index was returned raw and the community seeds not at
+ * all; later, "produced" meant "some item exists" — so idea items stuck in
+ * Reach's retired drafting read as produced blogs.
  */
 final class ContentBaseOverviewTest extends ApiTestCase
 {
@@ -35,37 +35,41 @@ final class ContentBaseOverviewTest extends ApiTestCase
         $this->assertArrayHasKey('knowledge_base', $data['surfaces']);
         $this->assertArrayHasKey('community', $data['surfaces']);
 
-        $this->assertSame('blog/index.json', $data['surfaces']['blog']['source_file']);
-        $this->assertSame('knowledge-base/index.json', $data['surfaces']['knowledge_base']['source_file']);
-        $this->assertSame('community/question-seeds.json', $data['surfaces']['community']['source_file']);
+        $this->assertSame('blog/index.json', $data['surfaces']['blog']['seed_file']);
+        $this->assertSame('knowledge-base/index.json', $data['surfaces']['knowledge_base']['seed_file']);
+        $this->assertSame('community/question-seeds.json', $data['surfaces']['community']['seed_file']);
 
         // The repo ships a populated base, so a zero total means the deployed
         // directory was not found — exactly the failure this view exists for.
         $this->assertGreaterThan(0, $data['totals']['entries']);
     }
 
-    public function testBlogEntriesCarryTheirRoadmapSyncState(): void
+    public function testABlogTopicIsProducedOnlyWhenVettingApprovedItNotWhenAnyItemExists(): void
     {
         $db    = Database::connect();
         $entry = $this->fetch()['surfaces']['blog']['entries'][0] ?? null;
         $this->assertNotNull($entry, 'The repo base ships blog entries.');
-        $this->assertSame('pending_sync', $entry['sync']['state'], 'Nothing is synced on a fresh database.');
+        $this->assertSame('planned', $entry['status'], 'Nothing is written on a fresh database.');
 
-        $db->table('reach_topic_candidates')->insert([
-            'title'            => $entry['title'],
-            'normalized_title' => strtolower($entry['title']),
-            'content_base_key' => $entry['key'],
-            'status'           => 'pinned',
-            'created_at'       => date('Y-m-d H:i:s'),
-            'updated_at'       => date('Y-m-d H:i:s'),
+        // Reach's retired in-house drafting left an idea item on the candidate:
+        // that used to read "Produced".
+        $db->table('reach_content_items')->insert([
+            'content_type' => 'blog', 'title' => $entry['title'], 'slug' => 'legacy-' . bin2hex(random_bytes(4)), 'workflow_status' => 'brief_ready',
+        ]);
+        $itemId = (int) $db->insertID();
+        // The first read imported the seeds and mirrored them into the roadmap.
+        $db->table('reach_topic_candidates')->where('content_base_key', $entry['key'])->update([
+            'content_item_id' => $itemId,
+            'status'          => 'roadmap_selected',
         ]);
 
-        $after = $this->fetch()['surfaces']['blog']['entries'][0];
-        $this->assertSame('queued', $after['sync']['state'], 'A candidate without a content item is queued, not produced.');
-        $this->assertSame('pinned', $after['sync']['candidate_status']);
+        $after = $this->fetch()['surfaces']['blog']['entries'];
+        $after = array_values(array_filter($after, static fn ($e) => $e['key'] === $entry['key']))[0];
+        $this->assertSame('queued', $after['status'], 'held, not produced');
+        $this->assertStringContainsString('brief_ready', (string) $after['status_reason']);
     }
 
-    public function testKnowledgeTopicsResolveAgainstIngestedContentItems(): void
+    public function testKnowledgeTopicsResolveAgainstRoutineSubmissions(): void
     {
         $db      = Database::connect();
         $section = $this->fetch()['surfaces']['knowledge_base'];
@@ -76,7 +80,7 @@ final class ContentBaseOverviewTest extends ApiTestCase
 
         $topic = $product['topics'][0] ?? null;
         $this->assertNotNull($topic);
-        $this->assertSame('pending_sync', $topic['sync']['state']);
+        $this->assertSame('planned', $topic['status']);
 
         $db->table('reach_content_items')->insert([
             'content_type'     => 'knowledge_base',
@@ -85,10 +89,22 @@ final class ContentBaseOverviewTest extends ApiTestCase
             'workflow_status'  => 'draft',
             'content_base_key' => $topic['key'],
         ]);
+        $itemId = (int) $db->insertID();
+        $db->table('reach_routine_submissions')->insert(['content_type' => 'knowledge_base', 'content_item_id' => $itemId, 'content_key' => $topic['key'], 'status' => 'pending_vetting']);
+        $this->assertSame('queued', $this->topic($topic['key'])['status']);
 
-        $after = $this->fetch()['surfaces']['knowledge_base']['products'][0]['topics'][0];
-        $this->assertSame('produced', $after['sync']['state']);
-        $this->assertSame('draft', $after['sync']['workflow_status']);
+        $db->table('reach_routine_submissions')->where('content_item_id', $itemId)->update(['status' => 'live']);
+        $this->assertSame('published', $this->topic($topic['key'])['status']);
+    }
+
+    private function topic(string $key): array
+    {
+        foreach ($this->fetch()['surfaces']['knowledge_base']['entries'] as $e) {
+            if ($e['key'] === $key) {
+                return $e;
+            }
+        }
+        $this->fail("topic {$key} missing");
     }
 
     public function testCommunitySeedsResolveAgainstCuratedQuestions(): void
@@ -98,7 +114,7 @@ final class ContentBaseOverviewTest extends ApiTestCase
 
         $this->assertNotNull($seed, 'The repo base ships community question seeds.');
         $this->assertNotSame('', $seed['title'], 'A seed renders its question text as the title.');
-        $this->assertSame('pending_sync', $seed['sync']['state']);
+        $this->assertSame('planned', $seed['status']);
     }
 
     public function testCountsAggregateAcrossSurfaces(): void
