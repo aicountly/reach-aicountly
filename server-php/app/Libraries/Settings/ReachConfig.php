@@ -151,6 +151,38 @@ final class ReachConfig
                 'help' => 'A JSON object merged into the TikTok entry of targets[] (next to account_id). Copy field names from the request social-api.ai\'s dashboard sends (DevTools → Network → posts → Payload). Blank = none.'],
             // ── end social-api.ai ──
 
+            // ── Stream a — social inbox bot (comments/DMs → reply / Flow ticket / lead). Keep this block contiguous. ──
+            'social.inbox.enabled' => ['group' => 'Social inbox', 'label' => 'Read comments & messages (social inbox bot)', 'type' => 'bool', 'env' => 'SOCIAL_INBOX_ENABLED', 'default' => true,
+                'help' => 'Every 10 minutes Reach reads new comments and messages on the connected social-api.ai accounts, classifies them with Gemini and answers, lodges complaints in Flow or records sales leads. docs/operations/SOCIAL_API.md → Social inbox bot.'],
+            'social.inbox.auto_reply' => ['group' => 'Social inbox', 'label' => 'Post replies automatically', 'type' => 'bool', 'env' => 'SOCIAL_INBOX_AUTO_REPLY', 'default' => true,
+                'help' => 'Off = messages are still read, classified, lodged in Flow and recorded as leads, but nothing is posted on the networks.'],
+            'social.inbox.platforms' => ['group' => 'Social inbox', 'label' => 'Networks to read', 'type' => 'string', 'default' => 'facebook,instagram,linkedin,x,youtube',
+                'help' => 'Comma-separated: facebook, instagram, linkedin, x, youtube, tiktok. A network without an active social-api.ai account is skipped.'],
+            'social.inbox.daily_reply_cap' => ['group' => 'Social inbox', 'label' => 'Replies per day (all networks)', 'type' => 'int', 'default' => 40,
+                'help' => 'Safety cap (IST day). Messages over the cap wait for the next day; after the age limit below they are left unanswered.'],
+            'social.inbox.min_confidence' => ['group' => 'Social inbox', 'label' => 'Answer only above this classification confidence (%)', 'type' => 'int', 'default' => 70,
+                'help' => 'Below it Reach does not reply (complaints are still lodged in Flow, with the confidence on the ticket).'],
+            'social.inbox.reply_max_age_hours' => ['group' => 'Social inbox', 'label' => 'Do not reply to messages older than (hours)', 'type' => 'int', 'default' => 48],
+            'social.inbox.lookback_hours' => ['group' => 'Social inbox', 'label' => 'First read looks back (hours)', 'type' => 'int', 'default' => 24,
+                'help' => 'How far back the first poll of an account reads. Later polls start just before the newest message already stored.'],
+            'social.inbox.hide_spam' => ['group' => 'Social inbox', 'label' => 'Hide spam / abusive comments', 'type' => 'bool', 'default' => false,
+                'help' => 'Uses the hide endpoint below. Leave off until the first live run confirms social-api.ai supports it; spam is never answered either way.'],
+            'social.inbox.alert_recipients' => ['group' => 'Social inbox', 'label' => 'Immediate alert for high-severity complaints', 'type' => 'email_list', 'default' => '',
+                'help' => 'Legal threats, data/privacy issues, fraud allegations. Blank = the daily report recipients. Everything else is only in the daily report.'],
+            'social.inbox.list_path' => ['group' => 'Social inbox', 'label' => 'social-api.ai inbox list path', 'type' => 'string', 'env' => 'SOCIALAPI_INBOX_LIST_PATH', 'default' => '/inbox',
+                'help' => 'ASSUMPTION until the first live run (docs.social-api.ai/guides/inbox). Relative to the base URL; {account_id} is replaced when present. The social-api.ai live check probes it read-only.'],
+            'social.inbox.reply_path' => ['group' => 'Social inbox', 'label' => 'social-api.ai reply path', 'type' => 'string', 'env' => 'SOCIALAPI_INBOX_REPLY_PATH', 'default' => '/inbox/{id}/reply',
+                'help' => 'ASSUMPTION: POST with {"text": …}; {id} = the message id. Confirm against docs.social-api.ai/guides/inbox.'],
+            'social.inbox.hide_path' => ['group' => 'Social inbox', 'label' => 'social-api.ai hide path', 'type' => 'string', 'env' => 'SOCIALAPI_INBOX_HIDE_PATH', 'default' => '/inbox/{id}/hide',
+                'help' => 'ASSUMPTION: POST, no body. Used only when "Hide spam" is on.'],
+            'ai.vetting.model.social_inbox' => ['group' => 'Social inbox', 'label' => 'Classifier / reply-draft model (Gemini)', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
+            'ai.vetting.model.social_reply' => ['group' => 'Social inbox', 'label' => 'Reply vetting model (Gemini)', 'type' => 'model', 'help' => 'Vets every drafted reply before it is posted. Blank = default vetting model.'],
+            'flow.api_base_url' => ['group' => 'Social inbox', 'label' => 'Flow API base URL', 'type' => 'string', 'env' => 'FLOW_API_BASE_URL', 'default' => 'https://flow.aicountly.org/api', 'format' => 'https_url',
+                'help' => 'Complaints are lodged at {this}/internal/reach/social-tickets.'],
+            'flow.reach_key' => ['group' => 'Social inbox', 'label' => 'Flow key (Reach → Flow)', 'type' => 'secret', 'env' => 'FLOW_REACH_INBOUND_KEY',
+                'help' => 'The same value as FLOW_REACH_INBOUND_KEY in Flow’s server-php/.env (at least 32 characters). Without it complaints wait (“deferred”) and are lodged once it is set.'],
+            // ── end Stream a ──
+
             // ── Distribution (campaign sends: email / SMS / WhatsApp) ───────
             'distribution.batch_size' => ['group' => 'Distribution', 'label' => 'Recipients per dispatch batch', 'type' => 'int', 'default' => 100,
                 'help' => 'Each distribution job sends this many recipients, then queues the next batch.'],

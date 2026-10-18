@@ -20,6 +20,7 @@ export const ROUTES = {
 
   SOCIAL_PLANNER: '/social',
   SOCIAL_QUEUE:   '/social/queue',
+  SOCIAL_INBOX:   '/social/inbox', // stream a — social inbox bot (nav entry: Social & Ads hub → Inbox)
 
   EMAIL_LIST:    '/email',
   EMAIL_DETAIL:  '/email/:id',

@@ -38,7 +38,10 @@ use Throwable;
  *   tts        → one short phrase through OpenAI TTS (bytes discarded)
  *   social_api → GET /v1/accounts on social-api.ai with the saved key: lists the
  *                connected accounts (platform, name, id — never the key) and
- *                which account each platform would post to; never posts
+ *                which account each platform would post to; never posts. With
+ *                the social inbox bot on, also GET the inbox list once
+ *                (social.inbox.list_path) to confirm its shape; on a
+ *                404 the usual alternative paths are tried, GET only
  *
  * Results never carry a credential: every message and detail is scrubbed of
  * the configured secret values before it is returned.
@@ -440,12 +443,91 @@ final class LiveIntegrationCheck
         $summary = $counts === [] ? 'no accounts connected' : implode(', ', array_map(static fn ($p, $n) => "{$p} {$n}", array_keys($counts), $counts));
         $ready   = array_keys(array_filter($targets, static fn ($t) => str_starts_with($t, 'posts go to')));
 
-        return $this->result('social_api', true, sprintf(
+        $message = sprintf(
             'Key accepted; %d connected account(s): %s. Ready to post to: %s. Nothing was posted.',
             count($all),
             $summary,
             $ready === [] ? 'none' : implode(', ', $ready),
-        ), $detail);
+        );
+
+        // Social inbox bot: confirm the (assumed) inbox list endpoint, read-only.
+        if (! (bool) ReachConfig::get('social.inbox.enabled', true)) {
+            $detail['inbox'] = 'not checked — the social inbox bot is off (social.inbox.enabled)';
+            return $this->result('social_api', true, $message, $detail);
+        }
+        $probe           = $this->socialInboxProbe($client, $all);
+        $detail['inbox'] = $probe['detail'];
+
+        return $this->result('social_api', $probe['ok'], $message . ' ' . $probe['line'], $detail);
+    }
+
+    /** Inbox paths tried read-only when the configured one answers 404 (to tell the operator which exists). */
+    public const INBOX_PROBE_ALTERNATIVES = ['/inbox', '/inbox/comments', '/inbox/conversations', '/inbox/messages', '/comments', '/conversations', '/messages'];
+
+    /**
+     * GET the inbox list once for one active account (never posts, never
+     * replies). On a 404, the usual alternative paths are tried (GET only) and
+     * the ones that answer are named, so the setting can be corrected.
+     *
+     * @param list<array<string, mixed>> $accounts
+     * @return array{ok: bool, line: string, detail: array<string, mixed>}
+     */
+    private function socialInboxProbe(SocialApiAiClient $client, array $accounts): array
+    {
+        $path   = SocialApiAiClient::path((string) ReachConfig::get('social.inbox.list_path', SocialApiAiClient::INBOX_LIST_PATH), SocialApiAiClient::INBOX_LIST_PATH);
+        $wanted = \App\Libraries\Distribution\SocialInbox\SocialInboxService::platforms();
+        $acc    = null;
+        foreach ($accounts as $a) {
+            if ($a['active'] && in_array($a['platform'], $wanted, true)) {
+                $acc = $a;
+                break;
+            }
+        }
+        $detail = ['list_path' => $path];
+        if ($acc === null) {
+            return ['ok' => true, 'line' => 'Inbox: not checked — no active account of the networks it reads (' . implode(', ', $wanted) . ').', 'detail' => $detail + ['result' => 'not checked']];
+        }
+        $detail['account'] = $acc['platform'] . ' ' . $acc['id'];
+        $query = ['account_id' => (string) $acc['id'], 'limit' => 5, 'since' => gmdate('Y-m-d\TH:i:s\Z', ($this->clock)() - 7 * 86400)];
+        try {
+            $json = $client->inbox($query, $path);
+        } catch (SocialApiException $e) {
+            if ($e->httpStatus !== 404) {
+                return ['ok' => false, 'line' => "Inbox list FAILED (GET {$path}): " . $e->getMessage(), 'detail' => $detail + ['result' => 'failed', 'http_status' => $e->httpStatus]];
+            }
+            $found = [];
+            foreach (self::INBOX_PROBE_ALTERNATIVES as $alt) {
+                if ($alt === $path) {
+                    continue;
+                }
+                try {
+                    $altJson = $client->inbox($query, $alt);
+                    $p = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($altJson, $acc['platform'], (string) $acc['id']);
+                    $found[] = $alt . ($p['recognised'] ? ' (' . count($p['items']) . ' item(s))' : ' (answered, shape not recognised)');
+                } catch (SocialApiException) {
+                }
+            }
+            return ['ok' => false, 'line' => "Inbox list FAILED: GET {$path} is HTTP 404 — the path is an assumption. " . ($found !== []
+                ? 'These answered: ' . implode(', ', $found) . '. Set social.inbox.list_path to the right one (docs.social-api.ai/guides/inbox).'
+                : 'None of ' . implode(', ', array_diff(self::INBOX_PROBE_ALTERNATIVES, [$path])) . ' answered either; read docs.social-api.ai/guides/inbox and set social.inbox.list_path.'),
+                'detail' => $detail + ['result' => 'not found (404)', 'alternatives_answering' => $found === [] ? 'none' : $found]];
+        }
+
+        $page = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($json, $acc['platform'], (string) $acc['id']);
+        if (! $page['recognised']) {
+            return ['ok' => false, 'line' => "Inbox list answered (GET {$path}) but with a shape Reach does not recognise (top-level keys: " . implode(', ', $page['keys']) . '). Nothing will be read until the parser matches it.',
+                'detail' => $detail + ['result' => 'unrecognised shape', 'keys' => implode(', ', $page['keys'])]];
+        }
+        $first = $page['items'][0] ?? null;
+        $fields = $first !== null ? array_slice(array_map('strval', array_keys((array) $first['raw'])), 0, 15) : [];
+
+        return ['ok' => true, 'line' => sprintf('Inbox list OK (GET %s): %d item(s) on the first page%s. Nothing was replied to.', $path, count($page['items']), $page['next'] !== null ? ', more pages' : ''), 'detail' => $detail + [
+            'result'        => 'ok',
+            'items'         => count($page['items']),
+            'dropped_items' => count($page['skipped']),
+            'item_fields'   => $fields === [] ? 'no items to inspect' : implode(', ', $fields),
+            'first_item'    => $first !== null ? sprintf('%s %s, %d characters, received %s', $first['platform'] ?? '?', $first['kind'], mb_strlen((string) $first['text']), $first['received_at'] ?? 'time not given') : null,
+        ]];
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

@@ -47,6 +47,12 @@ modes and superadmin approval gates.
     once social-api.ai reports them published (polled every 5 minutes) —
     [`docs/operations/SOCIAL_API.md`](docs/operations/SOCIAL_API.md). Verify with
     `php spark reach:integrations-check --only=social_api`.
+    The **social inbox bot** reads comments / DMs through the same key every 10 minutes and answers
+    (Gemini draft + vetting), lodges complaints in Flow, records sales leads — Social → Inbox,
+    SOCIAL_API.md § "Social inbox bot".
+  - **Flow** — complaints from social media become Flow tickets via
+    `POST {FLOW_API_BASE_URL}/internal/reach/social-tickets` (`Authorization: Bearer {FLOW_REACH_INBOUND_KEY}`,
+    the same key in Flow's `.env`; flow-react-app `docs/REACH_SOCIAL_TICKETS.md`).
   - **AICOUNTLY.com blog publish** — HTTP placeholder against
     `{AICOUNTLY_SITE_API_BASE_URL}/blog/posts`. If either env is empty the
     post stays `approved` with `publishing_status = pending_publishing`.

@@ -23,6 +23,7 @@ import { LandingDetailPage } from './pages/landing/LandingDetailPage';
 
 import { SocialPlannerPage } from './pages/social/SocialPlannerPage';
 import { SocialQueuePage } from './pages/social/SocialQueuePage';
+import { SocialInboxPage } from './pages/social/SocialInboxPage';
 
 import { EmailListPage } from './pages/email/EmailListPage';
 import { EmailDetailPage } from './pages/email/EmailDetailPage';
@@ -353,6 +354,7 @@ export default function App() {
 
         <Route path={ROUTES.SOCIAL_PLANNER} element={<SocialPlannerPage />} />
         <Route path={ROUTES.SOCIAL_QUEUE}   element={<SocialQueuePage />} />
+        <Route path={ROUTES.SOCIAL_INBOX}   element={<SocialInboxPage />} />
 
         <Route path={ROUTES.EMAIL_LIST}      element={<EmailListPage />} />
         <Route path={ROUTES.EMAIL_DETAIL}    element={<EmailDetailPage />} />

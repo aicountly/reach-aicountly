@@ -136,4 +136,15 @@ final class ReachScheduleTimetableTest extends CIUnitTestCase
         $this->assertArrayNotHasKey('reach.social_post_poll', self::byType('2026-10-17 10:21:00'));
         $this->assertTrue((new \App\Libraries\JobHandlerRegistry())->has('reach.social_post_poll'));
     }
+
+    public function testTheSocialInboxIsPolledEveryTenMinutesOnTheDistributionQueue(): void
+    {
+        $at20 = self::byType('2026-10-17 10:20:00');
+        $this->assertSame('social-inbox-poll-202610171020', $at20['reach.social_inbox_poll']['opts']['idempotency_key']);
+        $this->assertSame('distribution', $at20['reach.social_inbox_poll']['opts']['queue']);
+        $this->assertSame(15, $at20['reach.social_inbox_poll']['payload']['limit']);
+        $this->assertArrayNotHasKey('reach.social_inbox_poll', self::byType('2026-10-17 10:25:00'));
+        $this->assertArrayNotHasKey('reach.social_inbox_poll', self::byType('2026-10-17 10:21:00'));
+        $this->assertTrue((new \App\Libraries\JobHandlerRegistry())->has('reach.social_inbox_poll'));
+    }
 }

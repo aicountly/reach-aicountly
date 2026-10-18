@@ -183,6 +183,12 @@ class ReachSchedule extends BaseCommand
             $add('reach.social_post_poll', ['limit' => 25], 'social-post-poll-' . $utc->format('YmdHi'), ['queue' => 'distribution']);
         }
 
+        // Stream a — every 10 minutes: the social inbox bot reads new comments / DMs
+        // and answers, lodges complaints in Flow or records leads. Idempotent per slot.
+        if ($minute % 10 === 0) {
+            $add('reach.social_inbox_poll', ['limit' => 15], 'social-inbox-poll-' . $utc->format('YmdHi'), ['queue' => 'distribution']);
+        }
+
         // Every hour: due-date reminders, overdue escalation, schedule readiness
         $add('reach.content_due_date_reminder', [], "content-due-date-reminder-{$hourKey}", ['queue' => 'notifications']);
         $add('reach.content_overdue_escalation', [], "content-overdue-escalation-{$hourKey}", ['queue' => 'notifications']);

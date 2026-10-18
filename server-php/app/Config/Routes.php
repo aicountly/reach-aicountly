@@ -252,6 +252,10 @@ $routes->group('v1', static function ($routes) {
         $routes->post('social/posts/(:num)/reject',      'Api\\V1\\SocialPostController::reject/$1',    ['filter' => 'permission:social.approve']);
         $routes->post('social/posts/(:num)/mark-posted', 'Api\\V1\\SocialPostController::markPosted/$1',['filter' => 'permission:social.dispatch']);
         $routes->get('social/queue',                     'Api\\V1\\SocialQueueController::index',       ['filter' => 'permission:social.view']);
+        // Stream a — social inbox bot (comments / DMs read from social-api.ai)
+        $routes->get('social/inbox',                     'Api\\V1\\SocialInboxController::index',       ['filter' => 'permission:social.view']);
+        $routes->get('social/inbox/summary',             'Api\\V1\\SocialInboxController::summary',     ['filter' => 'permission:social.view']);
+        $routes->post('social/inbox/(:num)/retry',       'Api\\V1\\SocialInboxController::retry/$1',    ['filter' => 'permission:social.dispatch']);
 
         // Email + WhatsApp campaigns
         $routes->get('email/campaigns',                    'Api\\V1\\EmailCampaignController::index',        ['filter' => 'permission:email.view']);
