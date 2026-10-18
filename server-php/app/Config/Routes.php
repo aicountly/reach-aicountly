@@ -247,6 +247,23 @@ $routes->group('v1', static function ($routes) {
         $routes->post('campaigns/(:num)/approve',  'Api\\V1\\CampaignController::approve/$1',    ['filter' => 'permission:campaign.approve']);
         $routes->post('campaigns/(:num)/status',   'Api\\V1\\CampaignController::setStatus/$1',  ['filter' => 'permission:campaign.dispatch']);
 
+        // Social & Ads → Ads: paid campaigns placed by hand in each ads manager
+        // (no ads API). Readable by campaign or social staff; the summary also
+        // by dashboard viewers (dashboard / plan tiles).
+        $routes->get('ads/meta',                         'Api\\V1\\AdsController::meta',            ['filter' => 'permission:campaign.view,social.view']);
+        $routes->get('ads/summary',                      'Api\\V1\\AdsController::summary',         ['filter' => 'permission:campaign.view,social.view,dashboard.view']);
+        $routes->get('ads/campaigns',                    'Api\\V1\\AdsController::index',           ['filter' => 'permission:campaign.view,social.view']);
+        $routes->post('ads/campaigns',                   'Api\\V1\\AdsController::store',           ['filter' => 'permission:campaign.create,social.create']);
+        $routes->post('ads/campaigns/launch-plan',       'Api\\V1\\AdsController::launchPlan',      ['filter' => 'permission:campaign.create,social.create']);
+        $routes->get('ads/campaigns/(:num)',             'Api\\V1\\AdsController::show/$1',         ['filter' => 'permission:campaign.view,social.view']);
+        $routes->put('ads/campaigns/(:num)',             'Api\\V1\\AdsController::update/$1',       ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->delete('ads/campaigns/(:num)',          'Api\\V1\\AdsController::destroy/$1',      ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->get('ads/campaigns/(:num)/results',     'Api\\V1\\AdsController::results/$1',      ['filter' => 'permission:campaign.view,social.view']);
+        $routes->put('ads/campaigns/(:num)/results',     'Api\\V1\\AdsController::saveResult/$1',   ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->delete('ads/results/(:num)',            'Api\\V1\\AdsController::deleteResult/$1', ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->post('ads/import',                      'Api\\V1\\AdsController::import',          ['filter' => 'permission:campaign.edit,social.edit']);
+        $routes->post('ads/utm-link',                    'Api\\V1\\AdsController::utmLink',         ['filter' => 'permission:campaign.view,social.view']);
+
         // Landing pages
         $routes->get('landing-pages',           'Api\\V1\\LandingPageController::index',      ['filter' => 'permission:campaign.view']);
         $routes->post('landing-pages',          'Api\\V1\\LandingPageController::store',      ['filter' => 'permission:campaign.create']);

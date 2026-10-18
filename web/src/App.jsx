@@ -24,7 +24,7 @@ import SocialAdsLayout from './pages/social/SocialAdsLayout.jsx';
 import SocialAccountsTab, { SocialHubIndex } from './pages/social/SocialAccountsTab.jsx';
 import SocialCalendarTab from './pages/social/SocialCalendarTab.jsx';
 import SocialPerformanceTab from './pages/social/SocialPerformanceTab.jsx';
-import SocialAdsPlaceholder from './pages/social/SocialAdsPlaceholder.jsx';
+import SocialAdsPage from './pages/social/ads/SocialAdsPage.jsx';
 import { ComingSoonPage } from './pages/ComingSoonPage.jsx';
 import { LeadsLayout } from './pages/leads/LeadsLayout.jsx';
 import { AnalyticsLayout } from './pages/reports/AnalyticsLayout.jsx';
@@ -362,7 +362,7 @@ export default function App() {
           <Route path="calendar" element={<SocialCalendarTab />} />
           <Route path="inbox" element={<SocialInboxPage />} />
           <Route path="performance" element={<SocialPerformanceTab />} />
-          <Route path="ads" element={<SocialAdsPlaceholder />} />
+          <Route path="ads" element={<SocialAdsPage />} />
         </Route>
 
         <Route path={ROUTES.EMAIL_LIST}      element={<EmailListPage />} />
