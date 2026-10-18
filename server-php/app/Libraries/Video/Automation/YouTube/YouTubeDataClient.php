@@ -144,7 +144,22 @@ final class YouTubeDataClient implements YouTubeClient
 
     public function channel(): array
     {
-        $res = $this->http->request('GET', self::API_BASE . '/channels?part=snippet&mine=true', $this->auth() + ['Accept' => 'application/json'], null, ['timeout' => 30]);
+        $item = $this->channelResource('snippet');
+        return ['id' => (string) $item['id'], 'title' => (string) ($item['snippet']['title'] ?? '')];
+    }
+
+    /**
+     * The connected channel's resource (channels.list mine=true) with the
+     * given parts, e.g. "snippet,status". Read-only; 1 quota unit.
+     *
+     * @return array<string, mixed>
+     */
+    public function channelResource(string $parts = 'snippet'): array
+    {
+        if (! preg_match('/^[a-zA-Z]+(,[a-zA-Z]+)*$/', $parts)) {
+            throw new VideoProviderException('Invalid channels.list parts.', VideoProviderException::PERMANENT);
+        }
+        $res = $this->http->request('GET', self::API_BASE . '/channels?part=' . $parts . '&mine=true', $this->auth() + ['Accept' => 'application/json'], null, ['timeout' => 30]);
         if (! $res->ok()) {
             throw VideoProviderException::fromResponse('YouTube', 'channels.list', $res);
         }
@@ -152,7 +167,7 @@ final class YouTubeDataClient implements YouTubeClient
         if (! is_array($item) || ($item['id'] ?? '') === '') {
             throw new VideoProviderException('This Google account has no YouTube channel. Create one, then connect again.', VideoProviderException::PERMANENT);
         }
-        return ['id' => (string) $item['id'], 'title' => (string) ($item['snippet']['title'] ?? '')];
+        return $item;
     }
 
     private function queryUpload(string $sessionUrl, int $total): UploadProgress

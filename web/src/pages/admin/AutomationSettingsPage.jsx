@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Save, PlugZap, Eraser } from 'lucide-react';
+import { Save, PlugZap, Eraser, Activity } from 'lucide-react';
 import { adminService } from '../../services/adminService';
+import { usePermission } from '../../hooks/usePermission';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
@@ -21,6 +22,93 @@ function groupRows(rows) {
     g.rows.push(row);
   }
   return groups;
+}
+
+function detailEntries(detail, prefix = '') {
+  if (!detail || typeof detail !== 'object') return [];
+  return Object.entries(detail).flatMap(([k, v]) => {
+    if (v && typeof v === 'object') return detailEntries(v, `${prefix}${k}.`);
+    if (v === null || v === undefined) return [];
+    return [[`${prefix}${k}`, typeof v === 'boolean' ? (v ? 'yes' : 'no') : String(v)]];
+  });
+}
+
+/**
+ * "Run live checks": every integration (Shotstack, YouTube, DataForSEO,
+ * Gemini, OpenAI, TTS) against the live service with the saved credentials.
+ * The server never returns a credential. The Shotstack test render is
+ * CLI-only (it waits minutes and may be billed).
+ */
+function LiveChecksCard() {
+  const { has } = usePermission();
+  const [running, setRunning] = useState(false);
+  const [report, setReport]   = useState(null);
+  const [failure, setFailure] = useState(null);
+
+  if (!has('settings.manage')) return null;
+
+  const run = async () => {
+    setRunning(true); setFailure(null);
+    try {
+      setReport(await adminService.runLiveChecks());
+    } catch (e) {
+      setFailure(e.message);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Card title="Live integration checks">
+      <p className="text-sm text-muted" style={{ marginTop: 0 }}>
+        Calls Shotstack, YouTube, DataForSEO, Gemini, OpenAI and OpenAI TTS with the credentials saved here (or in the server .env):
+        one cheap authenticated request each, plus a one-second voice sample. Nothing is uploaded or rendered.
+        For a Shotstack test render run <code>php spark reach:integrations-check --render-test</code> on the server.
+      </p>
+      <div className="page-header__actions">
+        <button type="button" className="btn btn-primary" onClick={run} disabled={running}>
+          <Activity size={14} aria-hidden="true" /> {running ? 'Running live checks… (up to a minute)' : 'Run live checks'}
+        </button>
+      </div>
+      {failure && <Alert variant="danger">{failure}</Alert>}
+      {report && (
+        <>
+          <Alert variant={report.ok ? 'success' : 'danger'}>
+            {report.passed} passed, {report.failed} failed{report.ran_at ? ` · ${new Date(report.ran_at).toLocaleString()}` : ''}
+          </Alert>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr><th>Check</th><th>Result</th><th>Reason</th></tr>
+              </thead>
+              <tbody>
+                {(report.results ?? []).map((r) => {
+                  const details = detailEntries(r.detail);
+                  return (
+                    <tr key={r.target}>
+                      <td>{r.target}</td>
+                      <td><span className={`badge ${r.ok ? 'badge--success' : 'badge--danger'}`}>{r.ok ? 'OK' : 'FAIL'}</span></td>
+                      <td>
+                        {r.message}
+                        {details.length > 0 && (
+                          <details>
+                            <summary className="text-sm text-muted">Details</summary>
+                            <ul className="text-sm" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                              {details.map(([k, v]) => <li key={k}><strong>{k}</strong>: {v}</li>)}
+                            </ul>
+                          </details>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Card>
+  );
 }
 
 function displayValue(row) {
@@ -109,6 +197,8 @@ export function AutomationSettingsPage() {
 
       {error && <Alert variant="danger">{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
+
+      <LiveChecksCard />
 
       {groups.map((group) => (
         <Card key={group.name} title={group.name}>
