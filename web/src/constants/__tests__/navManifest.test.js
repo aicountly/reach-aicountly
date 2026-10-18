@@ -65,9 +65,10 @@ describe('navManifest', () => {
 
   it('lists the routes other streams are building so nav entries never dead-end', () => {
     const paths = PLANNED_ROUTES.map((r) => r.path);
-    expect(paths).toEqual(expect.arrayContaining(['/bot/activities', '/bot/ask', '/social/inbox']));
-    // Landed with its real page (Bot Plan & Performance), so no placeholder any more.
+    expect(paths).toEqual(expect.arrayContaining(['/bot/activities', '/bot/ask']));
+    // Landed with their real pages (Bot plan, Social inbox), so no placeholders any more.
     expect(paths).not.toContain('/bot/plan');
+    expect(paths).not.toContain('/social/inbox');
     const navPaths = new Set(buildNavSections().flatMap((s) => s.items).map((i) => i.path));
     for (const p of paths) expect(navPaths.has(p), p).toBe(true);
   });

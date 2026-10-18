@@ -85,6 +85,8 @@ class JobHandlerRegistry
         $this->handlers[DistributionJobTypes::CAMPAIGN_RECONCILE]       = new \App\Jobs\DistributionReconcileJob();
         // social-api.ai: confirm `publishing` posts (published / failed / 30-minute timeout).
         $this->handlers[\App\Libraries\Distribution\SocialPostStatusPoller::JOB_TYPE] = new \App\Jobs\SocialPostPollJob();
+        // Stream a: social inbox bot — comments / DMs → vetted reply, Flow ticket or lead (every 10 minutes).
+        $this->handlers[\App\Libraries\Distribution\SocialInbox\SocialInboxService::JOB_TYPE] = new \App\Jobs\SocialInboxPollJob();
         // Stream F: SEO Tracker (DataForSEO SERP checks) + daily analytics report
         $this->handlers['reach.seo_tracker']                         = new \App\Jobs\SeoTrackerJob();
         $this->handlers['reach.daily_analytics_report']              = new \App\Jobs\DailyAnalyticsReportJob();

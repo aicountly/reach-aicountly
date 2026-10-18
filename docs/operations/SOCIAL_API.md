@@ -163,3 +163,114 @@ stores the raw, redacted response on the post so a mismatch is visible):
    format) is what marks a Short.
 10. Withdraw/delete is not implemented (no confirmed endpoint): Reach refuses rather than
     pretending; remove posts in social-api.ai.
+
+## Social inbox bot (comments and DMs)
+
+Reach reads the comments and direct messages on the connected accounts and handles each one without a
+person in the loop. Code: `server-php/app/Libraries/Distribution/SocialInbox/` (`SocialInboxService`,
+`SocialInboxParser`, `SocialInboxClassifier`, `SocialReplyPolicy`, `FlowTicketClient`), the inbox
+methods of `SocialApiAiClient`, job `reach.social_inbox_poll`, table `reach_social_inbox`, UI
+**Social → Inbox** (`/social/inbox`), API `GET v1/social/inbox`, `GET v1/social/inbox/summary`,
+`POST v1/social/inbox/{id}/retry` (`social.view` / `social.dispatch`).
+
+### What happens to a message
+
+1. **Read** — every 10 minutes (`reach:schedule`, queue `distribution`), for each network in
+   `social.inbox.platforms` that has an active account (same resolution as posting): `GET
+   {social.inbox.list_path}?account_id=…&since=…&limit=50[&cursor=…]`, up to 3 pages. The first read
+   goes back `social.inbox.lookback_hours` (24); later reads start an hour before the newest stored
+   message. Each message is stored once (`UNIQUE (network, external_id)`); our own replies
+   (`direction: outbound`, `is_from_me`, …) and deleted items are not stored.
+2. **Classify** — Gemini (`ai.vetting.model.social_inbox`, blank = default vetting model) returns a
+   category — question, praise, complaint, sales_lead, spam_abuse, sensitive (shares personal data /
+   a private matter), other — with a confidence, a severity (high = legal threat, regulator or
+   consumer court, data / privacy / security issue, money lost or fraud allegation, media), a
+   personal-data flag, a neutral summary and, for question / praise / sales_lead / other, a short
+   draft reply. The message is passed as untrusted data; manipulation attempts count as spam_abuse.
+3. **Act**
+
+   | Category | Reach does | Final status |
+   |---|---|---|
+   | question, praise (and other with a draft) | the draft is vetted (`social_reply` rubric — the vetting decision is final), checked by `SocialReplyPolicy`, then posted | `replied` (only once social-api.ai accepted the reply) |
+   | complaint | lodged in **Flow** (`POST {flow.api_base_url}/internal/reach/social-tickets`, idempotent on the message id), then the fixed acknowledgement quoting the ticket (`TCK-…`) and asking them to DM / e-mail support@ — no account details in public. A DM gets the DM wording. | `ticket_created` (+ reply status) |
+   | complaint, high severity | as above **plus** an immediate e-mail to `social.inbox.alert_recipients` (blank = daily report recipients), once per message, at most 10 a day. Informational — nothing to approve. | `ticket_created` |
+   | sales_lead | a Reach lead (`source_kind = social_inbox`, `utm_source = <network>`, `utm_medium = social_inbox`, priority high, the message and post link in the notes) pushed to Engage like any captured lead; then the vetted reply | `lead_created` |
+   | sensitive | the fixed privacy nudge (never repeats what they posted) | `replied` |
+   | spam_abuse | never answered. Hidden when `social.inbox.hide_spam` is on **and** social-api.ai accepted the hide | `hidden` / `ignored` |
+   | other without a draft | nothing | `ignored` |
+
+   **Why draft + vet, not a routine:** replies must go out within minutes, and the vetting service
+   already supports exactly this pattern (one model drafts, `ContentVettingService` approves /
+   revises / rejects with a pinned rubric). Complaint acknowledgements and privacy nudges are fixed
+   texts — no model writes them. Reach still does not generate long-form content here.
+
+4. **Guards** (in this order; a skipped reply always says why in `reply_reason` / `status_reason`):
+   `social.inbox.auto_reply` off → nothing is posted (classification, Flow tickets and leads still
+   happen) · confidence below `social.inbox.min_confidence` (70) → not answered (a complaint is still
+   lodged; the ticket shows the confidence) · older than `social.inbox.reply_max_age_hours` (48) →
+   not answered · one reply per conversation (same network + thread + author; without a thread id,
+   the same author and kind within 24 h) · `social.inbox.daily_reply_cap` (40 per IST day) → the
+   message waits (`deferred`) for a later run while it is young enough · `SocialReplyPolicy`: at most
+   280 characters on X (600 elsewhere), signed "— AICOUNTLY team", no PAN / Aadhaar / card / phone /
+   foreign e-mail, links to aicountly.com only.
+5. **Failures are honest.** Gemini or Flow unavailable → `retry`, up to 5 attempts, then `failed`
+   with the reason. Flow not set up (no key, Flow 401 / 503 "not configured" / 404) → `deferred`: the
+   complaint is not acknowledged (there is no ticket to quote) and is lodged automatically once Flow
+   accepts it; the daily report counts "complaints waiting for Flow". A reply POST is never retried:
+   a refused reply is `failed` with social-api.ai's error; a network error / 5xx is `failed` with
+   "outcome unknown". **Retry** on the Inbox page (social.dispatch) re-runs a failed item (it asks
+   first when a reply's outcome was unknown).
+6. **Report.** The 08:00 IST daily report has a "Social inbox (last 24h)" section (read, replies
+   posted, Flow tickets, leads, by type, reply failures, complaints waiting for Flow, high-severity
+   items) and to-do lines when complaints wait for Flow or replies failed. Lodged complaints, leads,
+   sent replies and hides are audited (`social.inbox.*`, fanned out to Console's central audit).
+
+Run it by hand: `php spark reach:social-inbox` (poll + handle), `--poll-only`, `--process-only`,
+`--item=<id>`, `--flow-check` (proves the Flow key: Flow must answer 422 to an empty body; nothing is
+lodged), `--json`.
+
+### Set it up (operator)
+
+1. Deploy Flow with migration 045 and `FLOW_REACH_INBOUND_KEY` in Flow's `server-php/.env`
+   (flow-react-app `docs/REACH_SOCIAL_TICKETS.md`). Put the **same** key in Reach → Settings → AI &
+   Automation → **Social inbox** → *Flow key* (or `FLOW_REACH_INBOUND_KEY` in Reach's `.env`). Check:
+   `php spark reach:social-inbox --flow-check`.
+2. Run `php spark migrate` in Reach (table `reach_social_inbox`).
+3. Run `php spark reach:integrations-check --only=social_api`. It now also GETs the inbox list once.
+   If it says `Inbox list FAILED: GET /inbox is HTTP 404 … These answered: …`, set
+   `social.inbox.list_path` to the right path from docs.social-api.ai/guides/inbox and re-run until it
+   says `Inbox list OK`. Check `item_fields` against the assumptions below.
+4. Optionally set `social.inbox.alert_recipients`. Leave `social.inbox.hide_spam` off until the hide
+   endpoint is confirmed.
+5. Watch the first run on **Social → Inbox** (or `php spark reach:social-inbox --poll-only --json`
+   first, which reads without answering). To read and classify without posting anything for a day,
+   turn off *Post replies automatically*.
+
+### Assumed — confirm with the live check and the first run
+
+social-api.ai's inbox guide (docs.social-api.ai/guides/inbox) could not be read from this build. Reach
+parses defensively, logs what it does not understand (`[SocialInbox]` in `writable/logs`) and never
+guesses:
+
+1. **List**: `GET /v1/inbox` (setting `social.inbox.list_path`; `{account_id}` in the path is
+   substituted instead of the query) with `account_id`, `since` (RFC 3339), `limit`, `cursor` query
+   parameters. Unknown parameters are assumed to be ignored; Reach also de-duplicates, so a list that
+   ignores `since` / `account_id` only costs reads.
+2. **Shape**: a list, or a list under `data` / `items` / `results` / `messages` / `comments` /
+   `conversations` / `threads` / `inbox` (also one level under `data`); conversation objects with a
+   `messages` / `comments` / `replies` list are flattened. Item fields: id (`id` | `message_id` |
+   `comment_id` | `item_id`), text (`text` | `message` | `content` | `body` | `comment` | `caption`,
+   or `content.text`), type (`type` | `kind` → comment / message / mention / review), author
+   (`author` | `from` | `sender` | `user` | `commenter` with `name` / `username` | `handle` | `id`),
+   thread (`thread_id` | `conversation_id` | `post_id` | `post.id`), link (`post_url` | `permalink` |
+   `url` | `post.url`, https only), time (`created_at` | `timestamp` | … ISO or epoch s / ms), ours
+   (`direction: outbound` | `is_from_me` | `from_me` | …). Next page: `next_cursor` | `cursor` |
+   `next` | `pagination.*` | `meta.*` | `paging.cursors.after`; `has_more: false` stops.
+3. **Reply**: `POST /v1/inbox/{id}/reply` with `{"text": "…"}` (setting `social.inbox.reply_path`)
+   for both comments and DMs; any 2xx without `success: false` = accepted; the reply id is read from
+   `id` | `reply_id` | `message_id` when present. An `Idempotency-Key` header is sent (harmless if
+   ignored). Moving a public complaint to DM is done in words (the acknowledgement asks them to DM or
+   e-mail support@) — no DM-initiation endpoint is assumed.
+4. **Hide**: `POST /v1/inbox/{id}/hide` (setting `social.inbox.hide_path`), only with
+   `social.inbox.hide_spam` on.
+5. **Webhooks** for new comments are not used (signature scheme unknown) — Reach polls.

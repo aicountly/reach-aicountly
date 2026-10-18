@@ -28,7 +28,7 @@ export const ROUTES = {
   SOCIAL_CALENDAR:    '/social/calendar',
   SOCIAL_PERFORMANCE: '/social/performance',
   SOCIAL_ADS:         '/social/ads',   // paid-ads register (ads stream); placeholder until merged
-  SOCIAL_INBOX:       '/social/inbox', // social inbox (inbox stream); placeholder until merged
+  SOCIAL_INBOX:       '/social/inbox', // social inbox bot (comments/DMs → replies, Flow tickets)
 
   EMAIL_LIST:    '/email',
   EMAIL_DETAIL:  '/email/:id',

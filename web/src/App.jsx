@@ -28,6 +28,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage.jsx';
 import { LeadsLayout } from './pages/leads/LeadsLayout.jsx';
 import { AnalyticsLayout } from './pages/reports/AnalyticsLayout.jsx';
 import { LEGACY_REDIRECTS, PLANNED_ROUTES } from './constants/navManifest';
+import { SocialInboxPage } from './pages/social/SocialInboxPage';
 
 import { EmailListPage } from './pages/email/EmailListPage';
 import { EmailDetailPage } from './pages/email/EmailDetailPage';
@@ -355,7 +356,7 @@ export default function App() {
           <Route index element={<SocialHubIndex />} />
           <Route path="accounts" element={<SocialAccountsTab />} />
           <Route path="calendar" element={<SocialCalendarTab />} />
-          <Route path="inbox" element={<ComingSoonPage />} />
+          <Route path="inbox" element={<SocialInboxPage />} />
           <Route path="performance" element={<SocialPerformanceTab />} />
           <Route path="ads" element={<SocialAdsPlaceholder />} />
         </Route>

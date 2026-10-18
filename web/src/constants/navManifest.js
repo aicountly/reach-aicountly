@@ -143,7 +143,6 @@ export function visibleNavSections(has) {
 export const PLANNED_ROUTES = [
   { path: ROUTES.BOT_ACTIVITIES, label: 'Run now', description: 'Start a bot activity or routine on demand.' },
   { path: ROUTES.BOT_ASK, label: 'Ask the bot', description: 'Ask the bot about its work and plans.' },
-  { path: ROUTES.SOCIAL_INBOX, label: 'Social inbox', description: 'Comments and messages from the connected social accounts.' },
 ];
 
 /**

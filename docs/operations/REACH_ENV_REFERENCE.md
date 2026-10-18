@@ -132,6 +132,10 @@ surface, not the environment.
 | `SOCIALAPI_ACCOUNT_<PLATFORM>` | fallback for `social.socialapi.account.<platform>` (youtube, instagram, facebook, linkedin, x, tiktok); blank = the single active account |
 | `SOCIALAPI_PLATFORM_DATA_<PLATFORM>` | fallback for `social.socialapi.platform_data.<platform>` (JSON object) |
 | `VIDEO_YOUTUBE_PUBLISHER` | `social_api` — fallback for `video.youtube.publisher` (`social_api` \| `direct`) |
+| `SOCIAL_INBOX_ENABLED` / `SOCIAL_INBOX_AUTO_REPLY` | `true` / `true` — fallbacks for `social.inbox.enabled` / `social.inbox.auto_reply` (social inbox bot, SOCIAL_API.md § "Social inbox bot") |
+| `SOCIALAPI_INBOX_LIST_PATH` / `_REPLY_PATH` / `_HIDE_PATH` | `/inbox`, `/inbox/{id}/reply`, `/inbox/{id}/hide` — fallbacks for `social.inbox.*_path` (**assumed** social-api.ai paths; confirm with the live check) |
+| `FLOW_API_BASE_URL` | `https://flow.aicountly.org/api` — fallback for `flow.api_base_url` (complaints → Flow tickets) |
+| `FLOW_REACH_INBOUND_KEY` | empty — fallback for the secret `flow.reach_key`; must equal Flow's `FLOW_REACH_INBOUND_KEY` (≥ 32 chars). Without it complaints are kept `deferred` |
 
 See `CAMPAIGN_READINESS.md` for the per-channel requirements.
 

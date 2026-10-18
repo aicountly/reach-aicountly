@@ -49,6 +49,7 @@ final class DailyReportRenderer
         $body .= self::section('Content published (last 24h)', self::contentHtml($s['content'] ?? []));
         $body .= self::section('AI vetting (last 24h)', self::vettingHtml($s['vetting'] ?? []));
         $body .= self::section('Pipeline health', self::pipelineHtml($s['pipeline'] ?? []));
+        $body .= self::section('Social inbox (last 24h)', self::socialInboxHtml($s['social_inbox'] ?? []));
 
         $title = 'Daily analytics report — ' . self::e(self::longDate((string) $summary['report_date']));
         $meta  = 'Generated ' . self::e(self::generatedAt($summary));
@@ -169,10 +170,61 @@ final class DailyReportRenderer
             $out[] = 'Email: ' . $p['email'];
         }
 
+        $out[] = '';
+        $out[] = '== Social inbox (last 24h) ==';
+        foreach (self::socialInboxLines($s['social_inbox'] ?? []) as $line) {
+            $out[] = $line;
+        }
+
         return implode("\n", $out) . "\n";
     }
 
     // ── section renderers ──────────────────────────────────────────────────
+
+    /** @param array<string, mixed> $i */
+    private static function socialInboxLines(array $i): array
+    {
+        if (empty($i['configured']) || ! isset($i['received'])) {
+            return [self::noteOf($i)];
+        }
+        $c   = $i['by_classification'] ?? [];
+        $out = [sprintf('Read %d · replies posted %d · Flow tickets %d · leads %d · reply failures %d · complaints waiting for Flow %d',
+            $i['received'], $i['replies_sent'], $i['tickets'], $i['leads'], $i['reply_failures'], $i['waiting_for_flow'])];
+        if ($c !== []) {
+            $out[] = 'By type: ' . implode(', ', array_map(static fn ($k, $n) => str_replace('_', ' ', (string) $k) . ' ' . $n, array_keys($c), $c));
+        }
+        foreach ($i['high_severity'] ?? [] as $h) {
+            $out[] = sprintf('  HIGH: %s @%s — %s%s', $h['network'], $h['author_handle'] ?? '?', $h['summary'] ?? '', ! empty($h['ticket_number']) ? ' (' . $h['ticket_number'] . ')' : ' (not lodged yet)');
+        }
+        return $out;
+    }
+
+    /** @param array<string, mixed> $i */
+    private static function socialInboxHtml(array $i): string
+    {
+        if (empty($i['configured']) || ! isset($i['received'])) {
+            return self::note($i);
+        }
+        $tiles = self::tiles([
+            ['Read', (string) $i['received'], null, false],
+            ['Replies posted', (string) $i['replies_sent'], null, false],
+            ['Flow tickets', (string) $i['tickets'], null, false],
+            ['Leads', (string) $i['leads'], null, false],
+        ]);
+        $rows = [];
+        foreach (($i['by_classification'] ?? []) as $k => $n) {
+            $rows[] = [str_replace('_', ' ', (string) $k), (string) $n];
+        }
+        $rows[] = ['Reply failures', (string) $i['reply_failures']];
+        $rows[] = ['Complaints waiting for Flow', (string) $i['waiting_for_flow']];
+        $high = '';
+        if (! empty($i['high_severity'])) {
+            $high = '<div style="font-size:13px;font-weight:600;margin:14px 0 4px;">High severity</div>'
+                . self::table(['Network', 'Author', 'Summary', 'Ticket'], array_map(static fn ($h) => [(string) $h['network'], '@' . ($h['author_handle'] ?? '?'), (string) ($h['summary'] ?? ''), (string) ($h['ticket_number'] ?? 'not lodged yet')], $i['high_severity']));
+        }
+
+        return $tiles . self::table(['Type / signal', 'Count'], $rows) . $high;
+    }
 
     /** @param array<string, mixed> $t */
     private static function todoHtml(array $t): string

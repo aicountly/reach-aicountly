@@ -19,7 +19,7 @@ use Config\Database;
  * saying so — a section never shows invented or placeholder figures, and one
  * failing source never takes the rest of the report down with it.
  *
- * Sections: search, traffic, seo_tracker, content, vetting, pipeline, plan, todo.
+ * Sections: search, traffic, seo_tracker, content, vetting, pipeline, plan, social_inbox, todo.
  */
 class DailyReportBuilder
 {
@@ -76,6 +76,7 @@ class DailyReportBuilder
             'pipeline'    => $this->guard('pipeline', fn () => $this->pipeline($window)),
             // Bot Plan & Performance: yesterday's plan vs achieved (stored review).
             'plan'        => $this->guard('plan', fn () => (new \App\Libraries\Bot\Plan\PlanReportSection($this->db))->build($reportDate)),
+            'social_inbox' => $this->guard('social_inbox', fn () => $this->socialInbox($window)),
         ];
         $sections['todo'] = ['configured' => true, 'items' => self::todo($sections)];
 
@@ -366,6 +367,24 @@ class DailyReportBuilder
         return $out;
     }
 
+    /**
+     * Stream a — what the social inbox bot read and did in the window.
+     *
+     * @param array{start:string, end:string} $window
+     * @return array<string, mixed>
+     */
+    private function socialInbox(array $window): array
+    {
+        if (! SchemaGuard::hasTable($this->db, 'reach_social_inbox')) {
+            return ['configured' => false, 'note' => 'Social inbox not set up yet (run the migrations).'];
+        }
+        if (! (bool) \App\Libraries\Settings\ReachConfig::get('social.inbox.enabled', true)) {
+            return ['configured' => false, 'note' => 'The social inbox bot is off (social.inbox.enabled).'];
+        }
+
+        return ['configured' => true] + \App\Libraries\Distribution\SocialInbox\SocialInboxService::stats($this->db, $window['start'], $window['end']);
+    }
+
     // ── "What to do today" ─────────────────────────────────────────────────
 
     /**
@@ -429,6 +448,14 @@ class DailyReportBuilder
         if (! empty($vet['configured']) && ($vet['counts']['reject'] ?? 0) > ($vet['counts']['approve'] ?? 0) && ($vet['counts']['reject'] ?? 0) > 0) {
             $items[] = sprintf('Vetting rejected %d draft(s) vs %d approved — review the top reject reasons and adjust the routine prompts.',
                 $vet['counts']['reject'], $vet['counts']['approve'] ?? 0);
+        }
+
+        $inbox = $s['social_inbox'] ?? [];
+        if (($inbox['waiting_for_flow'] ?? 0) > 0) {
+            $items[] = sprintf('%d social complaint(s) are waiting to be lodged in Flow — set the Reach → Flow key (Settings → Social inbox) or check Flow is up.', $inbox['waiting_for_flow']);
+        }
+        if (($inbox['reply_failures'] ?? 0) > 0) {
+            $items[] = sprintf('%d social repl(ies) were not accepted by social-api.ai in the last 24 hours — see Social → Inbox for the reasons.', $inbox['reply_failures']);
         }
 
         $content = $s['content'] ?? [];
