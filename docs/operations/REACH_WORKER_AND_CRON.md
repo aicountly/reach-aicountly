@@ -129,7 +129,8 @@ period, not sixty times.
 | 03:00 | `reach.content_refresh_detection` | default | per day |
 | **04:00** | **`reach.search_console_ingest`** — pulls Search Console (site-wide + blog-mapped) for the incremental window and one slice of any active backfill | default | `search-console-ingest-<date>` |
 | 05:00 | `reach.seo_snapshot` — tracked-keyword ranks of the freshest ingested GSC day + backlink snapshot | default | per day |
-| 06:00 | `reach.content_base_sync` | default | per day |
+| every hour | `reach.content_base_sync` — import content-base seeds, release roadmap topics stuck in the retired in-house drafting, reconcile topic statuses | default | `content-base-sync-<Y-m-d-H>` |
+| 01:30 IST (20:00 UTC) | `reach.roadmap_refresh` — rescore the roadmap for the IST date unless the 00:30 IST optimiser cron already completed a run | default | `roadmap-refresh-<IST date>` |
 | 07:00 | `reach.daily_marketing_pack` (for tomorrow) | default | per target date |
 | 08:00 | `reach.daily_approval_digest` | notifications | `approval-digest-<date>` |
 | 09:00 | `reach.gallery_deficit_alert` | notifications | per day |
@@ -154,7 +155,7 @@ report's pipeline-health section names them, e.g. "email via itwalk_api, fallbac
 
 Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
 Daily jobs handled by `reach:schedule` (no extra cron lines needed):
-05:00 SEO rank/backlink snapshots · 06:00 content-base sync ·
+05:00 SEO rank/backlink snapshots · hourly content-base sync ·
 09:00 cover-gallery deficit email.
 Every 5 minutes `reach:schedule` also enqueues `reach.routine_content_sweep`
 (default queue), which carries Claude-routine blog/KB submissions forward —

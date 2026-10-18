@@ -124,6 +124,10 @@ $routes->group('v1', static function ($routes) {
     // ---------------------------------------------------------------------
     $routes->group('automation', ['filter' => 'automation-token'], static function ($routes) {
         $routes->get('content-base',    'Api\\V1\\Content\\AutomationIngestController::contentBase');
+        // Stream 5 — living content base: next topics, proposals, produced (no git pushes).
+        $routes->get('content-base/next',      'Api\\V1\\Automation\\ContentBaseAutomationController::next');
+        $routes->post('content-base/propose',  'Api\\V1\\Automation\\ContentBaseAutomationController::propose');
+        $routes->post('content-base/produced', 'Api\\V1\\Automation\\ContentBaseAutomationController::produced');
         $routes->get('gallery/status',  'Api\\V1\\Content\\AutomationIngestController::galleryStatus');
         $routes->get('link-registry',   'Api\\V1\\Content\\AutomationIngestController::linkRegistry');
         $routes->get('kb-plan',         'Api\\V1\\Content\\AutomationIngestController::kbPlan');

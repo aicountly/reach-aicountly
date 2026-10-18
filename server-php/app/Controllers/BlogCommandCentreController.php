@@ -417,6 +417,18 @@ class BlogCommandCentreController extends BaseApiController
             ->get()
             ->getResultArray();
 
+        // Postgres booleans come back as "t"/"f"; "f" is truthy in the
+        // console, which showed every candidate as Pinned + Locked.
+        foreach ($rows as &$row) {
+            foreach (['is_locked', 'is_human_pinned', 'evidence_ready'] as $flag) {
+                if (array_key_exists($flag, $row)) {
+                    $row[$flag] = \App\Libraries\Support\PgBoolean::isTrue($row[$flag]);
+                }
+            }
+            $row['in_routine_queue'] = ($row['status'] ?? '') === 'roadmap_selected' && empty($row['content_item_id']);
+        }
+        unset($row);
+
         return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }
 

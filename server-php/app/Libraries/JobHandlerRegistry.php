@@ -68,6 +68,7 @@ class JobHandlerRegistry
         $this->handlers['reach.blog_cover_sweep']                    = new BlogCoverSweepJob();
         // Content base + cover gallery (2026-08 automation revamp)
         $this->handlers['reach.content_base_sync']                   = new \App\Jobs\ContentBaseSyncJob();
+        $this->handlers['reach.roadmap_refresh']                     = new \App\Jobs\RoadmapRefreshJob();
         $this->handlers['reach.gallery_deficit_alert']               = new \App\Jobs\GalleryDeficitAlertJob();
         // Search Console ingestion — writes reach_search_metric_facts, which the
         // SEO snapshot job and every Search Intelligence view read from.

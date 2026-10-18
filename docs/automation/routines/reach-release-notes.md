@@ -119,6 +119,19 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
         - 429: today's limit in Reach is used — stop the whole run.
         - 5xx or network error: retry once after 60 seconds, then skip.
 
-3. Finish with a table: product | version | result (published URL, rejected
-   + reasons, pending, skipped + why). Do not change any repository.
+3. Help-centre follow-up (optional, at most 5 topics per run). For each NEW user
+   task you put under "New" in a note today, propose a knowledge-base topic so the
+   KB routine documents it: POST
+   https://reach.aicountly.org/api/v1/automation/content-base/propose
+   {"type":"kb","items":[{"key":"kb-<product_slug>-<task>","title":"How to <task>
+   in <App>","product_slug":"<product_slug>","category":"how_to","brief":"<what
+   the user can now do and on which screen>","evidence":[{"repo":"aicountly/<repo>",
+   "commits":["<sha7>"],"file":"<path>","note":"<what it shows>"}]}],
+   "routine_run_id":"<this session id>"}. Results "exists"/"duplicate" are fine.
+   Only for changes you saw in the diff — never invent one. (KB topics exist for
+   the products with a KB cadence; others answer "invalid" — skip them.)
+
+4. Finish with a table: product | version | result (published URL, rejected
+   + reasons, pending, skipped + why), plus the KB topics proposed. Do not change
+   any repository.
 ```

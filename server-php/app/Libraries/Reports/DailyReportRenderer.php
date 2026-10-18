@@ -44,6 +44,9 @@ final class DailyReportRenderer
         $body .= self::section('Content published (last 24h)', self::contentHtml($s['content'] ?? []));
         $body .= self::section('AI vetting (last 24h)', self::vettingHtml($s['vetting'] ?? []));
         $body .= self::section('Pipeline health', self::pipelineHtml($s['pipeline'] ?? []));
+        if (! empty($s['routines']['health'])) {
+            $body .= self::section('Claude routines (last activity)', self::routinesHtml($s['routines']));
+        }
 
         $title = 'Daily analytics report — ' . self::e(self::longDate((string) $summary['report_date']));
         $meta  = 'Generated ' . self::e((string) $summary['generated_at']) . ' (' . self::e((string) $summary['timezone']) . ')';
@@ -159,10 +162,36 @@ final class DailyReportRenderer
             $out[] = 'Email: ' . $p['email'];
         }
 
+        if (! empty($s['routines']['health'])) {
+            $out[] = '';
+            $out[] = '== Claude routines (last activity) ==';
+            foreach ($s['routines']['health'] as $type => $h) {
+                $out[] = sprintf('%s (%s): %s%s', $h['routine'], str_replace('_', ' ', (string) $type),
+                    $h['last_activity_at'] === null ? 'never seen' : $h['hours_since'] . ' h ago',
+                    $h['state'] === 'stale' || $h['state'] === 'never_seen' ? ' — quiet' : ($h['state'] === 'off' ? ' — switched off' : ''));
+            }
+        }
+
         return implode("\n", $out) . "\n";
     }
 
     // ── section renderers ──────────────────────────────────────────────────
+
+    /** @param array<string, mixed> $r */
+    private static function routinesHtml(array $r): string
+    {
+        $rows = [];
+        foreach ($r['health'] as $type => $h) {
+            $state = match ($h['state']) {
+                'ok' => 'ok', 'off' => 'switched off', 'never_seen' => 'never seen', default => 'quiet',
+            };
+            $rows[] = [(string) $h['routine'], str_replace('_', ' ', (string) $type),
+                $h['last_activity_at'] === null ? '—' : $h['hours_since'] . ' h ago', $state];
+        }
+
+        return self::table(['Routine', 'Content', 'Last activity', 'State'], $rows)
+            . '<div style="font-size:12px;color:' . self::C_MUTED . ';margin-top:8px;">Informational. "Quiet" = no API call or submission for longer than the routine\'s cadence allows (36 h daily, 8 days weekly).</div>';
+    }
 
     /** @param array<string, mixed> $t */
     private static function todoHtml(array $t): string

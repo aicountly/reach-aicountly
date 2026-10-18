@@ -199,9 +199,14 @@ class ReachSchedule extends BaseCommand
             $add('reach.content_refresh_detection', [], "content-refresh-detection-{$today}");
         }
 
-        // 06:00 — sync repo content-base into topic candidates (idempotent per day)
-        if ($hour === 6) {
-            $add('reach.content_base_sync', ['date' => $today], "content-base-sync-{$today}");
+        // Every hour: content base — import git seeds, release stuck roadmap
+        // topics, reconcile topic statuses from the pipeline (idempotent).
+        $add('reach.content_base_sync', ['date' => $today], "content-base-sync-{$hourKey}");
+
+        // 01:30 IST (20:00 UTC) — rescore the roadmap for today's IST date,
+        // unless the 00:30 IST cron already completed a run (RoadmapRefreshJob).
+        if ($istHour === 1) {
+            $add('reach.roadmap_refresh', ['date' => $istDate], "roadmap-refresh-{$istDate}");
         }
 
         // 09:00 — superadmin cover-gallery deficit reminder (skips when no deficit)

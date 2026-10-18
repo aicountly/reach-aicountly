@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updated_at": "2026-08-05",
-  "notes": "Knowledge Base articles are generated ONLY by the Claude routine (Opus writes, Sonnet verifies). Products listed here must authenticate via my.aicountly.com or ourpeople.work. Tiers set daily quotas in reach_kb_product_cadence; entries here are topic seeds the routine works through in order.",
+  "notes": "Knowledge Base articles are written ONLY by the reach-kb Claude routine (Sonnet, from the product's own code); Gemini vets each one and Reach publishes approved articles to aicountly.com/help. Products listed here sign in through my.aicountly.com or ourpeople.work. Daily quotas per product are rows in reach_kb_product_cadence (a product without an enabled row is not offered). This file is only the seed baseline: Reach imports it hourly into its database, routines add topics through v1/automation/content-base/propose, and Reach sets each topic's status from its pipeline.",
   "products": [
     {
       "product_slug": "books",

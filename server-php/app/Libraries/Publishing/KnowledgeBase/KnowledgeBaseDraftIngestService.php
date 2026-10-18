@@ -37,9 +37,10 @@ class KnowledgeBaseDraftIngestService
     /**
      * Today's writing plan for the routine: the overall quota, then per
      * product (launch apps first) the remaining per-product cadence and the
-     * un-ingested topic seeds from content-base/knowledge-base/index.json.
-     * Seeds are suggestions — the routine may propose its own topic for real
-     * functionality it finds in the product's code, with its own content key.
+     * planned topics of the living content base (reach_content_base_entries:
+     * git seeds + routine proposals), each with its content_base_key. Topics
+     * are suggestions — the routine may write another real task it finds in
+     * the product's code, with its own content key.
      *
      * @return array<string,mixed>
      */
@@ -51,10 +52,7 @@ class KnowledgeBaseDraftIngestService
             ->get()->getResultArray();
 
         $index     = (new \App\Libraries\Blog\ContentBaseService($this->db))->knowledgeBaseIndex();
-        $byProduct = [];
-        foreach ((array) ($index['products'] ?? []) as $productEntry) {
-            $byProduct[(string) ($productEntry['product_slug'] ?? '')] = (array) ($productEntry['topics'] ?? []);
-        }
+        $byProduct = $this->plannedTopicsByProduct();
 
         $todayByProduct = [];
         foreach ($this->db->query(
@@ -84,16 +82,7 @@ class KnowledgeBaseDraftIngestService
             $quota = (int) $cadence['daily_quota'];
             $done  = $todayByProduct[$slug] ?? 0;
 
-            $topics = [];
-            foreach ($byProduct[$slug] ?? [] as $topic) {
-                $key = (string) ($topic['key'] ?? '');
-                if ($key === '' || strtolower((string) ($topic['status'] ?? 'planned')) === 'retired') {
-                    continue;
-                }
-                if ($this->db->table('reach_content_items')->where('content_base_key', $key)->countAllResults() === 0) {
-                    $topics[] = $topic;
-                }
-            }
+            $topics = $byProduct[$slug] ?? [];
 
             $plan[] = [
                 'product_slug'    => $slug,
@@ -125,6 +114,31 @@ class KnowledgeBaseDraftIngestService
             'existing_articles' => $existing,
             'notes'             => (string) ($index['notes'] ?? ''),
         ];
+    }
+
+    /**
+     * Planned KB topics from the living content base (git seeds + routine
+     * proposals), per product, each with the content_base_key to submit under.
+     *
+     * @return array<string, list<array<string,mixed>>>
+     */
+    private function plannedTopicsByProduct(): array
+    {
+        $entries = new \App\Libraries\Content\Base\ContentBaseEntries($this->db);
+        if (! $entries->available()) {
+            return [];
+        }
+        if ($entries->isEmpty()) {
+            (new \App\Libraries\Content\Base\ContentBaseSync($this->db))->run();
+        }
+        $entries->reconcile('knowledge_base');
+
+        $out = [];
+        foreach ($entries->planned('knowledge_base', 200) as $topic) {
+            $out[(string) $topic['product_slug']][] = $topic;
+        }
+
+        return $out;
     }
 
     /**

@@ -74,6 +74,7 @@ class DailyReportBuilder
             'content'     => $this->guard('content', fn () => $this->content($window)),
             'vetting'     => $this->guard('vetting', fn () => $this->vetting($window)),
             'pipeline'    => $this->guard('pipeline', fn () => $this->pipeline($window)),
+            'routines'    => $this->guard('routines', fn () => $this->routines()),
         ];
         $sections['todo'] = ['configured' => true, 'items' => self::todo($sections)];
 
@@ -364,6 +365,18 @@ class DailyReportBuilder
         return $out;
     }
 
+    /**
+     * Stream 5: when each Claude routine last reached Reach (informational).
+     *
+     * @return array<string, mixed>
+     */
+    private function routines(): array
+    {
+        $health = (new \App\Libraries\Content\Base\RoutineActivity($this->db))->health();
+
+        return ['configured' => true, 'health' => $health, 'stale' => \App\Libraries\Content\Base\RoutineActivity::staleLines($health)];
+    }
+
     // ── "What to do today" ─────────────────────────────────────────────────
 
     /**
@@ -432,6 +445,11 @@ class DailyReportBuilder
         $content = $s['content'] ?? [];
         if (isset($content['total']) && (int) $content['total'] === 0) {
             $items[] = 'Nothing was published in the last 24 hours — check the content automation routines and the publishing queue.';
+        }
+
+        // Informational: a quiet routine (no call or submission for > 36 h).
+        foreach (array_slice($s['routines']['stale'] ?? [], 0, 2) as $line) {
+            $items[] = $line;
         }
 
         if ($items === []) {

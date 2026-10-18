@@ -19,6 +19,9 @@ All calls: no auth header of your own — the environment's network secret adds 
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
 | `POST https://reach.aicountly.org/api/v1/automation/community-qa` | a new frequently-asked question with the desk's answer: `{external_key, question_title, question_body, category_slug, product_slug?, answer_html, short_answer?, source_references?, provenance}` |
+| `GET  https://reach.aicountly.org/api/v1/automation/content-base/next?type=community` | planned question topics (git seeds and proposals), each with the `content_base_key` to use as `external_key` |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/produced` | report a planned question you answered (`submitted`) or one that no longer applies (`not_applicable` + reason) |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/propose` | optional: add question topics with an official source as evidence |
 
 `provenance` is `{"generated_by_model": "claude-sonnet", "routine_run_id": "<this session id>"}`.
 `source_references` is a list of `{"title": "...", "url": "https://..."}` (official sources: gst.gov.in,
@@ -60,8 +63,15 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
    source_references, provenance}. Answer the question the member asked, in its own
    terms; do not rewrite their question.
 
-3. With the remaining budget, write new frequently-asked questions. Choose topics so the
-   day's mix follows mix_targets (favour the targets whose last_7_days is lowest against
+3. With the remaining budget, write new frequently-asked questions. First take planned
+   questions from GET /v1/automation/content-base/next?type=community, in order: use the
+   item's title as the question (you may tighten the wording), its brief as context, its
+   category as category_slug, and its content_base_key as external_key EXACTLY. After the
+   POST, report it: POST /v1/automation/content-base/produced {"type":"community","key":"<item
+   key>","outcome":"submitted","content_base_key":"<external_key>","routine_run_id":"<this
+   session id>"}. A planned question that is outdated (scheme ended, law changed) → report
+   outcome "not_applicable" with the reason instead. Then, for any budget left, choose topics
+   of your own so the day's mix follows mix_targets (favour the targets whose last_7_days is lowest against
    their share). The launch apps come first: Smart Books accounting, GST billing and
    invoicing, Inventory, Notes and Drive; then everyday Indian GST, income tax/TDS,
    accounting and payroll questions. Each question must be one a real owner, accountant
