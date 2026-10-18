@@ -36,7 +36,17 @@ function ChannelCard({ channel }) {
         <StateBadge state={channel.state} />
       </div>
       <div className="card__body">
-        {channel.provider && <p className="muted">Provider: {channel.provider}</p>}
+        {Array.isArray(channel.providers) && channel.providers.length > 0 ? (
+          <p className="muted" data-testid={`providers-${channel.channel}`}>
+            Providers (in send order):{' '}
+            {channel.providers.map((p, i) => (
+              <span key={p.code}>{i > 0 ? ', ' : ''}<code>{p.code}</code> ({p.role})</span>
+            ))}
+            {channel.provider_source && channel.provider_source !== 'console' ? ` — source: ${channel.provider_source}` : ''}
+          </p>
+        ) : (
+          channel.provider && <p className="muted">Provider: {channel.provider}</p>
+        )}
         {(channel.reasons ?? []).length > 0 && (
           <ul>
             {channel.reasons.map((r) => <li key={r}>{r}</li>)}

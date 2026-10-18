@@ -8,7 +8,7 @@ class MockEmailSender implements EmailSenderInterface
 {
     public function send(ChannelMessage $message): ProviderReceipt
     {
-        ProviderGuard::refuseMockInProduction('Email', 'set EMAIL_API_KEY (Itwalk) and SENDER_EMAIL');
+        ProviderGuard::refuseMockInProduction('Email', 'add an email provider for reach in Console → Email providers (or EMAIL_API_KEY as the last resort) and set SENDER_EMAIL');
         $scenario = $this->scenario($message->idempotencyKey);
         if ($scenario === 'rate_limit')    throw new \RuntimeException('MOCK: rate limit', 429);
         if ($scenario === 'transient_fail') throw new \RuntimeException('MOCK: transient failure', 503);

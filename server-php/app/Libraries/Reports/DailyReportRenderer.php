@@ -155,6 +155,9 @@ final class DailyReportRenderer
         } else {
             $out[] = self::noteOf($p);
         }
+        if (isset($p['email']) && $p['email'] !== '') {
+            $out[] = 'Email: ' . $p['email'];
+        }
 
         return implode("\n", $out) . "\n";
     }
@@ -295,8 +298,11 @@ final class DailyReportRenderer
     /** @param array<string, mixed> $p */
     private static function pipelineHtml(array $p): string
     {
+        $email = isset($p['email']) && $p['email'] !== ''
+            ? '<div style="font-size:13px;margin:10px 0 0;">Email: ' . self::e((string) $p['email']) . '</div>'
+            : '';
         if (! isset($p['failed_jobs_24h'])) {
-            return self::note($p);
+            return self::note($p) . $email;
         }
         $rows = [
             ['Failed jobs (24h)', (string) $p['failed_jobs_24h']],
@@ -316,7 +322,7 @@ final class DailyReportRenderer
                 . self::table(['Job type', 'Count'], array_map(static fn ($r) => [$r['job_type'], (string) $r['c']], $p['top_failing']));
         }
 
-        return self::table(['Signal', 'Value'], $rows) . $failing;
+        return self::table(['Signal', 'Value'], $rows) . $failing . $email;
     }
 
     // ── primitives ─────────────────────────────────────────────────────────

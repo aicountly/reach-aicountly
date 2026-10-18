@@ -6,6 +6,16 @@ namespace App\Libraries\Distribution\Providers;
 
 use App\Libraries\Gateways\Mailer;
 
+/**
+ * Campaign email through Mailer → EmailDispatcher (Console's email providers for reach, primary
+ * then fallback; .env EMAIL_API_KEY as the last resort).
+ *
+ * The unsubscribe link and postal-address footer are already in the HTML/text body
+ * (ChannelDispatchService::buildMessage). When the message carries metadata.unsubscribe_url it
+ * is also sent as RFC 8058 List-Unsubscribe / List-Unsubscribe-Post headers (the SMTP provider
+ * sets them; the HTTP API carries the body only). A send is accepted only when a provider
+ * accepted it; otherwise the exception lists every provider's reason.
+ */
 class GatewayEmailSender implements EmailSenderInterface
 {
     public function send(ChannelMessage $message): ProviderReceipt
@@ -18,7 +28,16 @@ class GatewayEmailSender implements EmailSenderInterface
             ? $message->metadata['body_text']
             : null;
 
-        if (!Mailer::send($to, $subject, $html, $plain)) {
+        $opts         = [];
+        $unsubscribe  = trim((string) ($message->metadata['unsubscribe_url'] ?? ''));
+        if ($unsubscribe !== '' && preg_match('#^https?://#i', $unsubscribe) === 1) {
+            $opts['headers'] = [
+                'List-Unsubscribe'      => '<' . $unsubscribe . '>',
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ];
+        }
+
+        if (!Mailer::send($to, $subject, $html, $plain, $opts)) {
             throw new \RuntimeException(
                 'Email gateway rejected send: ' . (Mailer::getLastError() ?? 'unknown'),
                 502,
@@ -32,6 +51,7 @@ class GatewayEmailSender implements EmailSenderInterface
             providerMessageId: $messageId,
             status:            'accepted',
             acceptedAt:        new \DateTimeImmutable(),
+            rawResponse:       json_encode(['provider' => Mailer::getLastProvider(), 'mode' => Mailer::getLastSendMode()]) ?: null,
         );
     }
 
@@ -50,8 +70,9 @@ class GatewayEmailSender implements EmailSenderInterface
         return [
             'batch_size' => 1000,
             'rate_limit' => 100,
-            'features'   => ['tracking', 'unsubscribe_header'],
-            'provider'   => 'itwalk',
+            'features'   => ['tracking', 'unsubscribe_header', 'failover'],
+            'provider'   => 'console_email',
+            'providers'  => array_column(Mailer::providerSummary()['providers'], 'code'),
         ];
     }
 
@@ -67,7 +88,7 @@ class GatewayEmailSender implements EmailSenderInterface
 
     public function providerName(): string
     {
-        return 'itwalk_email';
+        return 'console_email';
     }
 
     /**

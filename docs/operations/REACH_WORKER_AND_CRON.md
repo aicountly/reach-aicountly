@@ -144,7 +144,13 @@ php spark reach:search-console backfill --days=90 # then let the 04:00 job walk 
 php spark reach:daily-report                     # build + store today's report (no email)
 php spark reach:daily-report --send              # build + email to reports.daily.recipients
 php spark reach:daily-report --date=2026-10-17 --send --to=you@aicountly.com
+php spark reach:email-providers                  # which email providers send (names only, from Console)
+php spark reach:email-providers --send=you@aicountly.com [--resend]   # test mail, normal / fallback-first order
 ```
+
+Report and campaign mail go through Console's email providers for reach (primary, then fallback);
+an explicit `--send` / UI "Send now" of a date already attempted is a resend (fallback first). The
+report's pipeline-health section names them, e.g. "email via itwalk_api, fallback aicountly_smtp".
 
 Search Console setup: [`SEARCH_CONSOLE_SETUP.md`](SEARCH_CONSOLE_SETUP.md).
 Daily jobs handled by `reach:schedule` (no extra cron lines needed):

@@ -23,6 +23,9 @@ final class DailyReportTest extends ApiTestCase
     /** @var list<array{to:string, subject:string}> */
     private array $sent = [];
 
+    /** @var list<bool> resend flag of each send, in order */
+    private array $resend = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -44,8 +47,9 @@ final class DailyReportTest extends ApiTestCase
         return new DailyReportService(
             $db,
             $builder,
-            function (string $to, string $subject, string $html, string $text) use ($accept): array {
-                $this->sent[] = ['to' => $to, 'subject' => $subject];
+            function (string $to, string $subject, string $html, string $text, array $opts = []) use ($accept): array {
+                $this->sent[]   = ['to' => $to, 'subject' => $subject];
+                $this->resend[] = ! empty($opts['resend']);
 
                 return $accept ? ['ok' => true, 'error' => null] : ['ok' => false, 'error' => 'HTTP 401'];
             },
@@ -78,6 +82,7 @@ final class DailyReportTest extends ApiTestCase
         $this->assertTrue($s['vetting']['configured'], 'reach_ai_vetting_runs is created by the vetting migration.');
         $this->assertSame(['approve' => 0, 'revise' => 0, 'reject' => 0, 'other' => 0], $s['vetting']['counts'], 'No vetting runs yet.');
         $this->assertArrayHasKey('failed_jobs_24h', $s['pipeline']);
+        $this->assertStringStartsWith('email', $s['pipeline']['email'], 'pipeline health names the email providers (or says there are none)');
         $this->assertNotEmpty($s['todo']['items']);
         $this->assertSame('2026-10-16 02:30:00+00:00', $summary['window']['start'], '24h up to 08:00 IST (02:30 UTC).');
     }
@@ -139,6 +144,18 @@ final class DailyReportTest extends ApiTestCase
         $svc->send('2026-10-17', ['ops@aicountly.com']);
         $this->assertCount(2, $this->sent);
         $this->assertSame(1, (int) Database::connect()->table('reach_daily_reports')->countAllResults());
+    }
+
+    public function testAnExplicitSendOfAnAttemptedDateIsAResend(): void
+    {
+        $svc = $this->service(accept: false);
+        $svc->runScheduled('2026-10-17');                 // scheduled attempt fails
+        $svc->send('2026-10-17', ['ops@aicountly.com']);  // a person clicks "Send now"
+        $this->assertSame([false, true], $this->resend, 'scheduled = normal order; explicit re-send = fallback provider first');
+
+        $this->resend = [];
+        $this->service()->send('2026-10-16', ['ops@aicountly.com']);
+        $this->assertSame([false], $this->resend, 'the first send of a date is not a resend');
     }
 
     public function testGatewayRejectionIsFailedWithReason(): void

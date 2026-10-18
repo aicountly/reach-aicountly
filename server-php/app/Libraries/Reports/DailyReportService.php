@@ -12,14 +12,18 @@ use Config\Database;
 /**
  * Builds, stores and emails the daily analytics report (reach_daily_reports).
  *
- * Production honesty: a report is `sent` only when the mail gateway accepted
- * it. With EMAIL_API_KEY missing nothing is attempted and the row is `failed`
- * with that reason; a gateway rejection is `failed` (or `partial` when some
- * recipients were accepted) with the gateway's message.
+ * Production honesty: a report is `sent` only when an email provider accepted
+ * it (Console's providers for reach via Mailer/EmailDispatcher, primary then
+ * fallback; .env EMAIL_API_KEY as the last resort). With no provider at all
+ * nothing is attempted and the row is `failed` with that reason; when every
+ * provider refuses it is `failed` (or `partial` when some recipients were
+ * accepted) with each provider's reason.
  *
  * Idempotency: the scheduled run never re-sends a date already `sent` or
  * `partial`; only an explicit send (UI "Send now", `reach:daily-report --send`)
- * does.
+ * does. An explicit send of a date that was already attempted is a person
+ * asking for the mail again, so it goes out as a resend (EmailDispatcher tries
+ * the fallback provider first, then the primary).
  */
 class DailyReportService
 {
@@ -27,14 +31,14 @@ class DailyReportService
 
     private DailyReportBuilder $builder;
 
-    /** @var \Closure(string, string, string, string): array{ok:bool, error:?string} */
+    /** @var \Closure(string, string, string, string, array<string,mixed>): array{ok:bool, error:?string} */
     private \Closure $mailer;
 
     /** @var \Closure(): bool */
     private \Closure $mailConfigured;
 
     /**
-     * @param (callable(string, string, string, string): array{ok:bool, error:?string})|null $mailer
+     * @param (callable(string, string, string, string, array<string,mixed>): array{ok:bool, error:?string})|null $mailer (to, subject, html, text, opts{resend})
      * @param (callable(): bool)|null $mailConfigured
      */
     public function __construct(
@@ -45,8 +49,8 @@ class DailyReportService
     ) {
         $this->db      = $db ?? Database::connect();
         $this->builder = $builder ?? new DailyReportBuilder($this->db);
-        $this->mailer  = $mailer !== null ? \Closure::fromCallable($mailer) : static function (string $to, string $subject, string $html, string $text): array {
-            $ok = Mailer::send($to, $subject, $html, $text);
+        $this->mailer  = $mailer !== null ? \Closure::fromCallable($mailer) : static function (string $to, string $subject, string $html, string $text, array $opts = []): array {
+            $ok = Mailer::send($to, $subject, $html, $text, $opts);
 
             return ['ok' => $ok, 'error' => $ok ? null : (Mailer::getLastError() ?? 'Mail gateway did not accept the message.')];
         };
@@ -126,6 +130,8 @@ class DailyReportService
      */
     public function send(string $date, ?array $to = null, string $triggeredBy = 'manual'): array
     {
+        $before     = $this->findByDate($date);
+        $resend     = $triggeredBy !== 'schedule' && $before !== null && (int) ($before['send_attempts'] ?? 0) > 0;
         $report     = $this->generate($date, $triggeredBy);
         $recipients = $to ?? self::recipients();
         $recipients = array_values(array_filter(array_map('trim', $recipients), static fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL)));
@@ -134,13 +140,13 @@ class DailyReportService
             return $this->markResult((int) $report['id'], 'failed', [], 'No valid recipients (reports.daily.recipients is empty).');
         }
         if (! ($this->mailConfigured)()) {
-            return $this->markResult((int) $report['id'], 'failed', [], 'EMAIL_API_KEY is not configured — the report was generated but not sent.');
+            return $this->markResult((int) $report['id'], 'failed', [], 'No email provider is configured (Console → Email providers for reach, or EMAIL_API_KEY as the last resort) — the report was generated but not sent.');
         }
 
         $accepted = [];
         $errors   = [];
         foreach ($recipients as $email) {
-            $result = ($this->mailer)($email, (string) $report['subject'], (string) $report['html'], (string) $report['text_body']);
+            $result = ($this->mailer)($email, (string) $report['subject'], (string) $report['html'], (string) $report['text_body'], ['resend' => $resend]);
             if ($result['ok']) {
                 $accepted[] = $email;
             } else {

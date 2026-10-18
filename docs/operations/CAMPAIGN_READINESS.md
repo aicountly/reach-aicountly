@@ -96,10 +96,20 @@ States used below and on the readiness page: **ready**, **test_mode**
 
 ### Email — state depends on config; code ready
 
-- **Provider:** Itwalk (`GatewayEmailSender` → `Gateways\Mailer`).
-- **Env / settings:** `EMAIL_API_KEY` (required), `SENDER_EMAIL`,
-  `SENDER_NAME`, `REPLY_TO_EMAIL`, optional `EMAIL_API_URL`,
-  `EMAIL_API_FORMAT`; `EMAIL_PROVIDER` blank or `itwalk`.
+- **Providers:** managed centrally in Console (**Email providers**, bound to
+  `reach`) — `GatewayEmailSender` → `Gateways\Mailer` → `Email\EmailDispatcher`,
+  which reads `GET {CONSOLE_API_URL}/portal/email/providers?app_code=reach` with
+  `CONSOLE_API_TOKEN` (capability `email.credentials`; `Email\EmailProviderResolver`,
+  cached for the answer's TTL in an encrypted 0600 file, used up to 15 minutes stale
+  while Console is down). A send tries the primary, then each fallback (HTTP API =
+  Itwalk, SMTP = AICOUNTLY's mail server); a recipient counts as sent only when a
+  provider accepted it. The readiness page lists the providers by name in send
+  order (never a key). `php spark reach:email-providers [--send=you@x] [--resend]`
+  shows the same and sends a test.
+- **Env / settings:** `SENDER_EMAIL` (used when a provider has no `from_email`),
+  `SENDER_NAME`, `REPLY_TO_EMAIL`; `EMAIL_API_KEY` / `EMAIL_API_URL` /
+  `EMAIL_API_FORMAT` only as the last resort (Console has no provider for reach,
+  or is unreachable with nothing cached); `EMAIL_PROVIDER` blank.
   **Settings → Distribution:** `distribution.email.postal_address` (or env
   `DISTRIBUTION_POSTAL_ADDRESS`) — **required, sends are refused without it**;
   `distribution.email.unsubscribe_base_url` (blank = `REACH_APP_URL`);
@@ -109,14 +119,15 @@ States used below and on the readiness page: **ready**, **test_mode**
 - Every campaign email gets a footer with a signed one-click unsubscribe link and
   the postal address; `{{unsubscribe_url}}` in the body is also replaced.
   Clicking it adds the address to the email suppression list.
-- **Known gap:** `Mailer` cannot set `List-Unsubscribe` / `List-Unsubscribe-Post`
-  headers (Itwalk header support not verified). Gmail and Yahoo require
-  one-click header unsubscribe for bulk senders (≈5,000+/day to their users);
-  stay under that volume until headers are added.
-- **Prerequisites outside Reach:** SPF including Itwalk, DKIM signing for the
-  `SENDER_EMAIL` domain, DMARC record (at least `p=none` with reporting,
-  aligned From); a working reply-to inbox; Itwalk account out of sandbox with
-  enough daily quota.
+- `List-Unsubscribe` / `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
+  (RFC 8058) headers go out when the SMTP provider sends; the HTTP API (Itwalk)
+  carries the body footer only (its header support is not verified). Gmail and
+  Yahoo require one-click header unsubscribe for bulk senders (≈5,000+/day to
+  their users): above that volume make the SMTP provider the primary for reach.
+- **Prerequisites outside Reach:** SPF including every provider (Itwalk and the
+  AICOUNTLY mail server), DKIM signing for each provider's from domain, DMARC
+  record (at least `p=none` with reporting, aligned From); a working reply-to
+  inbox; Itwalk account out of sandbox with enough daily quota.
 
 ### SMS — code ready; blocked on DLT registration + opt-ins
 

@@ -52,22 +52,41 @@ class CampaignReadinessService
         ];
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * Email goes through Console's email providers for reach (EmailDispatcher: primary, then
+     * fallback; .env EMAIL_API_KEY as the last resort). Provider codes only — never a secret.
+     *
+     * @return array<string,mixed>
+     */
     private function email(): array
     {
-        $sender = self::env('SENDER_EMAIL');
-        $checks = [
-            self::check('EMAIL_API_KEY', 'env', Mailer::isConfigured(), 'Itwalk email API key.'),
+        $sender    = self::env('SENDER_EMAIL');
+        $providers = Mailer::providerSummary();
+        $codes     = array_column($providers['providers'], 'code');
+        $checks    = [
+            self::check('email providers', 'console', $codes !== [], 'Console → Email providers bound to reach (EMAIL_API_KEY in .env is only the last resort).'),
             self::check('SENDER_EMAIL', 'env', $sender !== '' && (bool) filter_var($sender, FILTER_VALIDATE_EMAIL), 'From address on an SPF/DKIM-authenticated domain (falls back to support@aicountly.com if unset).'),
             self::check('distribution.email.postal_address', 'setting', trim((string) self::setting('distribution.email.postal_address')) !== '', 'Postal address printed in every campaign email footer.'),
             self::check('unsubscribe links', 'setting', UnsubscribeLinks::isAvailable(), 'Needs REACH_APP_URL (or distribution.email.unsubscribe_base_url) and REACH_SETTINGS_KEY/JWT_SECRET.'),
         ];
         $manual = [
-            'SPF, DKIM and DMARC records published for the SENDER_EMAIL domain (check with the Itwalk console / a DNS lookup).',
-            'Itwalk account out of sandbox with enough daily volume for distribution.send_cap.email.',
+            'SPF, DKIM and DMARC records published for each provider\'s from address / SENDER_EMAIL domain (check with the provider console / a DNS lookup).',
+            'Each email provider (e.g. Itwalk) out of sandbox with enough daily volume for distribution.send_cap.email.',
         ];
 
-        return $this->channel('email', 'Email', 'itwalk_email', $checks, $manual, null);
+        $channel = $this->channel('email', 'Email', $codes === [] ? 'none' : implode(' → ', $codes), $checks, $manual, null);
+        $channel['providers']       = $providers['providers'];
+        $channel['provider_source'] = $providers['source'];
+        $channel['provider_line']   = $providers['line'];
+        if ($providers['source'] !== 'console' && $providers['note'] !== null) {
+            $channel['reasons'][] = match ($providers['source']) {
+                'console_stale' => 'Console could not be reached — using its cached provider list (' . $providers['note'] . ').',
+                'env'           => 'Using the .env EMAIL_API_KEY last-resort provider: ' . $providers['note'] . '.',
+                default         => $providers['note'] . '.',
+            };
+        }
+
+        return $channel;
     }
 
     /** @return array<string,mixed> */
