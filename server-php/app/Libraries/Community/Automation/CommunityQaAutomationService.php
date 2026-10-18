@@ -112,9 +112,32 @@ class CommunityQaAutomationService
         self::$vettingOverride = $vetting;
     }
 
+    /** The vetting service other automation (the inbox triage) should use. */
+    public static function vettingService(): ContentVettingService
+    {
+        return self::$vettingOverride ?? new ContentVettingService();
+    }
+
     // -------------------------------------------------------------------------
     // Plan
     // -------------------------------------------------------------------------
+
+    /** @return array{enabled: bool, daily_limit: int, used_today: int, remaining_today: int, max_this_run: int} */
+    public function budget(): array
+    {
+        $enabled = (bool) ReachConfig::get('automation.community.enabled', true);
+        $limit   = max(0, (int) ReachConfig::get('automation.community.daily_limit', 10));
+        $used    = $this->usedToday();
+        $remain  = $enabled ? max(0, $limit - $used) : 0;
+
+        return [
+            'enabled'         => $enabled,
+            'daily_limit'     => $limit,
+            'used_today'      => $used,
+            'remaining_today' => $remain,
+            'max_this_run'    => min(self::MAX_PER_RUN, $remain),
+        ];
+    }
 
     /** What the routine should do this run. */
     public function plan(): array
@@ -204,7 +227,16 @@ class CommunityQaAutomationService
 
         $this->assertEnabled();
         if (($existing = $this->findByKey($in['external_key'])) !== null) {
-            return ['status' => 'already_submitted'] + $this->view($existing);
+            // The default key is one per question; once that answer was not
+            // published, the next answer gets the next key instead of being
+            // told "already submitted" for ever.
+            if (! ($in['key_defaulted'] ?? false) || ! in_array($existing['status'], ['withdrawn', 'failed'], true)) {
+                return ['status' => 'already_submitted'] + $this->view($existing);
+            }
+            $in['external_key'] = $this->nextDefaultKey($in['external_key']);
+            if (($existing = $this->findByKey($in['external_key'])) !== null && ! in_array($existing['status'], ['withdrawn', 'failed'], true)) {
+                return ['status' => 'already_submitted'] + $this->view($existing);
+            }
         }
         $this->assertQuota();
 
@@ -212,11 +244,17 @@ class CommunityQaAutomationService
         if ($question === null) {
             throw new CommunityQaRefusal('Question not found: ' . $in['question_uuid'], 404);
         }
+        // Settle it first: a question answered elsewhere since the routine
+        // read the queue is closed as a duplicate here, not answered twice.
+        $question = (new CommunityInboxAutomationService($this->db))->refreshQuestionId((int) $question['id']) ?? $question;
         if (($question['moderation_state'] ?? 'clean') !== 'clean' || PgBoolean::isTrue($question['personal_data_detected'] ?? false)) {
             throw new CommunityQaRefusal('This question is held for moderation or contains personal data; the desks do not answer it.', 422);
         }
         if (CommunityQuestionStatus::tryFrom((string) $question['status'])?->isTerminal() ?? false) {
-            throw new CommunityQaRefusal('This question is archived or merged into another.', 409);
+            throw new CommunityQaRefusal('This question is archived or merged into another' . (! empty($question['handling_note']) ? ': ' . $question['handling_note'] : '.') . ' Skip it.', 409);
+        }
+        if (in_array($question['handled_by'] ?? null, [CommunityInboxPolicy::CLOSED, CommunityInboxPolicy::CLOSED_BY_PERSON], true)) {
+            throw new CommunityQaRefusal('This question was closed: ' . ($question['handling_note'] ?? 'no reason recorded') . ' Skip it.', 409);
         }
         if ($this->hasOpenSubmissionFor((int) $question['id'])) {
             throw new CommunityQaRefusal('An answer to this question is already being vetted.', 409);
@@ -270,6 +308,23 @@ class CommunityQaAutomationService
      * live, published).
      */
     public function process(int $submissionId): array
+    {
+        $view = $this->advance($submissionId);
+
+        // Keep the Question Inbox in step: vetting, published, or closed.
+        $questionId = $this->submission($submissionId)['question_id'] ?? null;
+        if ($questionId !== null) {
+            try {
+                (new CommunityInboxAutomationService($this->db))->refreshQuestionId((int) $questionId);
+            } catch (Throwable $e) {
+                log_message('warning', '[CommunityQaAutomation] inbox refresh failed for question ' . $questionId . ': ' . $e->getMessage());
+            }
+        }
+
+        return $view;
+    }
+
+    private function advance(int $submissionId): array
     {
         $sub = $this->submission($submissionId);
         if ($sub === null) {
@@ -960,51 +1015,29 @@ class CommunityQaAutomationService
     }
 
     /**
-     * Screened questions with no answer content yet, members' first. A
-     * question holding only an empty legacy draft counts as open; the
-     * routine's answer takes that draft over. A question whose routine answer
-     * was not published rests for a day, and is dropped after two attempts,
-     * so one hard question cannot use up the daily quota.
+     * The routine's queue: CommunityInboxAutomationService::pending(), which
+     * settles the inbox first (published, duplicates and unanswerable
+     * questions closed, stuck legacy drafts handed over) and then lists the
+     * questions waiting for an answer, members' first.
      *
      * @return list<array<string, mixed>>
      */
     private function openQuestions(int $limit): array
     {
-        $rows = $this->db->query(
-            "SELECT q.uuid, q.title, q.body, q.category, q.product, q.source_type, q.intake_timestamp
-               FROM reach_community_questions q
-              WHERE q.moderation_state = 'clean'
-                AND q.personal_data_detected = FALSE
-                AND q.status NOT IN ('archived', 'duplicate_merged', 'published', 'withdrawn')
-                AND NOT EXISTS (
-                        SELECT 1 FROM reach_community_official_answers a
-                         WHERE a.question_id = q.id
-                           AND a.status <> 'archived'
-                           AND (a.status NOT IN ('draft_requested', 'validation_failed')
-                                OR EXISTS (SELECT 1 FROM reach_community_answer_versions v WHERE v.answer_id = a.id))
-                    )
-                AND NOT EXISTS (
-                        SELECT 1 FROM reach_community_automation_submissions s
-                         WHERE s.question_id = q.id
-                           AND (s.status IN ('pending', 'approved', 'published', 'blocked')
-                                OR s.created_at > NOW() - INTERVAL '1 day')
-                    )
-                AND (SELECT COUNT(*) FROM reach_community_automation_submissions s
-                      WHERE s.question_id = q.id AND s.status IN ('withdrawn', 'failed')) < 2
-              ORDER BY (q.source_type = 'official_question') ASC, q.intake_timestamp ASC, q.id ASC
-              LIMIT ?",
-            [$limit]
-        )->getResultArray();
+        return (new CommunityInboxAutomationService($this->db))->pending($limit);
+    }
 
-        return array_map(static fn (array $row): array => [
-            'question_id'   => $row['uuid'],
-            'title'         => $row['title'],
-            'body'          => $row['body'],
-            'category_slug' => $row['category'],
-            'product_slug'  => $row['product'],
-            'asked_by'      => $row['source_type'] === 'official_question' ? 'curated' : 'member',
-            'asked_at'      => $row['intake_timestamp'],
-        ], $rows);
+    /** member-answer:<uuid> → member-answer:<uuid>:2, :3 … — the first key not used by an unsuccessful answer. */
+    private function nextDefaultKey(string $key): string
+    {
+        for ($n = 2; $n < 20; $n++) {
+            $candidate = $key . ':' . $n;
+            $row       = $this->findByKey($candidate);
+            if ($row === null || ! in_array($row['status'], ['withdrawn', 'failed'], true)) {
+                return $candidate;
+            }
+        }
+        return $key . ':' . $n;
     }
 
     /** @return list<array<string, mixed>> */

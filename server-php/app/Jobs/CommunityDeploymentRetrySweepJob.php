@@ -40,6 +40,12 @@ class CommunityDeploymentRetrySweepJob implements JobHandlerInterface
                     'queue'           => 'community',
                     'idempotency_key' => 'community_deploy_retry_' . $uuid . '_' . (int) ($row['attempt_count'] ?? 0),
                     'enqueued_actor_type' => 'system',
+                    // The deployment row carries its own retry schedule (this
+                    // sweep re-enqueues it when next due). A job-level retry
+                    // only re-reached the same verdict: a dead-lettered
+                    // deployment failed its job five times over. One attempt
+                    // records the failure once.
+                    'max_attempts'        => 1,
                 ]
             );
             $enqueued++;

@@ -106,7 +106,9 @@ cPanel → **Cron Jobs**. All entries assume the app is installed at
 * * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark reach:schedule >> writable/logs/schedule.log 2>&1
 
 # Every 5 minutes — Community Q&A housekeeping (scheduled publish, deployment
-# retries, re-vetting routine submissions left pending by unavailable vetting).
+# retries, re-vetting routine submissions left pending by unavailable vetting,
+# and settling the Question Inbox: published / duplicate / auto-closed /
+# routine queue).
 */5 * * * * cd /home/<user>/reach-aicountly/server-php && /usr/local/bin/php spark community:schedule >> writable/logs/community-schedule.log 2>&1
 
 # Every 30 minutes — community intake housekeeping: seed curation, intake
@@ -249,10 +251,13 @@ weekly cron:
 8. **Community answers stuck before publication** (`draft_requested`,
    `validation_failed`, `draft_generated`, review queues): these are left over
    from the old in-Reach drafting, which `community:agents-run` no longer does.
-   `php spark community:legacy-drafts` lists them; `--clear --confirm`
-   archives them so their questions appear in the routine's
-   `community-plan` open questions again. Routine submissions themselves are
-   tracked in Community → Automated feed.
+   `community:schedule` archives any that has not moved for
+   `automation.community.stuck_hours` (default 6) and hands its question to the
+   routine queue (`GET v1/automation/community/pending`) on its own; the
+   Question Inbox's **Handled by** column shows it. `php spark
+   community:legacy-drafts` still lists them and `--clear --confirm` does the
+   same at once. Routine submissions themselves are tracked in Community →
+   Automated feed.
 9. **Daily report `failed`:** open Reach → Reports; the row's error says why
    (usually `EMAIL_API_KEY is not configured`). Fix the env, then "Send now"
    (super admin) or `php spark reach:daily-report --send`.

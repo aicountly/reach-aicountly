@@ -17,6 +17,9 @@ All calls: no auth header of your own — the environment's network secret adds 
 | Endpoint | Purpose |
 |---|---|
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
+| `GET  https://reach.aicountly.org/api/v1/automation/community/pending?limit=10` | the Question Inbox's routine queue: `{enabled, remaining_today, max_this_run, questions: [{question_id, title, body, category_slug, product_slug, asked_by, asked_at, queued_at, triage_score, risk, previous_attempts, answer_endpoint}]}` — members first, then highest triage score, then oldest; one per question text. Reach settles the inbox before answering (answered questions marked published, duplicates and unanswerable questions closed, stuck drafts handed over) |
+| `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/answer` | the desk's answer to that inbox question: `{answer_html, short_answer?, source_references?, provenance}` — the same vetting → approval → publish path as `community-answers` |
+| `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/decline` | `{reason}` — you cannot answer it truthfully (e.g. the product code does not show how); Reach closes it with your reason so it does not wait for ever |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
 | `POST https://reach.aicountly.org/api/v1/automation/community-qa` | a new frequently-asked question with the desk's answer: `{external_key, question_title, question_body, category_slug, product_slug?, answer_html, short_answer?, source_references?, provenance}` |
 
@@ -54,13 +57,24 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
    run, and never more than 3), open_questions, recent_question_titles, mix_targets,
    categories, products, allowed_html_tags.
 
-2. Answer open questions first. Take open_questions in the order given (asked_by
-   "member" comes first) and answer up to max_this_run of them. For each, POST
-   /v1/automation/community-answers with {question_id, answer_html, short_answer,
-   source_references, provenance}. Answer the question the member asked, in its own
-   terms; do not rewrite their question.
+2. Clear the Question Inbox first. GET /v1/automation/community/pending?limit=10 and
+   take its questions in the order given (members first, then the highest
+   triage_score, then the oldest). Answer up to max_this_run of them before writing
+   any new FAQ: for each, POST /v1/automation/community/pending/{question_id}/answer
+   with {answer_html, short_answer, source_references, provenance}. Answer the
+   question that was asked, in its own terms; do not rewrite it. A question about the
+   asker's own situation still gets an answer: the general rule plus one line
+   suggesting they confirm the specifics with their CA (step 4).
+   - If you cannot answer one truthfully — the product code does not show how to do
+     it, or it needs facts nobody can know — POST
+     /v1/automation/community/pending/{question_id}/decline with {reason: one plain
+     sentence}. Reach closes it with that reason. Do not decline a question only
+     because it is short, informal or common.
+   - 409 means it was answered or closed since you read the queue: skip it.
+   - Spam, abusive, personal-data and off-topic questions are closed by Reach itself;
+     you will not see them in the queue.
 
-3. With the remaining budget, write new frequently-asked questions. Choose topics so the
+3. Only with budget left after the queue, write new frequently-asked questions. Choose topics so the
    day's mix follows mix_targets (favour the targets whose last_7_days is lowest against
    their share). The launch apps come first: Smart Books accounting, GST billing and
    invoicing, Inventory, Notes and Drive; then everyday Indian GST, income tax/TDS,
@@ -111,9 +125,10 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
    topic for an FAQ). 429 or 503: stop immediately. Any other error: skip the item.
    Do not resubmit a "pending" item — Reach retries vetting itself.
 
-6. Report a table: kind (member answer / FAQ), question, category/product, outcome,
-   decision, reasons (for withdrawn), public_url. Then one line: submitted N of
-   max_this_run, remaining_today from the plan.
+6. Report a table: kind (inbox answer / declined / FAQ), question, category/product,
+   outcome, decision, reasons (for withdrawn or declined), public_url. Then one line:
+   submitted N of max_this_run, remaining_today from the plan, and how many questions
+   the pending queue still holds.
 ```
 
 ## Operator notes
@@ -125,5 +140,15 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
   to an hour, up to 24 attempts) and checks approved ones until aicountly.com reports them live.
 - Community → **Automated feed** in Reach lists every submission with its decision, reasons, public
   link and retry state.
-- `php spark community:legacy-drafts` lists answers stranded by the old in-Reach drafting;
-  `--clear --confirm` archives them so their questions reappear in `open_questions`.
+- **Question Inbox.** `community:schedule` (and every `community/pending` read) settles the inbox
+  with nobody in the loop (`CommunityInboxAutomationService`): a question whose answer is live is
+  marked **published**; one already answered elsewhere (same normalised title, same duplicate cluster
+  or a strong related link) is **auto-closed** as a duplicate and linked to that answer; personal
+  data, a moderation flag, spam, a prohibited topic, a vetting-model reject (Gemini,
+  `community_question` rubric, `automation.community.triage`), two answers that were not published,
+  or a routine decline close it with the reason; an old in-Reach draft that has not moved for
+  `automation.community.stuck_hours` (default 6) is archived and its question handed to the
+  **routine queue**. The inbox shows who handles each question and since when.
+- `php spark community:legacy-drafts` still lists answers stranded by the old in-Reach drafting;
+  the sweep now releases them on its own after `stuck_hours`, so `--clear --confirm` is only a
+  shortcut.

@@ -33,7 +33,11 @@ enum CommunityQuestionStatus: string
         return match ($from) {
             self::Intake             => [self::Triaged, self::Archived, self::DuplicateMerged],
             self::Triaged            => [self::DraftRequested, self::Archived, self::DuplicateMerged],
-            self::DraftRequested     => [self::Generating, self::Archived],
+            // Published / DuplicateMerged: the question mirrors its answer once
+            // that answer is live, and a question answered elsewhere is merged
+            // into it (CommunityInboxAutomationService). Nothing else moves a
+            // question past draft_requested, so without these it stayed there.
+            self::DraftRequested     => [self::Generating, self::Archived, self::Published, self::DuplicateMerged],
             self::Generating         => [self::DraftGenerated, self::ValidationFailed],
             self::DraftGenerated     => [self::ValidationFailed, self::ModerationRequired, self::EditorialReview],
             self::ValidationFailed   => [self::DraftGenerated, self::Archived],

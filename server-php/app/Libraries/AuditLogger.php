@@ -239,6 +239,9 @@ class AuditLogger
     public const COMMUNITY_AUTOMATION_SUBMITTED         = 'community.automation.submitted';
     public const COMMUNITY_AUTOMATION_DECIDED           = 'community.automation.decided';
     public const COMMUNITY_AUTOMATION_PENDING           = 'community.automation.pending';
+    public const COMMUNITY_INBOX_QUEUED                 = 'community.inbox.queued';
+    public const COMMUNITY_INBOX_CLOSED                 = 'community.inbox.closed';
+    public const COMMUNITY_INBOX_PUBLISHED              = 'community.inbox.published';
     public const COMMUNITY_SPACE_CREATED                = 'community.space.created';
     public const COMMUNITY_SPACE_UPDATED                = 'community.space.updated';
     public const COMMUNITY_MODERATION_FINDING_RESOLVED  = 'community.moderation.finding_resolved';

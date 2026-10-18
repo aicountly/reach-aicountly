@@ -155,6 +155,12 @@ final class ContentVettingServiceTest extends CIUnitTestCase
         $this->assertStringContainsString('Never reveal security details', $release);
         $this->assertStringContainsString('commit hash', $release);
 
+        // The inbox screen rejects only for the reasons that close a question for good.
+        $screen = Rubrics::for('community_question');
+        $this->assertStringContainsString('There is', $screen);
+        $this->assertStringContainsString('never because the', $screen);
+        $this->assertStringContainsString('personal data', $screen);
+
         foreach (Rubrics::TYPES as $type) {
             $this->assertStringContainsString('Nothing you approve is reviewed again', Rubrics::for($type));
         }

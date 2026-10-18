@@ -138,6 +138,10 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community-plan',     'Api\\V1\\Community\\CommunityAutomationController::plan');
         $routes->post('community-qa',      'Api\\V1\\Community\\CommunityAutomationController::storeQa');
         $routes->post('community-answers', 'Api\\V1\\Community\\CommunityAutomationController::storeAnswer');
+        // Stream 2 — the Question Inbox's routine queue (answer by id, or decline with a reason).
+        $routes->get('community/pending',                       'Api\\V1\\Community\\CommunityAutomationController::pending');
+        $routes->post('community/pending/(:segment)/answer',    'Api\\V1\\Community\\CommunityAutomationController::answerPending/$1');
+        $routes->post('community/pending/(:segment)/decline',   'Api\\V1\\Community\\CommunityAutomationController::declinePending/$1');
         // Stream D — release notes ("What's new") + workflow guides (vetted, auto-published).
         $routes->get('release-plan',     'Api\\V1\\Automation\\StructuredContentController::releasePlan');
         $routes->get('workflow-plan',    'Api\\V1\\Automation\\StructuredContentController::workflowPlan');

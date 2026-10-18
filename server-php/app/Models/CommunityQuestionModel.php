@@ -35,6 +35,10 @@ class CommunityQuestionModel extends Model
         'sensitivity_flags', 'personal_data_detected', 'spam_score',
         'moderation_state', 'duplicate_cluster_id', 'triage_score',
         'assigned_to', 'status',
+        // Who handles the question (CommunityInboxAutomationService).
+        'handled_by', 'handling_note', 'handling_updated_at', 'routine_queued_at',
+        'closed_at', 'close_reason', 'answered_by_question_id',
+        'triage_decision', 'triage_vetting_run_id', 'triage_checked_at', 'automation_failures',
     ];
 
     // tags / sensitivity_flags are native Postgres TEXT[] columns. The old
@@ -74,6 +78,9 @@ class CommunityQuestionModel extends Model
 
         if (!empty($filters['status'])) {
             $builder->where('q.status', $filters['status']);
+        }
+        if (!empty($filters['handled_by'])) {
+            $builder->where('q.handled_by', $filters['handled_by']);
         }
         if (!empty($filters['space_id'])) {
             $builder->where('q.space_id', (int) $filters['space_id']);
@@ -128,6 +135,26 @@ class CommunityQuestionModel extends Model
             ->select(
                 '(SELECT c.risk_classification FROM reach_community_question_classifications c'
                 . ' WHERE c.question_id = q.id ORDER BY c.id DESC LIMIT 1) AS risk_classification',
+                false
+            )
+            // The live answer's public link, and the question a duplicate was
+            // closed into, so the inbox can show where each one went.
+            ->select(
+                "(SELECT a.public_url FROM reach_community_official_answers a"
+                . " WHERE a.question_id = q.id AND a.status = 'published' ORDER BY a.id DESC LIMIT 1) AS answer_public_url",
+                false
+            )
+            ->select(
+                "(SELECT d.uuid::text FROM reach_community_questions d WHERE d.id = q.answered_by_question_id) AS answered_by_question_uuid",
+                false
+            )
+            ->select(
+                "(SELECT d.title FROM reach_community_questions d WHERE d.id = q.answered_by_question_id) AS answered_by_question_title",
+                false
+            )
+            ->select(
+                "(SELECT a.public_url FROM reach_community_official_answers a"
+                . " WHERE a.question_id = q.answered_by_question_id AND a.status = 'published' ORDER BY a.id DESC LIMIT 1) AS answered_by_public_url",
                 false
             )
             ->join('reach_community_spaces s', 's.id = q.space_id', 'left');

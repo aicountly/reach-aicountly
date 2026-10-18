@@ -45,6 +45,41 @@ const QUESTION = {
   space_title: 'GST help',
   space_slug: 'gst-help',
   risk_classification: 'high',
+  handled_by: 'routine_queue',
+  handling_note: 'Queued for the community-qa routine.',
+  handling_updated_at: '2026-10-18 06:00:00+00',
+  routine_queued_at: '2026-10-18 06:00:00+00',
+  closed_at: null,
+  close_reason: null,
+  answered_by_question_id: null,
+  answer_public_url: null,
+  answered_by_question_uuid: null,
+  answered_by_question_title: null,
+  answered_by_public_url: null,
+};
+
+const PUBLISHED = {
+  ...QUESTION,
+  id: '2',
+  uuid: '6b1f0f7e-1c2d-4e3f-8a9b-0c1d2e3f4a5b',
+  title: 'What turnover limit requires GST registration for a small business?',
+  status: 'published',
+  handled_by: 'published',
+  handling_note: 'Answered and published on aicountly.com/community: https://aicountly.com/community/q/gst-turnover-limit',
+  answer_public_url: 'https://aicountly.com/community/q/gst-turnover-limit',
+};
+
+const DUPLICATE = {
+  ...QUESTION,
+  id: '3',
+  uuid: '7c2a1b3d-2e4f-4a5b-9c8d-1e2f3a4b5c6d',
+  title: 'what turnover limit requires GST registration for a small business',
+  status: 'duplicate_merged',
+  handled_by: 'auto_closed',
+  close_reason: 'duplicate',
+  closed_at: '2026-10-18 07:00:00+00',
+  handling_note: 'Already answered: “What turnover limit requires GST registration for a small business?”.',
+  answered_by_public_url: 'https://aicountly.com/community/q/gst-turnover-limit',
 };
 
 const listBody = (rows) => ({
@@ -91,7 +126,7 @@ describe('QuestionInboxPage', () => {
     await waitFor(() => expect(screen.getByText(/No questions/i)).toBeInTheDocument());
   });
 
-  it('renders a question row from the list API', async () => {
+  it('renders a question row from the list API, with who handles it', async () => {
     stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
     renderWithAuth(<QuestionInboxPage />, ctx);
 
@@ -105,17 +140,39 @@ describe('QuestionInboxPage', () => {
       '49.500',
       '10-07-2026',
     ]);
+    expect(cells[6]).toContain('Routine queue');
+    expect(cells[6]).toContain('since 18-10-2026');
+    expect(cells[6]).toContain('Queued for the community-qa routine.');
   });
 
-  it('links Open to the question uuid', async () => {
+  it('shows published and auto-closed rows with their links and no action button', async () => {
+    stubApi({ 'GET v1/community/questions': [200, listBody([PUBLISHED, DUPLICATE])] });
+    renderWithAuth(<QuestionInboxPage />, { auth: { user: { id: 2, role: 'marketing' }, permissions: ['community.view'] } });
+
+    const published = (await screen.findByText(PUBLISHED.title)).closest('tr');
+    expect(published.textContent).toContain('Published');
+    expect(published.querySelector('a[href="https://aicountly.com/community/q/gst-turnover-limit"]')).not.toBeNull();
+
+    const closed = screen.getByText(DUPLICATE.title).closest('tr');
+    expect(closed.textContent).toContain('Auto-closed');
+    expect(closed.textContent).toContain('Already answered');
+    expect(screen.getByRole('link', { name: 'View the existing answer' })).toHaveAttribute('href', DUPLICATE.answered_by_public_url);
+
+    // Nobody is asked to act: no Open button, and titles are plain text for non-admins.
+    expect(screen.queryByRole('link', { name: 'Open' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    expect(screen.queryByRole('link', { name: PUBLISHED.title })).toBeNull();
+  });
+
+  it('keeps the manual workspace one click away for super admins', async () => {
     stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
     renderWithAuth(<QuestionInboxPage />, ctx);
 
-    const open = await screen.findByRole('link', { name: 'Open' });
-    expect(open).toHaveAttribute('href', `/community/questions/${QUESTION.uuid}`);
+    const link = await screen.findByRole('link', { name: QUESTION.title });
+    expect(link).toHaveAttribute('href', `/community/questions/${QUESTION.uuid}`);
   });
 
-  it('opens the question workspace from the Open link', async () => {
+  it('opens the question workspace from the title for a super admin', async () => {
     const fetch = stubApi({
       'GET v1/community/questions': [200, listBody([QUESTION])],
       [`GET v1/community/questions/${QUESTION.uuid}`]: [200, { data: QUESTION }],
@@ -129,12 +186,21 @@ describe('QuestionInboxPage', () => {
       { ...ctx, route: '/community/questions' },
     );
 
-    await userEvent.setup().click(await screen.findByRole('link', { name: 'Open' }));
+    await userEvent.setup().click(await screen.findByRole('link', { name: QUESTION.title }));
 
     expect(await screen.findByText('Question details')).toBeInTheDocument();
     expect(screen.getByText(QUESTION.uuid)).toBeInTheDocument();
     expect(requestedUrls(fetch)).toContainEqual(expect.stringContaining(`v1/community/questions/${QUESTION.uuid}`));
     expect(requestedUrls(fetch).some((url) => url.includes('undefined'))).toBe(false);
+  });
+
+  it('filters by who handles the question', async () => {
+    const fetch = stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
+    renderWithAuth(<QuestionInboxPage />, ctx);
+    await screen.findByText(QUESTION.title);
+
+    await userEvent.setup().selectOptions(screen.getByDisplayValue('Anyone'), 'routine_queue');
+    await waitFor(() => expect(requestedUrls(fetch).at(-1)).toContain('handled_by=routine_queue'));
   });
 
   it('filters by a real question status', async () => {
@@ -144,7 +210,7 @@ describe('QuestionInboxPage', () => {
 
     const statusSelect = screen.getByDisplayValue('All');
     expect([...statusSelect.options].map((o) => o.value)).toEqual(
-      ['', 'intake', 'triaged', 'draft_requested', 'archived', 'duplicate_merged'],
+      ['', 'intake', 'triaged', 'draft_requested', 'published', 'archived', 'duplicate_merged'],
     );
 
     await userEvent.setup().selectOptions(statusSelect, 'intake');
