@@ -92,7 +92,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
             ->on('GET', '#^https://generativelanguage\.googleapis\.com/v1beta/models\?#', FakeHttpTransport::json(200, ['models' => [
                 ['name' => 'models/gemini-2.5-flash', 'displayName' => 'Gemini 2.5 Flash', 'supportedGenerationMethods' => ['generateContent']],
             ]]))
-            ->on('GET', '#^https://api\.openai\.com/v1/models$#', FakeHttpTransport::json(200, ['data' => [['id' => 'dall-e-3'], ['id' => 'gpt-4o-mini-tts']]]))
+            ->on('GET', '#^https://api\.openai\.com/v1/models$#', FakeHttpTransport::json(200, ['data' => [['id' => 'gpt-image-2.5-flare'], ['id' => 'gpt-4o-mini-tts']]]))
             ->on('GET', '#^https://api\.dataforseo\.com/v3/appendix/user_data$#', FakeHttpTransport::json(200, ['status_code' => 20000, 'tasks' => [['result' => [['money' => ['balance' => 42.5]]]]]]))
             ->on('GET', '#^https://api\.shotstack\.io/edit/stage/templates$#', FakeHttpTransport::json(200, ['success' => true, 'response' => ['templates' => [['id' => 't1']]]]))
             ->on('POST', '#^https://oauth2\.googleapis\.com/token$#', FakeHttpTransport::json(200, [
@@ -174,7 +174,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
 
         $this->assertStringContainsString('Balance: $42.5', $r['dataforseo']['message']);
         $this->assertStringContainsString('gemini-2.5-flash is available', $r['gemini']['message']);
-        $this->assertStringContainsString('dall-e-3 is available', $r['openai']['message']);
+        $this->assertStringContainsString('gpt-image-2.5-flare is available', $r['openai']['message']);
 
         $this->assertMatchesRegularExpression('/Synthesised [\d,]+ bytes of MP3 \(1\.0 s\) with gpt-4o-mini-tts \/ coral\./', $r['tts']['message']);
         $speech = json_decode((string) $http->to('#audio/speech#')[0]['body'], true);

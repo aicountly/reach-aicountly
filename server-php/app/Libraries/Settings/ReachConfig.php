@@ -71,10 +71,12 @@ final class ReachConfig
             // ── end Stream H ──
 
             // ── Images ──────────────────────────────────────────────────────
-            'ai.image.model' => ['group' => 'Images', 'label' => 'Image model (OpenAI)', 'type' => 'string', 'env' => 'AI_OPENAI_IMAGE_MODEL', 'default' => 'dall-e-3',
-                'help' => 'e.g. dall-e-3 or gpt-image-1.'],
-            'ai.image.size' => ['group' => 'Images', 'label' => 'Image size', 'type' => 'string', 'default' => '1792x1024',
-                'help' => 'dall-e-3: 1792x1024 / 1024x1024; gpt-image-1: 1536x1024.'],
+            'ai.image.model' => ['group' => 'Images', 'label' => 'Image model (OpenAI)', 'type' => 'string', 'env' => 'AI_OPENAI_IMAGE_MODEL', 'default' => 'gpt-image-2.5-flare',
+                'help' => 'A GPT Image model, e.g. gpt-image-2.5-flare (fast, everyday) or gpt-image-2.5-sunburst. OpenAI removed dall-e-2 / dall-e-3 from the API on 12 May 2026. Run live checks after changing it: it confirms the model is available to the key.'],
+            'ai.image.size' => ['group' => 'Images', 'label' => 'Image size', 'type' => 'string', 'default' => '1536x1024',
+                'help' => 'GPT Image: 1536x1024 (landscape, blog covers), 1024x1024, 1024x1536 (portrait). Other sizes are snapped to the nearest of these.'],
+            'ai.image.quality' => ['group' => 'Images', 'label' => 'Image quality (GPT Image)', 'type' => 'choice', 'env' => 'AI_OPENAI_IMAGE_QUALITY', 'default' => 'medium', 'options' => ['low', 'medium', 'high', 'auto'],
+                'help' => 'Price and detail rise with quality; medium suits blog covers and video stills.'],
 
             // ── Automation volumes & switches ───────────────────────────────
             'automation.community.enabled' => ['group' => 'Automation', 'label' => 'Community Q&A automation', 'type' => 'bool', 'default' => true],
