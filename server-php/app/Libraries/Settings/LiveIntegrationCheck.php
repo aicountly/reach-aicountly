@@ -541,6 +541,10 @@ final class LiveIntegrationCheck
                     $altJson = $client->inbox($query, $alt);
                     $p = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($altJson, $acc['platform'], (string) $acc['id']);
                     $found[] = $alt . ($p['recognised'] ? ' (' . count($p['items']) . ' item(s))' : ' (answered, shape not recognised)');
+                    if (! $p['recognised']) {
+                        // Types only, no values: what the parser needs to learn.
+                        $detail['shape ' . $alt] = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::skeleton($altJson);
+                    }
                 } catch (SocialApiException) {
                 }
             }
@@ -553,7 +557,7 @@ final class LiveIntegrationCheck
         $page = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($json, $acc['platform'], (string) $acc['id']);
         if (! $page['recognised']) {
             return ['ok' => false, 'line' => "Inbox list answered (GET {$path}) but with a shape Reach does not recognise (top-level keys: " . implode(', ', $page['keys']) . '). Nothing will be read until the parser matches it.',
-                'detail' => $detail + ['result' => 'unrecognised shape', 'keys' => implode(', ', $page['keys'])]];
+                'detail' => $detail + ['result' => 'unrecognised shape', 'keys' => implode(', ', $page['keys']), 'shape' => \App\Libraries\Distribution\SocialInbox\SocialInboxParser::skeleton($json)]];
         }
         $first = $page['items'][0] ?? null;
         $fields = $first !== null ? array_slice(array_map('strval', array_keys((array) $first['raw'])), 0, 15) : [];
