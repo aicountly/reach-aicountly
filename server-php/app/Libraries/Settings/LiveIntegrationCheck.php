@@ -498,20 +498,21 @@ final class LiveIntegrationCheck
         return $this->result('social_api', $probe['ok'], $message . ' ' . $probe['line'], $detail);
     }
 
-    /** Inbox paths tried read-only when the configured one answers 404 (to tell the operator which exists). */
-    public const INBOX_PROBE_ALTERNATIVES = ['/inbox', '/inbox/comments', '/inbox/conversations', '/inbox/messages', '/comments', '/conversations', '/messages'];
+    /** Inbox paths tried read-only when a configured one answers 404 (to tell the operator which exists). */
+    public const INBOX_PROBE_ALTERNATIVES = ['/inbox/comments', '/inbox/conversations', '/inbox', '/inbox/messages', '/comments', '/conversations', '/messages'];
 
     /**
-     * GET the inbox list once for one active account (never posts, never
-     * replies). On a 404, the usual alternative paths are tried (GET only) and
-     * the ones that answer are named, so the setting can be corrected.
+     * GET each configured inbox list once for one active account (never posts,
+     * never replies). A 404 makes the usual alternative paths get tried (GET
+     * only) and the ones that answer named; an answer Reach cannot read is shown
+     * as its skeleton (key names and types only, no values).
      *
      * @param list<array<string, mixed>> $accounts
      * @return array{ok: bool, line: string, detail: array<string, mixed>}
      */
     private function socialInboxProbe(SocialApiAiClient $client, array $accounts): array
     {
-        $path   = SocialApiAiClient::path((string) ReachConfig::get('social.inbox.list_path', SocialApiAiClient::INBOX_LIST_PATH), SocialApiAiClient::INBOX_LIST_PATH);
+        $paths  = SocialApiAiClient::listPaths((string) ReachConfig::get('social.inbox.list_path', SocialApiAiClient::INBOX_LIST_PATH));
         $wanted = \App\Libraries\Distribution\SocialInbox\SocialInboxService::platforms();
         $acc    = null;
         foreach ($accounts as $a) {
@@ -520,55 +521,64 @@ final class LiveIntegrationCheck
                 break;
             }
         }
-        $detail = ['list_path' => $path];
+        $detail = ['list_paths' => implode(', ', $paths)];
         if ($acc === null) {
             return ['ok' => true, 'line' => 'Inbox: not checked — no active account of the networks it reads (' . implode(', ', $wanted) . ').', 'detail' => $detail + ['result' => 'not checked']];
         }
         $detail['account'] = $acc['platform'] . ' ' . $acc['id'];
         $query = ['account_id' => (string) $acc['id'], 'limit' => 5, 'since' => gmdate('Y-m-d\TH:i:s\Z', ($this->clock)() - 7 * 86400)];
-        try {
-            $json = $client->inbox($query, $path);
-        } catch (SocialApiException $e) {
-            if ($e->httpStatus !== 404) {
-                return ['ok' => false, 'line' => "Inbox list FAILED (GET {$path}): " . $e->getMessage(), 'detail' => $detail + ['result' => 'failed', 'http_status' => $e->httpStatus]];
+
+        $ok       = true;
+        $parts    = [];
+        $notFound = false;
+        foreach ($paths as $path) {
+            try {
+                $json = $client->inbox($query, $path);
+            } catch (SocialApiException $e) {
+                $ok      = false;
+                $parts[] = "GET {$path} FAILED (" . ($e->httpStatus === 404 ? 'HTTP 404' : $e->getMessage()) . ')';
+                $detail['result ' . $path] = $e->httpStatus === 404 ? 'not found (404)' : 'failed, HTTP ' . $e->httpStatus;
+                $notFound = $notFound || $e->httpStatus === 404;
+                continue;
             }
+            $page = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($json, $acc['platform'], (string) $acc['id'], SocialApiAiClient::listPathKind($path));
+            if (! $page['recognised']) {
+                $ok      = false;
+                $parts[] = "GET {$path} answered in a shape Reach does not read";
+                $detail['result ' . $path] = 'unrecognised shape';
+                $detail['shape ' . $path]  = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::skeleton($json);
+                continue;
+            }
+            $first   = $page['items'][0] ?? null;
+            $parts[] = sprintf('GET %s OK: %d item(s)%s', $path, count($page['items']), $page['next'] !== null ? ', more pages' : '');
+            $detail['result ' . $path] = 'ok, ' . count($page['items']) . ' item(s)' . ($page['skipped'] !== [] ? ', ' . count($page['skipped']) . ' unreadable' : '');
+            if ($first !== null) {
+                $detail['item fields ' . $path] = implode(', ', array_slice(array_map('strval', array_keys((array) $first['raw'])), 0, 15));
+                $detail['first item ' . $path]  = sprintf('%s %s, %d characters, received %s', $first['platform'] ?? '?', $first['kind'], mb_strlen((string) $first['text']), $first['received_at'] ?? 'time not given');
+            }
+        }
+
+        if ($notFound) {
             $found = [];
             foreach (self::INBOX_PROBE_ALTERNATIVES as $alt) {
-                if ($alt === $path) {
+                if (in_array($alt, $paths, true)) {
                     continue;
                 }
                 try {
                     $altJson = $client->inbox($query, $alt);
-                    $p = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($altJson, $acc['platform'], (string) $acc['id']);
+                    $p = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($altJson, $acc['platform'], (string) $acc['id'], SocialApiAiClient::listPathKind($alt));
                     $found[] = $alt . ($p['recognised'] ? ' (' . count($p['items']) . ' item(s))' : ' (answered, shape not recognised)');
                     if (! $p['recognised']) {
-                        // Types only, no values: what the parser needs to learn.
                         $detail['shape ' . $alt] = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::skeleton($altJson);
                     }
                 } catch (SocialApiException) {
                 }
             }
-            return ['ok' => false, 'line' => "Inbox list FAILED: GET {$path} is HTTP 404 — the path is an assumption. " . ($found !== []
-                ? 'These answered: ' . implode(', ', $found) . '. Set social.inbox.list_path to the right one (docs.social-api.ai/guides/inbox).'
-                : 'None of ' . implode(', ', array_diff(self::INBOX_PROBE_ALTERNATIVES, [$path])) . ' answered either; read docs.social-api.ai/guides/inbox and set social.inbox.list_path.'),
-                'detail' => $detail + ['result' => 'not found (404)', 'alternatives_answering' => $found === [] ? 'none' : $found]];
+            $detail['alternatives_answering'] = $found === [] ? 'none' : $found;
+            $parts[] = $found !== [] ? 'These answered: ' . implode(', ', $found) . ' — set social.inbox.list_path (comma-separated).' : 'No alternative inbox path answered either.';
         }
 
-        $page = \App\Libraries\Distribution\SocialInbox\SocialInboxParser::page($json, $acc['platform'], (string) $acc['id']);
-        if (! $page['recognised']) {
-            return ['ok' => false, 'line' => "Inbox list answered (GET {$path}) but with a shape Reach does not recognise (top-level keys: " . implode(', ', $page['keys']) . '). Nothing will be read until the parser matches it.',
-                'detail' => $detail + ['result' => 'unrecognised shape', 'keys' => implode(', ', $page['keys']), 'shape' => \App\Libraries\Distribution\SocialInbox\SocialInboxParser::skeleton($json)]];
-        }
-        $first = $page['items'][0] ?? null;
-        $fields = $first !== null ? array_slice(array_map('strval', array_keys((array) $first['raw'])), 0, 15) : [];
-
-        return ['ok' => true, 'line' => sprintf('Inbox list OK (GET %s): %d item(s) on the first page%s. Nothing was replied to.', $path, count($page['items']), $page['next'] !== null ? ', more pages' : ''), 'detail' => $detail + [
-            'result'        => 'ok',
-            'items'         => count($page['items']),
-            'dropped_items' => count($page['skipped']),
-            'item_fields'   => $fields === [] ? 'no items to inspect' : implode(', ', $fields),
-            'first_item'    => $first !== null ? sprintf('%s %s, %d characters, received %s', $first['platform'] ?? '?', $first['kind'], mb_strlen((string) $first['text']), $first['received_at'] ?? 'time not given') : null,
-        ]];
+        return ['ok' => $ok, 'line' => 'Inbox ' . ($ok ? 'OK' : 'FAILED') . ': ' . implode('; ', $parts) . '. Nothing was replied to.', 'detail' => $detail];
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

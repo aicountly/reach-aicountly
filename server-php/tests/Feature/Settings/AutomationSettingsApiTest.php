@@ -136,7 +136,7 @@ final class AutomationSettingsApiTest extends ApiTestCase
         \App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts::forget();
         $http = (new FakeHttpTransport())->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, [
             ['id' => 'acc_yt', 'name' => 'AICOUNTLY', 'platform' => 'youtube', 'status' => 'active'],
-        ]))->on('GET', '#^https://api\.social-api\.ai/v1/inbox\?#', FakeHttpTransport::json(200, ['data' => []]));
+        ]))->on('GET', '#^https://api\.social-api\.ai/v1/inbox/(comments|conversations)\?#', FakeHttpTransport::json(200, ['data' => null, 'pagination' => ['has_more' => false]]));
         VideoProviders::override('http', $http);
         try {
             $res = $this->withHeaders($h)->withBodyFormat('json')->call('POST', 'v1/settings/automation/live-check', ['only' => ['social_api']]);
@@ -145,7 +145,7 @@ final class AutomationSettingsApiTest extends ApiTestCase
             $this->assertTrue($data['ok']);
             $this->assertSame('social_api', $data['results'][0]['target']);
             $this->assertStringContainsString('1 connected account(s): youtube 1', $data['results'][0]['message']);
-            $this->assertStringContainsString('Inbox list OK (GET /inbox): 0 item(s)', $data['results'][0]['message']);
+            $this->assertStringContainsString('Inbox OK: GET /inbox/comments OK: 0 item(s); GET /inbox/conversations OK: 0 item(s)', $data['results'][0]['message']);
             $this->assertStringNotContainsString('sapi_key_live_check_456', (string) $res->getJSON());
             $this->assertSame(['GET'], array_values(array_unique(array_column($http->requests, 'method'))));
         } finally {

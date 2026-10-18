@@ -220,9 +220,38 @@ final class SocialApiAiClient
     // The paths are settings (social.inbox.*_path) so a different
     // layout needs no code change. Answers are parsed by SocialInboxParser.
 
-    public const INBOX_LIST_PATH  = '/inbox';
-    public const INBOX_REPLY_PATH = '/inbox/{id}/reply';
-    public const INBOX_HIDE_PATH  = '/inbox/{id}/hide';
+    // Confirmed on the first live run (18 Oct 2026): GET /inbox is 404; comments and direct
+    // messages are listed separately at /inbox/comments and /inbox/conversations, and an
+    // empty list answers {"data": null, "pagination": {…}}. Reply / hide are still assumptions.
+    public const INBOX_COMMENTS_PATH      = '/inbox/comments';
+    public const INBOX_CONVERSATIONS_PATH = '/inbox/conversations';
+    public const INBOX_LIST_PATH          = self::INBOX_COMMENTS_PATH . ',' . self::INBOX_CONVERSATIONS_PATH;
+    public const INBOX_REPLY_PATH         = '/inbox/comments/{id}/reply';
+    public const INBOX_MESSAGE_REPLY_PATH = '/inbox/conversations/{thread_id}/messages';
+    public const INBOX_HIDE_PATH          = '/inbox/comments/{id}/hide';
+
+    /**
+     * The inbox list setting as paths (comma-separated; each validated like path()).
+     *
+     * @return list<string>
+     */
+    public static function listPaths(string $setting): array
+    {
+        $out = [];
+        foreach (explode(',', $setting) as $p) {
+            $p = self::path($p, '');
+            if ($p !== '' && ! in_array($p, $out, true)) {
+                $out[] = $p;
+            }
+        }
+        return $out !== [] ? $out : explode(',', self::INBOX_LIST_PATH);
+    }
+
+    /** The kind an inbox list path holds when its items do not say: conversations are direct messages. */
+    public static function listPathKind(string $path): ?string
+    {
+        return preg_match('#/(conversations|messages|dms?)(/|$|\?)#', $path) === 1 ? 'message' : null;
+    }
 
     /**
      * GET the inbox list (retried on 5xx / network like every GET).
@@ -231,9 +260,9 @@ final class SocialApiAiClient
      * @return array<string, mixed>|list<mixed> the decoded body
      * @throws SocialApiException non-2xx (404 → kind permanent, httpStatus 404), or a 2xx that is not JSON
      */
-    public function inbox(array $query = [], string $pathTemplate = self::INBOX_LIST_PATH): array
+    public function inbox(array $query = [], string $pathTemplate = self::INBOX_COMMENTS_PATH): array
     {
-        $path = self::path($pathTemplate, self::INBOX_LIST_PATH);
+        $path = self::path($pathTemplate, self::INBOX_COMMENTS_PATH);
         if (str_contains($path, '{account_id}')) {
             $path = str_replace('{account_id}', rawurlencode((string) ($query['account_id'] ?? '')), $path);
             unset($query['account_id']);
@@ -287,7 +316,7 @@ final class SocialApiAiClient
     public static function path(string $template, string $default): string
     {
         $t = trim($template);
-        if ($t === '' || ! str_starts_with($t, '/') || str_contains($t, '..') || str_contains($t, '://') || preg_match('/\s/', $t)) {
+        if ($t === '' || ! str_starts_with($t, '/') || str_contains($t, '..') || str_contains($t, '://') || str_contains($t, ',') || preg_match('/\s/', $t)) {
             return $default;
         }
         return $t;

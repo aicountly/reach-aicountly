@@ -109,10 +109,11 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
                 ['id' => 'acc_ig_1', 'name' => 'AICOUNTLY', 'username' => 'aicountly.in', 'platform' => 'instagram', 'status' => 'active'],
                 ['id' => 'acc_li_1', 'name' => 'AICOUNTLY', 'platform' => 'linkedin', 'status' => 'expired'],
             ]))
-            // Social inbox bot: the read-only probe of the (assumed) inbox list.
-            ->on('GET', '#^https://api\.social-api\.ai/v1/inbox\?#', FakeHttpTransport::json(200, ['data' => [
+            // Social inbox bot: the read-only probe of both inbox lists (shapes confirmed live).
+            ->on('GET', '#^https://api\.social-api\.ai/v1/inbox/comments\?#', FakeHttpTransport::json(200, ['data' => [
                 ['id' => 'cmt_1', 'type' => 'comment', 'platform' => 'instagram', 'text' => 'Does AICOUNTLY file GSTR-1?', 'author' => ['username' => 'asha'], 'created_at' => '2026-10-18T09:00:00Z'],
-            ], 'next_cursor' => null]));
+            ], 'pagination' => ['has_more' => false]]))
+            ->on('GET', '#^https://api\.social-api\.ai/v1/inbox/conversations\?#', FakeHttpTransport::json(200, ['data' => null, 'pagination' => ['has_more' => false, 'next_cursor' => ''], 'sync_state' => 'idle', 'last_synced_at' => null]));
     }
 
     /** @param array<string, mixed> $report */
@@ -209,12 +210,13 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         $this->assertStringStartsWith('posts go to acc_yt_1 “AICOUNTLY” (auto', $r['social_api']['detail']['targets']['youtube']);
         $this->assertStringContainsString('not available — No active LinkedIn account', $r['social_api']['detail']['targets']['linkedin']);
         $this->assertSame('Bearer sapi_key_live_secret_xyz', $http->to('#social-api#')[0]['headers']['Authorization']);
-        $this->assertCount(2, $http->to('#social-api#'), 'GET /accounts + one GET of the inbox list; never a post');
+        $this->assertCount(3, $http->to('#social-api#'), 'GET /accounts + one GET of each inbox list; never a post');
         $this->assertSame([], array_filter($http->to('#social-api#'), static fn ($r) => $r['method'] !== 'GET'));
-        $this->assertStringContainsString('Inbox list OK (GET /inbox): 1 item(s) on the first page. Nothing was replied to.', $r['social_api']['message']);
-        $this->assertSame('ok', $r['social_api']['detail']['inbox']['result']);
+        $this->assertStringContainsString('Inbox OK: GET /inbox/comments OK: 1 item(s); GET /inbox/conversations OK: 0 item(s). Nothing was replied to.', $r['social_api']['message']);
+        $this->assertSame('ok, 1 item(s)', $r['social_api']['detail']['inbox']['result /inbox/comments']);
+        $this->assertSame('ok, 0 item(s)', $r['social_api']['detail']['inbox']['result /inbox/conversations']);
         $this->assertSame('youtube acc_yt_1', $r['social_api']['detail']['inbox']['account']);
-        $this->assertStringContainsString('id, type, platform, text, author, created_at', $r['social_api']['detail']['inbox']['item_fields']);
+        $this->assertStringContainsString('id, type, platform, text, author, created_at', $r['social_api']['detail']['inbox']['item fields /inbox/comments']);
         $this->assertStringNotContainsString('GSTR-1', json_encode($r['social_api']), 'the probe never prints message text');
         $inboxUrl = $http->to('#/v1/inbox#')[0]['url'];
         $this->assertStringContainsString('account_id=acc_yt_1', $inboxUrl);
@@ -227,15 +229,17 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
     {
         $http = (new FakeHttpTransport())
             ->on('GET', '#/v1/accounts$#', FakeHttpTransport::json(200, [['id' => 'acc_li', 'platform' => 'linkedin', 'status' => 'active']]))
-            ->on('GET', '#/v1/inbox\?#', FakeHttpTransport::json(404, ['error' => ['code' => 'resource.not_found', 'message' => 'Not found']]))
+            ->on('GET', '#/v1/inbox/conversations\?#', FakeHttpTransport::json(404, ['error' => ['code' => 'resource.not_found', 'message' => 'Not found']]))
             ->on('GET', '#/v1/inbox/comments\?#', FakeHttpTransport::json(200, ['items' => [['comment_id' => 'c1', 'message' => 'hi']]]))
+            ->on('GET', '#/v1/inbox/messages\?#', FakeHttpTransport::json(200, ['data' => [['id' => 'm1', 'text' => 'hi']]]))
             ->on('GET', '#/v1/conversations\?#', FakeHttpTransport::json(200, ['weird' => true]))
-            ->on('GET', '#/v1/(inbox/conversations|inbox/messages|comments|messages)\?#', FakeHttpTransport::json(404, []));
+            ->on('GET', '#/v1/(inbox|comments|messages)\?#', FakeHttpTransport::json(404, []));
         $r = $this->check($http)->run(['social_api'])['results'][0];
 
         $this->assertFalse($r['ok'], 'posting works, but the inbox bot cannot read — the check says so');
         $this->assertStringContainsString('Key accepted; 1 connected account(s)', $r['message']);
-        $this->assertStringContainsString('Inbox list FAILED: GET /inbox is HTTP 404 — the path is an assumption. These answered: /inbox/comments (1 item(s)), /conversations (answered, shape not recognised).', $r['message']);
+        $this->assertStringContainsString('Inbox FAILED: GET /inbox/comments OK: 1 item(s); GET /inbox/conversations FAILED (HTTP 404); These answered: /inbox/messages (1 item(s)), /conversations (answered, shape not recognised) — set social.inbox.list_path (comma-separated).', $r['message']);
+        $this->assertSame('{weird: bool}', $r['detail']['inbox']['shape /conversations'], 'an unreadable answer is shown as types only');
         $this->assertSame([], array_filter($http->requests, static fn ($q) => $q['method'] !== 'GET'), 'the probe only ever GETs');
     }
 
@@ -243,10 +247,11 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
     {
         $http = (new FakeHttpTransport())
             ->on('GET', '#/v1/accounts$#', FakeHttpTransport::json(200, [['id' => 'acc_li', 'platform' => 'linkedin', 'status' => 'active']]))
-            ->on('GET', '#/v1/inbox\?#', FakeHttpTransport::json(200, ['total' => 3, 'unexpected' => ['a' => 1]]));
+            ->on('GET', '#/v1/inbox/(comments|conversations)\?#', FakeHttpTransport::json(200, ['total' => 3, 'unexpected' => ['a' => 1]]));
         $r = $this->check($http)->run(['social_api'])['results'][0];
         $this->assertFalse($r['ok']);
-        $this->assertStringContainsString('shape Reach does not recognise (top-level keys: total, unexpected)', $r['message']);
+        $this->assertStringContainsString('GET /inbox/comments answered in a shape Reach does not read', $r['message']);
+        $this->assertSame('{total: int, unexpected: {a: int}}', $r['detail']['inbox']['shape /inbox/comments']);
 
         $this->setVideoEnv(['SOCIAL_INBOX_ENABLED' => 'false']);
         $http2 = (new FakeHttpTransport())->on('GET', '#/v1/accounts$#', FakeHttpTransport::json(200, [['id' => 'acc_li', 'platform' => 'linkedin', 'status' => 'active']]));

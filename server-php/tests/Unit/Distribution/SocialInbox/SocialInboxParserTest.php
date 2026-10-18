@@ -125,4 +125,18 @@ final class SocialInboxParserTest extends CIUnitTestCase
             $this->assertStringNotContainsString($leak, $s);
         }
     }
+
+    public function testAnEmptyInboxAnswersDataNullAndIsAnEmptyPage(): void
+    {
+        $p = SocialInboxParser::page(['data' => null, 'pagination' => ['has_more' => false, 'next_cursor' => ''], 'sync_state' => 'idle', 'last_synced_at' => null]);
+        $this->assertTrue($p['recognised']);
+        $this->assertSame([], $p['items']);
+        $this->assertNull($p['next']);
+    }
+
+    public function testItemsFromTheConversationsListAreDirectMessagesUnlessTheySayOtherwise(): void
+    {
+        $p = SocialInboxParser::page(['data' => [['id' => 'm1', 'text' => 'hi'], ['id' => 'm2', 'text' => 'yo', 'type' => 'comment']]], 'instagram', 'acc', 'message');
+        $this->assertSame(['message', 'comment'], array_column($p['items'], 'kind'));
+    }
 }

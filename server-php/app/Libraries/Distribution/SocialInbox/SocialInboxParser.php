@@ -40,7 +40,7 @@ final class SocialInboxParser
      * @param array<string, mixed>|list<mixed> $json
      * @return array{items: list<array<string, mixed>>, next: ?string, recognised: bool, keys: list<string>, skipped: list<string>}
      */
-    public static function page(array $json, ?string $platform = null, ?string $accountId = null): array
+    public static function page(array $json, ?string $platform = null, ?string $accountId = null, ?string $kindHint = null): array
     {
         [$list, $container] = self::locateList($json);
         $keys = array_slice(array_map('strval', array_keys($json)), 0, 15);
@@ -75,12 +75,12 @@ final class SocialInboxParser
                         'post_url'   => $child['post_url'] ?? $raw['post_url'] ?? $raw['permalink'] ?? $raw['url'] ?? null,
                         'type'       => $child['type'] ?? $child['kind'] ?? $raw['type'] ?? $raw['kind'] ?? null,
                     ], static fn ($v) => $v !== null && $v !== '');
-                    $n = self::item($child + $inherit, $platform, $accountId);
+                    $n = self::item(self::withKindHint($child + $inherit, $kindHint), $platform, $accountId);
                     $n === null ? $skipped[] = self::why($child) : $items[] = $n;
                 }
                 continue;
             }
-            $n = self::item($raw, $platform, $accountId);
+            $n = self::item(self::withKindHint($raw, $kindHint), $platform, $accountId);
             $n === null ? $skipped[] = self::why($raw) : $items[] = $n;
         }
 
@@ -254,10 +254,36 @@ final class SocialInboxParser
         };
     }
 
+    /**
+     * An endpoint that only lists one kind (social-api.ai: /inbox/conversations = direct
+     * messages) says so when the item itself does not.
+     *
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
+     */
+    private static function withKindHint(array $raw, ?string $kindHint): array
+    {
+        if ($kindHint === null) {
+            return $raw;
+        }
+        foreach (['type', 'kind', 'item_type', 'object', 'source_type', 'category'] as $k) {
+            if (isset($raw[$k]) && is_string($raw[$k]) && trim($raw[$k]) !== '') {
+                return $raw;
+            }
+        }
+        return $raw + ['kind' => $kindHint];
+    }
+
     private static function locateList(array $json): array
     {
         if (array_is_list($json)) {
             return [$json, $json];
+        }
+        // social-api.ai answers an empty inbox with {"data": null, "pagination": {…}}.
+        foreach (self::LIST_KEYS as $k) {
+            if (array_key_exists($k, $json) && $json[$k] === null) {
+                return [[], $json];
+            }
         }
         foreach (self::LIST_KEYS as $k) {
             if (isset($json[$k]) && is_array($json[$k])) {

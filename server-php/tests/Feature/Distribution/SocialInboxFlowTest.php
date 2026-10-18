@@ -125,7 +125,9 @@ final class SocialInboxFlowTest extends DatabaseTestCase
 
     private function inbox(array $items): void
     {
-        $this->http->on('GET', '#/v1/inbox\?#', FakeHttpTransport::json(200, ['data' => $items, 'next_cursor' => null]));
+        // Confirmed live shapes: comments and direct messages are separate lists; an empty one is data: null.
+        $this->http->on('GET', '#/v1/inbox/comments\?#', FakeHttpTransport::json(200, ['data' => $items, 'pagination' => ['has_more' => false]]));
+        $this->http->on('GET', '#/v1/inbox/conversations\?#', FakeHttpTransport::json(200, ['data' => null, 'pagination' => ['has_more' => false, 'next_cursor' => ''], 'sync_state' => 'idle', 'last_synced_at' => null]));
     }
 
     private function item(string $id, string $text, array $extra = []): array
@@ -139,7 +141,7 @@ final class SocialInboxFlowTest extends DatabaseTestCase
 
     private function acceptReplies(): void
     {
-        $this->http->on('POST', '#/v1/inbox/[^/]+/reply$#', static fn (string $m, string $url): \App\Libraries\Video\Automation\Http\HttpResponse
+        $this->http->on('POST', '#/v1/inbox/comments/[^/]+/reply$#', static fn (string $m, string $url): \App\Libraries\Video\Automation\Http\HttpResponse
             => FakeHttpTransport::json(201, ['data' => ['id' => 'rep_' . basename(dirname($url))]]));
     }
 
@@ -172,7 +174,7 @@ final class SocialInboxFlowTest extends DatabaseTestCase
         $this->assertSame(0, $svc->poll()['stored'], 'polling again stores nothing new');
         $this->assertSame(2, $this->db->table('reach_social_inbox')->countAllResults());
 
-        $calls = $this->http->to('#/v1/inbox\?#');
+        $calls = $this->http->to('#/v1/inbox/comments\?#');
         $this->assertStringContainsString('account_id=acc_li', $calls[0]['url']);
         $this->assertStringContainsString('since=' . rawurlencode(gmdate('Y-m-d\TH:i:s\Z', $this->now - 24 * 3600)), $calls[0]['url'], 'first read: lookback');
         $this->assertStringContainsString('since=' . rawurlencode(gmdate('Y-m-d\TH:i:s\Z', $this->now - 600 - 3600)), $calls[1]['url'], 'later reads: newest stored minus an hour');
@@ -185,11 +187,12 @@ final class SocialInboxFlowTest extends DatabaseTestCase
 
     public function testA404OnTheAssumedInboxPathIsReportedWithTheSettingToFix(): void
     {
-        $this->http->on('GET', '#/v1/inbox\?#', FakeHttpTransport::json(404, ['error' => ['code' => 'resource.not_found']]));
+        $this->http->on('GET', '#/v1/inbox/(comments|conversations)\?#', FakeHttpTransport::json(404, ['error' => ['code' => 'resource.not_found']]));
         $r = $this->service()->poll();
         $this->assertSame('error', $r['status']);
         $this->assertStringContainsString('social.inbox.list_path', $r['errors']['linkedin']);
-        $this->assertCount(1, $this->http->to('#/v1/inbox\?#'));
+        $this->assertCount(1, $this->http->to('#/v1/inbox/comments\?#'), 'a 404 path is not asked again for the next account');
+        $this->assertCount(1, $this->http->to('#/v1/inbox/conversations\?#'));
     }
 
     // ── replies ─────────────────────────────────────────────────────────────
@@ -324,7 +327,7 @@ final class SocialInboxFlowTest extends DatabaseTestCase
         $this->assertStringContainsString('hiding is off', (string) $this->row('s1')['status_reason']);
 
         \App\Libraries\Settings\ReachConfig::set('social.inbox.hide_spam', true);
-        $this->http->on('POST', '#/v1/inbox/s2/hide$#', FakeHttpTransport::json(200, ['ok' => true]));
+        $this->http->on('POST', '#/v1/inbox/comments/s2/hide$#', FakeHttpTransport::json(200, ['ok' => true]));
         $svc->processOne((int) $this->row('s2')['id']);
         $this->assertSame('hidden', $this->row('s2')['status']);
         $this->assertSame([], $this->http->to('#/reply$#'), 'spam is never replied to');

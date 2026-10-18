@@ -31,14 +31,14 @@ final class SocialApiInboxClientTest extends CIUnitTestCase
     public function testTheListSendsTheQueryAndBearerAndRetriesA5xx(): void
     {
         $http = (new FakeHttpTransport())
-            ->on('GET', '#/v1/inbox\?#', FakeHttpTransport::json(503, []), 1)
-            ->on('GET', '#/v1/inbox\?#', FakeHttpTransport::json(200, ['data' => []]));
+            ->on('GET', '#/v1/inbox/comments\?#', FakeHttpTransport::json(503, []), 1)
+            ->on('GET', '#/v1/inbox/comments\?#', FakeHttpTransport::json(200, ['data' => []]));
         $json = $this->client($http)->inbox(['account_id' => 'acc_li', 'since' => '2026-10-17T00:00:00Z', 'limit' => 50, 'cursor' => null]);
 
         $this->assertSame(['data' => []], $json);
         $this->assertCount(2, $http->requests, 'one retry after the 503');
         $url = $http->requests[1]['url'];
-        $this->assertSame('https://api.social-api.ai/v1/inbox?account_id=acc_li&since=2026-10-17T00%3A00%3A00Z&limit=50', $url, 'empty cursor not sent');
+        $this->assertSame('https://api.social-api.ai/v1/inbox/comments?account_id=acc_li&since=2026-10-17T00%3A00%3A00Z&limit=50', $url, 'empty cursor not sent');
         $this->assertSame('Bearer ' . self::KEY, $http->requests[1]['headers']['Authorization']);
     }
 
@@ -48,7 +48,7 @@ final class SocialApiInboxClientTest extends CIUnitTestCase
         $this->client($http)->inbox(['account_id' => 'acc/1', 'limit' => 5], '/accounts/{account_id}/inbox');
         $this->assertSame('https://api.social-api.ai/v1/accounts/acc%2F1/inbox?limit=5', $http->requests[0]['url']);
 
-        foreach (['https://evil.example/x', '../secrets', 'inbox', '/in box'] as $bad) {
+        foreach (['https://evil.example/x', '../secrets', 'inbox', '/in box', '/inbox/comments,/inbox/conversations'] as $bad) {
             $this->assertSame('/inbox', SocialApiAiClient::path($bad, '/inbox'), $bad);
         }
     }
@@ -60,7 +60,7 @@ final class SocialApiInboxClientTest extends CIUnitTestCase
             $this->fail('404 accepted');
         } catch (SocialApiException $e) {
             $this->assertSame(404, $e->httpStatus);
-            $this->assertStringContainsString('inbox list (GET /inbox) failed (HTTP 404): resource.not_found Not found', $e->getMessage());
+            $this->assertStringContainsString('inbox list (GET /inbox/comments) failed (HTTP 404): resource.not_found Not found', $e->getMessage());
         }
         $this->expectException(SocialApiException::class);
         $this->client((new FakeHttpTransport())->on('GET', '#.#', new HttpResponse(200, '<html>login</html>')))->inbox([]);
@@ -68,7 +68,7 @@ final class SocialApiInboxClientTest extends CIUnitTestCase
 
     public function testAReplyIsAcceptedOnlyOnA2xxAndNeverRetried(): void
     {
-        $http = (new FakeHttpTransport())->on('POST', '#/v1/inbox/cmt%2F1/reply$#', FakeHttpTransport::json(201, ['data' => ['id' => 'rep_9']]));
+        $http = (new FakeHttpTransport())->on('POST', '#/v1/inbox/comments/cmt%2F1/reply$#', FakeHttpTransport::json(201, ['data' => ['id' => 'rep_9']]));
         $r = $this->client($http)->replyToInboxItem('cmt/1', 'Thanks! — AICOUNTLY team', SocialApiAiClient::INBOX_REPLY_PATH, 'reach-social-inbox:7');
         $this->assertTrue($r['accepted']);
         $this->assertSame('rep_9', $r['reply_id']);
@@ -96,5 +96,14 @@ final class SocialApiInboxClientTest extends CIUnitTestCase
     {
         $http = (new FakeHttpTransport())->on('POST', '#/v1/moderation/c1/hide$#', FakeHttpTransport::json(200, ['ok' => true]));
         $this->assertTrue($this->client($http)->hideInboxItem('c1', '/moderation/{id}/hide')['accepted']);
+    }
+
+    public function testTheListSettingIsSplitIntoSafePathsAndConversationsAreDirectMessages(): void
+    {
+        $this->assertSame(['/inbox/comments', '/inbox/conversations'], SocialApiAiClient::listPaths(SocialApiAiClient::INBOX_LIST_PATH));
+        $this->assertSame(['/inbox/comments'], SocialApiAiClient::listPaths(' /inbox/comments , https://evil.example/x, ../up '));
+        $this->assertSame(['/inbox/comments', '/inbox/conversations'], SocialApiAiClient::listPaths(''), 'nothing usable falls back to the confirmed defaults');
+        $this->assertSame('message', SocialApiAiClient::listPathKind('/inbox/conversations'));
+        $this->assertNull(SocialApiAiClient::listPathKind('/inbox/comments'));
     }
 }
