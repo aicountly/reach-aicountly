@@ -53,7 +53,7 @@ export function buildNavSections() {
       items: [
         { id: 'command-centre', label: 'Command centre', path: ROUTES.DASHBOARD, icon: LayoutDashboard, end: true, requires: 'dashboard.view', keywords: 'dashboard home overview' },
         // Page built by the bot-plan stream (plan today / tomorrow / week / month vs achieved).
-        { id: 'bot-plan', label: 'Bot plan', path: ROUTES.BOT_PLAN, icon: Target, requires: 'dashboard.view', keywords: 'plan today tomorrow week month achieved targets daily pack' },
+        { id: 'bot-plan', label: 'Bot plan', path: ROUTES.BOT_PLAN, icon: Target, requires: 'bot.view', keywords: 'plan today tomorrow week month achieved targets daily pack' },
         { id: 'bot-run-now', label: 'Run now', path: ROUTES.BOT_ACTIVITIES, icon: Zap, requires: 'dashboard.view', keywords: 'bot activities trigger routine run' },
         { id: 'bot-ask', label: 'Ask the bot', path: ROUTES.BOT_ASK, icon: MessageCircleQuestion, requires: 'dashboard.view', keywords: 'chat question assistant' },
       ],
@@ -141,7 +141,6 @@ export function visibleNavSections(has) {
  * at merge, delete the entry here once the real <Route> exists.
  */
 export const PLANNED_ROUTES = [
-  { path: ROUTES.BOT_PLAN, label: 'Bot plan', description: 'What the bot plans for today, tomorrow, this week and this month, against what it achieved.' },
   { path: ROUTES.BOT_ACTIVITIES, label: 'Run now', description: 'Start a bot activity or routine on demand.' },
   { path: ROUTES.BOT_ASK, label: 'Ask the bot', description: 'Ask the bot about its work and plans.' },
   { path: ROUTES.SOCIAL_INBOX, label: 'Social inbox', description: 'Comments and messages from the connected social accounts.' },

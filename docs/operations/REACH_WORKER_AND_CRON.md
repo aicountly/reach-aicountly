@@ -135,6 +135,8 @@ period, not sixty times.
 | 09:00 UTC (14:30 IST) | `reach.gallery_deficit_alert` | notifications | per day |
 | 06:00 IST (00:30 UTC) | `reach.seo_tracker` — DataForSEO SERP checks, capped by `seo.tracker.max_keywords_per_day`; a no-op without credentials | default | `seo-tracker-<IST date>` |
 | 08:00 IST (02:30 UTC) | `reach.daily_analytics_report` — email to `reports.daily.recipients`; never re-sent for a date already sent | notifications | `daily-report-<IST date>` |
+| 01:00 IST (19:30 UTC) | `reach.bot_plan` mode `daily` — snapshot yesterday's actuals (and the 4 days before, which may still change), review the last 7 days (variance, root causes, lessons), self-tune within bounds (`bot.self_tune.enabled`), regenerate every plan period; `php spark reach:bot-plan` by hand | default | `bot-plan-daily-<IST date>` |
+| every other hour (IST) | `reach.bot_plan` mode `refresh` — regenerate the plans only; a new version is stored only when a number changed | default | `bot-plan-refresh-<IST date>-<IST hour>` |
 
 Run or re-run by hand:
 

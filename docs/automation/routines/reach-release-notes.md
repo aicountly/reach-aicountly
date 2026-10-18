@@ -29,6 +29,15 @@ change you can see in the product's git history or code.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=release_note
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use avoid_reasons.release_note to steer clear of what Gemini rejected recently.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
+
 1. GET https://reach.aicountly.org/api/v1/automation/release-plan
    - If data.enabled is false, stop and report "release-note automation is off".
    - data.products is in priority order: the launch apps first (books, notes,

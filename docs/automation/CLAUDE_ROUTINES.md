@@ -47,6 +47,7 @@ Endpoints the routines use:
 
 | Endpoint | Purpose |
 |---|---|
+| `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=<blog\|knowledge_base\|community\|release_note\|workflow_guide\|video\|growth>` | **read first (step 0 of every routine)**: today's plan for the routine, yesterday vs plan, the top 3 lags of the last 7 days with cause, guidance and what the bot changed, Gemini's recent reject/revise reasons, topic mix — see "Plan & Performance" below |
 | `GET  https://reach.aicountly.org/api/v1/automation/blog-plan` | blog quota left today (`stop`), last 200 titles/slugs for de-duplication, priority topics (launch apps; Indian compliance calendar for the next 30 days), internal links |
 | `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | KB quota, per-product cadence (launch apps first), topic seeds, existing articles |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable URLs for internal links |
@@ -68,6 +69,32 @@ Responses the routines act on: **201** stored (and usually vetted already —
 see `pipeline.status`), **200** `already_ingested` (content key reused),
 **409** duplicate topic, **422** invalid draft, **429** today's quota is used
 (stop), **403** automation switched off (stop).
+
+## Plan & Performance — how the bot learns from its lags
+
+Reach keeps a plan per IST day / week / month (Bot → Plan & Performance, `/bot/plan`;
+`GET v1/bot/plan`, `GET v1/bot/performance`). Targets are derived, never guessed:
+the volume settings capped by the routine timetable above (blog 12 firings × 1, KB 2 × 5,
+community 7 × 3, KB further capped by the product cadence tiers), `video.daily.*`, one cover
+per routine blog, `seo.tracker.max_keywords_per_day` vs enabled keywords, and what is
+scheduled (social posts per network, email sends). Demand-driven output (release notes,
+guides) and outcomes (search clicks/impressions, leads, Engage conversions/revenue) are
+forecast from their own last 28 days (mean + least-squares trend, clamped ±50 %, ±1 s.d.
+range, stated confidence); with fewer than 14 days of history the plan says "baseline
+being established" instead of a number.
+
+At 01:00 IST job `reach.bot_plan` snapshots yesterday's actuals, compares them with the
+day plan of record, classifies each lag from real signals (switch off, integration not
+configured, routine not submitting, vetting rejections and their reasons, items stuck in
+vetting/cover, publish failures, failed jobs, empty topic queue, upstream output) and
+self-tunes within hard bounds (`bot.self_tune.enabled`, default on; every change in
+`reach_bot_self_tune_log`): a target is lowered to 0 only while a required integration is
+missing, otherwise never below 50 % of its base and only after 7 lagging days, once per
+7 days, and restored automatically; stuck drafts are retried when the provider is back;
+dead-lettered ingest/sync jobs are retried once; the briefing's topic mix shifts towards
+what was approved and clicked. Limits, keys and budgets are never changed by the bot —
+they appear as recommendations for the owner. Each routine reads the briefing first
+(step 0 in every prompt under `routines/`), so the next drafts avoid yesterday's reasons.
 
 ## What Reach does with a submission
 

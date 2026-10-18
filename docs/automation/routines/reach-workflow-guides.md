@@ -31,6 +31,15 @@ feature, a label or a step.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=workflow_guide
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use avoid_reasons.workflow_guide to steer clear of what Gemini rejected recently.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
+
 1. GET https://reach.aicountly.org/api/v1/automation/workflow-plan
    - If data.enabled is false, stop and report "workflow-guide automation is off".
    - data.products lists the launch apps in order (books = Smart Books, notes,

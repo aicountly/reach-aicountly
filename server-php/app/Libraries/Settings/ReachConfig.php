@@ -211,6 +211,10 @@ final class ReachConfig
                 'options' => ['Asia/Kolkata', 'UTC', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York'],
                 'help' => 'Every time on screen, in the daily report email, notifications, CLI output and CSV exports is shown in this zone (Asia/Kolkata = IST). Stored values and API/JSON fields stay UTC. Reload Reach after changing it.'],
             // ── end Stream IST ──
+
+            // ── Bot Plan & Performance (stream 8) ───────────────────────────
+            'bot.self_tune.enabled' => ['group' => 'Automation', 'label' => 'Bot self-tuning (Plan & Performance)', 'type' => 'bool', 'default' => true,
+                'help' => 'On: after each daily review the bot lowers targets that cannot be reached (and restores them), retries stuck drafts and safe failed jobs, and steers the routine briefing towards topics that perform — within hard bounds, every change logged on Bot → Plan & Performance. Off: nothing is applied; the log shows what it would have done.'],
         ];
     }
 

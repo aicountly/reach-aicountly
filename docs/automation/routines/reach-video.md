@@ -26,6 +26,15 @@ so be accurate and specific.
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds it to every reach.aicountly.org/api/v1/automation/ request.
 Send JSON bodies.
 
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=video
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use avoid_reasons.video_script to steer clear of what Gemini rejected recently.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
+
 1. PLAN. GET https://reach.aicountly.org/api/v1/automation/video-plan.
    - If "enabled" is false, or quota.vlog.remaining and quota.short.remaining are both 0,
      stop and report "nothing to do".
