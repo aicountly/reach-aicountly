@@ -23,6 +23,7 @@ import { LandingDetailPage } from './pages/landing/LandingDetailPage';
 
 import { SocialPlannerPage } from './pages/social/SocialPlannerPage';
 import { SocialQueuePage } from './pages/social/SocialQueuePage';
+import SocialAdsPage from './pages/social/ads/SocialAdsPage.jsx';
 
 import { EmailListPage } from './pages/email/EmailListPage';
 import { EmailDetailPage } from './pages/email/EmailDetailPage';
@@ -353,6 +354,9 @@ export default function App() {
 
         <Route path={ROUTES.SOCIAL_PLANNER} element={<SocialPlannerPage />} />
         <Route path={ROUTES.SOCIAL_QUEUE}   element={<SocialQueuePage />} />
+        {/* Social & Ads → Ads (paid-ads register). The Social & Ads hub links here; at merge this
+            element replaces the hub's SocialAdsPlaceholder at the same path. */}
+        <Route path="/social/ads" element={<SocialAdsPage />} />
 
         <Route path={ROUTES.EMAIL_LIST}      element={<EmailListPage />} />
         <Route path={ROUTES.EMAIL_DETAIL}    element={<EmailDetailPage />} />
