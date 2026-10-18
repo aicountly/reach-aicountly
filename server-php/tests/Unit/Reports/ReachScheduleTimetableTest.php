@@ -108,4 +108,23 @@ final class ReachScheduleTimetableTest extends CIUnitTestCase
         $this->assertMatchesRegularExpression('/reach:work --queue=[a-z,]*notifications/', $doc);
         $this->assertStringNotContainsString('--queue=default,blog,publishing,community --once', $doc);
     }
+
+    public function testRoutineAndStructuredSweepsArePlannedOnTheirMinutes(): void
+    {
+        // Regression: these two used an undefined $svc inside the static
+        // planner, so every tick on a multiple of 5 minutes threw and
+        // reach:schedule stopped before the growth-intel jobs and heartbeat.
+        $at15 = self::byType('2026-10-17 10:15:00');
+        $this->assertSame('routine-content-sweep-202610171015', $at15['reach.routine_content_sweep']['opts']['idempotency_key']);
+        $this->assertSame('default', $at15['reach.routine_content_sweep']['opts']['queue']);
+        $this->assertSame('structured-content-sweep-202610171015', $at15['reach.structured_content_sweep']['opts']['idempotency_key']);
+        $this->assertSame('publishing', $at15['reach.structured_content_sweep']['opts']['queue']);
+
+        $at10 = self::byType('2026-10-17 10:10:00');
+        $this->assertArrayHasKey('reach.routine_content_sweep', $at10);
+        $this->assertArrayNotHasKey('reach.structured_content_sweep', $at10);
+
+        $at11 = self::byType('2026-10-17 10:11:00');
+        $this->assertArrayNotHasKey('reach.routine_content_sweep', $at11);
+    }
 }
