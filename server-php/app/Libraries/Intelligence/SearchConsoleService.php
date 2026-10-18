@@ -172,7 +172,7 @@ class SearchConsoleService
             'connection_id'       => $connectionId,
             'provider'            => $connection['provider'],
             'site_property'       => $connection['site_property'],
-            'enabled'             => (bool) $connection['enabled'],
+            'enabled'             => \App\Models\Intelligence\IngestionCursorModel::pgBool($connection['enabled']),
             'health_status'       => $connection['health_status'],
             'last_health_check_at' => $connection['last_health_check_at'] ?? null,
             'connector_enabled'   => $connector->isEnabled(),

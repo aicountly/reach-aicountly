@@ -27,7 +27,8 @@ class GalleryDeficitAlertJob implements JobHandlerInterface
 
         $to = trim((string) env('BLOG_GALLERY_ALERT_EMAIL', ''));
         if ($to === '') {
-            return ['sent' => false, 'reason' => 'BLOG_GALLERY_ALERT_EMAIL_not_set'] + $report;
+            // Not configured: recorded as skipped (JobRunner), not completed.
+            return ['status' => 'skipped', 'sent' => false, 'reason' => 'BLOG_GALLERY_ALERT_EMAIL is not set — no one to alert.'] + $report;
         }
 
         $lines = [

@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Jobs\JobQueueInsights;
 use App\Models\JobModel;
 use Config\Services;
 
@@ -15,33 +16,36 @@ use Config\Services;
  */
 class JobController extends BaseApiController
 {
+    /**
+     * Filters (all optional) are JobQueueInsights::applyFilters(): status
+     * (one or a comma list), queue, job_type, worker_id, request_id,
+     * since_hours, ready, scheduled, running, stalled, retrying — the same
+     * predicates the dashboard counts with, so a tile's number and the list
+     * it opens always agree.
+     */
     public function index()
     {
         [$page, $limit, $offset] = $this->pagination();
-        $model = new JobModel();
 
-        foreach (['status', 'queue', 'job_type', 'worker_id'] as $f) {
+        $filters = [];
+        foreach (['status', 'queue', 'job_type', 'worker_id', 'request_id', 'since_hours', 'ready', 'scheduled', 'running', 'stalled', 'retrying'] as $f) {
             $v = trim((string) $this->request->getGet($f));
             if ($v !== '') {
-                $model->where($f, $v);
+                $filters[$f] = $v;
             }
         }
-        $rid = trim((string) $this->request->getGet('request_id'));
-        if ($rid !== '') {
-            $model->where('request_id', $rid);
-        }
 
-        $total = $model->countAllResults(false);
-        $rows  = $model
-            ->orderBy('id', 'DESC')
-            ->findAll($limit, $offset);
+        $builder = JobQueueInsights::applyFilters(\Config\Database::connect()->table('reach_jobs'), $filters);
+        $total   = $builder->countAllResults(false);
+        $rows    = $builder->orderBy('id', 'DESC')->limit($limit, $offset)->get()->getResultArray();
 
         $summarized = array_map(fn ($row) => $this->summarize($row, false), $rows);
         return $this->ok([
-            'items' => $summarized,
-            'total' => $total,
-            'page'  => $page,
-            'limit' => $limit,
+            'items'   => $summarized,
+            'total'   => $total,
+            'page'    => $page,
+            'limit'   => $limit,
+            'filters' => $filters,
         ]);
     }
 
@@ -63,8 +67,8 @@ class JobController extends BaseApiController
         if (! $row) {
             return $this->fail('Job not found.', 404);
         }
-        if (! in_array($row['status'], ['failed', 'dead_letter', 'cancelled'], true)) {
-            return $this->fail('Only failed / dead_letter / cancelled jobs may be retried.', 422);
+        if (! in_array($row['status'], ['failed', 'dead_letter', 'cancelled', 'skipped'], true)) {
+            return $this->fail('Only failed / dead_letter / cancelled / skipped jobs may be retried.', 422);
         }
         Services::jobService()->retry($id);
         Services::auditLogger()->log(
@@ -85,7 +89,7 @@ class JobController extends BaseApiController
         if (! $row) {
             return $this->fail('Job not found.', 404);
         }
-        if (in_array($row['status'], ['completed', 'dead_letter', 'cancelled'], true)) {
+        if (in_array($row['status'], ['completed', 'dead_letter', 'cancelled', 'skipped'], true)) {
             return $this->fail('Job cannot be cancelled in its current state.', 422);
         }
         $reason = trim((string) ($this->input()['reason'] ?? ''));

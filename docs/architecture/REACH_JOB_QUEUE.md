@@ -14,7 +14,7 @@ Defined in `2026-07-12-100029_CreateReachJobs.php`.
 | `job_uuid`            | UUIDv4 default (`gen_random_uuid()`) — external identifier |
 | `job_type`            | Slug that maps to a handler (`reach.marketing_bot_dispatch`, `reach.engage_push_retry`, `reach.health_check`) |
 | `queue`               | Named queue (`default`, `bots`, ...) so operators can scale by kind |
-| `status`              | `pending` \| `processing` \| `completed` \| `failed` \| `dead_letter` \| `cancelled` |
+| `status`              | `pending` \| `processing` \| `completed` \| `skipped` \| `failed` \| `dead_letter` \| `cancelled` (`skipped`: did not run by design — integration not configured; see REACH_WORKER_AND_CRON.md § Job outcomes) |
 | `priority`            | Higher wins; equal priority breaks by `id` ASC (FIFO)     |
 | `payload_json`        | JSONB — redacted via SecretRedactor at enqueue time       |
 | `result_json`         | JSONB — redacted return value from the handler            |
@@ -147,7 +147,9 @@ payload with `?include=payload` — audited as `job.payload_viewed`.
 ## Worker & scheduler CLI
 
 - `php spark reach:work [--queue=default] [--once] [--limit=10] [--worker-id=w1] [--sleep=2] [--lease=300]`
-- `php spark reach:schedule` — recovers expired leases, prunes old jobs.
+- `php spark reach:schedule` — recovers expired leases (dead-letters exhausted ones), prunes old jobs (completed/skipped 7 d, failures 14 d).
+- `php spark reach:jobs-report [--hours=24]` — failing job types with last errors, backlog per queue, stalled jobs.
+- `GET v1/jobs` filters: `status` (one or a comma list), `queue`, `job_type`, `since_hours`, `ready`, `scheduled`, `running`, `stalled`, `retrying` — the same predicates the dashboard counts with (`App\Libraries\Jobs\JobQueueInsights`).
 
 The worker restores `$request->reachRequestId` from `reach_jobs.request_id`
 so downstream integration calls carry the original `X-Request-Id`.

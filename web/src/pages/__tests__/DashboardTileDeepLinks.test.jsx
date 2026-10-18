@@ -45,6 +45,17 @@ describe('Job Monitor deep links', () => {
     );
   });
 
+  it('passes the narrowing filters the dashboard links with', async () => {
+    renderWithAuth(<JobMonitorPage />, { route: '/admin/jobs?status=dead_letter,failed&since_hours=24&job_type=reach.seo_tracker&stalled=1' });
+
+    await waitFor(() => expect(jobService.list).toHaveBeenCalled());
+    expect(jobService.list).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'dead_letter,failed', since_hours: '24', job_type: 'reach.seo_tracker', stalled: '1',
+    }));
+    expect(screen.getByRole('button', { name: /clear last 24 hours filter/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear stalled/i })).toBeInTheDocument();
+  });
+
   it('lists everything when no filter is given', async () => {
     renderWithAuth(<JobMonitorPage />, { route: '/admin/jobs' });
 

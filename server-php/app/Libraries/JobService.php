@@ -27,7 +27,13 @@ use Throwable;
  *   COMMIT;
  *
  * Retry policy: exponential backoff `min(2^attempt * baseSeconds, cap)`.
- * When attempts >= max_attempts the job is marked `dead_letter`.
+ * When attempts >= max_attempts the job is marked `dead_letter`; a failure
+ * marked non-retryable dead-letters at once. A job that did not run by design
+ * (integration not configured) is `skipped` — see JobRunner.
+ *
+ * Retention (pruneOlderThanDays, run by reach:schedule every minute):
+ * completed / skipped / cancelled after N days (default 7), dead_letter /
+ * failed after M days (default 14), at most PRUNE_BATCH rows per tick.
  */
 class JobService
 {
@@ -35,6 +41,8 @@ class JobService
     private const DEFAULT_LEASE_SECS = 300;
     private const BASE_BACKOFF_SECS  = 15;
     private const MAX_BACKOFF_SECS   = 3600;
+    /** Rows deleted per prune call — keeps a backlog of old rows from locking the table for long. */
+    public const PRUNE_BATCH         = 5000;
 
     private BaseConnection $db;
     private JobModel $model;
@@ -87,7 +95,11 @@ class JobService
             'request_id'          => $opts['request_id'] ?? null,
             'correlation_id'      => $opts['correlation_id'] ?? null,
             'enqueued_by_user_id' => $opts['enqueued_by_user_id'] ?? null,
-            'enqueued_actor_type' => $opts['enqueued_actor_type'] ?? 'human',
+            // No user behind the enqueue → the system did it. Defaulting to
+            // 'human' labelled every scheduler/sweep job as a person's in the
+            // Job Monitor.
+            'enqueued_actor_type' => $opts['enqueued_actor_type']
+                ?? (empty($opts['enqueued_by_user_id']) ? 'system' : 'human'),
         ];
 
         try {
@@ -132,6 +144,39 @@ class JobService
             'available_at' => $available,
         ], $opts['request_id'] ?? null);
         return $id;
+    }
+
+    /**
+     * Enqueue unless a job with this idempotency key already exists in ANY
+     * state — including a finished one whose key enqueue() retired
+     * (":retired:<id>" suffix). enqueue() on its own only de-duplicates while
+     * the first job is in flight, so a scheduler or sweep calling it every
+     * tick re-queues finished (or dead-lettered) work for ever.
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $opts must carry idempotency_key
+     * @return int|null the new job id, or null when the key was already used
+     */
+    public function enqueueOnce(string $jobType, array $payload, array $opts): ?int
+    {
+        $key = (string) ($opts['idempotency_key'] ?? '');
+        if ($key === '') {
+            throw new \InvalidArgumentException('enqueueOnce() needs an idempotency_key.');
+        }
+        if ($this->keyUsed($key)) {
+            return null;
+        }
+
+        return $this->enqueue($jobType, $payload, $opts);
+    }
+
+    /** True when any job (live, finished or retired) has carried this key. */
+    public function keyUsed(string $key): bool
+    {
+        return $this->db->query(
+            'SELECT 1 FROM reach_jobs WHERE idempotency_key = ? OR LEFT(idempotency_key, ?) = ? LIMIT 1',
+            [$key, strlen($key) + 9, $key . ':retired:']
+        )->getRowArray() !== null;
     }
 
     public function enqueueAt(string $jobType, array $payload, string $scheduledAtUtc, array $opts = []): int
@@ -218,7 +263,36 @@ class JobService
         $this->audit('job.completed', $jobId, null, ['at' => $now]);
     }
 
-    public function markFailed(int $jobId, string $errorMessage): void
+    /**
+     * The job did not run by design (integration not configured, feature
+     * off). Terminal, no retry, and never counted as a failure.
+     *
+     * @param array<string, mixed> $result
+     */
+    public function markSkipped(int $jobId, string $reason, array $result = []): void
+    {
+        $now    = date('Y-m-d H:i:s');
+        $reason = substr($reason, 0, 4000);
+        $this->db->table('reach_jobs')->where('id', $jobId)->update([
+            'status'           => 'skipped',
+            'completed_at'     => $now,
+            'result_json'      => json_encode(
+                ['skipped' => true, 'reason' => $reason] + ($this->redactor ? $this->redactor->redact($result) : $result),
+                JSON_UNESCAPED_SLASHES,
+            ),
+            'error_message'    => $reason,
+            'lease_expires_at' => null,
+            'updated_at'       => $now,
+        ]);
+        $this->audit('job.skipped', $jobId, null, ['reason' => $reason]);
+    }
+
+    /**
+     * Record a failed attempt: back off and retry, or dead-letter once
+     * attempts reach max_attempts. `$retryable = false` dead-letters now —
+     * for failures a retry cannot change (bad payload, missing handler).
+     */
+    public function markFailed(int $jobId, string $errorMessage, bool $retryable = true): void
     {
         $row = $this->db->table('reach_jobs')->where('id', $jobId)->get()->getRowArray();
         if (! $row) {
@@ -230,7 +304,7 @@ class JobService
         $now         = date('Y-m-d H:i:s');
         $err         = substr($errorMessage, 0, 4000);
 
-        if ($attempts >= $maxAttempts) {
+        if ($attempts >= $maxAttempts || ! $retryable) {
             $this->db->table('reach_jobs')->where('id', $jobId)->update([
                 'status'           => 'dead_letter',
                 'completed_at'     => $now,
@@ -239,9 +313,10 @@ class JobService
                 'updated_at'       => $now,
             ]);
             $this->audit('job.failed', $jobId, null, [
-                'attempts' => $attempts,
-                'final'    => true,
-                'error'    => $err,
+                'attempts'  => $attempts,
+                'final'     => true,
+                'retryable' => $retryable,
+                'error'     => $err,
             ]);
             return;
         }
@@ -308,35 +383,75 @@ class JobService
     }
 
     /**
-     * Recover leases whose lease_expires_at is in the past by returning them
-     * to `pending`. Called by `php spark reach:schedule`.
+     * Recover leases whose lease_expires_at is in the past. Called by
+     * `php spark reach:schedule` every minute.
      *
-     * @return int number of recovered jobs
+     * A lease only expires when the worker died mid-job (fatal error, memory
+     * or time limit, host killed the process) — the handler never got to
+     * markFailed(). Such a job used to go back to `pending` unconditionally,
+     * and reserve() bumps attempts without checking max_attempts, so a job
+     * that always kills its worker was re-run every few minutes for ever.
+     * Jobs that have used their attempts are dead-lettered instead.
+     *
+     * @return int number of recovered jobs (re-queued + dead-lettered)
      */
     public function recoverExpiredLeases(): int
     {
-        $sql = "UPDATE reach_jobs
+        $this->db->query(
+            "UPDATE reach_jobs
+                SET status='dead_letter',
+                    completed_at=NOW(),
+                    error_message=LEFT('Worker lease expired on attempt ' || attempts || ' of ' || max_attempts
+                        || ' (the worker died mid-job: fatal error, memory or time limit). '
+                        || COALESCE(error_message, ''), 4000),
+                    lease_expires_at=NULL,
+                    updated_at=NOW()
+              WHERE status='processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < NOW()
+                AND attempts >= max_attempts"
+        );
+        $dead = $this->db->affectedRows();
+
+        $this->db->query(
+            "UPDATE reach_jobs
                 SET status='pending',
                     reserved_at=NULL,
                     lease_expires_at=NULL,
                     worker_id=NULL,
                     started_at=NULL,
+                    error_message=LEFT('Worker lease expired on attempt ' || attempts || '; re-queued.', 4000),
                     updated_at=NOW()
-                WHERE status='processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < NOW()";
-        $this->db->query($sql);
-        return $this->db->affectedRows();
+              WHERE status='processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < NOW()"
+        );
+
+        return $dead + $this->db->affectedRows();
     }
 
     /**
-     * Prune completed / dead-letter / cancelled jobs older than N days.
+     * Prune finished jobs: completed / skipped / cancelled older than
+     * `$days`, dead_letter / failed older than `$failedDays` (default: the
+     * larger of 14 and $days, so failures stay visible for diagnosis longer
+     * than the scheduler noise). Rows without completed_at (written by old
+     * code paths) age by updated_at. At most PRUNE_BATCH rows per call.
+     *
+     * @return int rows deleted
      */
-    public function pruneOlderThanDays(int $days): int
+    public function pruneOlderThanDays(int $days, ?int $failedDays = null, int $batch = self::PRUNE_BATCH): int
     {
-        $cutoff = gmdate('Y-m-d H:i:s', time() - $days * 86400);
-        $this->db->table('reach_jobs')
-            ->whereIn('status', ['completed', 'dead_letter', 'cancelled'])
-            ->where('completed_at <', $cutoff)
-            ->delete();
+        $days       = max(1, $days);
+        $failedDays = max(1, $failedDays ?? max(14, $days));
+        $batch      = max(1, $batch);
+
+        $this->db->query(
+            "DELETE FROM reach_jobs WHERE id IN (
+                SELECT id FROM reach_jobs
+                 WHERE (status IN ('completed','skipped','cancelled')
+                        AND COALESCE(completed_at, updated_at) < NOW() - make_interval(days => ?))
+                    OR (status IN ('dead_letter','failed')
+                        AND COALESCE(completed_at, updated_at) < NOW() - make_interval(days => ?))
+                 LIMIT ?)",
+            [$days, $failedDays, $batch]
+        );
+
         return $this->db->affectedRows();
     }
 

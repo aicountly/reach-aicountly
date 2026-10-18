@@ -43,7 +43,11 @@ class CommunitySchedule extends BaseCommand
     public function run(array $params): int
     {
         $svc    = Services::jobService();
-        $bucket = date('Y-m-d-H-i');           // per-minute bucket → safe even if cron overlaps
+        // Five-minute bucket, enqueued once per key in any state
+        // (JobService::enqueueOnce): the documented cron is */5, but a host
+        // that runs this every minute must not quintuple the sweeps, and a
+        // finished sweep must not be re-queued by a second run in its slot.
+        $bucket = date('Y-m-d-H-') . str_pad((string) (intdiv((int) date('i'), 5) * 5), 2, '0', STR_PAD_LEFT);
         $hour   = (int) date('H');
         $today  = date('Y-m-d');
 
@@ -52,7 +56,7 @@ class CommunitySchedule extends BaseCommand
         $automation   = $this->sweepAutomationSubmissions();
 
         // Every tick: sweep deployments whose backoff window has elapsed.
-        $enqueuedIds['deployment_retry_sweep'] = $svc->enqueue(
+        $enqueuedIds['deployment_retry_sweep'] = $svc->enqueueOnce(
             'reach.community_deployment_retry_sweep',
             [],
             [
@@ -63,7 +67,7 @@ class CommunitySchedule extends BaseCommand
         );
 
         // Every tick: pull the public site's change feed and log drift.
-        $enqueuedIds['sync_changes'] = $svc->enqueue(
+        $enqueuedIds['sync_changes'] = $svc->enqueueOnce(
             'reach.community_sync_changes',
             [],
             [
@@ -75,8 +79,8 @@ class CommunitySchedule extends BaseCommand
 
         // Every 15 minutes: reconcile all published answers against the
         // public site's checksums (heavier than the change-feed pull above).
-        if ((int) date('i') % 15 === 0) {
-            $enqueuedIds['reconciliation'] = $svc->enqueue(
+        if ((int) date('i') % 15 < 5) {
+            $enqueuedIds['reconciliation'] = $svc->enqueueOnce(
                 'reach.community_publication_reconciliation',
                 [],
                 [
@@ -90,7 +94,7 @@ class CommunitySchedule extends BaseCommand
         // Once per day at 02:00: roll up yesterday's analytics into the cache.
         if ($hour === 2) {
             $yesterday = date('Y-m-d', strtotime('-1 day'));
-            $enqueuedIds['analytics_reconciliation'] = $svc->enqueue(
+            $enqueuedIds['analytics_reconciliation'] = $svc->enqueueOnce(
                 'reach.community_analytics_reconciliation',
                 ['date' => $yesterday],
                 [

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { contentService } from '../../services/contentService';
 import { Card } from '../../components/common/Card';
@@ -30,7 +30,17 @@ export function ContentListPage() {
   const [items, setItems]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
-  const [filters, setFilters]       = useState({});
+  // Seeded from the URL so dashboard tiles can open the rows they counted
+  // (e.g. ?workflow_status=scheduled,ready_for_publication).
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters]       = useState(() => {
+    const init = {};
+    ['workflow_status', 'content_type', 'search'].forEach((k) => {
+      const v = searchParams.get(k);
+      if (v) init[k] = v;
+    });
+    return init;
+  });
   const { has } = usePermission();
   const nav = useNavigate();
 
@@ -91,6 +101,9 @@ export function ContentListPage() {
         >
           <option value="">All statuses</option>
           {WORKFLOW_STATUSES.filter(Boolean).map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+          {filters.workflow_status && !WORKFLOW_STATUSES.includes(filters.workflow_status) && (
+            <option value={filters.workflow_status}>{filters.workflow_status.replace(/_/g, ' ').replace(/,/g, ' + ')}</option>
+          )}
         </select>
         <input
           type="search"
