@@ -205,6 +205,10 @@ final class ReachConfig
                 'help' => 'public, unlisted or private. Until Google verifies the OAuth app, YouTube locks API uploads to private.'],
             'video.youtube.category_id' => ['group' => 'Video', 'label' => 'YouTube category id', 'type' => 'string', 'default' => '28',
                 'help' => '28 = Science & Technology, 27 = Education.'],
+
+            // ── Bot Plan & Performance (stream 8) ───────────────────────────
+            'bot.self_tune.enabled' => ['group' => 'Automation', 'label' => 'Bot self-tuning (Plan & Performance)', 'type' => 'bool', 'default' => true,
+                'help' => 'On: after each daily review the bot lowers targets that cannot be reached (and restores them), retries stuck drafts and safe failed jobs, and steers the routine briefing towards topics that perform — within hard bounds, every change logged on Bot → Plan & Performance. Off: nothing is applied; the log shows what it would have done.'],
         ];
     }
 

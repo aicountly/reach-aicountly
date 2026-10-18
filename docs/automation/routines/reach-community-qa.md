@@ -17,6 +17,7 @@ All calls: no auth header of your own — the environment's network secret adds 
 | Endpoint | Purpose |
 |---|---|
 | `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
+| `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=community` | read first: today's plan, yesterday vs plan, top 3 lags with causes and what the bot changed, vetting reasons to avoid, topic mix |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
 | `POST https://reach.aicountly.org/api/v1/automation/community-qa` | a new frequently-asked question with the desk's answer: `{external_key, question_title, question_body, category_slug, product_slug?, answer_html, short_answer?, source_references?, provenance}` |
 
@@ -48,6 +49,15 @@ anything is published, and nothing you send is attributed to a member of the pub
 your questions are posted as the AICOUNTLY desk's own FAQ.
 
 Every call goes to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
+
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=community
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use avoid_reasons.community to steer clear of what Gemini rejected recently.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
 
 1. GET /v1/automation/community-plan. If enabled is false or max_this_run is 0, report
    that and stop. Keep: max_this_run (never send more than this many submissions this

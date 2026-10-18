@@ -14,6 +14,7 @@ Endpoints (no auth header of your own — the environment's network secret adds 
 | Call | Purpose |
 |---|---|
 | `GET  https://reach.aicountly.org/api/v1/automation/blog-plan` | quota left today, `stop` flag, existing titles/slugs (de-duplication), priority topics (launch apps + Indian compliance calendar for the next 30 days), internal links |
+| `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=blog` | read first: today's plan, yesterday vs plan, top 3 lags with causes and what the bot changed, vetting reasons to avoid, topic mix |
 | `POST https://reach.aicountly.org/api/v1/automation/blog-drafts` | submit the article; Reach has Gemini vet it, then approves, covers (DALL·E) and publishes it |
 
 What happens after the POST is Reach's job, not the routine's: Gemini's decision is final
@@ -27,6 +28,15 @@ You are the AICOUNTLY blog routine. Write and submit exactly ONE marketing/educa
 blog article for aicountly.com in this run, then stop.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
+
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=blog
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use avoid_reasons.blog to steer clear of what Gemini rejected recently, and prefer topic_mix.prefer categories (avoid topic_mix.avoid) when two topics are otherwise equal.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
 
 1. PLAN
    GET https://reach.aicountly.org/api/v1/automation/blog-plan

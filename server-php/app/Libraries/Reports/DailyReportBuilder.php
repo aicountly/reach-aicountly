@@ -19,7 +19,7 @@ use Config\Database;
  * saying so — a section never shows invented or placeholder figures, and one
  * failing source never takes the rest of the report down with it.
  *
- * Sections: search, traffic, seo_tracker, content, vetting, pipeline, todo.
+ * Sections: search, traffic, seo_tracker, content, vetting, pipeline, plan, todo.
  */
 class DailyReportBuilder
 {
@@ -74,6 +74,8 @@ class DailyReportBuilder
             'content'     => $this->guard('content', fn () => $this->content($window)),
             'vetting'     => $this->guard('vetting', fn () => $this->vetting($window)),
             'pipeline'    => $this->guard('pipeline', fn () => $this->pipeline($window)),
+            // Bot Plan & Performance: yesterday's plan vs achieved (stored review).
+            'plan'        => $this->guard('plan', fn () => (new \App\Libraries\Bot\Plan\PlanReportSection($this->db))->build($reportDate)),
         ];
         $sections['todo'] = ['configured' => true, 'items' => self::todo($sections)];
 

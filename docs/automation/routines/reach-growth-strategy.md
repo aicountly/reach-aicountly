@@ -21,6 +21,7 @@ All calls: no auth header of your own — the environment's network secret adds 
 | Endpoint | Purpose |
 |---|---|
 | `GET  https://reach.aicountly.org/api/v1/automation/insights-digest` | the latest AI Insights report (with the data digest it was written from and the list of figures Reach could not trace to that digest), AI-visibility summaries for 28 and 7 days (mention rate, share of voice, rank, gaps, markets, cited domains, skipped assistants), open actions and recent memos |
+| `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=growth` | read first: today's plan, yesterday vs plan, top 3 lags with causes and what the bot changed, vetting reasons to avoid, topic mix |
 | `POST https://reach.aicountly.org/api/v1/automation/strategy-memos` | store the memo: `{title, body_markdown, period_start, period_end, routine_run_id, model, sources[]}` |
 
 Responses: `GET` → `200 {data: …}`, or `503` when the feature is not migrated (stop and report).
@@ -36,6 +37,15 @@ founder. Goals: within 1-2 months AI assistants (ChatGPT, Gemini, Perplexity, Cl
 AICOUNTLY's products for relevant buyer questions; within 3 months AICOUNTLY is ready to raise from
 international investors (e.g. Japanese, Chinese, SE Asian, Middle Eastern funds) and to test markets
 outside India.
+
+0. BRIEFING (read it first — this is how the bot learns from its lags)
+   GET https://reach.aicountly.org/api/v1/automation/plan/briefing?type=growth
+   - lessons: the top lags of the last 7 days, each with its cause, evidence, guidance and
+     what Reach already changed (bot_changed). Follow each lesson's guidance in this run.
+   - today: what today's plan expects from this routine (target, achieved_so_far, why).
+   - Use lessons and yesterday as evidence in the memo: name the top lags, their causes and what the bot already changed, and keep the owner-only actions (keys, budgets, quotas) separate from what the bot handles itself.
+   - If the call fails, carry on without it — it informs, it never blocks; Reach still
+     enforces the quota and Gemini still decides.
 
 1. GET https://reach.aicountly.org/api/v1/automation/insights-digest. If it is not 200, stop and report the status and
    message. Read every section. `insights_report.unverified_numbers` lists figures Reach could not

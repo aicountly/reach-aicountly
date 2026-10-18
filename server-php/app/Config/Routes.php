@@ -148,6 +148,8 @@ $routes->group('v1', static function ($routes) {
         // Stream V — automated video (reach-video routine): script in → vetting → pipeline.
         $routes->post('video-scripts',  'Api\\V1\\Video\\VideoAutomationController::storeScript');
         $routes->get('video-plan',      'Api\\V1\\Video\\VideoAutomationController::plan');
+        // Bot Plan & Performance: lessons the routines read before writing.
+        $routes->get('plan/briefing',   'Api\\V1\\Bot\\PlanBriefingController::briefing');
     });
 
     // ---------------------------------------------------------------------
@@ -318,6 +320,9 @@ $routes->group('v1', static function ($routes) {
         $routes->post('bot/queue/(:num)/reject',  'Api\\V1\\MarketingBotController::rejectItem/$1',   ['filter' => ['permission:approval.decide', 'throttle:approval']]);
         $routes->get('bot/reports',               'Api\\V1\\BotReportController::index',              ['filter' => 'permission:bot.view']);
         $routes->get('bot/reports/(:num)',        'Api\\V1\\BotReportController::show/$1',            ['filter' => 'permission:bot.view']);
+        // Bot Plan & Performance (plan per period; plan vs achieved, causes, self-tune log)
+        $routes->get('bot/plan',                  'Api\\V1\\Bot\\BotPlanController::plan',          ['filter' => 'permission:bot.view']);
+        $routes->get('bot/performance',           'Api\\V1\\Bot\\BotPlanController::performance',   ['filter' => 'permission:bot.view']);
 
         // Approvals
         $routes->get('approvals',              'Api\\V1\\ApprovalController::index',       ['filter' => 'permission:approval.view']);

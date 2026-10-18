@@ -38,6 +38,9 @@ final class DailyReportRenderer
         $s = $summary['sections'];
         $body = '';
         $body .= self::section('What to do today', self::todoHtml($s['todo'] ?? []));
+        if (isset($s['plan'])) {
+            $body .= self::section('Plan vs achieved (yesterday)', \App\Libraries\Bot\Plan\PlanReportSection::html($s['plan']));
+        }
         $body .= self::section('Search (Google Search Console)', self::searchHtml($s['search'] ?? []));
         $body .= self::section('Website traffic (GA4)', self::trafficHtml($s['traffic'] ?? []));
         $body .= self::section('SEO Tracker', self::trackerHtml($s['seo_tracker'] ?? []));
@@ -73,6 +76,11 @@ final class DailyReportRenderer
         $out[] = '== What to do today ==';
         foreach (($s['todo']['items'] ?? []) as $i => $item) {
             $out[] = ($i + 1) . '. ' . $item;
+        }
+
+        if (isset($s['plan'])) {
+            $out[] = '';
+            array_push($out, ...\App\Libraries\Bot\Plan\PlanReportSection::text($s['plan']));
         }
 
         $out[] = '';

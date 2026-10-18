@@ -235,6 +235,15 @@ class ReachSchedule extends BaseCommand
             $add('reach.daily_analytics_report', ['date' => $istDate], "daily-report-{$istDate}", ['queue' => 'notifications']);
         }
 
+        // Bot Plan & Performance — 01:00 IST: snapshot yesterday's actuals, review the
+        // last 7 days, self-tune, regenerate plans (once per IST date). Every other
+        // hour: regenerate plans only (no new version when nothing changed).
+        if ($istHour === 1) {
+            $add('reach.bot_plan', ['mode' => 'daily', 'date' => $istDate], "bot-plan-daily-{$istDate}");
+        } else {
+            $add('reach.bot_plan', ['mode' => 'refresh', 'date' => $istDate], 'bot-plan-refresh-' . $ist->format('Y-m-d-H'));
+        }
+
         return $jobs;
     }
 
