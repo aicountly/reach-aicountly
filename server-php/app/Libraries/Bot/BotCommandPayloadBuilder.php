@@ -177,6 +177,7 @@ final class BotCommandPayloadBuilder
             'website'  => rtrim((string) (env('AICOUNTLY_PUBLIC_SITE_BASE_URL') ?: 'https://aicountly.com'), '/'),
             'audience' => $audience ?? 'Indian SMB owners, founders and their accountants; CA firms and Company Secretaries; HR/payroll operators; finance teams evaluating accounting / compliance software.',
             'voice'    => 'Warm, confident, practical Indian English. No hype words, no guarantees, no fear-mongering.',
+            'offer'    => \App\Libraries\Settings\BrandOffer::text() !== '' ? \App\Libraries\Settings\BrandOffer::text() : 'No offer claim is supported: say "visit aicountly.com" only.',
             'products' => array_values(array_map(
                 static fn ($slug, $label) => ['slug' => $slug, 'name' => $label],
                 array_keys(array_slice(SaasProductTaxonomy::products(), 0, 12, true)),

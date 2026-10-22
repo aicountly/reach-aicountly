@@ -208,6 +208,9 @@ class VideoAutomationService
             'company'         => 'AICOUNTLY — Indian cloud accounting and business software suite (aicountly.com)',
             'product_screens' => VideoTopicPlanner::screens(),
         ];
+        if (($offer = \App\Libraries\Settings\BrandOffer::text()) !== '') {
+            $context['offer'] = $offer;
+        }
         if ($slug !== '') {
             $context['product'] = ['slug' => $slug, 'name' => SaasProductTaxonomy::labelProduct(SaasProductTaxonomy::normalizeProductSlug($slug))];
         }
