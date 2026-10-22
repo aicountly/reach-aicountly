@@ -221,73 +221,83 @@ final class SocialApiAiPublisherTest extends CIUnitTestCase
 
     // ── media ──────────────────────────────────────────────────────────────
 
-    public function testAVideoIsDownloadedUploadedToThePresignedUrlVerifiedAndAttached(): void
+    public function testAPublicVideoIsAttachedByItsUrlWithoutUploading(): void
     {
-        $http = $this->withMedia($this->http(), [['status' => 'pending'], ['data' => ['status' => 'ready']]])
+        // social-api.ai answered publishing.media.missing_source to an uploaded media id on the
+        // live YouTube runs (19–22 Oct 2026); its documented shape is {source_type: url, source}.
+        $http = $this->withMedia($this->http())
             ->on('POST', '#/v1/posts$#', FakeHttpTransport::json(201, ['post_id' => 'post_v', 'status' => 'processing']));
         $media = [
             ['type' => 'video', 'kind' => 'youtube_short', 'url' => 'https://www.youtube.com/shorts/ABCDEFG1234'],
-            ['type' => 'video', 'kind' => 'mp4', 'url' => self::MP4],
+            ['type' => 'video', 'kind' => 'mp4', 'url' => self::MP4 . '?sig=abc'],
         ];
         $receipt = $this->publisher($http)->publish(self::message('Description', $media, ['title' => 'GST in 60 seconds #Shorts']), 'youtube');
 
         $this->assertSame('post_v', $receipt->providerMessageId);
-        $this->assertSame(['med_1'], $receipt->meta['media_ids']);
-
-        // 1. source fetched without Reach credentials, streamed to a file
-        $get = $http->to('#shotstack#')[0];
-        $this->assertArrayNotHasKey('Authorization', $get['headers']);
-        $this->assertArrayHasKey('sink_file', $get['options']);
-        $this->assertFileDoesNotExist($get['options']['sink_file'], 'the temp file is removed');
-        $this->assertSame([], $http->to('#youtube\.com#'), 'a YouTube link is not a file to upload');
-
-        // 2. presigned upload URL for the right type
-        $q = [];
-        parse_str((string) parse_url($http->to('#upload-url#')[0]['url'], PHP_URL_QUERY), $q);
-        $this->assertSame('video/mp4', $q['media_type']);
-        $this->assertMatchesRegularExpression('/^reach-[0-9a-f]{12}\.mp4$/', $q['filename']);
-
-        // 3. bytes PUT to the presigned URL — without the API key
-        $put = $http->to('#uploads\.social-api#', 'PUT')[0];
-        $this->assertSame('MP4BYTES-0123456789', $put['body']);
-        $this->assertSame('video/mp4', $put['headers']['Content-Type']);
-        $this->assertArrayNotHasKey('Authorization', $put['headers']);
-        $this->assertArrayHasKey('body_file', $put['options']);
-
-        // 4. verify until ready (pending → ready)
-        $this->assertCount(2, $http->to('#/media/med_1/verify$#', 'POST'));
-        $this->assertSame([SocialApiAiPublisher::VERIFY_PAUSE_SECS], $this->slept);
-
+        $this->assertSame(['url:' . self::MP4], $receipt->meta['media_ids'], 'recorded without the query string');
         $body = self::body($http);
-        // social-api.ai needs `source` on each media item (publishing.media.missing_source otherwise).
-        $this->assertSame([['source_type' => 'media_id', 'source' => 'med_1', 'media_id' => 'med_1']], $body['media']);
+        $this->assertSame([['source_type' => 'url', 'source' => self::MP4 . '?sig=abc']], $body['media']);
         $this->assertSame('GST in 60 seconds #Shorts', $body['title']);
-        $this->assertSame('Description', $body['text']);
         $this->assertSame([['account_id' => 'acc_yt', 'visibility' => 'public']], $body['targets'], 'social-api.ai defaults YouTube to private');
+        $this->assertSame([], $http->to('#shotstack#'), 'Reach does not download a file social-api.ai can fetch itself');
+        $this->assertSame([], $http->to('#upload-url|/verify#'));
+        $this->assertSame([], $http->to('#youtube\.com#'), 'a YouTube link is not a file to attach');
+    }
+
+    public function testAFileOnlyOnThisServerIsUploadedToThePresignedUrlVerifiedAndAttached(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'reach-mp4');
+        file_put_contents($file, 'MP4BYTES-0123456789');
+        try {
+            $http = $this->withMedia($this->http(), [['status' => 'pending'], ['data' => ['status' => 'ready']]])
+                ->on('POST', '#/v1/posts$#', FakeHttpTransport::json(201, ['post_id' => 'post_v', 'status' => 'processing']));
+            $receipt = $this->publisher($http)->publish(self::message('Description', [['type' => 'video', 'mime' => 'video/mp4', 'path' => $file]], ['title' => 'GST in 60 seconds #Shorts']), 'youtube');
+
+            $this->assertSame(['med_1'], $receipt->meta['media_ids']);
+            $q = [];
+            parse_str((string) parse_url($http->to('#upload-url#')[0]['url'], PHP_URL_QUERY), $q);
+            $this->assertSame('video/mp4', $q['media_type']);
+            $this->assertMatchesRegularExpression('/^reach-[0-9a-f]{12}\.mp4$/', $q['filename']);
+
+            $put = $http->to('#uploads\.social-api#', 'PUT')[0];
+            $this->assertSame('MP4BYTES-0123456789', $put['body']);
+            $this->assertSame('video/mp4', $put['headers']['Content-Type']);
+            $this->assertArrayNotHasKey('Authorization', $put['headers']);
+
+            $this->assertCount(2, $http->to('#/media/med_1/verify$#', 'POST'));
+            $this->assertSame([SocialApiAiPublisher::VERIFY_PAUSE_SECS], $this->slept);
+            $this->assertSame([['source_type' => 'media_id', 'source' => 'med_1', 'media_id' => 'med_1']], self::body($http)['media']);
+        } finally {
+            @unlink($file);
+        }
     }
 
     public function testRejectedMediaStopsBeforeAnyPost(): void
     {
+        $file = tempnam(sys_get_temp_dir(), 'reach-mp4');
+        file_put_contents($file, 'MP4BYTES');
         $http = $this->withMedia($this->http(), [['status' => 'failed']]);
         try {
-            $this->publisher($http)->publish(self::message('x', [['type' => 'video', 'url' => self::MP4]]), 'youtube');
+            $this->publisher($http)->publish(self::message('x', [['type' => 'video', 'mime' => 'video/mp4', 'path' => $file]]), 'youtube');
             $this->fail('rejected media must not post');
         } catch (SocialApiException $e) {
             $this->assertSame(SocialApiException::REJECTED, $e->kind);
+        } finally {
+            @unlink($file);
         }
         $this->assertSame([], $http->to('#/v1/posts$#'));
     }
 
-    public function testAnExpiredSourceIsAMediaSourceError(): void
+    public function testAMissingLocalFileIsAMediaSourceError(): void
     {
-        $http = $this->http()->on('GET', '#shotstack#', new HttpResponse(403, '<Error>AccessDenied</Error>'));
+        $http = $this->http();
         try {
-            $this->publisher($http)->publish(self::message('x', [['type' => 'video', 'url' => self::MP4]]), 'youtube');
+            $this->publisher($http)->publish(self::message('x', [['type' => 'video', 'mime' => 'video/mp4', 'path' => '/nonexistent/render.mp4']]), 'youtube');
             $this->fail('expected a media error');
         } catch (SocialApiException $e) {
             $this->assertSame(SocialApiException::MEDIA_SOURCE, $e->kind);
-            $this->assertStringContainsString('HTTP 403', $e->getMessage());
         }
+        $this->assertSame([], $http->to('#/v1/posts$#'));
     }
 
     public function testYouTubeWithoutAVideoIsRefusedBeforeCallingTheApi(): void
