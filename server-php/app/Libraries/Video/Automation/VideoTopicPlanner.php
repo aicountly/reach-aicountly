@@ -51,27 +51,32 @@ final class VideoTopicPlanner
     public static function screens(): array
     {
         $base = 'https://aicountly.com';
+        // Live: Smart Books, Inventory, Billing, Notes, Drive + Manage (aicountly.com/pricing and the
+        // launch page); every other app is Beta on the site. Drive has no product page of its own.
         $pages = [
-            '/'                      => 'AICOUNTLY home page — the product suite overview',
-            '/platform'              => 'Platform overview',
-            '/pricing'               => 'Pricing plans',
-            '/smart-books'           => 'Smart Books (accounting) product page',
-            '/financial-reporting'   => 'Financial Reporting product page',
-            '/auditor'               => 'Auditor product page',
-            '/secretarial'           => 'Secretarial (company law compliance) product page',
-            '/hrms'                  => 'HRMS product page',
-            '/our-people'            => 'Our People product page',
-            '/contacts'              => 'Contacts product page',
-            '/calendar'              => 'Calendar product page',
-            '/vault'                 => 'Vault (document storage) product page',
-            '/inventory'             => 'Inventory product page',
-            '/billing'               => 'Billing product page',
-            '/pos'                   => 'POS product page',
-            '/releases'              => 'Release notes — what shipped recently',
-            '/guides'                => 'Workflow guides index',
-            '/help'                  => 'Help centre (knowledge base)',
-            '/community'             => 'Community Q&A',
-            '/blogs'                 => 'Blog',
+            '/'                         => 'AICOUNTLY home page — the product suite overview',
+            '/free-accounting-software' => 'Launch page — Smart Books, Inventory, Billing, Notes and Drive are live with Manage; free to get started',
+            '/platform'                 => 'Platform overview',
+            '/pricing'                  => 'Pricing plans — the Free plan with the live apps; other apps marked Beta',
+            '/smart-books'              => 'Smart Books (accounting) product page — live',
+            '/billing'                  => 'Billing (GST billing & invoicing) product page — live',
+            '/inventory'                => 'Inventory product page — live',
+            '/notes'                    => 'Notes product page — live',
+            '/manage'                   => 'Manage (company, branches and financial years for every app) — live',
+            '/financial-reporting'      => 'Financial Reporting product page — Beta',
+            '/auditor'                  => 'Auditor product page — Beta',
+            '/secretarial'              => 'Secretarial (company law compliance) product page — Beta',
+            '/hrms'                     => 'HRMS product page — Beta',
+            '/our-people'               => 'Our People product page — Beta',
+            '/contacts'                 => 'Contacts product page — Beta',
+            '/calendar'                 => 'Calendar product page — Beta',
+            '/vault'                    => 'Vault (document storage) product page — Beta',
+            '/pos'                      => 'POS product page — Beta',
+            '/releases'                 => 'Release notes — what shipped recently',
+            '/guides'                   => 'Workflow guides index',
+            '/help'                     => 'Help centre (knowledge base)',
+            '/community'                => 'Community Q&A',
+            '/blogs'                    => 'Blog',
         ];
         $out = [];
         foreach ($pages as $path => $shows) {

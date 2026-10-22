@@ -151,6 +151,8 @@ Product claims:
   claims a capability the context does not support, remove the claim (revise) or reject.
 - Screens referenced in `visual` must be real product pages from the context's screen list;
   never describe what a screen shows beyond its plain purpose.
+- The screen list marks which products are live and which are Beta. Never replace a live product
+  the draft names with a different product; a Beta product may only be presented as Beta.
 Brand voice:
 - Warm, confident, practical Indian English for small-business owners, accountants and CAs.
   Short spoken sentences that sound natural read aloud; no jargon without a few-word explanation.

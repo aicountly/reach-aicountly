@@ -190,4 +190,14 @@ final class ContentVettingServiceTest extends CIUnitTestCase
         $this->assertStringContainsString('There is no free trial', \App\Libraries\Settings\BrandOffer::DEFAULT);
         $this->assertSame(\App\Libraries\Settings\BrandOffer::DEFAULT, \App\Libraries\Settings\ReachConfig::registry()['brand.offer']['default']);
     }
+
+    public function testTheVideoScreenListKnowsWhichProductsAreLive(): void
+    {
+        $shows = array_column(\App\Libraries\Video\Automation\VideoTopicPlanner::screens(), 'shows', 'url');
+        $this->assertStringContainsString('live', $shows['https://aicountly.com/notes']);
+        $this->assertStringContainsString('live', $shows['https://aicountly.com/manage']);
+        $this->assertStringContainsString('Notes and Drive are live', $shows['https://aicountly.com/free-accounting-software']);
+        $this->assertStringContainsString('Beta', $shows['https://aicountly.com/vault']);
+        $this->assertStringContainsString('Never replace a live product', Rubrics::for('video_script'));
+    }
 }
