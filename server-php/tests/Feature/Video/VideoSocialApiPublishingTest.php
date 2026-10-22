@@ -184,10 +184,12 @@ final class VideoSocialApiPublishingTest extends ApiTestCase
         $this->assertSame($post['content'], $create['text'], 'the YouTube description is the post text');
         // YouTube is published public unless social.socialapi.youtube.visibility says otherwise.
         $this->assertSame([['account_id' => 'acc_yt', 'visibility' => 'public']], $create['targets']);
-        $this->assertSame([['source_type' => 'media_id', 'source' => 'med_yt', 'media_id' => 'med_yt']], $create['media'], 'the uploaded video is referenced as the media source');
+        $this->assertCount(1, $create['media']);
+        $this->assertSame('url', $create['media'][0]['source_type'], 'the rendered video is attached by its public URL');
+        $this->assertMatchesRegularExpression(self::MP4, $create['media'][0]['source']);
         $this->assertTrue($create['publish_now']);
         $this->assertSame(['youtube' => ['privacy_status' => 'public']], $create['platform_data']);
-        $this->assertSame('FAKE-MP4-BYTES', $this->http->to('#uploads\.social-api#', 'PUT')[0]['body']);
+        $this->assertSame([], $this->http->to('#uploads\.social-api#', 'PUT'), 'social-api.ai fetches the render itself; nothing is uploaded');
         $this->assertCount(1, $this->http->to('#/v1/posts$#', 'POST'), 'submitted once');
 
         // The Short is then offered to Instagram (account resolves) and queued for the others.

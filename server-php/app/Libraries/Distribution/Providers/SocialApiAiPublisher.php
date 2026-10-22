@@ -79,7 +79,7 @@ class SocialApiAiPublisher implements SocialPublisherInterface
             throw new SocialApiException("Reach channel “{$platform}” cannot be posted through social-api.ai. Nothing was posted.", SocialApiException::PERMANENT, 422);
         }
         $account = $this->account($target);
-        $media   = $this->uploadMedia($message);
+        $media   = $this->attachMedia($message);
         if (isset(SocialApiPlatforms::MEDIA_REQUIRED[$target]) && $media === []) {
             throw new SocialApiException(
                 SocialApiPlatforms::label($target) . ' needs ' . SocialApiPlatforms::MEDIA_REQUIRED[$target] . '; this post has no media file Reach can fetch (media_refs). Nothing was posted.',
@@ -96,7 +96,7 @@ class SocialApiAiPublisher implements SocialPublisherInterface
     /**
      * The request body for POST /posts (public for tests and diagnosis).
      *
-     * @param list<string> $mediaIds
+     * @param list<string|array{source_type: string, source: string}> $mediaIds an uploaded media id, or a ready media item
      * @return array<string, mixed>
      */
     public function postBody(ChannelMessage $message, string $platform, string $accountId, array $mediaIds): array
@@ -119,8 +119,9 @@ class SocialApiAiPublisher implements SocialPublisherInterface
         $body['targets'] = [self::target($platform, $accountId)];
         if ($mediaIds !== []) {
             // social-api.ai: each media item needs `source` ("publishing.media.missing_source"
-            // otherwise — the first live YouTube upload, 19 Oct 2026); media_id is kept as sent before.
-            $body['media'] = array_map(static fn (string $id): array => ['source_type' => 'media_id', 'source' => $id, 'media_id' => $id], $mediaIds);
+            // otherwise). A public https file goes as {source_type: url, source: <url>} — the
+            // shape social-api.ai documents; an uploaded file as its media id.
+            $body['media'] = array_map(static fn ($m): array => is_array($m) ? $m : ['source_type' => 'media_id', 'source' => $m, 'media_id' => $m], $mediaIds);
         }
 
         // Never a draft: always publish_now, or scheduled_at when it is really in the future.
@@ -281,18 +282,23 @@ class SocialApiAiPublisher implements SocialPublisherInterface
     }
 
     /**
-     * Upload the post's media files; returns the verified media ids.
+     * The post's media: a public https file is referenced by its URL (social-api.ai
+     * fetches it — the live YouTube uploads of 19–22 Oct 2026 failed with
+     * publishing.media.missing_source when sent as an uploaded media id); a file
+     * only on this server is uploaded and sent as its verified media id.
      *
-     * @return list<string>
+     * @return list<string|array{source_type: string, source: string}>
      */
-    private function uploadMedia(ChannelMessage $message): array
+    private function attachMedia(ChannelMessage $message): array
     {
         $files = self::mediaFiles($message->mediaRefs);
-        $ids   = [];
+        $out   = [];
         foreach ($files as $i => $ref) {
-            $ids[] = $this->uploadOne($ref, $message->idempotencyKey . ':' . $i);
+            $out[] = ! $ref['local'] && preg_match('#^https://#i', $ref['source']) === 1
+                ? ['source_type' => 'url', 'source' => $ref['source']]
+                : $this->uploadOne($ref, $message->idempotencyKey . ':' . $i);
         }
-        return $ids;
+        return $out;
     }
 
     /** @param array{source: string, local: bool, type: ?string, mime: ?string} $ref */
@@ -355,7 +361,7 @@ class SocialApiAiPublisher implements SocialPublisherInterface
 
     /**
      * @param array{id: string, name: ?string, username: ?string, source: string} $account
-     * @param list<string>         $media
+     * @param list<string|array{source_type: string, source: string}> $media
      * @param array<string, mixed> $body
      */
     private function receipt(SocialApiPostResult $result, string $platform, array $account, array $media, array $body): ProviderReceipt
@@ -367,7 +373,8 @@ class SocialApiAiPublisher implements SocialPublisherInterface
             'platform'       => $platform,
             'account_id'     => $account['id'],
             'account_source' => $account['source'],
-            'media_ids'      => $media,
+            // ids as sent; a URL source is recorded without its query string (signed links)
+            'media_ids'      => array_map(static fn ($m): string => is_array($m) ? 'url:' . strtok($m['source'], '?') : $m, $media),
             'http_status'    => $s,
             'publish_mode'   => isset($body['scheduled_at']) ? 'scheduled' : 'publish_now',
             'scheduled_at'   => $body['scheduled_at'] ?? null,
