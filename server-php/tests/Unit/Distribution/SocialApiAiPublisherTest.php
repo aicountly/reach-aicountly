@@ -259,7 +259,8 @@ final class SocialApiAiPublisherTest extends CIUnitTestCase
         $this->assertSame([SocialApiAiPublisher::VERIFY_PAUSE_SECS], $this->slept);
 
         $body = self::body($http);
-        $this->assertSame([['source_type' => 'media_id', 'media_id' => 'med_1']], $body['media']);
+        // social-api.ai needs `source` on each media item (publishing.media.missing_source otherwise).
+        $this->assertSame([['source_type' => 'media_id', 'source' => 'med_1', 'media_id' => 'med_1']], $body['media']);
         $this->assertSame('GST in 60 seconds #Shorts', $body['title']);
         $this->assertSame('Description', $body['text']);
         $this->assertSame([['account_id' => 'acc_yt', 'visibility' => 'public']], $body['targets'], 'social-api.ai defaults YouTube to private');

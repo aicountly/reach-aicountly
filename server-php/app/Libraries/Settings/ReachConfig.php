@@ -51,6 +51,8 @@ final class ReachConfig
             'ai.vetting.model.knowledge_base' => ['group' => 'AI vetting', 'label' => 'Knowledge Base vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
             'ai.vetting.model.release_note' => ['group' => 'AI vetting', 'label' => 'Release notes vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
             'ai.vetting.model.workflow_guide' => ['group' => 'AI vetting', 'label' => 'Workflow guide vetting model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
+            'brand.offer' => ['group' => 'AI vetting', 'label' => 'What we offer new customers (for vetting)', 'type' => 'string', 'default' => \App\Libraries\Settings\BrandOffer::DEFAULT,
+                'help' => 'The only offer claims Gemini accepts in videos and social posts (e.g. "sign up free"). Blank = no offer claim is supported.'],
             'ai.insights.model' => ['group' => 'AI vetting', 'label' => 'AI Insights model', 'type' => 'model', 'help' => 'Blank = default vetting model.'],
 
             // ── Stream H: AI visibility (GEO) + AI Insights (keep this block contiguous) ──

@@ -181,4 +181,13 @@ final class ContentVettingServiceTest extends CIUnitTestCase
         $this->expectException(\InvalidArgumentException::class);
         Rubrics::for('unknown');
     }
+
+    public function testOfferClaimsAreAllowedOnlyAsTheContextOfferStatesThem(): void
+    {
+        $this->assertStringContainsString("context's `offer`", Rubrics::for('video_script'));
+        $this->assertStringContainsString("context's `offer`", Rubrics::for('social_post'));
+        $this->assertStringContainsString('Signing up at aicountly.com is free', \App\Libraries\Settings\BrandOffer::DEFAULT);
+        $this->assertStringContainsString('There is no free trial', \App\Libraries\Settings\BrandOffer::DEFAULT);
+        $this->assertSame(\App\Libraries\Settings\BrandOffer::DEFAULT, \App\Libraries\Settings\ReachConfig::registry()['brand.offer']['default']);
+    }
 }

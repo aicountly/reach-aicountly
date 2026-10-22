@@ -162,8 +162,9 @@ YouTube policy-safe:
   not ask for real people, logos of other companies, text-heavy images or shocking imagery.
 - No guarantees ("you will save", "never get a notice", "100% compliant", "zero penalties").
 CTA:
-- `cta_text` must be one clear, honest call to action (e.g. visit aicountly.com, start a free
-  trial only if the context says one exists). The last scene should lead into it.
+- `cta_text` must be one clear, honest call to action (e.g. visit aicountly.com). Anything about
+  price, signing up free, a free plan or a trial is allowed only exactly as the context's `offer`
+  states it — "sign up free" is supported when `offer` says so. The last scene should lead into it.
 Structure (keep it; fix text only): title ≤ 100 characters with no < or >, description in plain
 text, tags relevant and short, scenes in order. For a Short, the voice-over must fit in 60 seconds
 (≈ 140 words in total). Do not change visual types or URLs; you may edit text fields.
@@ -210,6 +211,7 @@ Instagram, X and/or YouTube), written by an automated routine — often on the o
 - If the post says or implies the content is made with AI (AI voice, AI-generated video), keep
   that disclosure; never remove one.
 - Links must point to aicountly.com (or an AICOUNTLY social profile) unless the context gives another.
+- Price, "sign up free", free plan or trial claims only exactly as the context's `offer` states them.
 Return `final` with the same fields (text, title, hashtags, link); edit text only.
 TXT,
         ];

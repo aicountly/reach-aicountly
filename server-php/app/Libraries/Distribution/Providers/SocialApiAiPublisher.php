@@ -118,7 +118,9 @@ class SocialApiAiPublisher implements SocialPublisherInterface
         }
         $body['targets'] = [self::target($platform, $accountId)];
         if ($mediaIds !== []) {
-            $body['media'] = array_map(static fn (string $id): array => ['source_type' => 'media_id', 'media_id' => $id], $mediaIds);
+            // social-api.ai: each media item needs `source` ("publishing.media.missing_source"
+            // otherwise — the first live YouTube upload, 19 Oct 2026); media_id is kept as sent before.
+            $body['media'] = array_map(static fn (string $id): array => ['source_type' => 'media_id', 'source' => $id, 'media_id' => $id], $mediaIds);
         }
 
         // Never a draft: always publish_now, or scheduled_at when it is really in the future.

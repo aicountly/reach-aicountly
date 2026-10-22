@@ -395,6 +395,9 @@ class AutomationSocialPostService
             'published_on' => 'the official AICOUNTLY accounts on: ' . implode(', ', self::json($row['channels_json'])),
             'media'     => array_map(static fn ($m) => ($m['type'] ?? 'file') . ': ' . $m['url'], $media),
         ];
+        if (($offer = \App\Libraries\Settings\BrandOffer::text()) !== '') {
+            $context['offer'] = $offer;
+        }
         if ($row['bot_command_id'] !== null) {
             $cmd = $this->db->table('reach_bot_commands')->select('instruction, created_by_name')->where('id', (int) $row['bot_command_id'])->get()->getRowArray();
             if ($cmd !== null) {
