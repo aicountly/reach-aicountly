@@ -2,6 +2,7 @@
  * Pure helpers for Bot → Plan & Performance. Dates are shown in IST with a
  * local Intl helper (the shared date helpers are being unified separately).
  */
+import { toDate } from '../../../utils/formatDate';
 
 export const IST = 'Asia/Kolkata';
 
@@ -60,16 +61,17 @@ export const ACTION_LABELS = {
 export function formatIstDate(value) {
   if (!value) return '—';
   const s = String(value);
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T12:00:00+05:30`) : new Date(s.replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return s;
+  // toDate reads PostgreSQL's "2026-10-22 10:00:00+00" (an hour-only offset new Date() rejects).
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T12:00:00+05:30`) : toDate(s);
+  if (!d || Number.isNaN(d.getTime())) return s;
   return new Intl.DateTimeFormat('en-IN', { timeZone: IST, day: 'numeric', month: 'short', year: 'numeric' }).format(d);
 }
 
 /** An instant → "18 Oct 2026, 01:00 IST". */
 export function formatIstDateTime(value) {
   if (!value) return '—';
-  const d = new Date(String(value).replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return String(value);
+  const d = toDate(value);
+  if (!d || Number.isNaN(d.getTime())) return String(value);
   const out = new Intl.DateTimeFormat('en-IN', {
     timeZone: IST, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(d);

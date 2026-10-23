@@ -472,6 +472,125 @@ final class AiVisibilityService
     }
 
     /**
+     * What was asked, of which assistant, and who each answer named — per
+     * prompt and assistant over the last $days IST days. Counted exactly like
+     * summary(): an answer to a question that itself names AICOUNTLY is not
+     * counted for the brand, and entities named in the question are left out
+     * of that answer's competitor list.
+     *
+     * @return array<string, mixed>
+     */
+    public function byPrompt(int $days = 28): array
+    {
+        $days  = max(1, min(180, $days));
+        $ist   = new \DateTimeZone('Asia/Kolkata');
+        $from  = (new \DateTimeImmutable(self::istToday(), $ist))->modify('-' . ($days - 1) . ' days');
+        $since = $from->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+
+        $runs = $this->db->query(
+            "SELECT r.id, r.ai_provider, r.ai_model, r.status, r.error_message, COALESCE(r.completed_at, r.queued_at) AS at,
+                    p.id AS prompt_id, p.name AS prompt_name, p.persona AS market, v.prompt_text
+               FROM reach_ai_visibility_runs r
+               JOIN reach_ai_visibility_prompt_versions v ON v.id = r.prompt_version_id
+               JOIN reach_ai_visibility_prompts p ON p.id = v.prompt_id
+              WHERE r.tenant_id = 1 AND r.status IN ('completed','failed') AND COALESCE(r.completed_at, r.queued_at) >= ?
+              ORDER BY r.id",
+            [$since]
+        )->getResultArray();
+
+        $ids       = array_map('intval', array_column(array_filter($runs, static fn (array $r): bool => $r['status'] === 'completed'), 'id'));
+        $obs       = $ids !== [] ? $this->observationsByRun($ids) : [];
+        $brandName = VisibilityExecutionService::brandAliases()[0];
+        $atIst     = static fn (string $ts): string => (new \DateTimeImmutable($ts))->setTimezone($ist)->format('c');
+
+        $prompts = [];
+        $totals  = ['answers' => 0, 'counted' => 0, 'brand_mentions' => 0, 'failed' => 0];
+        foreach ($runs as $r) {
+            $pid  = (int) $r['prompt_id'];
+            $prov = (string) $r['ai_provider'];
+            $prompts[$pid] ??= ['prompt_id' => $pid, 'name' => $r['prompt_name'], 'market' => $r['market'], 'question' => $r['prompt_text'],
+                'answers' => 0, 'counted' => 0, 'brand_mentions' => 0, 'failed' => 0, 'competitors' => [], 'providers' => [], 'last_asked_at' => null];
+            $p = &$prompts[$pid];
+            $p['providers'][$prov] ??= ['provider' => $prov, 'model' => $r['ai_model'], 'answers' => 0, 'counted' => 0, 'brand_mentions' => 0,
+                'failed' => 0, 'last_error' => null, 'competitors' => [], 'last_asked_at' => null, 'last_brand_excerpt' => null];
+            $pp = &$p['providers'][$prov];
+            $at = $atIst((string) $r['at']);
+
+            if ($r['status'] === 'failed') {
+                $pp['failed']++;
+                $p['failed']++;
+                $totals['failed']++;
+                $pp['last_error'] = $r['error_message'] !== null ? mb_substr((string) $r['error_message'], 0, 200) : null;
+                unset($pp, $p);
+                continue;
+            }
+
+            $eligible = true;
+            $named    = false;
+            $excerpt  = null;
+            $comps    = [];
+            foreach ($obs[(int) $r['id']] ?? [] as $o) {
+                $inQ = (bool) ($o['finding']['in_question'] ?? false);
+                if ($o['mention_type'] === 'brand') {
+                    $eligible = ! $inQ;
+                    $named    = $o['coverage_state'] === 'mentioned' && ! $inQ;
+                    $excerpt  = $named ? $o['evidence_excerpt'] : null;
+                } elseif ($o['coverage_state'] === 'mentioned' && ! $inQ) {
+                    $comps[(string) $o['entity_mentioned']] = true;
+                }
+            }
+
+            foreach ([&$p, &$pp, &$totals] as &$agg) {
+                $agg['answers']++;
+                $agg['counted'] += $eligible ? 1 : 0;
+                $agg['brand_mentions'] += $named ? 1 : 0;
+            }
+            unset($agg);
+            foreach (array_keys($comps) as $n) {
+                $p['competitors'][$n]  = ($p['competitors'][$n] ?? 0) + 1;
+                $pp['competitors'][$n] = ($pp['competitors'][$n] ?? 0) + 1;
+            }
+            if ($pp['last_asked_at'] === null || $at > $pp['last_asked_at']) {
+                $pp['last_asked_at'] = $at;
+                $pp['model']         = $r['ai_model'];
+                if ($excerpt !== null) {
+                    $pp['last_brand_excerpt'] = mb_substr((string) $excerpt, 0, 280);
+                }
+            }
+            if ($p['last_asked_at'] === null || $at > $p['last_asked_at']) {
+                $p['last_asked_at'] = $at;
+            }
+            unset($pp, $p);
+        }
+
+        $byCount = static function (array $counts): array {
+            arsort($counts);
+
+            return array_map(static fn ($n, $c) => ['name' => (string) $n, 'answers' => $c], array_keys($counts), array_values($counts));
+        };
+        $out = [];
+        foreach ($prompts as $p) {
+            $p['competitors'] = $byCount($p['competitors']);
+            $p['providers']   = array_values(array_map(static function (array $pp) use ($byCount): array {
+                $pp['competitors'] = $byCount($pp['competitors']);
+
+                return $pp;
+            }, $p['providers']));
+            $out[] = $p;
+        }
+        usort($out, static fn (array $a, array $b): int => [$b['brand_mentions'], $b['answers']] <=> [$a['brand_mentions'], $a['answers']] ?: strcmp((string) $a['name'], (string) $b['name']));
+
+        return [
+            'period'      => ['from' => $from->format('Y-m-d'), 'to' => self::istToday(), 'days' => $days],
+            'brand'       => $brandName,
+            'totals'      => $totals,
+            'prompts'     => $out,
+            'providers'   => $this->providers(),
+            'sample_note' => self::SAMPLE_NOTE,
+        ];
+    }
+
+    /**
      * A compact block for the daily report / insights digest.
      *
      * @return array<string, mixed>

@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { usePermission } from '../../hooks/usePermission';
+import { formatDateTime } from '../../utils/formatDate';
+import { useActivityDrilldown } from './useActivityDrilldown';
 import { formatAge } from '../../utils/formatAge';
 import { Bars, ForecastChart, Sparkline } from './Charts';
 import { ago, change, inr, num, pct, WINDOWS } from './format';
@@ -176,18 +178,83 @@ export function Recommendations({ section, onDone }) {
 
 /* ─────────────────────────────── activity ────────────────────────────── */
 
+const NEGATIVE_KINDS = ['vetting_rejected', 'job_failed'];
+
+/** "aicountly.com", "youtube.com" — names the site a public link opens. */
+function hostOf(url) {
+  try { return new URL(url).host.replace(/^www\./, ''); } catch { return 'live page'; }
+}
+
+/** One item behind a counter: title, IST time, detail, Reach + public links. */
+function ActivityItem({ item, showLabel, itemRef }) {
+  return (
+    <li ref={itemRef} tabIndex={-1} className={`cc-feed__item cc-feed__item--${item.tone}`}>
+      <span className="cc-feed__dot" aria-hidden="true" />
+      <div className="cc-feed__main">
+        <div className="cc-feed__title">{item.link ? <Link to={item.link}>{item.title}</Link> : item.title}</div>
+        <div className="cc-feed__meta text-xs text-muted">
+          {[showLabel ? item.label : null, item.content_type || null, item.kind === 'vetting_rejected' ? item.ref : item.detail]
+            .filter(Boolean).join(' · ')}
+        </div>
+        {item.reasons?.length > 0 && (
+          <ul className="cc-feed__reasons text-xs" aria-label="Gemini's reasons">
+            {item.reasons.map((r, i) => <li key={i}>{r}</li>)}
+          </ul>
+        )}
+        {item.public_url && (
+          <a className="cc-feed__public text-xs" href={item.public_url} target="_blank" rel="noopener noreferrer">
+            {hostOf(item.public_url)} <ExternalLink size={11} aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        )}
+      </div>
+      <time className="cc-feed__time text-xs text-muted" dateTime={item.at} title={ago(item.at)}>{formatDateTime(item.at)}</time>
+    </li>
+  );
+}
+
+/** Failed jobs of one type: how many, when they started and stopped, the latest error. */
+function JobGroup({ group, canOpenJobs, itemRef }) {
+  return (
+    <li ref={itemRef} tabIndex={-1} className="cc-feed__item cc-feed__item--negative">
+      <span className="cc-feed__dot" aria-hidden="true" />
+      <div className="cc-feed__main">
+        <div className="cc-feed__title"><code>{group.job_type}</code> · {num(group.count)} failed</div>
+        <div className="cc-feed__meta cc-feed__meta--wrap text-xs text-muted">
+          Latest {formatDateTime(group.latest_at)} ({ago(group.latest_at)}) · first {formatDateTime(group.first_at)} ·{' '}
+          <span className={group.last_24h > 0 ? 'text-danger' : 'text-success'}>
+            {group.last_24h > 0 ? `${num(group.last_24h)} in the last 24 h` : 'none in the last 24 h'}
+          </span>
+        </div>
+        {group.latest_error && <div className="cc-feed__error text-xs">{group.latest_error}</div>}
+        {canOpenJobs && (
+          <div className="cc-feed__links text-xs">
+            <Link to={group.link}>Open these {num(group.count)} in the Job Monitor</Link>
+            <Link to={group.latest_link}>Latest job</Link>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export function ActivityFeed({ section }) {
+  const { has } = usePermission();
   const [win, setWin] = useState('d7');
   const [kind, setKind] = useState('');
-  const counters = section?.counters || {};
-  const kinds = Object.entries(counters);
+  const ok = section?.status === 'ok';
+  const drill = useActivityDrilldown({ kind, win, refreshKey: section?.built_at ?? null, enabled: ok });
 
-  const events = useMemo(() => {
-    const ms = WINDOWS.find((w) => w.id === win).ms;
-    const since = Date.now() - ms;
-    return (section?.events || []).filter((e) => (!kind || e.kind === kind)
-      && new Date(String(e.at).replace(' ', 'T')).getTime() >= since);
-  }, [section, win, kind]);
+  // The drill-down answers with counters from the same moment as its list,
+  // so tile and list agree even when the cached section is a minute old.
+  const counters = useMemo(() => drill.counters || section?.counters || {}, [drill.counters, section?.counters]);
+  const kinds = Object.entries(counters);
+  const winLabel = WINDOWS.find((w) => w.id === win).label;
+  const allCount = kinds.reduce((s, [, c]) => s + (c[win] || 0), 0);
+  const label = kind ? counters[kind]?.label || drill.label : 'All';
+
+  const summary = drill.total === null ? '' : drill.grouped
+    ? `${num(drill.total)} failed jobs in ${num(drill.groupsTotal)} job types · last ${winLabel} · showing ${num(drill.items.length)} types`
+    : `${num(drill.total)} ${drill.total === 1 ? 'item' : 'items'} · last ${winLabel} · showing ${num(drill.items.length)}`;
 
   return (
     <Section id="activity" icon={Activity} title="What the bot did" section={section}
@@ -200,37 +267,50 @@ export function ActivityFeed({ section }) {
              )}>
       {section?.status === 'empty' && <Empty>{section.note}</Empty>}
       {kinds.length > 0 && (
-        <div className="cc-counters" role="group" aria-label="Filter by activity">
-          <button type="button" className={`cc-counter${kind === '' ? ' is-active' : ''}`} aria-pressed={kind === ''} onClick={() => setKind('')}>
-            <span className="cc-counter__value">{num(kinds.reduce((s, [, c]) => s + (c[win] || 0), 0))}</span>
+        <div className="cc-counters" role="group" aria-label="Show the items behind a count">
+          <button type="button" className={`cc-counter${kind === '' ? ' is-active' : ''}`} aria-pressed={kind === ''} aria-controls="cc-activity-list" onClick={() => setKind('')}>
+            <span className="cc-counter__value">{num(allCount)}</span>
             <span className="cc-counter__label">All</span>
           </button>
-          {kinds.filter(([, c]) => c.d30 > 0).map(([k, c]) => (
-            <button key={k} type="button" className={`cc-counter${kind === k ? ' is-active' : ''}${['vetting_rejected', 'job_failed'].includes(k) ? ' cc-counter--neg' : ''}`}
-                    aria-pressed={kind === k} onClick={() => setKind(kind === k ? '' : k)}>
+          {kinds.filter(([k, c]) => c.d30 > 0 || k === kind).map(([k, c]) => (
+            <button key={k} type="button" className={`cc-counter${kind === k ? ' is-active' : ''}${NEGATIVE_KINDS.includes(k) ? ' cc-counter--neg' : ''}`}
+                    aria-pressed={kind === k} aria-controls="cc-activity-list" onClick={() => setKind(kind === k ? '' : k)}>
               <span className="cc-counter__value">{num(c[win])}</span>
               <span className="cc-counter__label">{c.label}</span>
             </button>
           ))}
         </div>
       )}
-      {section?.status === 'ok' && events.length === 0 && <Empty>Nothing in this window.</Empty>}
-      <ol className="cc-feed">
-        {events.slice(0, 30).map((e, i) => (
-          <li key={`${e.kind}-${e.at}-${i}`} className={`cc-feed__item cc-feed__item--${e.tone}`}>
-            <span className="cc-feed__dot" aria-hidden="true" />
-            <div className="cc-feed__main">
-              <div className="cc-feed__title">
-                {e.link ? (e.external
-                  ? <a href={e.link} target="_blank" rel="noreferrer">{e.title} <ExternalLink size={11} aria-hidden="true" /></a>
-                  : <Link to={e.link}>{e.title}</Link>) : e.title}
-              </div>
-              <div className="cc-feed__meta text-xs text-muted">{e.label}{e.detail ? ` · ${e.detail}` : ''}</div>
+      {ok && (
+        <div id="cc-activity-list" className="cc-drill" aria-busy={drill.loading}>
+          <div className="cc-drill__head">
+            <h3 className="cc-drill__title">{label}</h3>
+            <span className="text-xs text-muted" role="status" aria-live="polite">{summary}</span>
+          </div>
+          {drill.error && (
+            <div className="cc-empty cc-empty--error" role="alert">
+              {drill.error} <button type="button" className="btn btn-sm btn-secondary" onClick={drill.retry}>Try again</button>
             </div>
-            <time className="cc-feed__time text-xs text-muted" dateTime={e.at} title={e.at}>{ago(e.at)}</time>
-          </li>
-        ))}
-      </ol>
+          )}
+          {drill.loading && drill.items.length === 0 && <Skeleton />}
+          {!drill.loading && !drill.error && drill.total === 0 && <Empty>Nothing in this window.</Empty>}
+          {drill.items.length > 0 && (
+            <ol className="cc-feed" aria-label={`${label}, last ${winLabel}`}>
+              {drill.items.map((it, i) => {
+                const ref = i === drill.focusIndex ? drill.focusRef : undefined;
+                return drill.grouped
+                  ? <JobGroup key={it.job_type} group={it} canOpenJobs={has('job.view')} itemRef={ref} />
+                  : <ActivityItem key={`${it.kind}-${it.id}`} item={it} showLabel={!kind} itemRef={ref} />;
+              })}
+            </ol>
+          )}
+          {drill.hasMore && (
+            <button type="button" className="btn btn-sm btn-secondary cc-drill__more" onClick={drill.loadMore} disabled={drill.loading}>
+              {drill.loading ? 'Loading…' : `Load more (${num((drill.grouped ? drill.groupsTotal : drill.total) - drill.items.length)} left)`}
+            </button>
+          )}
+        </div>
+      )}
     </Section>
   );
 }
@@ -290,59 +370,7 @@ export function Impact({ section }) {
   );
 }
 
-/* ─────────────────────────────── rankings ────────────────────────────── */
-
-export function Rankings({ section }) {
-  const t = section?.tracker || {};
-  const v = section?.visibility || {};
-  return (
-    <Section id="rankings" icon={Trophy} title="Rankings" section={section}
-             subtitle={t.available ? `SEO Tracker (DataForSEO) ${t.latest_date}${t.compared_with ? ` vs ${t.compared_with}` : ''}.` : null}>
-      {section?.status === 'empty' && <Empty>{section.note}</Empty>}
-      {t.available && (
-        <>
-          <div className="cc-kpis">
-            <Kpi label="Keywords in top 10" value={`${t.top10}/${t.keywords_checked}`} hint={pct(t.top10_share, 0)} to="/seo-centre/tracker" />
-            <Kpi label="Ranked (top 100)" value={num(t.ranked)} hint={t.avg_rank != null ? `avg position ${t.avg_rank}` : ''} />
-          </div>
-          <div className="grid grid-2 mt-2">
-            <div>
-              <div className="cc-mini-title">Movers up</div>
-              {(t.movers_up || []).length === 0 ? <p className="text-xs text-muted">No gains since the last check.</p> : (
-                <ul className="cc-list">{t.movers_up.map((m) => (
-                  <li key={m.keyword}><span>{m.keyword}</span><span className="cc-delta cc-delta--good"><ArrowUpRight size={12} aria-hidden="true" /> {m.previous_rank ?? '>100'} → {m.rank ?? '>100'}</span></li>
-                ))}</ul>
-              )}
-            </div>
-            <div>
-              <div className="cc-mini-title">Movers down</div>
-              {(t.movers_down || []).length === 0 ? <p className="text-xs text-muted">No drops since the last check.</p> : (
-                <ul className="cc-list">{t.movers_down.map((m) => (
-                  <li key={m.keyword}><span>{m.keyword}</span><span className="cc-delta cc-delta--bad"><ArrowDownRight size={12} aria-hidden="true" /> {m.previous_rank ?? '>100'} → {m.rank ?? '>100'}</span></li>
-                ))}</ul>
-              )}
-            </div>
-          </div>
-          {(t.competitors || []).length > 0 && (
-            <div className="mt-2">
-              <div className="cc-mini-title">Competitors on the same keywords (top-10 placements)</div>
-              <Bars label="Competitor top-10 placements"
-                    rows={[{ key: 'us', label: 'AICOUNTLY', value: t.top10, display: `${t.top10}` },
-                      ...t.competitors.map((c) => ({ key: c.domain, label: c.name, value: c.top10, display: `${c.top10}${c.avg_rank != null ? ` · avg ${c.avg_rank}` : ''}` }))]} />
-            </div>
-          )}
-        </>
-      )}
-      {section && !t.available && section.status !== 'empty' && <Empty>{t.note}</Empty>}
-      {v.available && (
-        <div className="cc-kpis mt-2">
-          <Kpi label="AI assistants mention us" value={pct(v.mention_rate, 0)} hint={`${v.answers} answers in ${v.period?.days ?? 28} days${v.avg_rank ? ` · avg rank ${v.avg_rank}` : ''}`} to="/intelligence/visibility" />
-        </div>
-      )}
-      {section && !v.available && section.status !== 'empty' && <p className="text-xs text-muted mt-1"><Radar size={12} aria-hidden="true" /> {v.note}</p>}
-    </Section>
-  );
-}
+/* Rankings lives in ./Rankings.jsx (tooltips + drill-downs). */
 
 /* ────────────────────────────── projections ──────────────────────────── */
 

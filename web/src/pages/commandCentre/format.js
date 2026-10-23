@@ -1,5 +1,7 @@
 /** Formatting helpers for the command centre (kept out of component files). */
 
+import { toDate } from '../../utils/formatDate';
+
 const nf = new Intl.NumberFormat('en-IN');
 
 export const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(Math.round(v * 10) / 10) : '—');
@@ -18,10 +20,21 @@ export const inr = (v) => (typeof v === 'number'
   ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v)
   : '—');
 
+/**
+ * Milliseconds since the epoch for any timestamp the API sends, or NaN.
+ * TIMESTAMPTZ columns arrive as PostgreSQL prints them ("2026-10-22
+ * 10:00:00+00"); `new Date()` cannot read an hour-only offset and returns
+ * NaN, which made every activity event fall outside every window.
+ */
+export function epochMs(ts) {
+  const d = toDate(ts);
+  return d ? d.getTime() : Number.NaN;
+}
+
 /** "3m ago", "5h ago", "2d ago" from an ISO / SQL timestamp. */
 export function ago(ts, now = Date.now()) {
   if (!ts) return '—';
-  const t = new Date(String(ts).replace(' ', 'T')).getTime();
+  const t = epochMs(ts);
   if (Number.isNaN(t)) return '—';
   const s = Math.max(0, Math.round((now - t) / 1000));
   if (s < 60) return 'just now';

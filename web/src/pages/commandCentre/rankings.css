@@ -1,0 +1,78 @@
+/* Command centre → Rankings: inspectable tiles, tooltips and drill-downs. */
+
+/* The card clips overflow by default; tooltips must be able to leave it. */
+section[aria-labelledby="cc-rankings-title"].card { overflow: visible; }
+
+.rk-tip { position: relative; display: block; min-width: 0; }
+.rk-tip__bubble {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0;
+  display: flex; flex-direction: column; gap: 0.2rem;
+  width: max-content; max-width: min(340px, calc(100vw - 32px));
+  padding: 0.5rem 0.65rem; border-radius: var(--radius); border: 1px solid var(--color-border);
+  background: var(--color-text); color: var(--color-surface); box-shadow: var(--shadow-sm);
+  font-size: 0.74rem; font-weight: 400; line-height: 1.35; text-align: left; white-space: normal; pointer-events: none;
+}
+.rk-tip__bubble[hidden] { display: none; }
+.rk-tip__bubble--end { left: auto; right: 0; }
+.rk-tip__title { font-weight: 700; }
+.rk-tip__list { display: flex; flex-direction: column; gap: 0.1rem; }
+.rk-tip__row { overflow-wrap: anywhere; }
+.rk-tip__row::before { content: '· '; }
+.rk-tip__more { opacity: 0.85; }
+
+.rk-tile { display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.rk-tile > span { display: block; }
+.rk-tile:hover, .rk-tile.is-open { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+.rk-tile:focus-visible, .rk-bar:focus-visible, .rk-focusable:focus-visible, .rk-inline-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.rk-chev { vertical-align: -2px; transition: transform 0.15s ease; }
+.rk-chev.is-open { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .rk-chev { transition: none; } }
+
+.rk-panel { margin: 0.25rem 0 0.75rem; padding: 0.6rem 0.7rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
+.rk-panel--inline { margin: 0.3rem 0 0.5rem; }
+.rk-links { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.5rem; }
+.rk-inline-btn { font-size: inherit; text-decoration: underline; }
+.rk-focusable { border-radius: 3px; cursor: help; }
+
+.rk-kw__filters { flex-wrap: wrap; margin: 0.4rem 0; }
+.rk-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.rk-table { width: 100%; min-width: 44rem; border-collapse: collapse; font-size: 0.78rem; }
+.rk-table--compact { min-width: 0; }
+.rk-table td { white-space: nowrap; }
+.rk-table td.rk-url, .rk-table td.rk-wrap { white-space: normal; }
+.rk-table .cc-delta { display: flex; white-space: nowrap; }
+.rk-table th, .rk-table td { padding: 0.4rem 0.55rem; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.rk-table thead th { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-secondary); background: var(--color-bg); white-space: nowrap; }
+.rk-table tbody th { font-weight: 600; min-width: 9rem; font-size: inherit; text-transform: none; letter-spacing: normal; color: var(--color-text); background: none; }
+.rk-table abbr { text-decoration: none; }
+.rk-table--compact tbody th { min-width: 0; }
+.rk-row--muted td, .rk-row--muted th { color: var(--color-text-secondary); }
+.rk-kw__name { display: block; overflow-wrap: anywhere; }
+.rk-kw__meta { display: block; font-size: 0.68rem; font-weight: 400; color: var(--color-text-muted); }
+.rk-top10 { color: var(--color-success); }
+.rk-url { max-width: 14rem; overflow-wrap: anywhere; }
+.rk-nowrap { white-space: nowrap; }
+
+.rk-bars { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; }
+.rk-bar {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0.5rem; align-items: center;
+  width: 100%; padding: 0.2rem 0.25rem; border: 1px solid transparent; border-radius: 4px; background: none;
+  font: inherit; font-size: 0.78rem; color: inherit; text-align: left; cursor: pointer; min-height: 32px;
+}
+.rk-bar:hover, .rk-bar.is-open { border-color: var(--color-border); background: var(--color-bg); }
+.rk-bar__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-bar--ours .rk-bar__label { font-weight: 700; }
+
+.rk-ai__list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
+.rk-ai__prompt { padding: 0.45rem 0.55rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.rk-ai__q { font-size: 0.8rem; font-weight: 600; overflow-wrap: anywhere; }
+.rk-ai__providers { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.3rem; font-size: 0.75rem; }
+.rk-ai__providers li { display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.25rem; border-top: 1px dashed var(--color-border); }
+.rk-ai__prov { font-weight: 700; }
+.rk-ai__excerpt { font-style: italic; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+
+@media (max-width: 767.98px) {
+  .rk-bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .rk-bar .cc-bars__track { display: none; }
+}
+.rk-wrap-text { display: block; white-space: normal; min-width: 10rem; }
