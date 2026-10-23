@@ -114,6 +114,37 @@ describe('CommandCentrePage', () => {
     expect(screen.getByText('6/day · 84 in 14 d')).toBeInTheDocument();
   });
 
+  it('links impact numbers, bars, roadmap items, quotas and routines to their records', async () => {
+    dashboardService.commandCentre.mockResolvedValue(full);
+    renderWithAuth(<CommandCentrePage />, ctx);
+    await waitFor(() => expect(screen.getByText('GST e-invoicing explained')).toBeInTheDocument());
+
+    const impact = screen.getByTestId('cc-impact');
+    const kpiLink = (label) => within(impact).getByText(label).closest('a');
+    expect(kpiLink('Revenue attributed')).toHaveAttribute('href', '/leads/outcomes');
+    expect(kpiLink('CTR')).toHaveAttribute('href', '/seo-centre/search');
+    expect(kpiLink('From Reach pages')).toHaveAttribute('href', '/seo-centre/search?by=page');
+    // Nothing posted: the calendar itself (not the legacy /social/queue redirect).
+    expect(kpiLink('Social posts (28 d)')).toHaveAttribute('href', '/social/calendar');
+    expect(within(impact).getByRole('link', { name: 'gst billing software' }))
+      .toHaveAttribute('href', '/seo-centre/search?query=gst+billing+software&by=page');
+    expect(within(impact).getByRole('link', { name: '/billing' }))
+      .toHaveAttribute('href', `/seo-centre/search?page=${encodeURIComponent('https://aicountly.com/billing')}&by=query`);
+
+    const proj = screen.getByTestId('cc-projections');
+    expect(within(proj).getByRole('link', { name: 'Scheduled post' })).toHaveAttribute('href', '/content/1');
+    expect(within(proj).getByRole('link', { name: 'Blogs' })).toHaveAttribute('href', '/content?content_type=blog&workflow_status=published');
+
+    expect(within(screen.getByTestId('cc-health')).getByText(/^Blog:/).closest('a')).toHaveAttribute('href', '/bot/activities');
+  });
+
+  it('does not link revenue when there is none', async () => {
+    dashboardService.commandCentre.mockResolvedValue({ ...full, impact: { ...full.impact, outcomes: { ...full.impact.outcomes, revenue_inr: 0 } } });
+    renderWithAuth(<CommandCentrePage />, ctx);
+    await waitFor(() => expect(screen.getByText('GST e-invoicing explained')).toBeInTheDocument());
+    expect(within(screen.getByTestId('cc-impact')).getByText('Revenue attributed').closest('a')).toBeNull();
+  });
+
   it('opens the items behind an activity counter', async () => {
     dashboardService.commandCentre.mockResolvedValue(full);
     const user = userEvent.setup();

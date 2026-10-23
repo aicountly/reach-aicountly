@@ -3,6 +3,8 @@
  * local Intl helper (the shared date helpers are being unified separately).
  */
 import { toDate } from '../../../utils/formatDate';
+import { drillHref } from '../../../utils/drill';
+import { ROUTES } from '../../../constants/routes';
 
 export const IST = 'Asia/Kolkata';
 
@@ -158,4 +160,52 @@ export function describeChange(row) {
     return `blog prefer: ${list(a.blog_prefer)}; avoid: ${list(a.blog_avoid)}; KB prefer: ${list(a.kb_prefer)}${steer}`;
   }
   return '—';
+}
+
+/**
+ * Where the records behind a plan metric live (PlanMetrics.php keys; the
+ * predicates follow ActualsCollector). The lists are not date-scoped, so a
+ * link narrows to the kind of record, not to the range. null = no list.
+ */
+export function metricRecordsHref(metricKey) {
+  const key = String(metricKey || '');
+  let m = key.match(/^content\.(blog|knowledge_base)\.published$/);
+  if (m) return drillHref(ROUTES.CONTENT, { content_type: m[1], workflow_status: 'published' });
+  m = key.match(/^video\.(vlog|short)\.published$/);
+  if (m) return drillHref('/video', { status: 'published', format: m[1] });
+  m = key.match(/^social\.([a-z]+)\.posted$/);
+  if (m) return drillHref(ROUTES.SOCIAL_CALENDAR, { status: 'posted', channel: m[1] });
+  if (key.startsWith('search.')) return '/seo-centre/search';
+  return METRIC_RECORDS[key] ?? null;
+}
+
+const METRIC_RECORDS = {
+  'content.community.published': '/community/deployments',
+  'content.release_note.published': '/publishing/release-notes',
+  'content.workflow_guide.published': '/publishing/workflow-guides',
+  'email.accepted': '/distribution/email',
+  'covers.generated': '/quality/gallery',
+  'seo.checks_run': '/seo-centre/tracker',
+  'leads.captured': ROUTES.LEADS,
+  'leads.pushed': drillHref(ROUTES.LEADS, { engage_push_status: 'pushed' }),
+  'engage.conversions': drillHref(ROUTES.LEAD_OUTCOMES, { stage: 'converted' }),
+  'engage.revenue_inr': drillHref(ROUTES.LEAD_OUTCOMES, { stage: 'payment_confirmed' }),
+};
+
+/** A link to a metric's records only when there is something to see (never a zero). */
+export function recordsHrefIfAny(metricKey, value) {
+  return Number(value) > 0 ? metricRecordsHref(metricKey) : null;
+}
+
+/** Each IST calendar day from → to ("YYYY-MM-DD", inclusive). */
+export function rangeDates(from, to) {
+  if (!from || !to) return [];
+  const out = [];
+  const d = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
+  for (let i = 0; d <= end && i < 400; i += 1) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
 }

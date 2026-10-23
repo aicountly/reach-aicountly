@@ -86,6 +86,8 @@ class PerformanceService
             'coverage'        => [
                 'days'              => count($dates),
                 'days_with_plan'    => count($plans),
+                // Which days those are, so the tile can list them.
+                'plan_dates'        => array_keys($plans),
                 'first_plan_date'   => $store->firstPlanDate(),
                 'note'              => count($plans) < count($dates)
                     ? sprintf('%d of %d day(s) in this range have no recorded plan (planning starts the day the planner first runs); those days count towards neither target nor achievement.', count($dates) - count($plans), count($dates))

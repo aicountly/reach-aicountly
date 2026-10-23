@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { botService } from '../../services/botService';
 import { Card } from '../../components/common/Card';
@@ -11,6 +11,17 @@ import { Modal } from '../../components/common/Modal';
 import { RequirePermission } from '../../components/auth/RequirePermission';
 import { ROUTES } from '../../constants/routes';
 import { formatDateTime } from '../../utils/formatDate';
+import { drillHref } from '../../utils/drill';
+
+/**
+ * The Job Monitor run behind a queue row: its dispatch job's request_id
+ * (MarketingBotController::queue adds it), else every bot dispatch job.
+ */
+function queueJobsHref(row) {
+  return row?.request_id
+    ? drillHref(ROUTES.JOBS, { request_id: row.request_id })
+    : drillHref(ROUTES.JOBS, { job_type: 'reach.marketing_bot_dispatch' });
+}
 
 const BOT_ACTIONS = [
   ['generate_campaign_ideas',       'Generate campaign ideas'],
@@ -36,6 +47,7 @@ export function BotQueuePage() {
   const [action, setAction] = useState(BOT_ACTIONS[0][0]);
   const [payload, setPayload] = useState('{}');
   const [dispatching, setDispatching] = useState(false);
+  const navigate = useNavigate();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -75,6 +87,8 @@ export function BotQueuePage() {
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'requested_by', label: 'By', render: (r) => r.requested_by || '—' },
     { key: 'created_at', label: 'When', render: (r) => r.created_at ? formatDateTime(r.created_at) : '—' },
+    { key: 'generation_job_id', label: 'Job', render: (r) => (r.generation_job_id ? `#${r.generation_job_id}` : '—'),
+      drill: (r) => (r.generation_job_id ? queueJobsHref(r) : null) },
     { key: 'error_message', label: 'Error', render: (r) => r.error_message ? <span className="text-danger text-xs">{r.error_message}</span> : '—' },
   ];
 
@@ -99,7 +113,9 @@ export function BotQueuePage() {
       )}
       {loading ? <Loader /> : (
         <Card padding={false}>
-          <DataTable columns={columns} rows={rows} emptyMessage="Bot queue is empty." />
+          <DataTable columns={columns} rows={rows} emptyMessage="Bot queue is empty."
+            onRowClick={(r) => navigate(queueJobsHref(r))}
+            rowLabel={(r) => `Open the job run for queue item #${r.id} in the Job Monitor`} />
         </Card>
       )}
 

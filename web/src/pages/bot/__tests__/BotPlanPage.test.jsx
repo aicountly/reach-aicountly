@@ -119,6 +119,77 @@ describe('BotPlanPage', () => {
   });
 });
 
+describe('BotPlanPage drill-downs', () => {
+  beforeEach(() => { plan.mockReset(); performance.mockReset(); });
+  const auth = { auth: { user: { id: 1 }, permissions: ['bot.view'] } };
+
+  it('links the scheduled tiles, campaigns, scheduled items and achieved counts to their records', async () => {
+    plan.mockResolvedValue({
+      ...planData,
+      scheduled: {
+        ...planData.scheduled,
+        campaigns: [{ id: 12, name: 'Diwali GST push', start: '2026-10-18', end: '2026-10-25', status: 'scheduled' }],
+        items: [{ kind: 'social', id: 5, channel: 'linkedin', title: 'GST tips', at: '2026-10-18T05:00:00Z' }],
+      },
+    });
+    renderWithAuth(<BotPlanPage />, { ...auth, route: '/bot/plan' });
+    await screen.findByTestId('plan-content.blog.published');
+
+    const tileLink = (label) => screen.getByText(label).closest('a');
+    expect(tileLink('Social posts')).toHaveAttribute('href', '/social/calendar?status=scheduled');
+    expect(tileLink('Email sends')).toHaveAttribute('href', '/distribution/email');
+    expect(tileLink('Topic queue')).toHaveAttribute('href', '/blog-command-centre/roadmap/candidates');
+    expect(tileLink('Calendar entries')).toBeNull(); // zero is not a link
+    expect(screen.getByRole('link', { name: /1 roadmap-selected topic/ }))
+      .toHaveAttribute('href', '/blog-command-centre/roadmap/candidates?status=roadmap_selected');
+    expect(screen.getByRole('link', { name: 'Diwali GST push' })).toHaveAttribute('href', '/campaigns/12');
+    expect(screen.getByRole('link', { name: 'GST tips' })).toHaveAttribute('href', '/social/calendar?status=scheduled&channel=linkedin');
+    expect(within(screen.getByTestId('plan-content.blog.published')).getByRole('link', { name: '2' }))
+      .toHaveAttribute('href', '/content?content_type=blog&workflow_status=published');
+  });
+
+  it('links each metric, top lag and variance row to its records', async () => {
+    performance.mockResolvedValue(perfData);
+    renderWithAuth(<BotPlanPage />, { ...auth, route: '/bot/plan?period=past&range=last_7_days' });
+    const card = await screen.findByTestId('perf-content.blog.published');
+    const blogHref = '/content?content_type=blog&workflow_status=published';
+    expect(within(card).getByRole('link', { name: /View records/ })).toHaveAttribute('href', blogHref);
+    expect(within(screen.getByTestId('perf-seo.checks_run')).getByRole('link', { name: /View records/ }))
+      .toHaveAttribute('href', '/seo-centre/tracker');
+    const lags = screen.getByRole('region', { name: 'Top lags' });
+    expect(within(lags).getByRole('link', { name: 'Blog posts published' })).toHaveAttribute('href', blogHref);
+    const variance = screen.getByRole('region', { name: 'Variance and root causes' });
+    expect(within(variance).getByRole('link', { name: 'Blog posts published' })).toHaveAttribute('href', blogHref);
+    expect(within(variance).getByRole('link', { name: '12' })).toHaveAttribute('href', blogHref);
+  });
+
+  it('filters the metric cards by the status tile, from the URL too, and lists the days with a plan', async () => {
+    performance.mockResolvedValue({ ...perfData, coverage: { ...perfData.coverage, plan_dates: ['2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17'] } });
+    const user = userEvent.setup();
+    renderWithAuth(<BotPlanPage />, { ...auth, route: '/bot/plan?period=past&range=last_7_days&status=met' });
+    await screen.findByTestId('perf-seo.checks_run');
+    expect(performance).toHaveBeenCalledWith('last_7_days');
+    expect(screen.queryByTestId('perf-content.blog.published')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Met/ })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: /^Lagging/ }));
+    expect(await screen.findByTestId('perf-content.blog.published')).toBeInTheDocument();
+    expect(screen.queryByTestId('perf-seo.checks_run')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show every metric' }));
+    expect(await screen.findByTestId('perf-seo.checks_run')).toBeInTheDocument();
+    expect(screen.getByTestId('perf-content.blog.published')).toBeInTheDocument();
+    // No metric is "slightly behind": nothing to drill into.
+    expect(screen.queryByRole('button', { name: /^Slightly behind/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Days with a plan/ }));
+    const daysList = screen.getByRole('list', { name: 'Days in this range' });
+    expect(within(daysList).getAllByRole('listitem')).toHaveLength(7);
+    expect(within(daysList).getByText('11 Oct 2026 · no plan')).toBeInTheDocument();
+    expect(within(daysList).getByText('17 Oct 2026 · plan recorded')).toBeInTheDocument();
+  });
+});
+
 describe('botPlan model', () => {
   it('formats IST dates without shifting calendar days', () => {
     expect(formatIstDate('2026-10-18')).toBe('18 Oct 2026');

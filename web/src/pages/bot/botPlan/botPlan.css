@@ -89,3 +89,15 @@
 .bp-list li { margin-bottom: 0.35rem; }
 .bp-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .bp-empty { font-size: 0.82rem; color: var(--color-text-muted); padding: 0.5rem 0; }
+
+/* Drill-downs: tiles that open (or filter to) the records they counted. */
+a.bp-tile, button.bp-tile { display: block; width: 100%; text-align: left; font: inherit; color: inherit; text-decoration: none; cursor: pointer; transition: border-color var(--transition), box-shadow var(--transition); }
+a.bp-tile:hover, button.bp-tile:hover { border-color: var(--color-primary); }
+a.bp-tile:focus-visible, button.bp-tile:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+button.bp-tile[aria-pressed='true'], button.bp-tile[aria-expanded='true'] { border-color: var(--color-primary); background: var(--color-primary-light); }
+.bp-card__records { font-size: 0.76rem; font-weight: 600; margin-top: 0.15rem; }
+.bp-chip { display: inline-flex; align-items: center; gap: 0.25rem; text-transform: none; font-weight: 600; }
+.bp-chip button { border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; display: inline-flex; }
+.bp-days { list-style: none; margin: -0.25rem 0 1rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.76rem; }
+.bp-days__day { padding: 0.2rem 0.5rem; border-radius: var(--radius); border: 1px dashed var(--color-border); color: var(--color-text-muted); }
+.bp-days__day--planned { border-style: solid; color: var(--color-text); }

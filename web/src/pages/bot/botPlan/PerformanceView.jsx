@@ -1,6 +1,18 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { X } from 'lucide-react';
+import { DrillLink, useUrlFilter } from '../../../components/drill';
 import {
-  ACTION_LABELS, STATUS_META, describeChange, formatIstDate, formatIstRange, formatValue, groupBy, pctTone, statusCounts,
+  ACTION_LABELS, STATUS_META, describeChange, formatIstDate, formatIstRange, formatValue, groupBy, pctTone, rangeDates,
+  recordsHrefIfAny, statusCounts,
 } from './model';
+
+/** The status tiles filter "Per metric" in place (?status=…), so the view stays linkable. */
+const STATUS_TILES = [
+  { key: 'met', label: 'Met', tone: 'success' },
+  { key: 'behind', label: 'Slightly behind', tone: 'warning' },
+  { key: 'lagging', label: 'Lagging', tone: 'danger' },
+];
 
 function Sparkline({ series = [] }) {
   const points = series.filter((s) => s.target !== null || s.achieved !== null);
@@ -54,6 +66,9 @@ function MetricCard({ m }) {
       )}
       <Sparkline series={m.series} />
       {m.days_without_data > 0 && <div className="bp-muted">{m.days_without_data} day(s) not reported by the source yet.</div>}
+      {recordsHrefIfAny(m.metric_key, m.achieved) && (
+        <Link className="bp-card__records" to={recordsHrefIfAny(m.metric_key, m.achieved)}>View records ›</Link>
+      )}
     </div>
   );
 }
@@ -63,6 +78,14 @@ export function PerformanceView({ data }) {
   const metrics = data.metrics || [];
   const planned = metrics.filter((m) => !['no_plan', 'nothing_planned'].includes(m.status) || (m.achieved ?? 0) > 0);
   const counts = statusCounts(metrics);
+  const [statusFilter, setStatusFilter] = useUrlFilter('status');
+  const [showDays, setShowDays] = useState(false);
+  const shown = statusFilter ? metrics.filter((m) => m.status === statusFilter) : planned;
+  const planDates = new Set(data.coverage?.plan_dates || []);
+  const days = rangeDates(data.range?.from, data.range?.to);
+  // Older API responses carry only the count; then the tile stays plain.
+  const daysBody = <><div className="bp-tile__label">Days with a plan</div><div className="bp-tile__value">{data.coverage?.days_with_plan ?? 0}/{data.coverage?.days ?? 0}</div></>;
+  const canListDays = Array.isArray(data.coverage?.plan_dates) && days.length > 0;
   const lagging = metrics.filter((m) => m.status === 'lagging' || m.status === 'behind');
   const log = data.self_tune?.log || [];
   const mix = data.topic_mix;
@@ -79,11 +102,32 @@ export function PerformanceView({ data }) {
       {data.coverage?.note && <div className="alert alert-info" style={{ marginBottom: '1rem' }}>{data.coverage.note}</div>}
 
       <div className="bp-summary">
-        <div className="bp-tile"><div className="bp-tile__label">Met</div><div className="bp-tile__value bp-pct--success">{counts.met}</div></div>
-        <div className="bp-tile"><div className="bp-tile__label">Slightly behind</div><div className="bp-tile__value bp-pct--warning">{counts.behind}</div></div>
-        <div className="bp-tile"><div className="bp-tile__label">Lagging</div><div className="bp-tile__value bp-pct--danger">{counts.lagging}</div></div>
-        <div className="bp-tile"><div className="bp-tile__label">Days with a plan</div><div className="bp-tile__value">{data.coverage?.days_with_plan ?? 0}/{data.coverage?.days ?? 0}</div></div>
+        {STATUS_TILES.map((t) => {
+          const body = <><div className="bp-tile__label">{t.label}</div><div className={`bp-tile__value bp-pct--${t.tone}`}>{counts[t.key]}</div></>;
+          // Zero is not a drill; the active filter stays clickable so it can be turned off.
+          if (!counts[t.key] && statusFilter !== t.key) return <div className="bp-tile" key={t.key}>{body}</div>;
+          return (
+            <button type="button" key={t.key} className="bp-tile" aria-pressed={statusFilter === t.key}
+              aria-controls="bp-metrics-list" onClick={() => setStatusFilter(statusFilter === t.key ? '' : t.key)}>
+              {body}
+            </button>
+          );
+        })}
+        {canListDays ? (
+          <button type="button" className="bp-tile" aria-expanded={showDays} aria-controls="bp-plan-days" onClick={() => setShowDays((v) => !v)}>
+            {daysBody}
+          </button>
+        ) : <div className="bp-tile">{daysBody}</div>}
       </div>
+      {canListDays && showDays && (
+        <ul className="bp-days" id="bp-plan-days" aria-label="Days in this range">
+          {days.map((d) => (
+            <li key={d} className={planDates.has(d) ? 'bp-days__day bp-days__day--planned' : 'bp-days__day'}>
+              {formatIstDate(d)} · {planDates.has(d) ? 'plan recorded' : 'no plan'}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <section className="bp-section" aria-labelledby="bp-toplags">
         <h2 className="bp-section__title" id="bp-toplags">Top lags</h2>
@@ -91,7 +135,9 @@ export function PerformanceView({ data }) {
           <div className="bp-lags">
             {data.top_lags.map((l) => (
               <div className="bp-lag" key={l.metric_key}>
-                <div className="bp-lag__title">{l.label} — {l.achievement_pct}%</div>
+                <div className="bp-lag__title">
+                  <DrillLink to={recordsHrefIfAny(l.metric_key, l.achieved)} title="Open the records behind this metric">{l.label}</DrillLink> — {l.achievement_pct}%
+                </div>
                 <div className="bp-muted">{formatValue(l.achieved)} of {formatValue(l.target)} planned</div>
                 {l.cause && <div className="bp-lag__cause"><strong>{l.cause.label}:</strong> {l.cause.detail}</div>}
                 {l.cause?.bot_action && <div className="bp-lag__fix">Bot: {l.cause.bot_action}</div>}
@@ -103,13 +149,23 @@ export function PerformanceView({ data }) {
       </section>
 
       <section className="bp-section" aria-labelledby="bp-metrics">
-        <h2 className="bp-section__title" id="bp-metrics">Per metric</h2>
-        {groupBy(planned).map((g) => (
-          <div key={g.group}>
-            <div className="bp-group__label">{g.label}</div>
-            <div className="bp-grid">{g.rows.map((m) => <MetricCard key={m.metric_key} m={m} />)}</div>
-          </div>
-        ))}
+        <h2 className="bp-section__title" id="bp-metrics">Per metric
+          {statusFilter && (
+            <span className="badge badge-secondary bp-chip">
+              {STATUS_META[statusFilter]?.label || statusFilter}
+              <button type="button" onClick={() => setStatusFilter('')} aria-label="Show every metric" title="Remove this filter"><X size={12} aria-hidden="true" /></button>
+            </span>
+          )}
+        </h2>
+        <div id="bp-metrics-list">
+          {statusFilter && shown.length === 0 && <div className="bp-empty">No metric is {(STATUS_META[statusFilter]?.label || statusFilter).toLowerCase()} in this range.</div>}
+          {groupBy(shown).map((g) => (
+            <div key={g.group}>
+              <div className="bp-group__label">{g.label}</div>
+              <div className="bp-grid">{g.rows.map((m) => <MetricCard key={m.metric_key} m={m} />)}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="bp-section" aria-labelledby="bp-variance">
@@ -121,9 +177,9 @@ export function PerformanceView({ data }) {
               <tbody>
                 {lagging.map((m) => (
                   <tr key={m.metric_key}>
-                    <td>{m.label}</td>
+                    <td><DrillLink to={recordsHrefIfAny(m.metric_key, m.achieved)}>{m.label}</DrillLink></td>
                     <td className="num">{formatValue(m.target, m.unit)}</td>
-                    <td className="num">{formatValue(m.achieved, m.unit)}</td>
+                    <td className="num"><DrillLink to={recordsHrefIfAny(m.metric_key, m.achieved)}>{formatValue(m.achieved, m.unit)}</DrillLink></td>
                     <td className={`num bp-pct bp-pct--${pctTone(m.achievement_pct)}`}>{m.achievement_pct ?? '—'}%</td>
                     <td><StatusBadge status={m.status} /></td>
                     <td>
