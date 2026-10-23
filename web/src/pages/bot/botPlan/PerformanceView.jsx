@@ -195,6 +195,7 @@ export function PerformanceView({ data }) {
           <h2 className="bp-section__title" id="bp-mix">Topic mix the routines are steered to</h2>
           <ul className="bp-list">
             <li>Blog — prefer: {(mix.blog?.prefer || []).join(', ') || 'no signal yet'}; avoid: {(mix.blog?.avoid || []).join(', ') || 'none'}</li>
+            {mix.blog?.steer?.why && <li>Blog mix (target 50% app-led, about 1 in 5 of those on a Beta app) — {mix.blog.steer.why}</li>}
             <li>Help articles — products furthest behind cadence: {(mix.knowledge_base?.prefer || []).join(', ') || 'none'}</li>
           </ul>
         </section>

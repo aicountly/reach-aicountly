@@ -166,7 +166,7 @@ final class RoutineBlogPipelineTest extends DatabaseTestCase
             'summary'          => 'A practical monthly GST routine for Indian small businesses.',
             'body_html'        => $this->body(),
             'seo'              => ['slug' => 'monthly-gst-routine', 'meta_title' => 'A monthly GST routine for small businesses', 'meta_description' => 'A simple monthly routine for GST returns, input tax credit and reconciliation that keeps Indian small businesses ready for every filing date.'],
-            'category'         => 'GST',
+            'category'         => 'gst',
             'tags'             => ['gst', 'compliance'],
             'content_base_key' => 'blog-20261017-monthly-gst-routine',
             'product_facts'    => ['Smart Books records sales and purchase invoices.'],
@@ -240,6 +240,54 @@ final class RoutineBlogPipelineTest extends DatabaseTestCase
         $calls = array_column(PublicSitePublisherFactory::mock()->getCalls(), 'method');
         $this->assertContains('publish', $calls);
         $this->assertContains('getVerification', $calls);
+
+        // aicountly.com receives the canonical category and (none for a topic
+        // article) product_slug.
+        $sent = null;
+        foreach (PublicSitePublisherFactory::mock()->getCalls() as $call) {
+            if (in_array($call['method'], ['createDraft', 'updateDraft'], true)) {
+                $sent = $call['args']['payload'] ?? null;
+            }
+        }
+        $this->assertIsArray($sent);
+        $this->assertSame('gst', $sent['category']);
+        $this->assertArrayHasKey('product_slug', $sent);
+        $this->assertNull($sent['product_slug']);
+    }
+
+    public function testCategoryAndProductAreCanonicalisedAndStoredForTopicMix(): void
+    {
+        $ingest = $this->ingest(['category' => 'Billing & Invoicing', 'product_slug' => 'billing', 'content_base_key' => 'blog-20261023-billing-reminders',
+            'title' => 'Payment reminders that get invoices paid on time', 'seo' => ['slug' => 'payment-reminders-invoices'] + $this->payload()['seo']]);
+        $db      = Database::connect();
+        $profile = $db->table('reach_blog_publication_profiles')->where('content_item_id', $ingest['content_item_id'])->get()->getRowArray();
+        $this->assertSame('billing-invoicing', $profile['category']);
+        $this->assertSame('billing', $profile['product_slug']);
+        $sub = (new RoutineSubmissions())->find($ingest['submission_id']);
+        $this->assertSame('billing-invoicing', $sub['submission_json']['category']);
+        $this->assertSame('billing', $sub['submission_json']['product_slug']);
+
+        $old = $this->ingest(['category' => 'Income Tax', 'product_slug' => 'smart_books', 'content_base_key' => 'blog-20261023-advance-tax',
+            'title' => 'Advance tax for small business owners, step by step', 'seo' => ['slug' => 'advance-tax-small-business'] + $this->payload()['seo']]);
+        $profile = $db->table('reach_blog_publication_profiles')->where('content_item_id', $old['content_item_id'])->get()->getRowArray();
+        $this->assertSame('income-tax', $profile['category'], 'an old label is filed under its canonical slug');
+        $this->assertSame('books', $profile['product_slug'], 'smart_books is the site slug books');
+    }
+
+    public function testAnUnknownCategoryOrProductIsRefusedBeforeAnythingIsStored(): void
+    {
+        $db     = Database::connect();
+        $before = $db->table('reach_content_items')->countAllResults();
+        foreach ([['category' => 'Marketing'], ['category' => null], ['category' => 'gst', 'product_slug' => 'tally'],
+            ['category' => 'payroll-hr', 'product_slug' => 'hrms']] as $bad) {
+            try {
+                $this->ingest(array_filter($bad, static fn ($v) => $v !== null) + ($bad['category'] === null ? ['category' => ''] : []));
+                $this->fail('expected a 422 for ' . json_encode($bad));
+            } catch (\InvalidArgumentException $e) {
+                $this->assertMatchesRegularExpression('/Use one of|is required|Beta app/', $e->getMessage());
+            }
+        }
+        $this->assertSame($before, $db->table('reach_content_items')->countAllResults());
     }
 
     public function testARevisionIsReVettedOnceAndTheApprovalCoversTheRevisedText(): void

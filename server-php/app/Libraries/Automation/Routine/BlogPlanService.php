@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Libraries\Automation\Routine;
 
+use App\Libraries\Blog\BlogMixService;
+use App\Libraries\Blog\BlogTaxonomy;
 use App\Libraries\Blog\ContentBaseService;
 use App\Libraries\Publishing\LinkRegistryService;
 use CodeIgniter\Database\BaseConnection;
@@ -51,8 +53,19 @@ class BlogPlanService
                     'Payroll compliance (PF, ESI, professional tax)',
                     'Company law and MCA filings for private limited companies and LLPs',
                     'How the launch apps help with the above — only features visible in their code',
+                    'Business operations: invoicing, stock, sales follow-up, notes and documents — app-led where a live app does the job',
                 ],
             ],
+            // What to file the article under and which app it may be about
+            // (BlogTaxonomy — the aicountly.com list), and the mix against the
+            // owner's 50/50 target, so the routine can steer.
+            'taxonomy'          => [
+                'categories'   => BlogTaxonomy::topics(),
+                'groups'       => BlogTaxonomy::GROUPS,
+                'products'     => BlogTaxonomy::productsForRoutine(),
+                'note'         => 'Send "category" as one slug from categories. Send "product_slug" only for an app-led article (the app is the subject); leave it out for a compliance/finance topic article that merely mentions an app. Beta apps: describe only what their repository shows and always call them Beta, e.g. "HRMS (Beta)".',
+            ],
+            'mix'               => $this->mix($now),
             'index_suggestions' => $this->indexSuggestions(),
             'internal_links'  => [
                 'site_base' => $siteBase,
@@ -63,32 +76,50 @@ class BlogPlanService
                 'Do not repeat or closely paraphrase any title in existing_titles; a duplicate title or slug is refused with HTTP 409.',
                 'HTTP 429 means today\'s quota is used: stop the run.',
                 'Every date in compliance_calendar is a statutory default — confirm current extensions before stating one.',
+                'category must be one of taxonomy.categories (slug); anything else is refused with HTTP 422 listing the allowed slugs. product_slug, when sent, must be one of taxonomy.products.',
+                'Mix: half compliance/finance topic articles, half app-led. Follow mix.next (kind app_led / topic / either, and app_status live / beta) when the queue gives you a choice.',
             ],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function mix(\DateTimeImmutable $now): array
+    {
+        try {
+            return (new BlogMixService($this->db))->summary($now);
+        } catch (\Throwable $e) {
+            log_message('error', '[BlogPlanService] mix unavailable: ' . $e->getMessage());
+
+            return ['target' => BlogTaxonomy::mix([])['target'], 'next' => null, 'error' => 'mix unavailable'];
+        }
     }
 
     /**
      * Most recent blogs that are live or on their way (not rejected/archived),
      * newest first.
      *
-     * @return list<array{title: string, slug: string, status: string, content_key: ?string}>
+     * @return list<array{title: string, slug: string, status: string, content_key: ?string, category: ?string, product_slug: ?string}>
      */
     private function existing(int $limit): array
     {
-        $rows = $this->db->table('reach_content_items')
-            ->select('title, slug, workflow_status, content_base_key')
-            ->where('content_type', 'blog')
-            ->where('deleted_at IS NULL', null, false)
-            ->whereNotIn('workflow_status', ['rejected', 'archived', 'unpublished'])
-            ->orderBy('COALESCE(published_at, created_at)', 'DESC', false)
+        $product = \App\Libraries\Database\SchemaGuard::hasColumn($this->db, 'reach_blog_publication_profiles', 'product_slug') ? 'p.product_slug' : 'NULL AS product_slug';
+        $rows = $this->db->table('reach_content_items i')
+            ->select("i.title, i.slug, i.workflow_status, i.content_base_key, p.category, {$product}", false)
+            ->join('reach_blog_publication_profiles p', 'p.content_item_id = i.id', 'left')
+            ->where('i.content_type', 'blog')
+            ->where('i.deleted_at IS NULL', null, false)
+            ->whereNotIn('i.workflow_status', ['rejected', 'archived', 'unpublished'])
+            ->orderBy('COALESCE(i.published_at, i.created_at)', 'DESC', false)
             ->limit($limit)
             ->get()->getResultArray();
 
         return array_map(static fn (array $r): array => [
-            'title'       => (string) $r['title'],
-            'slug'        => (string) $r['slug'],
-            'status'      => (string) $r['workflow_status'],
-            'content_key' => $r['content_base_key'] ?? null,
+            'title'        => (string) $r['title'],
+            'slug'         => (string) $r['slug'],
+            'status'       => (string) $r['workflow_status'],
+            'content_key'  => $r['content_base_key'] ?? null,
+            'category'     => BlogTaxonomy::canonical($r['category'] ?? null),
+            'product_slug' => BlogTaxonomy::canonicalProduct($r['product_slug'] ?? null),
         ], $rows);
     }
 

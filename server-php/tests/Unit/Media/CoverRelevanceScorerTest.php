@@ -187,4 +187,23 @@ class CoverRelevanceScorerTest extends CIUnitTestCase
 
         $this->assertGreaterThanOrEqual(6, $this->scorer->score($asset, $keywords, 'compliance')['score']);
     }
+
+    /** Covers tagged under the old labels still match posts filed under the new slugs, and back. */
+    public function testCategoryTagsMatchAcrossOldLabelsAndNewSlugs(): void
+    {
+        $kw = $this->scorer->articleKeywords('Advance tax instalments for freelancers', 'income-tax');
+        foreach ([
+            [['income tax'], 'income-tax'],
+            [['tds'], 'tds-tcs'],
+            [['payroll'], 'Payroll & HR'],
+            [['tds-tcs'], 'TDS'],
+            [['financial-reporting'], 'accounting'],
+        ] as [$tags, $category]) {
+            $r = $this->scorer->score($this->asset(9, $tags), $kw, $category);
+            $this->assertContains('category_tag', $r['reasons'], json_encode([$tags, $category]));
+        }
+        $this->assertNotContains('category_tag', $this->scorer->score($this->asset(9, ['gst']), $kw, 'income-tax')['reasons']);
+        // The label's words are keywords: "TDS/TCS" gives both acronyms.
+        $this->assertContains('tcs', $this->scorer->articleKeywords('Deposits explained', 'tds-tcs'));
+    }
 }

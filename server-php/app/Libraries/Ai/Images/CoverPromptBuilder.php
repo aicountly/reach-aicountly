@@ -24,7 +24,8 @@ class CoverPromptBuilder
     {
         $title     = trim($title) !== '' ? trim($title) : 'business finance and compliance';
         $summary   = trim((string) $summary);
-        $category  = trim((string) $category);
+        // A category slug ("tds-tcs") reads as its label ("TDS/TCS").
+        $category  = \App\Libraries\Blog\BlogTaxonomy::displayLabel($category);
         $sceneHint = trim((string) $sceneHint);
 
         $points = [];

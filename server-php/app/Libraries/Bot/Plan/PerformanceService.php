@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Libraries\Bot\Plan;
 
+use App\Libraries\Blog\BlogMixService;
+use App\Libraries\Blog\BlogTaxonomy;
 use App\Libraries\Database\SchemaGuard;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
@@ -250,7 +252,10 @@ class PerformanceService
     /**
      * Which blog categories / KB products to lean towards, from the last 28
      * days: Gemini approval rate and search clicks on the published pages
-     * (blogs), and the gap to each product's cadence (KB).
+     * per canonical blog category (BlogTaxonomy — the profile's category,
+     * old labels folded in), the app-led vs topic mix against the owner's
+     * 50/50 target (with about one app-led post in five about a Beta app),
+     * and the gap to each product's cadence (KB).
      *
      * @return array<string, mixed>
      */
@@ -259,53 +264,86 @@ class PerformanceService
         $from  = PlanPeriods::addDays($to, -27);
         $start = PlanPeriods::istMidnightUtc($from);
         $end   = PlanPeriods::istMidnightUtc(PlanPeriods::addDays($to, 1));
-        $out   = ['window' => ['from' => $from, 'to' => $to], 'blog' => ['prefer' => [], 'avoid' => [], 'categories' => []], 'knowledge_base' => ['prefer' => [], 'products' => []]];
+        $out   = ['window' => ['from' => $from, 'to' => $to], 'blog' => ['prefer' => [], 'avoid' => [], 'categories' => [], 'mix' => null, 'steer' => null], 'knowledge_base' => ['prefer' => [], 'products' => []]];
         if (! SchemaGuard::hasTable($this->db, 'reach_routine_submissions')) {
             return $out;
         }
 
+        // The category of record is the publication profile's (canonicalised:
+        // rows filed under old labels count with the new slug); the
+        // submission's copy covers a profile that is gone.
+        $hasProfiles = SchemaGuard::hasTable($this->db, 'reach_blog_publication_profiles');
+        $catSql      = $hasProfiles ? "COALESCE(NULLIF(p.category, ''), s.submission_json->>'category')" : "s.submission_json->>'category'";
+        $profileJoin = $hasProfiles ? 'LEFT JOIN reach_blog_publication_profiles p ON p.content_item_id = s.content_item_id' : '';
+        $canon       = static fn ($raw): string => BlogTaxonomy::canonical($raw !== null ? (string) $raw : null) ?? 'uncategorised';
+
         $clicks = [];
         if (SchemaGuard::hasTable($this->db, 'reach_search_site_facts')) {
             foreach ($this->db->query(
-                "SELECT COALESCE(NULLIF(s.submission_json->>'category', ''), 'Uncategorised') AS cat, SUM(f.clicks) AS clicks
+                "SELECT {$catSql} AS cat, SUM(f.clicks) AS clicks
                  FROM reach_routine_submissions s
                  JOIN reach_content_items i ON i.id = s.content_item_id
+                 {$profileJoin}
                  JOIN reach_search_site_facts f ON f.page_url LIKE '%/' || i.slug || '%'
                  WHERE s.content_type = 'blog' AND s.status = 'live' AND i.slug IS NOT NULL AND i.slug <> ''
                    AND f.metric_date BETWEEN ? AND ?
                  GROUP BY 1",
                 [$from, $to]
             )->getResultArray() as $r) {
-                $clicks[(string) $r['cat']] = (int) $r['clicks'];
+                $c = $canon($r['cat']);
+                $clicks[$c] = ($clicks[$c] ?? 0) + (int) $r['clicks'];
             }
         }
-        $cats = [];
+        $agg = [];
         foreach ($this->db->query(
-            "SELECT COALESCE(NULLIF(submission_json->>'category', ''), 'Uncategorised') AS cat,
-                    COUNT(*) AS submitted, COUNT(*) FILTER (WHERE status = 'rejected') AS rejected, COUNT(*) FILTER (WHERE status = 'live') AS live
-             FROM reach_routine_submissions WHERE content_type = 'blog' AND created_at >= ? AND created_at < ? GROUP BY 1",
+            "SELECT {$catSql} AS cat,
+                    COUNT(*) AS submitted, COUNT(*) FILTER (WHERE s.status = 'rejected') AS rejected, COUNT(*) FILTER (WHERE s.status = 'live') AS live
+             FROM reach_routine_submissions s {$profileJoin}
+             WHERE s.content_type = 'blog' AND s.created_at >= ? AND s.created_at < ? GROUP BY 1",
             [$start, $end]
         )->getResultArray() as $r) {
-            $sub  = (int) $r['submitted'];
-            $live = (int) $r['live'];
+            $c = $canon($r['cat']);
+            $agg[$c] ??= ['submitted' => 0, 'rejected' => 0, 'live' => 0];
+            $agg[$c]['submitted'] += (int) $r['submitted'];
+            $agg[$c]['rejected']  += (int) $r['rejected'];
+            $agg[$c]['live']      += (int) $r['live'];
+        }
+        $cats = [];
+        foreach ($agg as $c => $a) {
+            $sub  = $a['submitted'];
+            $live = $a['live'];
             $cats[] = [
-                'category'        => (string) $r['cat'],
+                'category'        => $c,
+                'label'           => BlogTaxonomy::label($c) ?? 'Uncategorised',
+                'group'           => BlogTaxonomy::group($c),
                 'submitted'       => $sub,
-                'rejected'        => (int) $r['rejected'],
+                'rejected'        => $a['rejected'],
                 'live'            => $live,
-                'approval_rate'   => $sub > 0 ? round(($sub - (int) $r['rejected']) / $sub, 2) : null,
-                'clicks'          => $clicks[(string) $r['cat']] ?? null,
-                'clicks_per_post' => $live > 0 && isset($clicks[(string) $r['cat']]) ? round($clicks[(string) $r['cat']] / $live, 1) : null,
+                'approval_rate'   => $sub > 0 ? round(($sub - $a['rejected']) / $sub, 2) : null,
+                'clicks'          => $clicks[$c] ?? null,
+                'clicks_per_post' => $live > 0 && isset($clicks[$c]) ? round($clicks[$c] / $live, 1) : null,
             ];
         }
-        usort($cats, static fn ($a, $b) => [-($a['clicks_per_post'] ?? -1), -($a['approval_rate'] ?? 0)] <=> [-($b['clicks_per_post'] ?? -1), -($b['approval_rate'] ?? 0)]);
+        usort($cats, static fn ($a, $b) => [-($a['clicks_per_post'] ?? -1), -($a['approval_rate'] ?? 0), $a['category']] <=> [-($b['clicks_per_post'] ?? -1), -($b['approval_rate'] ?? 0), $b['category']]);
         $out['blog']['categories'] = $cats;
         foreach ($cats as $c) {
+            if ($c['category'] === 'uncategorised') {
+                continue; // not something a routine can choose
+            }
             if ($c['submitted'] >= 3 && $c['approval_rate'] !== null && $c['approval_rate'] < 0.5) {
                 $out['blog']['avoid'][] = $c['category'];
             } elseif (($c['approval_rate'] ?? 0) >= 0.7 && count($out['blog']['prefer']) < 3) {
                 $out['blog']['prefer'][] = $c['category'];
             }
+        }
+
+        // The owner's mix over the same window, and the steer that follows.
+        try {
+            $mix = BlogTaxonomy::mix((new BlogMixService($this->db))->posts($start, $end));
+            $out['blog']['mix']   = array_diff_key($mix, ['next' => true]);
+            $out['blog']['steer'] = $mix['next'] + ['why' => BlogMixService::why($mix, 'Last 28 days')];
+        } catch (\Throwable $e) {
+            log_message('warning', '[PerformanceService] blog mix unavailable: ' . $e->getMessage());
         }
 
         if (SchemaGuard::hasTable($this->db, 'reach_kb_product_cadence') && SchemaGuard::hasTable($this->db, 'reach_kb_publication_profiles')) {

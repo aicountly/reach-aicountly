@@ -3,6 +3,7 @@
 namespace App\Libraries\Publishing\Blog;
 
 use App\Libraries\Blog\BlogContentApprovalService;
+use App\Libraries\Blog\BlogTaxonomy;
 use App\Libraries\HtmlSanitizer;
 
 /**
@@ -53,6 +54,12 @@ class BlogPublicationPayloadBuilder
         $seo = $this->db->table('reach_content_seo_profiles')
             ->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
 
+        // aicountly.com taxonomy: the canonical category slug and the app the
+        // post is about (BlogTaxonomy). Old labels on unmigrated rows are
+        // canonicalised here; a value that maps to nothing is not sent.
+        $category    = BlogTaxonomy::canonical($profile['category'] ?? null);
+        $postProduct = BlogTaxonomy::canonicalProduct($profile['product_slug'] ?? null);
+
         $blogDetails = $this->db->table('reach_content_blog_details')
             ->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
 
@@ -87,10 +94,10 @@ class BlogPublicationPayloadBuilder
             $registry    = new \App\Libraries\Publishing\LinkRegistryService($this->db);
             $siteBase    = rtrim((string) env('AICOUNTLY_PUBLIC_SITE_BASE_URL', 'https://aicountly.com'), '/');
             $selfPath    = '/blogs/' . rawurlencode((string) ($item['slug'] ?? ''));
-            $productSlug = $this->resolveProductSlug($contentItemId);
+            $productSlug = $postProduct ?? $this->resolveProductSlug($contentItemId);
             $suggested   = $registry->suggestFor(
                 $productSlug,
-                (string) ($profile['category'] ?? ''),
+                $category ?? (string) ($profile['category'] ?? ''),
                 $selfPath,
                 3,
             );
@@ -181,7 +188,8 @@ class BlogPublicationPayloadBuilder
             'meta_description'     => $seo['meta_description'] ?? '',
             'canonical_preference' => $seo['canonical_preference'] ?? 'self_canonical',
             'robots_directive'     => $seo['robots_directive'] ?? 'index,follow',
-            'category'             => $profile['category'] ?? '',
+            'category'             => $category ?? '',
+            'product_slug'         => $postProduct,
             'tags'                 => $tags,
             'author_name'          => $profile['author_reference'] ?? '',
             'reviewer_name'        => $protectedReviewerName ?? '',
@@ -191,7 +199,7 @@ class BlogPublicationPayloadBuilder
                                      ? $profile['featured_image_alt']
                                      : CoverAltTextBuilder::build(
                                          (string) ($item['title'] ?? ''),
-                                         (string) ($profile['category'] ?? ''),
+                                         BlogTaxonomy::displayLabel($profile['category'] ?? null),
                                      ),
             'internal_links'       => $internalLinks,
             'citations'            => [],

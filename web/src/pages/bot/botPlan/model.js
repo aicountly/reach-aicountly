@@ -153,7 +153,9 @@ export function describeChange(row) {
   if (row?.action === 'requeue_stuck') return `${b.status || 'waiting'} → retry now`;
   if (row?.action === 'topic_mix') {
     const list = (v) => (Array.isArray(v) && v.length ? v.join(', ') : 'none');
-    return `blog prefer: ${list(a.blog_prefer)}; avoid: ${list(a.blog_avoid)}; KB prefer: ${list(a.kb_prefer)}`;
+    const [kind, status] = String(a.blog_steer || '').split(':');
+    const steer = kind ? `; blog next: ${kind.replace('_', '-')}${status ? ` (${status} app)` : ''}` : '';
+    return `blog prefer: ${list(a.blog_prefer)}; avoid: ${list(a.blog_avoid)}; KB prefer: ${list(a.kb_prefer)}${steer}`;
   }
   return '—';
 }

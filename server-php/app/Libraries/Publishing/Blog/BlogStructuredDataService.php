@@ -56,7 +56,8 @@ class BlogStructuredDataService
         }
 
         if (!empty($profile['category'])) {
-            $schema['articleSection'] = $profile['category'];
+            // The human label ("Income Tax"), not the slug.
+            $schema['articleSection'] = \App\Libraries\Blog\BlogTaxonomy::displayLabel((string) $profile['category']);
         }
 
         return $schema;
