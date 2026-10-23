@@ -113,9 +113,9 @@ export function DashboardPage({ embedded = false }) {
         <Tile label="Blog — in progress"      value={inFlight}           hint={`${n(blog.total)} total · ${n(blog.drafts)} drafts`} icon={FileText}  to={ROUTES.BLOG_COMMAND_CENTRE} />
         <Tile label="Blog — in review"        value={blog.in_review}     hint={`${n(blog.approved)} approved`}      icon={FileText}  to={linkIfAny(blog.in_review, ROUTES.BCC_VERIFICATION, ROUTES.BLOG_COMMAND_CENTRE)} />
         <Tile label="Blog — published"        value={blog.published}     hint={`${n(blog.pending_publishing)} pending publish`} icon={FileText} to={linkIfAny(blog.published, ROUTES.BCC_PUBLISHED, ROUTES.BLOG_COMMAND_CENTRE)} />
-        <Tile label="Campaigns — running"     value={camp.running}       hint={`${n(camp.total)} total`}            icon={Megaphone} to={ROUTES.CAMPAIGN_LIST} />
+        <Tile label="Campaigns — running"     value={camp.running}       hint={`${n(camp.total)} total`}            icon={Megaphone} to={linkIfAny(camp.running, `${ROUTES.CAMPAIGN_LIST}?status=running`, ROUTES.CAMPAIGN_LIST)} />
         <Tile label="Social — queue"          value={soc.queue}          hint={`${n(soc.posted)} posted · ${n(soc.publishing)} publishing`} icon={Share2} to={ROUTES.SOCIAL_QUEUE} />
-        <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${n(leads.pushed)} pushed`}         icon={Users}     to={ROUTES.ENGAGE_PUSH} />
+        <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${n(leads.pushed)} pushed`}         icon={Users}     to={linkIfAny(leads.pending_push, `${ROUTES.ENGAGE_PUSH}?status=pending_push`, ROUTES.ENGAGE_PUSH)} />
         <Tile label="Approvals — pending"     value={appr.pending}       hint={`${n(appr.total)} total`}            icon={ShieldCheck} to={ROUTES.APPROVALS} />
         <Tile label="Bot — running jobs"      value={jobs.running}       hint={`${n(jobs.queued)} queued · ${n(jobs.stalled)} stalled`} icon={Bot} to={linkIfAny(jobs.running, jobsLink('running'), ROUTES.JOBS)} />
       </div>

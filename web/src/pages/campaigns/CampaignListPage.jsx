@@ -8,14 +8,16 @@ import { CampaignCard } from '../../components/campaign/CampaignCard';
 import { EmptyState } from '../../components/common/EmptyState';
 import { FilterBar } from '../../components/common/FilterBar';
 import { ROUTES } from '../../constants/routes';
+import { useUrlFilter } from '../../components/drill';
 
 const TYPES  = ['', 'email','whatsapp','social','landing','paid_ad','webinar','referral','multi'];
 const STATES = ['', 'draft','pending_approval','approved','scheduled','running','completed','paused','archived'];
 
 export function CampaignListPage() {
   const [rows, setRows] = useState([]);
-  const [type, setType] = useState('');
-  const [status, setStatus] = useState('');
+  // In the URL so dashboard tiles can link to a filtered list (?status=running).
+  const [type, setType] = useUrlFilter('type');
+  const [status, setStatus] = useUrlFilter('status');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -50,7 +52,7 @@ export function CampaignListPage() {
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
         rows.length === 0
-          ? <EmptyState message="No campaigns yet." />
+          ? <EmptyState message={type || status ? 'No campaigns match this filter.' : 'No campaigns yet.'} />
           : (
             <div className="grid grid-3">
               {rows.map((c) => <CampaignCard key={c.id} campaign={c} />)}

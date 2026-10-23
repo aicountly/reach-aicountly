@@ -7,6 +7,7 @@ import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { FilterBar } from '../../components/common/FilterBar';
 import { formatDateTime } from '../../utils/formatDate';
+import { useUrlFilter } from '../../components/drill';
 
 const STATES = ['','pending_push','pushed','failed','duplicate','rejected','retry_scheduled'];
 
@@ -15,7 +16,7 @@ export function EngagePushPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useUrlFilter('status');
 
   const load = useCallback(() => {
     setLoading(true);
