@@ -48,6 +48,14 @@ use Throwable;
  * tier 4 is blocked and never vetted; VettingUnavailableException leaves it
  * pending for community:schedule to retry. Nothing unvetted is published.
  *
+ * Repairs of live answers (origin 'revet', CommunityReanswerQueue): a live
+ * answer that re-vetting found wrong is offered back to the routine as a
+ * priority re-answer item; the routine's text — or the vetting model's own
+ * revision (submitCorrection) — becomes a correction version of the SAME
+ * answer and takes this same path, without using the daily quota. If it is
+ * not published, the answer is put back exactly as it was (a kept-live answer
+ * stays live; nothing is archived) and the question is offered again.
+ *
  * Attribution: a routine-written question is the desk's own FAQ post
  * (source_type official_question, author_type official_bot on the public
  * site, ai_assisted). Nothing is attributed to a member of the public, and
@@ -92,6 +100,8 @@ class CommunityQaAutomationService
 
     private BaseConnection $db;
     private ContentVettingService $vetting;
+    private CommunityReanswerQueue $reanswers;
+    private ?bool $hasOrigin = null;
 
     public function __construct(
         ?ContentVettingService $vetting = null,
@@ -102,8 +112,9 @@ class CommunityQaAutomationService
         private readonly OfficialAnswerVersionService $versions = new OfficialAnswerVersionService(),
         ?BaseConnection $db = null,
     ) {
-        $this->vetting = $vetting ?? self::$vettingOverride ?? new ContentVettingService();
-        $this->db      = $db ?? Database::connect();
+        $this->vetting   = $vetting ?? self::$vettingOverride ?? new ContentVettingService();
+        $this->db        = $db ?? Database::connect();
+        $this->reanswers = new CommunityReanswerQueue($this->db, $this->answers);
     }
 
     /** Tests: the vetting service HTTP-level callers get. */
@@ -122,7 +133,7 @@ class CommunityQaAutomationService
     // Plan
     // -------------------------------------------------------------------------
 
-    /** @return array{enabled: bool, daily_limit: int, used_today: int, remaining_today: int, max_this_run: int} */
+    /** @return array{enabled: bool, daily_limit: int, used_today: int, remaining_today: int, max_this_run: int, reanswer_queue: int} */
     public function budget(): array
     {
         $enabled = (bool) ReachConfig::get('automation.community.enabled', true);
@@ -136,6 +147,8 @@ class CommunityQaAutomationService
             'used_today'      => $used,
             'remaining_today' => $remain,
             'max_this_run'    => min(self::MAX_PER_RUN, $remain),
+            // Re-answers of live answers (reanswer: true in the queue) do not use the quota.
+            'reanswer_queue'  => $this->reanswers->countQueued(),
         ];
     }
 
@@ -161,6 +174,11 @@ class CommunityQaAutomationService
             'products'               => SaasProductTaxonomy::products(),
             'allowed_html_tags'      => config(\Config\ContentSanitization::class)->allowedTags,
             'pending_retry'          => $this->countByStatus('pending'),
+            // Live answers re-vetting found wrong, first in open_questions
+            // (reanswer: true). They do not use the quota: answer them even
+            // when max_this_run is 0.
+            'reanswer_queue'         => $this->reanswers->countQueued(),
+            'max_reanswers_this_run' => $enabled ? min(self::MAX_PER_RUN, $this->reanswers->countQueued()) : 0,
         ];
     }
 
@@ -226,6 +244,20 @@ class CommunityQaAutomationService
         $in = CommunityQaPayload::memberAnswer($payload);
 
         $this->assertEnabled();
+
+        // A re-answer of a live answer re-vetting found wrong: its own key
+        // (the question's default key belongs to the answer being replaced)
+        // and no quota.
+        $reanswer = null;
+        $target   = $this->questions->findByUuid($in['question_uuid']);
+        if ($target !== null) {
+            $reanswer = $this->reanswers->queuedForQuestion((int) $target['id']);
+        }
+        if ($reanswer !== null && ($in['key_defaulted'] ?? false)) {
+            $in['external_key']  = 'reanswer:' . $reanswer['id'] . ':' . ((int) $reanswer['attempts'] + 1);
+            $in['key_defaulted'] = false;
+        }
+
         if (($existing = $this->findByKey($in['external_key'])) !== null) {
             // The default key is one per question; once that answer was not
             // published, the next answer gets the next key instead of being
@@ -238,7 +270,9 @@ class CommunityQaAutomationService
                 return ['status' => 'already_submitted'] + $this->view($existing);
             }
         }
-        $this->assertQuota();
+        if ($reanswer === null) {
+            $this->assertQuota();
+        }
 
         $question = $this->questions->findByUuid($in['question_uuid']);
         if ($question === null) {
@@ -261,6 +295,14 @@ class CommunityQaAutomationService
         }
 
         $live = (new \App\Models\CommunityOfficialAnswerModel())->findLiveByQuestionId((int) $question['id']);
+        if ($reanswer !== null) {
+            if ($live === null || (int) $live['id'] !== (int) $reanswer['answer_id']
+                || ! in_array($live['status'], [CommunityAnswerStatus::Published->value, CommunityAnswerStatus::Withdrawn->value], true)
+            ) {
+                throw new CommunityQaRefusal('The answer this re-answer replaces has changed since it was queued; skip it.', 409);
+            }
+            return ['status' => 'created'] + $this->startCorrection($question, $live, $reanswer, $in, true);
+        }
         if ($live !== null && ! in_array(CommunityAnswerStatus::tryFrom((string) $live['status']), self::TAKE_OVER_STATUSES, true)) {
             throw new CommunityQaRefusal("This question already has an answer ({$live['status']}).", 409);
         }
@@ -287,6 +329,99 @@ class CommunityQaAutomationService
         }
 
         return ['status' => 'created'] + $this->process($submissionId);
+    }
+
+    /**
+     * The vetting model's own revision of a live answer, published as a
+     * correction version of the same answer through the same vet → approve →
+     * publish → verify chain (origin 'revet', no quota). The current text
+     * stays live until the correction is.
+     *
+     * @throws CommunityQaRefusal 409 when the answer is not live or already being corrected
+     */
+    public function submitCorrection(int $answerId, int $reanswerId, string $answerHtml, string $shortAnswer, string $modelRoute): array
+    {
+        $answer   = $this->answers->findById($answerId);
+        $reanswer = $this->reanswers->find($reanswerId);
+        if ($answer === null || $reanswer === null || (int) $reanswer['answer_id'] !== $answerId) {
+            throw new CommunityQaRefusal("Answer #{$answerId} or its re-answer request was not found.", 404);
+        }
+        if ($answer['status'] !== CommunityAnswerStatus::Published->value) {
+            throw new CommunityQaRefusal("Answer #{$answerId} is {$answer['status']}, not live; nothing to correct.", 409);
+        }
+        $question = $this->questions->findById((int) $answer['question_id']);
+        if ($question === null) {
+            throw new CommunityQaRefusal("Answer #{$answerId} has no question.", 404);
+        }
+        $previous = $this->answers->getVersion($answerId, (int) ($answer['approved_version'] ?? $answer['current_version'] ?? 0)) ?? [];
+
+        return $this->startCorrection($question, $answer, $reanswer, [
+            'external_key'   => 'revet-correction:' . $reanswerId . ':' . (int) $answer['current_version'],
+            'question_title' => (string) $question['title'],
+            'category_slug'  => (string) ($question['category'] ?? ''),
+            'product_slug'   => $question['product'] ?? null,
+            'answer_html'    => $answerHtml,
+            'short_answer'   => $shortAnswer,
+            'sources'        => is_array($previous['sources'] ?? null) ? $previous['sources'] : (json_decode((string) ($previous['sources'] ?? '[]'), true) ?: []),
+            'model_route'    => $modelRoute,
+            'provenance'     => ['generated_by_model' => $modelRoute, 'routine_run_id' => null, 'origin' => 'reach:content-revet'],
+        ], false);
+    }
+
+    /**
+     * Shared by a routine re-answer and the vetting revision: the text becomes
+     * a correction version (OfficialAnswerCorrectionService) of the answer it
+     * replaces, then the normal pipeline runs.
+     */
+    private function startCorrection(array $question, array $answer, array $reanswer, array $in, bool $routineAttempt): array
+    {
+        if ($this->hasOpenSubmissionFor((int) $question['id'])) {
+            throw new CommunityQaRefusal('An answer to this question is already being vetted.', 409);
+        }
+
+        $kind = $routineAttempt ? 'member_answer' : 'correction';
+        $in  += [
+            'question_title' => (string) $question['title'],
+            'category_slug'  => (string) ($question['category'] ?? ''),
+            'product_slug'   => $question['product'] ?? null,
+        ];
+
+        $this->db->transBegin();
+        try {
+            $snapshot     = $this->reanswers->snapshot((int) $answer['id']);
+            $submissionId = $this->insertSubmission($kind, $in, (int) $question['id'], 'revet', (int) $reanswer['id']);
+            $this->answers->save(['id' => (int) $answer['id'], 'ai_assisted' => true]);
+            (new \App\Libraries\Community\OfficialAnswerCorrectionService($this->answers, $this->versions))->startCorrection(
+                (int) $answer['id'],
+                $in['answer_html'],
+                $in['short_answer'],
+                CommunityReanswerQueue::CORRECTION_NOTE,
+                $in['sources'] ?? [],
+                null,
+                ['model_route' => mb_substr((string) ($in['model_route'] ?? ('claude-routine:' . $in['provenance']['generated_by_model'])), 0, 120),
+                 'prompt_version' => ! empty($in['provenance']['routine_run_id']) ? mb_substr((string) $in['provenance']['routine_run_id'], 0, 80) : null],
+            );
+            $this->moveAnswerTo((int) $answer['id'], CommunityAnswerStatus::DraftGenerated);
+            $fresh = $this->answers->findById((int) $answer['id']) ?? $answer;
+            $this->db->table('reach_community_automation_submissions')->where('id', $submissionId)->update([
+                'answer_id'  => (int) $answer['id'],
+                'risk_tier'  => $this->lifecycle->riskTierOf($fresh)->value,
+                'updated_at' => gmdate('Y-m-d H:i:sP'),
+            ]);
+            $this->reanswers->markSubmitted((int) $reanswer['id'], $submissionId, $snapshot, $routineAttempt);
+
+            $this->commit();
+        } catch (Throwable $e) {
+            $this->db->transRollback();
+            throw $e;
+        }
+
+        AuditLogger::record('community.answer.revet_correction', [
+            'answer_id' => (int) $answer['id'], 'reanswer_id' => (int) $reanswer['id'], 'submission_id' => $submissionId,
+            'kind' => $kind, 'mode' => $reanswer['mode'],
+        ]);
+
+        return $this->process($submissionId);
     }
 
     /** Commit, unless a statement failed quietly (DBDebug off), which rolls everything back. */
@@ -508,10 +643,10 @@ class CommunityQaAutomationService
     // Steps
     // -------------------------------------------------------------------------
 
-    private function insertSubmission(string $kind, array $in, int $questionId): int
+    private function insertSubmission(string $kind, array $in, int $questionId, string $origin = 'routine', ?int $reanswerId = null): int
     {
         $now = gmdate('Y-m-d H:i:sP');
-        $this->db->table('reach_community_automation_submissions')->insert([
+        $this->db->table('reach_community_automation_submissions')->insert(($origin !== 'routine' ? ['origin' => $origin, 'reanswer_id' => $reanswerId] : []) + [
             'external_key'    => $in['external_key'],
             'kind'            => $kind,
             'question_id'     => $questionId,
@@ -531,6 +666,7 @@ class CommunityQaAutomationService
             'question_id'    => $questionId,
             'generated_by'   => $in['provenance']['generated_by_model'],
             'routine_run_id' => $in['provenance']['routine_run_id'],
+            'origin'         => $origin,
         ]);
 
         return $id;
@@ -620,6 +756,10 @@ class CommunityQaAutomationService
     private function context(array $sub, array $answer, CommunityRiskTier $tier): array
     {
         $member = $sub['kind'] === 'member_answer';
+        if (($sub['origin'] ?? 'routine') === 'revet') {
+            // A repair answers whatever question the live answer was on.
+            $member = ($this->questions->findById((int) $answer['question_id'])['source_type'] ?? 'official_question') !== 'official_question';
+        }
 
         return [
             'today'             => $this->today()->format('Y-m-d'),
@@ -633,7 +773,24 @@ class CommunityQaAutomationService
             'product'           => $this->productFacts($sub['product_slug'] ?? null),
             'publication'       => 'Published on aicountly.com/community under the desk, labelled "AI-assisted · AICOUNTLY Desk". No person reviews it after you.',
             'allowed_html_tags' => config(\Config\ContentSanitization::class)->allowedTags,
-        ];
+        ] + $this->replacesContext($sub);
+    }
+
+    /** For a repair: what was wrong with the answer this text replaces, so the vetting checks those points. */
+    private function replacesContext(array $sub): array
+    {
+        if (($sub['origin'] ?? 'routine') !== 'revet' || empty($sub['reanswer_id'])) {
+            return [];
+        }
+        $row = $this->reanswers->find((int) $sub['reanswer_id']);
+        if ($row === null) {
+            return [];
+        }
+        $why = array_slice(array_map('strval', (array) (json_decode((string) $row['reasons'], true) ?: [])), 0, 6);
+
+        return ['replaces' => 'This is a correction of an answer already on aicountly.com that an earlier review found '
+            . ($row['source'] === 'reject' ? 'wrong (it was taken down)' : 'in need of changes')
+            . '. Check in particular that these problems are fixed: ' . implode(' ', $why)];
     }
 
     /** @return array<string, mixed>|null */
@@ -699,7 +856,8 @@ class CommunityQaAutomationService
             return 'The vetting revision left the question or answer too short to publish.';
         }
 
-        if ($title !== $draft['question_title'] || $body !== $draft['question_body']) {
+        // A repair of a live answer keeps its question (and so its URL) as published.
+        if (($sub['origin'] ?? 'routine') !== 'revet' && ($title !== $draft['question_title'] || $body !== $draft['question_body'])) {
             $this->questions->save([
                 'id'    => (int) $answer['question_id'],
                 'title' => mb_substr($title, 0, 255),
@@ -842,13 +1000,17 @@ class CommunityQaAutomationService
      */
     private function withdraw(array $sub, array $answer, string $status, ?string $decision, array $reasons): array
     {
-        try {
-            $this->moveAnswerTo((int) $answer['id'], CommunityAnswerStatus::Archived);
-            if ($sub['kind'] === 'faq') {
-                $this->moveQuestionTo((int) $answer['question_id'], CommunityQuestionStatus::Archived);
+        // A repair of a public answer is never archived here: finish() hands
+        // it to CommunityReanswerQueue, which puts the answer back as it was.
+        if (($sub['origin'] ?? 'routine') !== 'revet') {
+            try {
+                $this->moveAnswerTo((int) $answer['id'], CommunityAnswerStatus::Archived);
+                if ($sub['kind'] === 'faq') {
+                    $this->moveQuestionTo((int) $answer['question_id'], CommunityQuestionStatus::Archived);
+                }
+            } catch (Throwable $e) {
+                log_message('error', '[CommunityQaAutomation] could not retire answer ' . $answer['id'] . ': ' . $e->getMessage());
             }
-        } catch (Throwable $e) {
-            log_message('error', '[CommunityQaAutomation] could not retire answer ' . $answer['id'] . ': ' . $e->getMessage());
         }
 
         AuditLogger::record(AuditLogger::COMMUNITY_AUTOMATION_DECIDED, [
@@ -870,7 +1032,21 @@ class CommunityQaAutomationService
         if ($reasons !== null) {
             $changes['reasons_json'] = json_encode(array_values($reasons), JSON_UNESCAPED_UNICODE);
         }
-        return $this->view($this->touch($sub, $changes));
+        $sub = $this->touch($sub, $changes);
+
+        if (($sub['origin'] ?? 'routine') === 'revet') {
+            try {
+                if ($status === 'published') {
+                    $this->reanswers->onPublished($sub);
+                } else {
+                    $this->reanswers->onNotPublished($sub, $status, array_values($reasons ?? array_filter([$error])));
+                }
+            } catch (Throwable $e) {
+                log_message('error', '[CommunityQaAutomation] re-answer bookkeeping failed for submission ' . $sub['id'] . ': ' . $e->getMessage());
+            }
+        }
+
+        return $this->view($sub);
     }
 
     private function recordRun(array $sub, VettingResult $result): array
@@ -978,11 +1154,21 @@ class CommunityQaAutomationService
         return trim(preg_replace('/[^a-z0-9]+/', ' ', strtolower($title)) ?? '');
     }
 
+    /** Routine submissions since midnight IST; repairs of live answers (origin revet) do not count. */
     private function usedToday(): int
     {
-        return (int) $this->db->table('reach_community_automation_submissions')
-            ->where('created_at >=', $this->today()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:sP'))
-            ->countAllResults();
+        $b = $this->db->table('reach_community_automation_submissions')
+            ->where('created_at >=', $this->today()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:sP'));
+        if ($this->hasOrigin()) {
+            $b->where('origin', 'routine');
+        }
+
+        return (int) $b->countAllResults();
+    }
+
+    private function hasOrigin(): bool
+    {
+        return $this->hasOrigin ??= \App\Libraries\Database\SchemaGuard::hasColumn($this->db, 'reach_community_automation_submissions', 'origin');
     }
 
     private function today(): DateTimeImmutable
@@ -1049,6 +1235,7 @@ class CommunityQaAutomationService
             ->select('category_slug, product_slug, COUNT(*) AS n')
             ->where('created_at >=', $since)
             ->whereIn('status', ['pending', 'approved', 'published'])
+            ->where($this->hasOrigin() ? "origin = 'routine'" : '1 = 1', null, false)
             ->groupBy(['category_slug', 'product_slug'])
             ->get()->getResultArray() as $row) {
             $counts[($row['category_slug'] ?? '') . '|' . ($row['product_slug'] ?? '')] = (int) $row['n'];
@@ -1102,6 +1289,7 @@ class CommunityQaAutomationService
             'risk_tier'     => $sub['risk_tier'] !== null ? (int) $sub['risk_tier'] : null,
             'public_url'    => $sub['public_url'] ?? null,
             'vetting_runs'  => json_decode((string) ($sub['vetting_run_ids'] ?? '[]'), true) ?: [],
+            'origin'        => $sub['origin'] ?? 'routine',
         ];
     }
 }

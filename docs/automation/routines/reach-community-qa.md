@@ -16,10 +16,10 @@ All calls: no auth header of your own — the environment's network secret adds 
 
 | Endpoint | Purpose |
 |---|---|
-| `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, open questions still waiting for an answer (members first), the last 200 question titles, the topic mix and category/product slugs |
+| `GET  https://reach.aicountly.org/api/v1/automation/community-plan` | today's remaining quota, `max_this_run`, `reanswer_queue` / `max_reanswers_this_run` (live answers to replace — no quota), open questions still waiting for an answer (re-answers first, then members), the last 200 question titles, the topic mix and category/product slugs |
 | `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=community` | read first: today's plan, yesterday vs plan, top 3 lags with causes and what the bot changed, vetting reasons to avoid, topic mix |
-| `GET  https://reach.aicountly.org/api/v1/automation/community/pending?limit=10` | the Question Inbox's routine queue: `{enabled, remaining_today, max_this_run, questions: [{question_id, title, body, category_slug, product_slug, asked_by, asked_at, queued_at, thread_url, triage_score, risk, previous_attempts, answer_endpoint}]}` (`thread_url` is set for a real member's question from aicountly.com; the answer is posted on that thread) — members first, then highest triage score, then oldest; one per question text. Reach settles the inbox before answering (answered questions marked published, duplicates and unanswerable questions closed, stuck drafts handed over) |
-| `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/answer` | the desk's answer to that inbox question: `{answer_html, short_answer?, source_references?, provenance}` — the same vetting → approval → publish path as `community-answers` |
+| `GET  https://reach.aicountly.org/api/v1/automation/community/pending?limit=10` | the Question Inbox's routine queue: `{enabled, remaining_today, max_this_run, questions: [{question_id, title, body, category_slug, product_slug, asked_by, asked_at, queued_at, thread_url, triage_score, risk, previous_attempts, reanswer, answer_endpoint}]}` (`thread_url` is set for a real member's question from aicountly.com; the answer is posted on that thread) — **re-answer items first** (`reanswer: true`, plus `reanswer_id`, `replaces {answer_id, state: live\|withdrawn, public_url}`, `why` and `rules`: a live answer re-vetting found wrong; does not use the quota), then members first, then highest triage score, then oldest; one per question text. Reach settles the inbox before answering (answered questions marked published, duplicates and unanswerable questions closed, stuck drafts handed over) |
+| `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/answer` | the desk's answer to that inbox question: `{answer_html, short_answer?, source_references?, provenance}` — the same vetting → approval → publish path as `community-answers`. For a re-answer item it replaces the existing answer at the same URL and does not count against the quota |
 | `POST https://reach.aicountly.org/api/v1/automation/community/pending/{question_id}/decline` | `{reason}` — you cannot answer it truthfully (e.g. the product code does not show how); Reach closes it with your reason so it does not wait for ever |
 | `POST https://reach.aicountly.org/api/v1/automation/community-answers` | the desk's answer to an open question: `{question_id, answer_html, short_answer?, source_references?, external_key?, provenance}` |
 | `POST https://reach.aicountly.org/api/v1/automation/community-qa` | a new frequently-asked question with the desk's answer: `{external_key, question_title, question_body, category_slug, product_slug?, answer_html, short_answer?, source_references?, provenance}` |
@@ -65,14 +65,28 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
    - If the call fails, carry on without it — it informs, it never blocks; Reach still
      enforces the quota and Gemini still decides.
 
-1. GET /v1/automation/community-plan. If enabled is false or max_this_run is 0, report
-   that and stop. Keep: max_this_run (never send more than this many submissions this
-   run, and never more than 3), open_questions, recent_question_titles, mix_targets,
+1. GET /v1/automation/community-plan. If enabled is false, report that and stop. If
+   max_this_run is 0 and reanswer_queue is 0, report that and stop. Keep: max_this_run
+   (never send more than this many NEW submissions this run, and never more than 3),
+   max_reanswers_this_run, open_questions, recent_question_titles, mix_targets,
    categories, products, allowed_html_tags.
 
+1b. Re-answers come first. Items in the pending queue (step 2) with "reanswer": true are
+   live answers that Reach's re-vetting found wrong (state "withdrawn": it was taken down;
+   "live": it is still up but needs changes). Answer up to max_reanswers_this_run of them
+   before anything else — they do not count against max_this_run or the quota, so do them
+   even when max_this_run is 0. For each: read "why" (what was wrong) and "rules"; write a
+   complete, correct answer to the same question that fixes every point in "why" — do not
+   copy the old text, and check every rate, cap, due date and section number against an
+   official source; then POST it to its answer_endpoint exactly like an inbox answer.
+   Reach publishes it as a correction of the same answer, at the same URL, after vetting.
+   409 means it is already being handled: skip it. Never decline a re-answer item
+   because it is hard; decline only if it truly cannot be answered (step 2 rules).
+
 2. Clear the Question Inbox first. GET /v1/automation/community/pending?limit=10 and
-   take its questions in the order given (members first, then the highest
-   triage_score, then the oldest). Answer up to max_this_run of them before writing
+   take its questions in the order given (re-answers first — step 1b — then members,
+   then the highest triage_score, then the oldest). Answer up to max_this_run of the
+   non-re-answer questions before writing
    any new FAQ: for each, POST /v1/automation/community/pending/{question_id}/answer
    with {answer_html, short_answer, source_references, provenance}. Answer the
    question that was asked, in its own terms; do not rewrite it. Questions with a
@@ -147,7 +161,7 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
    topic for an FAQ). 429 or 503: stop immediately. Any other error: skip the item.
    Do not resubmit a "pending" item — Reach retries vetting itself.
 
-6. Report a table: kind (inbox answer / declined / FAQ), question, category/product,
+6. Report a table: kind (re-answer / inbox answer / declined / FAQ), question, category/product,
    outcome, decision, reasons (for withdrawn or declined), public_url. Then one line:
    submitted N of max_this_run, remaining_today from the plan, and how many questions
    the pending queue still holds.
@@ -180,6 +194,17 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
   copy and screens it again; an edit after the answer is noted; a member delete or a moderation hide
   closes it with that reason (a waiting answer is withdrawn). The cursor is the
   `community_member_questions_cursor` setting; the first run reads every member question ever asked.
+- **Re-answers (live answers fixed by the bot).** `php spark reach:content-revet --community` (and
+  the daily `reach.content_quality_sweep`) re-vets live answers with Gemini. A **reject** takes the
+  answer down reversibly (unpublished on aicountly.com, withdrawn in Reach) and queues the question
+  in `reach_community_reanswers`; a **revise** with revised text is published as a correction version
+  ("Updated for accuracy.") through the normal vet → SystemApprover → publish → verify path while the
+  current text stays live; a revise without text, or a correction that does not pass, keeps the
+  answer live and queues it. Queued re-answers appear first in `community/pending` (`reanswer:
+  true`); the routine's answer becomes a correction of the same answer (origin `revet`, no quota)
+  and is republished at the same URL. A re-answer that is not published puts the answer back as it
+  was and is offered again, up to two routine answers, then cancelled (reasons kept). Tier 4 topics
+  are never re-answered.
 - `php spark community:legacy-drafts` still lists answers stranded by the old in-Reach drafting;
   the sweep now releases them on its own after `stuck_hours`, so `--clear --confirm` is only a
   shortcut.

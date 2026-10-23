@@ -13,7 +13,24 @@ use CodeIgniter\CLI\CLI;
  * unpublished and every live blog / KB article / release note / workflow
  * guide (and, with --community, live community answers) with the vetting
  * model, then clean up: see ContentRevetService for exactly what each verdict
- * does. --dry-run changes nothing and prints what would happen.
+ * does. --dry-run changes nothing and prints, per row, what a real run would
+ * do (`would: …`, also counted in the totals as would:<step>).
+ *
+ * Live community answers (--community), fixed by the bot with nobody in the loop:
+ *   reject              → withdraw+requeue: unpublished on aicountly.com and marked
+ *                         withdrawn in Reach (reversible), then offered to the
+ *                         reach-community-qa routine as a priority re-answer (no
+ *                         quota); the new answer goes up at the same URL.
+ *   revise, with text   → correct: the vetting model's revision is published as a
+ *                         correction version ("Updated for accuracy.") through
+ *                         vet → SystemApprover → publish → verify; the current
+ *                         text stays live until then.
+ *   revise, no text     → keep_live+requeue: stays live, queued for a re-answer.
+ * Actions reported: withdrawn+requeued, corrected, correction_pending,
+ * correction_failed+requeued, kept_live+requeued, held_high_risk_left_as_is,
+ * withdraw_failed, requeue_failed … A failed step is reported, never hidden,
+ * and does not stop the run. To vet only community answers, pass --community
+ * with --scope=live --type=none.
  *
  * Live items: a Gemini reject withdraws the page and queues a same-slug
  * rewrite; a revise that Gemini approved after correcting it is applied
@@ -28,11 +45,12 @@ use CodeIgniter\CLI\CLI;
  * Options:
  *   --dry-run            report only
  *   --scope=all|unpublished|live
- *   --type=blog,knowledge_base,release_note,workflow_guide
+ *   --type=blog,knowledge_base,release_note,workflow_guide   (none = no content items)
  *   --ids=1,5            only these content items
+ *   --answer-ids=2,4     with --community: only these community answers (reach_community_official_answers.id)
  *   --limit=200
  *   --heuristics-only    no Gemini calls; list what the cheap checks flag (implies --dry-run)
- *   --community          also vet live community answers (report only)
+ *   --community          also vet live community answers, and fix them unless --dry-run
  *   --json               machine-readable output
  */
 class ReachContentRevet extends BaseCommand
@@ -41,8 +59,8 @@ class ReachContentRevet extends BaseCommand
 
     protected $group       = 'Reach';
     protected $name        = 'reach:content-revet';
-    protected $description = 'Re-vet approved-unpublished and live content; retire, unpublish and queue regeneration for what fails.';
-    protected $usage       = 'reach:content-revet [--dry-run] [--scope=all|unpublished|live] [--type=blog,...] [--ids=1,5] [--limit=200] [--heuristics-only] [--community] [--json]';
+    protected $description = 'Re-vet approved-unpublished and live content (and, with --community, live community answers); retire, unpublish, correct and queue rewrites for what fails.';
+    protected $usage       = 'reach:content-revet [--dry-run] [--scope=all|unpublished|live] [--type=blog,...|none] [--ids=1,5] [--answer-ids=2,4] [--limit=200] [--heuristics-only] [--community] [--json]';
 
     public function run(array $params): int
     {
@@ -51,15 +69,17 @@ class ReachContentRevet extends BaseCommand
         $dryRun         = $heuristicsOnly || $this->sparkOption('dry-run', $params) !== null;
         $types          = $this->list($this->sparkOption('type', $params));
         $ids            = array_map('intval', $this->list($this->sparkOption('ids', $params)));
+        $answerIds      = array_map('intval', $this->list($this->sparkOption('answer-ids', $params)));
 
         $report = (new ContentRevetService())->run([
-            'types'           => $types !== [] ? $types : ContentRevetService::ITEM_TYPES,
+            'types'           => $types === ['none'] ? [] : ($types !== [] ? $types : ContentRevetService::ITEM_TYPES),
             'scope'           => (string) ($this->sparkOption('scope', $params, 'all') ?? 'all'),
             'dry_run'         => $dryRun,
             'heuristics_only' => $heuristicsOnly,
             'ids'             => $ids,
             'limit'           => (int) ($this->sparkOption('limit', $params, '200') ?? '200'),
             'community'       => $this->sparkOption('community', $params) !== null,
+            'answer_ids'      => $answerIds,
             'trigger'         => 'command',
         ]);
 

@@ -385,6 +385,8 @@ php spark reach:content-revet --heuristics-only          # free: list what the c
 php spark reach:content-revet --dry-run --community      # Gemini verdicts, nothing changed
 php spark reach:content-revet                            # apply
 php spark reach:content-revet --ids=1,5                  # just these items
+php spark reach:content-revet --type=none --community --dry-run   # community answers only: verdict + would
+php spark reach:content-revet --type=none --community --answer-ids=1,2   # fix just these live answers
 ```
 
 | Item | Verdict | What happens |
@@ -396,6 +398,10 @@ php spark reach:content-revet --ids=1,5                  # just these items
 | live | unresolved revise, no changed text, HIGH_RISK, release note / guide | `flagged_for_owner` (reason in the report) |
 | live | approve | recorded only |
 | any | vetting unavailable | nothing changes |
+| community answer, live | reject | `withdrawn+requeued`: unpublished on aicountly.com (reversible: the receiver's restore endpoint) and withdrawn in Reach, then offered to the community-qa routine as a priority re-answer (no quota); the new text is a correction of the same answer, republished at the same URL |
+| community answer, live | revise with revised text | `corrected`: the vetting model's revision is published as a correction version ("Updated for accuracy.") through vet → SystemApprover → publish → verify; the current text stays live until then (`correction_pending` while vetting/publishing; `correction_failed+requeued` if it does not pass — the old text stays live) |
+| community answer, live | revise without text | `kept_live+requeued`: stays live, queued for a re-answer |
+| community answer, live | tier 4 (prohibited) | a reject is withdrawn but not re-answered; a revise is `held_high_risk_left_as_is` |
 
 The blog and KB routines take queued rewrites first (`GET v1/automation/regenerate/next`) and
 submit them with `regeneration_id`; the rewrite becomes a new version of the same item (the
