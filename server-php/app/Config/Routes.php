@@ -988,6 +988,7 @@ $routes->group('v1', static function ($routes) {
         $routes->get('intelligence/search/site/queries',   'Api\\V1\\Intelligence\\SearchConsoleController::siteQueries',   ['filter' => 'permission:search.read']);
         $routes->get('intelligence/search/site/pages',     'Api\\V1\\Intelligence\\SearchConsoleController::sitePages',     ['filter' => 'permission:search.read']);
         $routes->get('intelligence/search/site/positions', 'Api\\V1\\Intelligence\\SearchConsoleController::sitePositions', ['filter' => 'permission:search.read']);
+        $routes->get('intelligence/search/site/explore',   'Api\\V1\\Intelligence\\SearchConsoleController::siteExplore',   ['filter' => 'permission:search.read']);
         $routes->get('seo/tracker',                        'Api\\V1\\Intelligence\\SeoTrackerController::index',            ['filter' => 'permission:seo.view']);
         $routes->post('seo/tracker/run',                   'Api\\V1\\Intelligence\\SeoTrackerController::run',              ['filter' => 'permission:seo.manage']);
         $routes->post('seo/tracker/keywords',              'Api\\V1\\Intelligence\\SeoTrackerController::createKeyword',    ['filter' => 'permission:seo.manage']);

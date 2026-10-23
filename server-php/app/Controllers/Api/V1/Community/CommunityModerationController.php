@@ -40,15 +40,27 @@ class CommunityModerationController extends BaseApiController
                 return $this->response->setJSON($empty);
             }
 
+            // finding_type / severity narrow the queue (the page keeps them in
+            // its URL); the total uses the same predicate as the rows.
+            $filters  = ['reach_community_moderation_findings.status' => 'open'];
+            $type     = trim((string) ($this->request->getGet('finding_type') ?? ''));
+            $severity = trim((string) ($this->request->getGet('severity') ?? ''));
+            if ($type !== '' && preg_match('/^[a-z_]{1,40}$/', $type) === 1) {
+                $filters['reach_community_moderation_findings.finding_type'] = $type;
+            }
+            if (in_array($severity, ['info', 'warning', 'error', 'critical'], true)) {
+                $filters['reach_community_moderation_findings.severity'] = $severity;
+            }
+
             $total = (int) $db->table('reach_community_moderation_findings')
-                ->where('status', 'open')
+                ->where($filters)
                 ->countAllResults();
 
             // Avoid table aliases in Query Builder — some CI4/Postgres
             // identifier escaping paths quote "table alias" as one name.
             $builder = $db->table('reach_community_moderation_findings')
                 ->select('reach_community_moderation_findings.*')
-                ->where('reach_community_moderation_findings.status', 'open')
+                ->where($filters)
                 ->orderBy('reach_community_moderation_findings.created_at', 'ASC')
                 ->limit($perPage, $offset);
 
@@ -62,6 +74,14 @@ class CommunityModerationController extends BaseApiController
                     'reach_community_answer_versions.id = reach_community_moderation_findings.answer_version_id',
                     'left'
                 );
+                // The answer's public id, so the queue row can open the answer editor.
+                if (SchemaGuard::hasTable($db, 'reach_community_official_answers')) {
+                    $builder->select('reach_community_official_answers.uuid AS answer_uuid')->join(
+                        'reach_community_official_answers',
+                        'reach_community_official_answers.id = reach_community_answer_versions.answer_id',
+                        'left'
+                    );
+                }
             }
 
             $rows = $builder->get()->getResultArray();

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Library, FileText, BookOpen, MessagesSquare } from 'lucide-react';
 import { contentBaseService } from '../../services/contentBaseService';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
 import { formatDate, formatDateTime } from '../../utils/formatDate';
+import { ROUTES } from '../../constants/routes';
+import { DrillLink, useUrlFilter } from '../../components/drill';
 
 /**
  * The living content base — the topics the Claude routines work through for
@@ -56,9 +59,9 @@ function RoutineLine({ health }) {
   );
 }
 
-function EntryTable({ entries, keyLabel = 'Key' }) {
+function EntryTable({ entries, keyLabel = 'Key', filtered = false }) {
   if (!entries.length) {
-    return <div className="text-sm text-muted">No topics of this type yet.</div>;
+    return <div className="text-sm text-muted">{filtered ? 'No topics in this status.' : 'No topics of this type yet.'}</div>;
   }
 
   return (
@@ -73,7 +76,12 @@ function EntryTable({ entries, keyLabel = 'Key' }) {
           {entries.map((entry) => (
             <tr key={entry.key}>
               <td><code>{entry.key}</code></td>
-              <td>{entry.title}</td>
+              <td>
+                {/* A written topic opens the article it produced. */}
+                {entry.content_item_id
+                  ? <Link to={ROUTES.CONTENT_DETAIL.replace(':id', entry.content_item_id)}>{entry.title}</Link>
+                  : entry.title}
+              </td>
               <td>{entry.stream || '—'}</td>
               <td>{entry.target_date ? formatDate(entry.target_date) : '—'}</td>
               <td><StatusBadge status={entry.status} /></td>
@@ -87,14 +95,23 @@ function EntryTable({ entries, keyLabel = 'Key' }) {
   );
 }
 
-function CountStrip({ counts }) {
+/** Each count filters the table below to that status (?status=…). */
+function CountStrip({ counts, onStatus }) {
+  const count = (key) => (
+    <DrillLink onClick={counts[key] > 0 ? () => onStatus(key) : undefined} label={`Show ${counts[key]} ${key} topics`}>
+      {counts[key]} {key}
+    </DrillLink>
+  );
   return (
     <p className="text-sm text-muted">
-      {counts.total} topics · {counts.planned} planned · {counts.queued} queued · {counts.produced} produced ·{' '}
-      {counts.published} published{counts.retired ? ` · ${counts.retired} retired` : ''}
+      <DrillLink onClick={() => onStatus('')} label="Show all topics">{counts.total} topics</DrillLink>
+      {' · '}{count('planned')} · {count('queued')} · {count('produced')} ·{' '}
+      {count('published')}{counts.retired ? <> · {count('retired')}</> : ''}
     </p>
   );
 }
+
+const byStatus = (entries, status) => (status ? entries.filter((e) => e.status === status) : entries);
 
 const EMPTY_COUNTS = { total: 0, planned: 0, queued: 0, produced: 0, published: 0, retired: 0 };
 
@@ -102,7 +119,10 @@ export function ContentBasePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [active, setActive] = useState('blog');
+  // Tab and status filter live in the URL so a count elsewhere can open
+  // e.g. ?surface=knowledge_base&status=planned.
+  const [active, setActive] = useUrlFilter('surface', 'blog');
+  const [status, setStatus] = useUrlFilter('status');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -191,10 +211,18 @@ export function ContentBasePage() {
             : <span className="text-xs text-muted">no routine proposals yet</span>}
         >
           <RoutineLine health={section.routine} />
-          <CountStrip counts={{ ...EMPTY_COUNTS, ...section.counts }} />
+          <CountStrip counts={{ ...EMPTY_COUNTS, ...section.counts }} onStatus={setStatus} />
+          {status && (
+            <div className="flex items-center gap-2 mb-2">
+              <button type="button" className="badge badge-secondary" onClick={() => setStatus('')}
+                      aria-label={`Clear ${status} filter`}>
+                Status: {STATUS[status]?.label ?? status} ✕
+              </button>
+            </div>
+          )}
 
           {active === 'knowledge_base' ? (
-            (section.products ?? []).map((product) => (
+            (section.products ?? []).filter((product) => !status || byStatus(product.topics ?? [], status).length > 0).map((product) => (
               <div key={product.product_slug} className="mt-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">{product.product_slug}</h3>
@@ -202,11 +230,15 @@ export function ContentBasePage() {
                     {product.tier ? `${product.tier} tier · ` : ''}{product.daily_quota}/day{product.enabled ? '' : ' · no enabled KB cadence (not offered to the routine)'}
                   </span>
                 </div>
-                <EntryTable entries={product.topics ?? []} />
+                <EntryTable entries={byStatus(product.topics ?? [], status)} filtered={!!status} />
               </div>
             ))
           ) : (
-            <EntryTable entries={section.entries ?? []} keyLabel={active === 'community' ? 'Seed' : 'Key'} />
+            <EntryTable
+              entries={byStatus(section.entries ?? [], status)}
+              keyLabel={active === 'community' ? 'Seed' : 'Key'}
+              filtered={!!status}
+            />
           )}
         </Card>
       </div>

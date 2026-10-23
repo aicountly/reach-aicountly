@@ -62,7 +62,8 @@ describe('BlogOverviewPage — Publishing card', () => {
     // Ready to Publish lists approved drafts and cannot show a deployment.
     expect(cardLink('Publishing')).toHaveAttribute(
       'href',
-      '/blog-command-centre/publishing/deployments?status=failed,blocked',
+      // Blog-only, like the counts on the card.
+      '/blog-command-centre/publishing/deployments?status=failed%2Cblocked&content_type=blog',
     );
   });
 
@@ -137,5 +138,46 @@ describe('BlogOverviewPage — Production card', () => {
 
     await waitFor(() => expect(cardBadge('Production')).toHaveTextContent('OK'));
     expect(cardLink('Production')).toHaveAttribute('href', '/blog-command-centre/pipeline/drafts');
+  });
+});
+
+describe('BlogOverviewPage — metric drill-down', () => {
+  beforeEach(() => getOverview.mockReset());
+
+  const metricLink = (name) => screen.getByRole('link', { name });
+
+  it('links each count to the records it added up', async () => {
+    getOverview.mockResolvedValue(overview({
+      workflow_counts: { brief_ready: 2, outline_ready: 1, draft: 3, internal_review: 1, approved: 4, rejected: 2 },
+      content: { blog_total: 13 },
+      publishing: { in_flight: 2, failed: 1, failed_recent: 0, published: 5, verified: 0, recent_days: 7 },
+      optimizer: { enabled: true, last_run: { id: 9, run_for_date: '2026-10-22', status: 'completed', candidates_scored: 12, decisions_created: 4 } },
+    }));
+    render();
+
+    await waitFor(() => expect(screen.getByText('Production')).toBeInTheDocument());
+    expect(metricLink('Production: 3 briefs/outlines')).toHaveAttribute('href',
+      '/blog-command-centre/pipeline/briefs?workflow_status=idea%2Croadmap_planned%2Cbrief_draft%2Cbrief_ready%2Coutline_draft%2Coutline_ready');
+    expect(metricLink('Production: 3 drafts')).toHaveAttribute('href',
+      '/blog-command-centre/pipeline/drafts?workflow_status=draft%2Cdraft_generating%2Cfact_verifying%2Cfact_verified');
+    expect(metricLink('Production: 1 awaiting review')).toHaveAttribute('href',
+      '/blog-command-centre/pipeline/editorial?workflow_status=seo_review%2Cinternal_review%2Cchanges_requested');
+    expect(metricLink('Quality: 4 approved')).toHaveAttribute('href', '/content?content_type=blog&workflow_status=approved');
+    expect(metricLink('Quality: 2 rejected')).toHaveAttribute('href', '/content?content_type=blog&workflow_status=rejected');
+    expect(metricLink('Publishing: 5 published')).toHaveAttribute('href',
+      '/blog-command-centre/publishing/deployments?status=published&content_type=blog');
+    expect(metricLink('Publishing: 1 failed')).toHaveAttribute('href',
+      '/blog-command-centre/publishing/deployments?status=failed%2Cblocked&content_type=blog');
+    expect(metricLink('Roadmap: 4 decisions')).toHaveAttribute('href', '/blog-command-centre/roadmap/optimizer?run_id=9');
+    expect(metricLink('Roadmap: 12 scored')).toHaveAttribute('href', '/blog-command-centre/roadmap/scored?scored_for_date=2026-10-22');
+  });
+
+  it('does not link a zero', async () => {
+    getOverview.mockResolvedValue(overview({ content: { blog_total: 0 } }));
+    render();
+
+    await waitFor(() => expect(screen.getByText('Production')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: /drafts/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /failed/ })).not.toBeInTheDocument();
   });
 });

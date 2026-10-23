@@ -13,6 +13,7 @@ const GRID_LINES = 4;
  * The line and the area under it tween whenever the data loads or changes, and
  * a full-height hover band sits over every step so the readout appears anywhere
  * along the chart — not only when the pointer lands exactly on a 3px dot.
+ * `onSelect(row, index)` makes each step a drill-down (click / Enter).
  */
 export function LineChart({
   data,
@@ -20,6 +21,7 @@ export function LineChart({
   valueKey = 'value',
   color = 'var(--color-primary)',
   height = 200,
+  onSelect,
 }) {
   const { containerRef, tooltip, showTooltip, hideTooltip } = useChartTooltip();
   const [activeIndex, setActiveIndex] = useState(null);
@@ -140,8 +142,11 @@ export function LineChart({
             height={chartH}
             fill="transparent"
             tabIndex={0}
-            role="img"
-            aria-label={`${row?.[labelKey] ?? `Point ${i + 1}`}: ${series[i]}`}
+            role={onSelect ? 'button' : 'img'}
+            aria-label={`${row?.[labelKey] ?? `Point ${i + 1}`}: ${series[i]}${onSelect ? ' — view records' : ''}`}
+            onClick={onSelect ? () => onSelect(row, i) : undefined}
+            onKeyDown={onSelect ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(row, i); } } : undefined}
+            data-drill={onSelect ? 'true' : undefined}
             onMouseEnter={(e) => activate(e, i)}
             onMouseMove={(e) => activate(e, i)}
             onFocus={(e) => activate(e, i)}

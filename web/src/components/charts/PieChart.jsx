@@ -16,8 +16,9 @@ const polar = (cx, cy, r, deg) => [
  * Slices sweep out from twelve o'clock on load and re-sweep when the numbers
  * change. Both the slice and its legend row are hover targets for the same
  * readout, so the value is reachable however the pointer arrives.
+ * `onSelect(row, index)` makes slices and legend rows drill-downs.
  */
-export function PieChart({ data, labelKey = 'label', valueKey = 'value', size = 180 }) {
+export function PieChart({ data, labelKey = 'label', valueKey = 'value', size = 180, onSelect }) {
   const { containerRef, tooltip, showTooltip, hideTooltip } = useChartTooltip();
   const [activeIndex, setActiveIndex] = useState(null);
 
@@ -64,6 +65,13 @@ export function PieChart({ data, labelKey = 'label', valueKey = 'value', size = 
     hideTooltip();
   };
 
+  const drillProps = (i) => (onSelect ? {
+    role: 'button',
+    onClick: () => onSelect(rows[i], i),
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(rows[i], i); } },
+    'data-drill': 'true',
+  } : { role: 'img' });
+
   const activate = (event, i) => {
     setActiveIndex(i);
     showTooltip(event, {
@@ -91,8 +99,8 @@ export function PieChart({ data, labelKey = 'label', valueKey = 'value', size = 
               transform: `translate(${ox} ${oy})`,
               opacity: activeIndex === null || activeIndex === i ? 1 : 0.55,
               tabIndex: 0,
-              role: 'img',
-              'aria-label': `${seg.label}: ${seg.value} (${seg.percent}%)`,
+              ...drillProps(i),
+              'aria-label': `${seg.label}: ${seg.value} (${seg.percent}%)${onSelect ? ' — view records' : ''}`,
               onMouseEnter: (e) => activate(e, i),
               onMouseMove: (e) => activate(e, i),
               onFocus: (e) => activate(e, i),
@@ -112,8 +120,8 @@ export function PieChart({ data, labelKey = 'label', valueKey = 'value', size = 
               className="chart-legend-item flex items-center gap-2 text-sm"
               style={{ marginBottom: 4, opacity: activeIndex === null || activeIndex === i ? 1 : 0.55 }}
               tabIndex={0}
-              role="img"
-              aria-label={`${seg.label}: ${seg.value} (${seg.percent}%)`}
+              {...drillProps(i)}
+              aria-label={`${seg.label}: ${seg.value} (${seg.percent}%)${onSelect ? ' — view records' : ''}`}
               onMouseEnter={(e) => activate(e, i)}
               onMouseMove={(e) => activate(e, i)}
               onMouseLeave={clear}

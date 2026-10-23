@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { blogCommandCentreService } from '../../../services/blogCommandCentreService';
 import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { RoadmapEmptyState } from './roadmapShared';
 import { formatScore } from './roadmapFormat';
-import { formatDate } from '../../../utils/formatDate';
+import { formatDate, toDateInputValue } from '../../../utils/formatDate';
+import { ROUTES } from '../../../constants/routes';
+import { DrillLink, DrillPath, drillHref, useDrillFilters } from '../../../components/drill';
+
+const DECISION_FILTERS = ['run_id', 'has_work_block', 'decision'];
+const DECISION_LABELS = { run_id: 'Run', has_work_block: 'With work block', decision: 'Decision' };
 
 const WEIGHT_FIELDS = [
   ['search_opportunity', 'Search opportunity'],
@@ -33,22 +39,38 @@ export function RoadmapOptimizerPage() {
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The decisions table is drilled from the run counts (?run_id=…) and from
+  // the decision badges; filters live in the URL so Back steps out again.
+  const drill = useDrillFilters(DECISION_FILTERS);
+  const { run_id: runId, has_work_block: hasWorkBlock, decision: decisionFilter } = drill.filters;
+  const [decisionsTotal, setDecisionsTotal] = useState(0);
 
   useEffect(() => {
     Promise.all([
       blogCommandCentreService.getOptimizerRuns(),
-      blogCommandCentreService.getRoadmapDecisions(),
       blogCommandCentreService.getScoringWeights(),
     ])
-      .then(([runsData, decisionsData, weightsData]) => {
+      .then(([runsData, weightsData]) => {
         setRuns(runsData?.items ?? []);
-        setDecisions(decisionsData?.items ?? []);
         setWeights(weightsData ?? null);
         setError('');
       })
       .catch((err) => setError(err?.message || 'Unable to load optimiser data.'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const params = {};
+    if (runId) params.run_id = runId;
+    if (hasWorkBlock) params.has_work_block = hasWorkBlock;
+    if (decisionFilter) params.decision = decisionFilter;
+    blogCommandCentreService.getRoadmapDecisions(params)
+      .then((data) => {
+        setDecisions(data?.items ?? []);
+        setDecisionsTotal(data?.total ?? 0);
+      })
+      .catch((err) => setError(err?.message || 'Unable to load roadmap decisions.'));
+  }, [runId, hasWorkBlock, decisionFilter]);
 
   const weightSum = weights
     ? WEIGHT_FIELDS.reduce((sum, [key]) => sum + Number(weights[key] ?? 0), 0)
@@ -110,9 +132,32 @@ export function RoadmapOptimizerPage() {
                 <tr key={run.id}>
                   <td>{formatDate(run.run_for_date)}</td>
                   <td><span className={`badge badge--${statusVariant(run.status)}`}>{run.status}</span></td>
-                  <td>{run.candidates_scored ?? 0}</td>
-                  <td>{run.decisions_created ?? 0}</td>
-                  <td>{run.work_blocks_created ?? 0}</td>
+                  <td>
+                    <DrillLink
+                      to={run.candidates_scored > 0 && run.run_for_date
+                        ? drillHref(ROUTES.BCC_ROADMAP_SCORED, { scored_for_date: toDateInputValue(run.run_for_date) })
+                        : undefined}
+                      label={`Topics scored on ${formatDate(run.run_for_date)}`}
+                    >
+                      {run.candidates_scored ?? 0}
+                    </DrillLink>
+                  </td>
+                  <td>
+                    <DrillLink
+                      onClick={run.decisions_created > 0 ? () => drill.drill({ run_id: run.id, has_work_block: '', decision: '' }) : undefined}
+                      label={`Decisions from the run on ${formatDate(run.run_for_date)}`}
+                    >
+                      {run.decisions_created ?? 0}
+                    </DrillLink>
+                  </td>
+                  <td>
+                    <DrillLink
+                      onClick={run.work_blocks_created > 0 ? () => drill.drill({ run_id: run.id, has_work_block: '1', decision: '' }) : undefined}
+                      label={`Decisions that queued a work block on ${formatDate(run.run_for_date)}`}
+                    >
+                      {run.work_blocks_created ?? 0}
+                    </DrillLink>
+                  </td>
                   <td>{run.skipped_reason ?? '—'}</td>
                   <td>{run.duration_ms ? `${run.duration_ms} ms` : '—'}</td>
                 </tr>
@@ -123,10 +168,18 @@ export function RoadmapOptimizerPage() {
       </section>
 
       <section>
-        <h3>Recent decisions</h3>
+        <h3>{drill.depth > 0 ? `Decisions (${decisionsTotal})` : 'Recent decisions'}</h3>
+        {drill.depth > 0 && (
+          <DrillPath
+            drill={drill}
+            rootLabel="All decisions"
+            labels={DECISION_LABELS}
+            format={(key, value) => (key === 'run_id' ? `#${value}` : key === 'has_work_block' ? 'yes' : value)}
+          />
+        )}
         {decisions.length === 0 ? (
           <RoadmapEmptyState
-            title="No decisions yet"
+            title={drill.depth > 0 ? 'No decisions match this filter' : 'No decisions yet'}
             detail="Decisions are recorded each time the optimiser ranks and classifies candidates."
           />
         ) : (
@@ -145,8 +198,19 @@ export function RoadmapOptimizerPage() {
             <tbody>
               {decisions.map((decision) => (
                 <tr key={decision.id}>
-                  <td>{decision.title ?? '—'}</td>
-                  <td><span className="badge badge--info">{decision.decision}</span></td>
+                  <td>
+                    {decision.content_item_id
+                      ? <Link to={ROUTES.CONTENT_DETAIL.replace(':id', decision.content_item_id)}>{decision.title ?? `Article #${decision.content_item_id}`}</Link>
+                      : (decision.title ?? '—')}
+                  </td>
+                  <td>
+                    <DrillLink
+                      onClick={() => drill.drill({ decision: decision.decision })}
+                      label={`Only ${decision.decision} decisions`}
+                    >
+                      <span className="badge badge--info">{decision.decision}</span>
+                    </DrillLink>
+                  </td>
                   <td>{formatScore(decision.score_at_decision)}</td>
                   <td>{decision.rank_at_decision ?? '—'}</td>
                   <td>

@@ -99,6 +99,7 @@ final class BotPlanApiTest extends ApiTestCase
         $this->assertArrayHasKey('log', $d['self_tune']);
         $this->assertSame(0.5, (float) $d['self_tune']['bounds']['min_fraction_of_base']);
         $this->assertSame(7, $d['coverage']['days_with_plan']);
+        $this->assertSame(PlanPeriods::dates(PlanPeriods::addDays($y, -6), $y), $d['coverage']['plan_dates'], 'the tile lists the days it counted');
         $this->assertNotEmpty($d['recommendations']);
     }
 

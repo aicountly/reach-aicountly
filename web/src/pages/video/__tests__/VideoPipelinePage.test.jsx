@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderWithAuth } from '../../../test/renderWithAuth';
 
 vi.mock('../../../services/videoService', () => ({
@@ -42,7 +42,7 @@ describe('VideoPipelinePage', () => {
   it('lists pipeline items with their step and honest readiness', async () => {
     renderWithAuth(<VideoPipelinePage />, admin);
     expect(await screen.findByText('GST returns explained')).toBeInTheDocument();
-    expect(screen.getByText('blocked')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('blocked')).toBeInTheDocument();
     expect(screen.getByText('YouTube upload')).toBeInTheDocument();
     expect(screen.getByText('Blocked: No YouTube channel is connected')).toBeInTheDocument();
     expect(screen.getByText('not ready')).toBeInTheDocument();

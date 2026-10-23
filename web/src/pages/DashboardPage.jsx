@@ -11,11 +11,15 @@ import { Alert } from '../components/common/Alert';
 import { ROUTES } from '../constants/routes';
 import { formatDate, formatTime } from '../utils/formatDate';
 import { formatAge } from '../utils/formatAge';
+import { drillHref } from '../utils/drill';
 
 /** Tiles poll so the dashboard tracks the pipeline instead of the page load. */
 const REFRESH_MS = 45_000;
 
 const n = (value) => (typeof value === 'number' ? value : 0);
+
+/** Distribution → Orchestration lists the campaign dispatch rows (no ROUTES constant). */
+const ORCHESTRATION = '/distribution/orchestration';
 
 
 /**
@@ -87,6 +91,8 @@ export function DashboardPage({ embedded = false }) {
   const jobsLink = (figure) => (jf[figure] ? `${ROUTES.JOBS}?${jf[figure]}` : ROUTES.JOBS);
   const overdue  = data.calendar_overdue || { count: 0, items: [] };
   const SCHEDULED_STATUSES = 'scheduled,ready_for_publication';
+  // DashboardSummaryService IN_REVIEW — the same states content.in_review counts.
+  const IN_REVIEW_STATUSES = 'validation_pending,review_pending,seo_review,internal_review';
 
   return (
     <div>
@@ -113,18 +119,18 @@ export function DashboardPage({ embedded = false }) {
         <Tile label="Blog — in progress"      value={inFlight}           hint={`${n(blog.total)} total · ${n(blog.drafts)} drafts`} icon={FileText}  to={ROUTES.BLOG_COMMAND_CENTRE} />
         <Tile label="Blog — in review"        value={blog.in_review}     hint={`${n(blog.approved)} approved`}      icon={FileText}  to={linkIfAny(blog.in_review, ROUTES.BCC_VERIFICATION, ROUTES.BLOG_COMMAND_CENTRE)} />
         <Tile label="Blog — published"        value={blog.published}     hint={`${n(blog.pending_publishing)} pending publish`} icon={FileText} to={linkIfAny(blog.published, ROUTES.BCC_PUBLISHED, ROUTES.BLOG_COMMAND_CENTRE)} />
-        <Tile label="Campaigns — running"     value={camp.running}       hint={`${n(camp.total)} total`}            icon={Megaphone} to={ROUTES.CAMPAIGN_LIST} />
-        <Tile label="Social — queue"          value={soc.queue}          hint={`${n(soc.posted)} posted · ${n(soc.publishing)} publishing`} icon={Share2} to={ROUTES.SOCIAL_QUEUE} />
-        <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${n(leads.pushed)} pushed`}         icon={Users}     to={ROUTES.ENGAGE_PUSH} />
-        <Tile label="Approvals — pending"     value={appr.pending}       hint={`${n(appr.total)} total`}            icon={ShieldCheck} to={ROUTES.APPROVALS} />
+        <Tile label="Campaigns — running"     value={camp.running}       hint={`${n(camp.total)} total`}            icon={Megaphone} to={linkIfAny(camp.running, `${ROUTES.CAMPAIGN_LIST}?status=running`, ROUTES.CAMPAIGN_LIST)} />
+        <Tile label="Social — queue"          value={soc.queue}          hint={`${n(soc.posted)} posted · ${n(soc.publishing)} publishing`} icon={Share2} to={linkIfAny(soc.queue, drillHref(ROUTES.SOCIAL_CALENDAR, { status: 'upcoming' }), ROUTES.SOCIAL_CALENDAR)} />
+        <Tile label="Leads — pending push"    value={leads.pending_push} hint={`${n(leads.pushed)} pushed`}         icon={Users}     to={linkIfAny(leads.pending_push, `${ROUTES.ENGAGE_PUSH}?status=pending_push`, ROUTES.ENGAGE_PUSH)} />
+        <Tile label="Approvals — pending"     value={appr.queue}         hint={`${n(appr.pending)} stage sign-offs open`} icon={ShieldCheck} to={linkIfAny(appr.queue, drillHref(ROUTES.APPROVALS, { area: 'ready_for_approval' }), ROUTES.APPROVALS)} />
         <Tile label="Bot — running jobs"      value={jobs.running}       hint={`${n(jobs.queued)} queued · ${n(jobs.stalled)} stalled`} icon={Bot} to={linkIfAny(jobs.running, jobsLink('running'), ROUTES.JOBS)} />
       </div>
 
       <div className="grid grid-4 mt-4">
-        <Tile label="Content — in review"    value={content.in_review}    hint={`${n(content.total)} items across all types`} icon={LayoutGrid}    to={ROUTES.CONTENT} />
+        <Tile label="Content — in review"    value={content.in_review}    hint={`${n(content.total)} items across all types`} icon={LayoutGrid}    to={linkIfAny(content.in_review, drillHref(ROUTES.CONTENT, { workflow_status: IN_REVIEW_STATUSES }), ROUTES.CONTENT)} />
         <Tile label="Content — scheduled"    value={content.scheduled}    hint={`${n(content.scheduled) - n(overdue.count)} upcoming · ${n(overdue.count)} overdue or undated`} icon={CalendarClock} to={linkIfAny(content.scheduled, `${ROUTES.CONTENT}?workflow_status=${SCHEDULED_STATUSES}`, ROUTES.CONTENT)} />
         <Tile label="Blog — needs attention" value={blog.needs_attention} hint={`${n(blog.pending_publishing)} publishing · ${n(blog.scheduled)} scheduled`} icon={ShieldCheck} to={linkIfAny(blog.needs_attention, `${ROUTES.CONTENT}?content_type=blog&workflow_status=failed,blocked,rejected`, ROUTES.BLOG_COMMAND_CENTRE)} />
-        <Tile label="Campaigns — dispatch queue" value={camp.dispatches_queued} hint={`${n(camp.dispatches_failed)} failed`}  icon={Megaphone}     to={ROUTES.CAMPAIGN_LIST} />
+        <Tile label="Campaigns — dispatch queue" value={camp.dispatches_queued} hint={`${n(camp.dispatches_failed)} failed`}  icon={Megaphone}     to={linkIfAny(camp.dispatches_queued, drillHref(ORCHESTRATION, { status: 'queued' }), ORCHESTRATION)} />
       </div>
 
       <div className="grid grid-2 mt-4">
@@ -133,7 +139,12 @@ export function DashboardPage({ embedded = false }) {
           {(data.calendar_upcoming || []).map((it) => (
             <div key={it.id} className="flex items-center justify-between" style={{ padding: '0.35rem 0', borderBottom: '1px solid var(--color-border)' }}>
               <div>
-                <div className="text-sm font-semibold">{it.title || '(untitled)'}</div>
+                <div className="text-sm font-semibold">
+                  {/* Legacy editorial-calendar rows have no content item to open. */}
+                  {it.content_item_id
+                    ? <Link to={ROUTES.CONTENT_DETAIL.replace(':id', it.content_item_id)} style={{ color: 'inherit' }}>{it.title || '(untitled)'}</Link>
+                    : (it.title || '(untitled)')}
+                </div>
                 <div className="text-xs text-muted">{formatDate(it.date)} · {it.item_kind}</div>
               </div>
               <span className="badge badge-secondary">{it.item_kind}</span>

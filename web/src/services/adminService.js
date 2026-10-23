@@ -11,7 +11,7 @@ export const adminService = {
   runLiveChecks:            (only) => api.post('v1/settings/automation/live-check', only && only.length ? { only } : {}),
   auditLogs:       (params) => api.get('v1/audit-logs', params),
   health:          () => api.get('v1/admin/api-health'),
-  consoleSync:     () => api.get('v1/admin/console-sync-status'),
+  consoleSync:     (params) => api.get('v1/admin/console-sync-status', params),
   workerStatus:    () => api.get('v1/admin/worker-status'),
   pingWorker:      () => api.post('v1/admin/worker-status/ping'),
 };

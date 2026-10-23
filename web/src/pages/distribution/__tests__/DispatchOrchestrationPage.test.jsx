@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithAuth } from '../../../test/renderWithAuth';
 
 vi.mock('../../../services/api', () => ({
@@ -58,8 +58,23 @@ describe('DispatchOrchestrationPage', () => {
     });
     renderWithAuth(<DispatchOrchestrationPage />, ctx);
     await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
-    expect(screen.getByText('email')).toBeInTheDocument();
-    expect(screen.getByText('completed')).toBeInTheDocument();
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('email')).toBeInTheDocument();
+    expect(table.getByText('completed')).toBeInTheDocument();
+    // The campaign cell opens that campaign's workspace.
+    expect(table.getByRole('link', { name: '42' })).toHaveAttribute('href', '/distribution/campaigns/42');
+  });
+
+  it('applies status and channel from the URL (dashboard links ?status=queued)', async () => {
+    api.get.mockResolvedValueOnce({ data: [], total: 0 });
+    renderWithAuth(<DispatchOrchestrationPage />, { ...ctx, route: '/distribution/orchestration?status=queued&channel=sms' });
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('v1/distribution/dispatches', {
+        page: 1, per_page: 25, status: 'queued', channel: 'sms',
+      }),
+    );
+    expect(screen.getByLabelText('Status')).toHaveValue('queued');
+    expect(screen.getByLabelText('Channel')).toHaveValue('sms');
   });
 
   it('shows empty state on 404 instead of hard error', async () => {

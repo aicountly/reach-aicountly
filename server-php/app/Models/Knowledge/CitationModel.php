@@ -46,6 +46,9 @@ class CitationModel extends Model
         if (! empty($filters['status'])) {
             $builder = $builder->where('status', $filters['status']);
         }
+        if (! empty($filters['q'])) {
+            $builder = $builder->like('citation_text', $filters['q'], 'both', null, true);
+        }
         $total = $builder->countAllResults(false);
         $items = $builder->orderBy('created_at', 'DESC')->findAll($limit, ($page - 1) * $limit);
         return ['items' => $items, 'total' => $total];

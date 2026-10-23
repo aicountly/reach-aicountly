@@ -11,6 +11,28 @@ import { useActivityDrilldown } from './useActivityDrilldown';
 import { formatAge } from '../../utils/formatAge';
 import { Bars, ForecastChart, Sparkline } from './Charts';
 import { ago, change, inr, num, pct, WINDOWS } from './format';
+import { drillHref } from '../../utils/drill';
+import { ROUTES } from '../../constants/routes';
+import { metricRecordsHref } from '../bot/botPlan/model';
+
+const SEARCH = '/seo-centre/search';
+
+/** Command-centre quota ids → the plan metric whose records they produce. */
+const QUOTA_METRIC = {
+  blog: 'content.blog.published',
+  knowledge_base: 'content.knowledge_base.published',
+  community: 'content.community.published',
+  release_note: 'content.release_note.published',
+  workflow_guide: 'content.workflow_guide.published',
+  video_vlog: 'video.vlog.published',
+  video_short: 'video.short.published',
+};
+
+/** A roadmap item's record: content items open their page; calendar entries the calendar. */
+function roadmapItemHref(it) {
+  if (it.source === 'calendar') return '/publishing/calendar';
+  return it.id ? ROUTES.CONTENT_DETAIL.replace(':id', it.id) : null;
+}
 
 /* ───────────────────────────── shared bits ───────────────────────────── */
 
@@ -116,10 +138,10 @@ export function HealthStrip({ section }) {
       <div className="cc-health__group">
         <span className="cc-health__heading">Routines</span>
         {(section.routines || []).map((r) => (
-          <span key={r.id} className={`cc-pill cc-pill--${!r.enabled ? '' : r.stale ? 'warn' : 'ok'}`}
+          <Link key={r.id} to={ROUTES.BOT_ACTIVITIES} className={`cc-pill cc-pill--${!r.enabled ? '' : r.stale ? 'warn' : 'ok'}`}
                 title={r.last_at ? `Last submission ${r.last_at}` : 'No submission yet'}>
             {r.label}: {!r.enabled ? 'off' : r.last_at ? ago(r.last_at) : 'never'}
-          </span>
+          </Link>
         ))}
       </div>
     </div>
@@ -333,20 +355,27 @@ export function Impact({ section }) {
               <div className="cc-kpis">
                 <Kpi label="Search clicks" value={num(s.current.clicks)} delta={s.change.clicks} to="/intelligence/search" />
                 <Kpi label="Impressions" value={num(s.current.impressions)} delta={s.change.impressions} to="/intelligence/search" />
-                <Kpi label="CTR" value={pct(s.current.ctr, 2)} hint={`avg position ${s.current.avg_position ?? '—'}`} />
+                <Kpi label="CTR" value={pct(s.current.ctr, 2)} hint={`avg position ${s.current.avg_position ?? '—'}`} to={SEARCH} />
                 <Kpi label="From Reach pages" value={num(s.reach_share.clicks)}
-                     hint={s.reach_share.share_of_clicks != null ? `${pct(s.reach_share.share_of_clicks)} of clicks · ${s.reach_share.pages} pages` : 'no clicks yet'} />
+                     hint={s.reach_share.share_of_clicks != null ? `${pct(s.reach_share.share_of_clicks)} of clicks · ${s.reach_share.pages} pages` : 'no clicks yet'}
+                     to={s.reach_share.clicks > 0 ? drillHref(SEARCH, { by: 'page' }) : undefined} />
               </div>
               <Sparkline values={(s.daily || []).map((d) => d.clicks)} width={600} height={44} label={`Daily search clicks, last ${(s.daily || []).length} days`} />
               {s.low_volume && <p className="text-xs text-muted">Low volume: fewer than ~3 clicks a day, so week-to-week changes are mostly noise.</p>}
               <div className="grid grid-2 mt-2">
                 <div>
                   <div className="cc-mini-title">Top queries</div>
-                  <Bars label="Top queries by clicks" rows={(s.top_queries || []).map((q) => ({ label: q.dimension_value, value: q.clicks, display: `${q.clicks} · ${num(q.impressions)} imp` }))} />
+                  <Bars label="Top queries by clicks" rows={(s.top_queries || []).map((q) => ({
+                    label: q.dimension_value, value: q.clicks, display: `${q.clicks} · ${num(q.impressions)} imp`,
+                    to: drillHref(SEARCH, { query: q.dimension_value, by: 'page' }),
+                  }))} />
                 </div>
                 <div>
                   <div className="cc-mini-title">Top pages</div>
-                  <Bars label="Top pages by clicks" rows={(s.top_pages || []).map((q) => ({ label: q.dimension_value.replace(/^https?:\/\/[^/]+/, '') || '/', value: q.clicks, display: `${q.clicks} · ${num(q.impressions)} imp` }))} />
+                  <Bars label="Top pages by clicks" rows={(s.top_pages || []).map((q) => ({
+                    key: q.dimension_value, label: q.dimension_value.replace(/^https?:\/\/[^/]+/, '') || '/', value: q.clicks, display: `${q.clicks} · ${num(q.impressions)} imp`,
+                    to: drillHref(SEARCH, { page: q.dimension_value, by: 'query' }),
+                  }))} />
                 </div>
               </div>
             </>
@@ -357,9 +386,12 @@ export function Impact({ section }) {
                  hint={leads.available ? `${num(leads.pushed)} pushed to Engage${leads.push_problems ? ` · ${leads.push_problems} push problems` : ''}` : 'no leads captured yet'} to="/leads" />
             <Kpi label="Engage outcomes (90 d)" value={out.available ? num(out.events) : '—'}
                  hint={out.available ? `${num(out.conversions)} conversions · ${out.content_attributed} from content` : 'no outcomes received yet'} to="/leads/outcomes" />
-            <Kpi label="Revenue attributed" value={out.available ? inr(out.revenue_inr) : '—'} hint={out.available ? `${out.campaign_attributed} campaign-attributed events` : ''} />
+            <Kpi label="Revenue attributed" value={out.available ? inr(out.revenue_inr) : '—'} hint={out.available ? `${out.campaign_attributed} campaign-attributed events` : ''}
+                 to={out.revenue_inr > 0 ? ROUTES.LEAD_OUTCOMES : undefined} />
+            {/* /social/queue only redirects (and drops the query), so link the calendar itself. */}
             <Kpi label="Social posts (28 d)" value={social.available ? num(social.posted) : '—'}
-                 hint={social.available ? `${social.failed} failed · ${social.publishing} publishing` : 'nothing posted yet'} to="/social/queue" />
+                 hint={social.available ? `${social.failed} failed · ${social.publishing} publishing` : 'nothing posted yet'}
+                 to={social.posted > 0 ? drillHref(ROUTES.SOCIAL_CALENDAR, { status: 'posted' }) : ROUTES.SOCIAL_CALENDAR} />
           </div>
           {section?.ga4?.available && (
             <p className="text-xs text-muted mt-1">GA4 (28 d): {num(section.ga4.sessions)} sessions · {num(section.ga4.users)} users · {num(section.ga4.page_views)} views on Reach content.</p>
@@ -415,13 +447,20 @@ export function Projections({ section, impact }) {
           <div className="cc-mini-title">Scheduled in the next {roadmap.days ?? 14} days ({roadmap.total ?? 0})</div>
           {(roadmap.items || []).length === 0 ? <p className="text-xs text-muted">Nothing dated yet — routine content publishes as it is vetted, without a calendar date.</p> : (
             <ul className="cc-list">{roadmap.items.slice(0, 8).map((it) => (
-              <li key={`${it.source}-${it.id}`}><span>{it.title}</span><span className="text-xs text-muted">{it.date} · {it.type}</span></li>
+              <li key={`${it.source}-${it.id}`}>
+                <span>{roadmapItemHref(it) ? <Link to={roadmapItemHref(it)}>{it.title}</Link> : it.title}</span>
+                <span className="text-xs text-muted">{it.date} · {it.type}</span>
+              </li>
             ))}</ul>
           )}
         </div>
         <div>
           <div className="cc-mini-title">Expected output (configured daily quotas)</div>
-          <Bars label="Daily quotas" rows={(section?.quotas || []).map((q) => ({ key: q.id, label: q.label, value: q.per_day, display: q.enabled ? `${q.per_day}/day · ${q.next_14_days} in 14 d` : 'off' }))} />
+          {/* A quota drills to what it has produced (the plan metric's records). */}
+          <Bars label="Daily quotas" rows={(section?.quotas || []).map((q) => ({
+            key: q.id, label: q.label, value: q.per_day, display: q.enabled ? `${q.per_day}/day · ${q.next_14_days} in 14 d` : 'off',
+            to: QUOTA_METRIC[q.id] ? metricRecordsHref(QUOTA_METRIC[q.id]) : undefined,
+          }))} />
         </div>
       </div>
     </Section>

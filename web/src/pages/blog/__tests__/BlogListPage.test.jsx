@@ -66,3 +66,14 @@ describe('BlogListPage', () => {
     expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
   });
 });
+
+describe('BlogListPage deep links', () => {
+  it('applies status and search from the URL', async () => {
+    blogService.list.mockResolvedValue({ items: [], total: 0 });
+    renderWithAuth(<BlogListPage />, { ...authAsAdmin, route: '/blog?status=draft&search=gst' });
+
+    await waitFor(() => expect(blogService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'draft', search: 'gst' }),
+    ));
+  });
+});

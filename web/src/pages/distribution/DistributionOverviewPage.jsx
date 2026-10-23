@@ -40,14 +40,21 @@ export default function DistributionOverviewPage() {
 
       {!loading && stats && (
         <div className="stats-row mb-6">
-          <div className="stat-card">
-            <div className="stat-card__value">{stats.totalCampaigns}</div>
-            <div className="stat-card__label">Total Campaigns</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card__value">{stats.totalDispatches}</div>
-            <div className="stat-card__label">Total Dispatches</div>
-          </div>
+          {[
+            { value: stats.totalCampaigns, label: 'Total Campaigns', to: '/distribution/campaigns' },
+            { value: stats.totalDispatches, label: 'Total Dispatches', to: '/distribution/orchestration' },
+          ].map(({ value, label, to }) => {
+            const body = (
+              <>
+                <div className="stat-card__value">{value}</div>
+                <div className="stat-card__label">{label}</div>
+              </>
+            );
+            // A zero has nothing behind it to open.
+            return value > 0
+              ? <Link key={label} to={to} className="stat-card stat-tile" aria-label={`${label}: ${value} — view records`}>{body}</Link>
+              : <div key={label} className="stat-card">{body}</div>;
+          })}
         </div>
       )}
 

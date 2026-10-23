@@ -44,6 +44,9 @@ export function JobMonitorPage() {
   const queue  = searchParams.get('queue') ?? '';
   const jobType = searchParams.get('job_type') ?? '';
   const sinceHours = searchParams.get('since_hours') ?? '';
+  // One worker's / one request's jobs (Bot queue rows link with request_id).
+  const workerId = searchParams.get('worker_id') ?? '';
+  const requestId = searchParams.get('request_id') ?? '';
   const flags = Object.keys(FLAG_FILTERS).filter((k) => searchParams.get(k) === '1');
   const flagKey = flags.join(',');
 
@@ -66,12 +69,14 @@ export function JobMonitorPage() {
     const params = { page, limit, status, queue };
     if (jobType) params.job_type = jobType;
     if (sinceHours) params.since_hours = sinceHours;
+    if (workerId) params.worker_id = workerId;
+    if (requestId) params.request_id = requestId;
     flagKey.split(',').filter(Boolean).forEach((k) => { params[k] = '1'; });
     jobService.list(params)
       .then((d) => { setRows(d.items || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, limit, status, queue, jobType, sinceHours, flagKey]);
+  }, [page, limit, status, queue, jobType, sinceHours, workerId, requestId, flagKey]);
   useEffect(load, [load]);
 
   const retryJob = async (id) => {
@@ -88,8 +93,11 @@ export function JobMonitorPage() {
 
   const columns = [
     { key: 'id', label: '#' },
-    { key: 'job_type', label: 'Type', render: (r) => <code style={{ fontSize: '0.75rem' }}>{r.job_type}</code> },
-    { key: 'queue', label: 'Queue' },
+    // Narrow to this row's type / queue in place (already narrowed: plain text).
+    { key: 'job_type', label: 'Type', render: (r) => <code style={{ fontSize: '0.75rem' }}>{r.job_type}</code>,
+      drill: (r) => (r.job_type && r.job_type !== jobType ? { onClick: () => setFilter('job_type', r.job_type), title: 'Only jobs of this type' } : null) },
+    { key: 'queue', label: 'Queue',
+      drill: (r) => (r.queue && r.queue !== queue ? { onClick: () => setFilter('queue', r.queue), title: 'Only jobs on this queue' } : null) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'attempts', label: 'Attempts', render: (r) => `${r.attempts} / ${r.max_attempts}` },
     { key: 'progress', label: 'Progress', render: (r) => r.progress != null ? `${r.progress}%` : '—' },
@@ -154,12 +162,24 @@ export function JobMonitorPage() {
         />
       </FilterBar>
 
-      {(sinceHours || flags.length > 0) && (
+      {(sinceHours || workerId || requestId || flags.length > 0) && (
         <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
           {sinceHours && (
             <button type="button" className="badge badge-secondary" onClick={() => setFilter('since_hours', '')}
                     aria-label={`Clear last ${sinceHours} hours filter`}>
               Last {sinceHours} h ✕
+            </button>
+          )}
+          {workerId && (
+            <button type="button" className="badge badge-secondary" onClick={() => setFilter('worker_id', '')}
+                    aria-label="Clear worker filter">
+              Worker {workerId} ✕
+            </button>
+          )}
+          {requestId && (
+            <button type="button" className="badge badge-secondary" onClick={() => setFilter('request_id', '')}
+                    aria-label="Clear request filter">
+              Request {requestId} ✕
             </button>
           )}
           {flags.map((k) => (

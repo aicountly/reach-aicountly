@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { knowledgeService } from '../../services/knowledgeService';
+import { useUrlFilter } from '../../components/drill';
+import { KnowledgeFilterChip } from './KnowledgeFilterChip';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { DataTable } from '../../components/common/DataTable';
@@ -12,24 +14,28 @@ import { formatDate } from '../../utils/formatDate';
 const STATUS_OPTIONS    = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const RULE_TYPE_OPTIONS = ['', 'preferred_name', 'avoid_term', 'tone', 'trademark', 'competitor_mention'];
 
+const productName = (id) => knowledgeService.getProduct?.(id).then((p) => p?.name);
+
 export function BrandRulesPage() {
   const [rows, setRows]         = useState([]);
   const [total, setTotal]       = useState(0);
   const [page, setPage]         = useState(1);
   const [limit]                 = useState(25);
-  const [status, setStatus]     = useState('');
-  const [ruleType, setRuleType] = useState('');
-  const [search, setSearch]     = useState('');
+  // Filters live in the URL so a product can link to its rules (product_id).
+  const [status, setStatus]     = useUrlFilter('status');
+  const [ruleType, setRuleType] = useUrlFilter('rule_type');
+  const [search, setSearch]     = useUrlFilter('search');
+  const [productId, setProductId] = useUrlFilter('product_id');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listBrandRules({ page, limit, status, rule_type: ruleType, search })
+    knowledgeService.listBrandRules({ page, limit, status, rule_type: ruleType, search, product_id: productId || undefined })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, limit, status, ruleType, search]);
+  }, [page, limit, status, ruleType, search, productId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -42,7 +48,8 @@ export function BrandRulesPage() {
         {r.rule_text || '—'}
       </div>
     )},
-    { key: 'product_id', label: 'Product', render: (r) => r.product_id ? `#${r.product_id}` : 'Global' },
+    { key: 'product_id', label: 'Product', render: (r) => r.product_id ? `#${r.product_id}` : 'Global',
+      drill: (r) => (r.product_id ? `/knowledge/products/${r.product_id}` : null) },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDate(r.updated_at) : '—' },
   ];
@@ -66,6 +73,8 @@ export function BrandRulesPage() {
         <SearchBar value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search rule text…" />
         <button className="btn btn-secondary" onClick={() => { setPage(1); load(); }}>Search</button>
       </FilterBar>
+
+      <KnowledgeFilterChip label="Product" value={productId} resolve={productName} onClear={() => { setPage(1); setProductId(''); }} />
 
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (

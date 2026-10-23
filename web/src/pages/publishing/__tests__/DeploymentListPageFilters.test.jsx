@@ -44,3 +44,13 @@ describe('DeploymentListPage additional', () => {
     await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument());
   });
 });
+
+describe('DeploymentListPage deep links', () => {
+  it('applies a single-state status from a dashboard count and shows it as selected', async () => {
+    api.get.mockResolvedValue({ items: [], last_page: 1 });
+    renderWithAuth(<DeploymentListPage />, { ...ctx, route: '/publishing/deployments?status=published&content_type=blog' });
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('v1/publishing/deployments', { page: 1, status: 'published', content_type: 'blog' }));
+    expect(screen.getByRole('option', { name: 'Published' }).selected).toBe(true);
+  });
+});

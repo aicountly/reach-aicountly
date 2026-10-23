@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { listSearchMetrics } from '../../services/intelligenceService.js';
+import { DrillLink, drillHref } from '../../components/drill';
+
+const pageUrl = (p) => p.url || p.page || p.page_url || p.dimension_value || '';
 
 export default function SearchPagePerformancePage() {
   const [rows, setRows] = useState([]);
@@ -68,8 +71,19 @@ export default function SearchPagePerformancePage() {
               {rows.map((p, i) => {
                 const position = Number(p.position ?? p.avg_position ?? 0);
                 return (
-                  <tr key={p.url || p.page || i}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{p.url || p.page || p.dimension_value || '—'}</td>
+                  <tr key={p.url || p.page || p.page_url || i}>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                      {/* The queries that bring people to this page, in the Search Console explorer. */}
+                      <DrillLink
+                        to={pageUrl(p) ? drillHref('/seo-centre/search', { page: pageUrl(p), by: 'query' }) : undefined}
+                        title="Queries bringing people to this page"
+                      >
+                        {pageUrl(p) || '—'}
+                      </DrillLink>
+                      {p.content_identity_id && (
+                        <> · <DrillLink to={`/intelligence/content/${p.content_identity_id}`}>analytics</DrillLink></>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{Number(p.clicks || 0).toLocaleString()}</td>
                     <td style={{ textAlign: 'right' }}>{Number(p.impressions || 0).toLocaleString()}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{position.toFixed(1)}</td>

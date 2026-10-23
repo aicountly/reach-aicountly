@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, RefreshCw, Activity, DownloadCloud, History, Link2Off } from 'lucide-react';
 import {
   listSearchMetrics,
@@ -13,6 +14,7 @@ import {
 } from '../../services/intelligenceService.js';
 import { formatTime } from '../../utils/formatDate';
 import SiteWideSearchPanel from './SiteWideSearchPanel.jsx';
+import { DrillLink } from '../../components/drill';
 
 const DEFAULT_BACKFILL_DAYS = 90;
 
@@ -59,8 +61,12 @@ export default function SearchIntelligencePage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   // Site-wide (the whole property) is the default; blog-mapped is the subset
-  // of rows a Reach-published post claims.
-  const [view, setView] = useState('site');
+  // of rows a Reach-published post claims. The view and any drill-down live
+  // in the URL so a drilled slice is shareable and Back walks up it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = searchParams.get('view') === 'blog' ? 'blog' : 'site';
+  const setView = (next) => setSearchParams(next === 'blog' ? { view: 'blog' } : {});
+  const drillSite = (params) => setSearchParams(params);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -307,8 +313,21 @@ export default function SearchIntelligencePage() {
                 </thead>
                 <tbody>
                   {queries.map((row, i) => (
-                    <tr key={row.dimension_value || i}>
-                      <td style={{ fontWeight: 500 }}>{row.dimension_value || '—'}</td>
+                    <tr
+                      key={row.dimension_value || i}
+                      className={row.dimension_value ? 'is-drillable' : undefined}
+                      onClick={row.dimension_value ? () => drillSite({ query: row.dimension_value, by: 'page' }) : undefined}
+                    >
+                      <td style={{ fontWeight: 500 }}>
+                        {row.dimension_value ? (
+                          <DrillLink
+                            onClick={() => drillSite({ query: row.dimension_value, by: 'page' })}
+                            title="Pages, days and devices for this query (site-wide)"
+                          >
+                            {row.dimension_value}
+                          </DrillLink>
+                        ) : '—'}
+                      </td>
                       <td style={{ textAlign: 'right' }}>{num(row.clicks)}</td>
                       <td style={{ textAlign: 'right' }}>{num(row.impressions)}</td>
                       <td style={{ textAlign: 'right' }}>{pct(row.ctr)}</td>
@@ -375,7 +394,14 @@ export default function SearchIntelligencePage() {
             </p>
             <ul className="text-sm" style={{ margin: 0, paddingLeft: '1.1rem' }}>
               {unmapped.slice(0, 25).map((finding) => (
-                <li key={finding.id} style={{ wordBreak: 'break-all' }}>{finding.unmapped_url}</li>
+                <li key={finding.id} style={{ wordBreak: 'break-all' }}>
+                  <DrillLink
+                    onClick={() => { drillSite({ page: finding.unmapped_url, by: 'query' }); window.scrollTo?.(0, 0); }}
+                    title="Queries that bring people to this URL"
+                  >
+                    {finding.unmapped_url}
+                  </DrillLink>
+                </li>
               ))}
             </ul>
           </div>

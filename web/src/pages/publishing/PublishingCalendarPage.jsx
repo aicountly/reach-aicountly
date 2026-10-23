@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { formatDate, toDateInputValue } from '../../utils/formatDate';
 
@@ -43,9 +44,15 @@ export default function PublishingCalendarPage() {
                   <span className={`badge badge--${item.content_type === 'blog' ? 'info' : 'warning'}`}>
                     {item.content_type}
                   </span>
-                  &nbsp;{item.content_title ?? `Deployment #${item.id}`}
                   &nbsp;
-                  <span className="muted">({item.status})</span>
+                  {/* Each entry opens its content item; the status opens the deployment. */}
+                  {item.content_item_id
+                    ? <Link to={`/content/${item.content_item_id}`}>{item.content_title ?? `Content #${item.content_item_id}`}</Link>
+                    : (item.content_title ?? `Deployment #${item.id}`)}
+                  &nbsp;
+                  <Link to={`/publishing/deployments/${item.id}`} className="muted" title={`Open deployment #${item.id}`}>
+                    ({item.status})
+                  </Link>
                 </li>
               ))}
             </ul>

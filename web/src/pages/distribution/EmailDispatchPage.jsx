@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { useUrlFilter } from '../../components/drill';
 
 export default function EmailDispatchPage() {
   const [campaigns, setCampaigns] = useState([]);
@@ -7,7 +9,9 @@ export default function EmailDispatchPage() {
   const [page, setPage]           = useState(1);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
-  const [filter, setFilter]       = useState('approved');
+  // Status filter in the URL (?status=failed) so it can be linked to and
+  // survives reload; 'approved' — the dispatchable set — is the default.
+  const [filter, setFilter]       = useUrlFilter('status', 'approved');
   const perPage = 25;
 
   const load = useCallback(() => {
@@ -94,7 +98,7 @@ export default function EmailDispatchPage() {
           <tbody>
             {campaigns.map(c => (
               <tr key={c.id}>
-                <td>{c.subject}</td>
+                <td><Link to={`/email/${c.id}`}>{c.subject || '(untitled)'}</Link></td>
                 <td>{c.from_name ?? c.from_email ?? '—'}</td>
                 <td><span className="badge badge--neutral">{c.status}</span></td>
                 <td className="text-sm">{renderStats(c.stats)}</td>

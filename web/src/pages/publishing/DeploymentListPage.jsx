@@ -74,7 +74,6 @@ export default function DeploymentListPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const { has } = usePermission();
@@ -82,6 +81,12 @@ export default function DeploymentListPage() {
 
   const status = searchParams.get('status') ?? '';
   const contentType = searchParams.get('content_type') ?? '';
+  // Paging belongs to one filter set: a drill link that changes the filter
+  // starts again at page 1 instead of keeping a page the new set may not have.
+  const filterKey = `${status}|${contentType}`;
+  const [paging, setPaging] = useState({ key: filterKey, page: 1 });
+  const page = paging.key === filterKey ? paging.page : 1;
+  const setPage = (next) => setPaging({ key: filterKey, page: typeof next === 'function' ? next(page) : next });
 
   const load = useCallback(() => {
     setLoading(true);
@@ -145,6 +150,10 @@ export default function DeploymentListPage() {
           <span className="text-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>Status</span>
           <select value={status} onChange={e => setFilter('status', e.target.value)}>
             {STATUS_FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            {/* A drill link may narrow to one state (e.g. ?status=published). */}
+            {status && !STATUS_FILTERS.some(f => f.key === status) && (
+              <option value={status}>{status.split(',').map(s => STATUS_LABELS[s] ?? s).join(' + ')}</option>
+            )}
           </select>
         </label>
         <label>

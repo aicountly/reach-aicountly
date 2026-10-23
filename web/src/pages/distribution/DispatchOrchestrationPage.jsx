@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { DrillLink, useUrlFilter } from '../../components/drill';
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -19,18 +21,32 @@ const STATUS_COLORS = {
   dead_lettered: 'badge--danger',
 };
 
+const STATUSES = Object.keys(STATUS_COLORS);
+const CHANNELS = ['email', 'sms', 'whatsapp', 'social'];
+
 export default function DispatchOrchestrationPage() {
   const [dispatches, setDispatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  // Filters live in the URL: the dashboard's dispatch-queue tile links here
+  // with ?status=queued, and a filtered view must survive reload / Back.
+  const [status, setStatusParam] = useUrlFilter('status');
+  const [channel, setChannelParam] = useUrlFilter('channel');
+  const navigate = useNavigate();
   const perPage = 25;
+
+  const setStatus = (v) => { setStatusParam(v); setPage(1); };
+  const setChannel = (v) => { setChannelParam(v); setPage(1); };
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    api.get('v1/distribution/dispatches', { page, per_page: perPage })
+    const params = { page, per_page: perPage };
+    if (status) params.status = status;
+    if (channel) params.channel = channel;
+    api.get('v1/distribution/dispatches', params)
       .then((r) => {
         setDispatches(normalizeList(r));
         setTotal(Number(r?.total ?? 0));
@@ -45,7 +61,7 @@ export default function DispatchOrchestrationPage() {
         setError(e?.message || 'Failed to load dispatches.');
       })
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, status, channel]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -70,11 +86,27 @@ export default function DispatchOrchestrationPage() {
         </p>
       </div>
 
+      <div className="filter-bar mb-4">
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+          <option value="">All statuses</option>
+          {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+          {status && !STATUSES.includes(status) && <option value={status}>{status}</option>}
+        </select>
+        <select value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Channel">
+          <option value="">All channels</option>
+          {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+          {channel && !CHANNELS.includes(channel) && <option value={channel}>{channel}</option>}
+        </select>
+        {(status || channel) && (
+          <span className="muted text-sm">{total} matching dispatch{total === 1 ? '' : 'es'}</span>
+        )}
+      </div>
+
       {error && <p className="text-error">{error}</p>}
       {loading && <p className="muted">Loading dispatches…</p>}
 
       {!loading && dispatches.length === 0 && !error && (
-        <p className="muted">No dispatches found.</p>
+        <p className="muted">No dispatches found{status || channel ? ' for this filter' : ''}.</p>
       )}
 
       {!loading && dispatches.length > 0 && (
@@ -92,13 +124,41 @@ export default function DispatchOrchestrationPage() {
           </thead>
           <tbody>
             {dispatches.map((d) => (
-              <tr key={d.id}>
-                <td>{d.campaign_id}</td>
-                <td><span className="badge badge--neutral">{d.channel}</span></td>
+              <tr
+                key={d.id}
+                className={d.campaign_id ? 'is-drillable' : undefined}
+                tabIndex={d.campaign_id ? 0 : undefined}
+                aria-label={d.campaign_id ? `Open campaign ${d.campaign_id}` : undefined}
+                onClick={d.campaign_id ? () => navigate(`/distribution/campaigns/${d.campaign_id}`) : undefined}
+                onKeyDown={d.campaign_id ? (e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    navigate(`/distribution/campaigns/${d.campaign_id}`);
+                  }
+                } : undefined}
+              >
                 <td>
-                  <span className={`badge ${STATUS_COLORS[d.status] ?? 'badge--neutral'}`}>
-                    {d.status}
-                  </span>
+                  <DrillLink to={d.campaign_id ? `/distribution/campaigns/${d.campaign_id}` : undefined}>
+                    {d.campaign_id ?? '—'}
+                  </DrillLink>
+                </td>
+                <td>
+                  <DrillLink
+                    onClick={d.channel && d.channel !== channel ? () => setChannel(d.channel) : undefined}
+                    title="Only this channel"
+                  >
+                    <span className="badge badge--neutral">{d.channel}</span>
+                  </DrillLink>
+                </td>
+                <td>
+                  <DrillLink
+                    onClick={d.status && d.status !== status ? () => setStatus(d.status) : undefined}
+                    title="Only this status"
+                  >
+                    <span className={`badge ${STATUS_COLORS[d.status] ?? 'badge--neutral'}`}>
+                      {d.status}
+                    </span>
+                  </DrillLink>
                 </td>
                 <td>{d.total_recipients ?? '—'}</td>
                 <td>{d.delivered_count ?? d.sent_count ?? 0}</td>
@@ -108,7 +168,7 @@ export default function DispatchOrchestrationPage() {
                     <button
                       type="button"
                       className="btn btn--sm btn--secondary"
-                      onClick={() => handleReconcile(d.id)}
+                      onClick={(e) => { e.stopPropagation(); handleReconcile(d.id); }}
                     >
                       Reconcile
                     </button>

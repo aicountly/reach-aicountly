@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { formatDate } from '../../utils/formatDate';
+import { useUrlFilter } from '../../components/drill';
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -14,7 +15,8 @@ export default function CampaignListPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [status, setStatus] = useState('');
+  // In the URL so status links (?status=running) land on the narrowed list.
+  const [status, setStatus] = useUrlFilter('status');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -40,7 +42,7 @@ export default function CampaignListPage() {
       </div>
 
       <div className="filter-bar">
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           <option value="">All statuses</option>
           {['draft', 'pending_approval', 'approved', 'scheduled', 'running', 'completed', 'paused', 'archived'].map((s) => (
             <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
@@ -69,7 +71,9 @@ export default function CampaignListPage() {
           <tbody>
             {campaigns.map((c) => (
               <tr key={c.id}>
-                <td>{c.name ?? `Campaign #${c.id}`}</td>
+                <td>
+                  <Link to={`/distribution/campaigns/${c.id}`}>{c.name ?? `Campaign #${c.id}`}</Link>
+                </td>
                 <td>{c.campaign_type ?? c.type ?? '—'}</td>
                 <td>
                   <span className="badge badge--neutral">

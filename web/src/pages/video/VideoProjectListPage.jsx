@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
 import { formatDate } from '../../utils/formatDate';
+import { useUrlFilter } from '../../components/drill';
+
+const STATUS_OPTIONS = ['draft', 'script_draft', 'script_in_review', 'script_approved', 'rendering', 'rendered', 'published', 'cancelled'];
 
 function ProjectStatusBadge({ status }) {
   const colorMap = {
@@ -35,7 +38,8 @@ export default function VideoProjectListPage() {
   const [page, setPage]         = useState(1);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
-  const [filter, setFilter]     = useState('');
+  // Status lives in the URL so a link (?status=render_failed) lands on that slice.
+  const [filter, setFilter]     = useUrlFilter('status');
   const perPage = 25;
 
   const load = useCallback(() => {
@@ -87,9 +91,10 @@ export default function VideoProjectListPage() {
             aria-label="Filter by status"
           >
             <option value="">All statuses</option>
-            {['draft','script_draft','script_in_review','script_approved','rendering','rendered','published','cancelled'].map(s => (
+            {STATUS_OPTIONS.map(s => (
               <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
             ))}
+            {filter && !STATUS_OPTIONS.includes(filter) && <option value={filter}>{filter.replace(/_/g, ' ')}</option>}
           </select>
         </label>
       </div>

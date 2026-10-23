@@ -47,4 +47,27 @@ describe('OutcomesAnalyticsSection', () => {
     await waitFor(() => expect(screen.getByText(/REACH_INBOUND_ENGAGE_TOKEN is not set/)).toBeInTheDocument());
     expect(screen.getAllByText('Nothing to show for this period.').length).toBe(2);
   });
+
+  it('links tiles and breakdown rows to the outcome events they count', async () => {
+    analyticsService.outcomes.mockResolvedValue({
+      ...base,
+      by_campaign: [...base.by_campaign, { campaign_id: null, events: 2, conversions: 0, revenue_inr: '0.00', converted_value_inr: '0.00' }],
+      by_content: [{ content_identity_id: 12, content_type: 'blog', canonical_url: 'https://x.test/a', events: 1, conversions: 0, revenue_inr: '0.00', converted_value_inr: '0.00' }],
+    });
+    renderWithAuth(<OutcomesAnalyticsSection />);
+
+    await screen.findByText('Diwali GST push (#7)');
+    const tile = (label) => screen.getAllByText(label).find((el) => el.className === 'stat-tile__label').closest('a');
+    expect(tile('Conversions')).toHaveAttribute('href', '/leads/outcomes?days=30&stage=converted');
+    expect(tile('Revenue (payments)')).toHaveAttribute('href', '/leads/outcomes?days=30&paid=1');
+    expect(screen.getByRole('link', { name: '1 not matched to a Reach lead' })).toHaveAttribute('href', '/leads/outcomes?days=30&match=unmatched');
+    expect(screen.getByRole('link', { name: 'Diwali GST push (#7)' })).toHaveAttribute('href', '/leads/outcomes?days=30&campaign_id=7');
+    expect(screen.getByText('No campaign').closest('a')).toBeNull();
+    expect(screen.getByRole('link', { name: 'google' })).toHaveAttribute('href', '/leads/outcomes?days=30&source=google');
+    expect(screen.getByRole('link', { name: 'SLR-000123' })).toHaveAttribute('href', '/leads/outcomes?days=30&seller_code=SLR-000123');
+    expect(screen.getByRole('link', { name: /x\.test\/a/ })).toHaveAttribute('href', '/intelligence/content/12');
+    // Conversions of a row open that row's converted events; a zero stays plain.
+    const row = screen.getByRole('link', { name: 'Diwali GST push (#7)' }).closest('tr');
+    expect(row.querySelectorAll('a')[2]).toHaveAttribute('href', '/leads/outcomes?days=30&campaign_id=7&stage=converted');
+  });
 });

@@ -11,8 +11,10 @@ use InvalidArgumentException;
 /**
  * Engage lead outcomes as seen by Reach staff.
  *
- *   GET v1/leads/outcomes          list (lead.view) — filters: stage, match, lead_id, campaign_id,
- *                                  from, to, search (lead code / seller code / lead name or e-mail)
+ *   GET v1/leads/outcomes          list (lead.view) — filters: stage, match (a match method, or
+ *                                  matched / unmatched), lead_id, campaign_id, content_identity_id,
+ *                                  source (`unattributed` = none), seller_code, paid=1, from, to,
+ *                                  search (lead code / seller code / lead name or e-mail)
  *   GET v1/leads/outcomes/summary  LeadOutcomeSummary::forPeriod (lead.view)
  *   GET v1/analytics/outcomes      the same summary for the Analytics page (analytics.view)
  *
@@ -28,14 +30,26 @@ class LeadOutcomeController extends BaseApiController
         $where  = [];
         $params = [];
 
-        foreach (['stage' => 'o.stage', 'match' => 'o.match_method'] as $key => $col) {
+        foreach (['stage' => 'o.stage', 'seller_code' => 'o.seller_code', 'source' => "COALESCE(o.source, 'unattributed')"] as $key => $col) {
             $v = trim((string) $this->request->getGet($key));
             if ($v !== '') {
                 $where[]  = "{$col} = ?";
                 $params[] = $v;
             }
         }
-        foreach (['lead_id' => 'o.lead_id', 'campaign_id' => 'o.campaign_id'] as $key => $col) {
+        // matched / unmatched mean "has a Reach lead" — the summary's matched/unmatched split.
+        $match = trim((string) $this->request->getGet('match'));
+        if ($match === 'matched' || $match === 'unmatched') {
+            $where[] = $match === 'matched' ? 'o.lead_id IS NOT NULL' : 'o.lead_id IS NULL';
+        } elseif ($match !== '') {
+            $where[]  = 'o.match_method = ?';
+            $params[] = $match;
+        }
+        // paid=1: the payment-confirmed events the summary sums into revenue_inr.
+        if ($this->request->getGet('paid') === '1') {
+            $where[] = LeadOutcomeSummary::PAID;
+        }
+        foreach (['lead_id' => 'o.lead_id', 'campaign_id' => 'o.campaign_id', 'content_identity_id' => 'o.content_identity_id'] as $key => $col) {
             $v = trim((string) $this->request->getGet($key));
             if ($v !== '' && ctype_digit($v)) {
                 $where[]  = "{$col} = ?";

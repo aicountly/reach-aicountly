@@ -24,6 +24,7 @@ class BrandRuleController extends BaseKnowledgeController
             'product_id' => $this->request->getGet('product_id'),
             'status'     => $this->request->getGet('status'),
             'rule_type'  => $this->request->getGet('rule_type'),
+            'q'          => $this->searchTerm(),
         ]));
     }
 

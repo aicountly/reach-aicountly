@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
+
+/** A tile's link, only when there is something behind the number. */
+function TileLink({ count, to, children }) {
+  return Number(count) > 0 ? <Link to={to} className="stat-card__link">{children}</Link> : null;
+}
 
 export default function CommunityAnalyticsPage() {
   const [overview, setOverview]   = useState(null);
@@ -56,14 +62,17 @@ export default function CommunityAnalyticsPage() {
           <div className="stat-card">
             <div className="stat-card__value">{overview.published_answers ?? 0}</div>
             <div className="stat-card__label">Published answers</div>
+            <TileLink count={overview.published_answers} to="/community/answers?status=published">View →</TileLink>
           </div>
           <div className="stat-card">
             <div className="stat-card__value">{overview.pending_approval ?? 0}</div>
             <div className="stat-card__label">Pending approval</div>
+            <TileLink count={overview.pending_approval} to="/community/answers?status=awaiting_approval">Review →</TileLink>
           </div>
           <div className="stat-card stat-card--warning">
             <div className="stat-card__value">{overview.open_moderation_flags ?? 0}</div>
             <div className="stat-card__label">Open moderation flags</div>
+            <TileLink count={overview.open_moderation_flags} to="/community/moderation">Resolve →</TileLink>
           </div>
         </div>
       )}

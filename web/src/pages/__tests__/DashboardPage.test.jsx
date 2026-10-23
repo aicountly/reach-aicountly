@@ -15,10 +15,10 @@ const summary = {
     total: 12, ideas: 2, drafts: 3, in_review: 4, approved: 1,
     scheduled: 1, published: 2, pending_publishing: 1, needs_attention: 0,
   },
-  campaigns: { total: 5, running: 2, dispatches_failed: 0 },
+  campaigns: { total: 5, running: 2, dispatches_queued: 3, dispatches_failed: 0 },
   social: { total: 9, queue: 6, posted: 3 },
   leads: { total: 20, pending_push: 7, pushed: 13 },
-  approvals: { pending: 4, total: 9 },
+  approvals: { queue: 2, pending: 4, total: 9 },
   bot: { mode: 'auto', reports_total: 8, reports_pending: 2 },
   jobs: {
     available: true, window_hours: 24,
@@ -35,7 +35,8 @@ const summary = {
   calendar_overdue: { count: 1, items: [{ id: 42, title: 'Stuck scheduled post', content_type: 'blog', workflow_status: 'scheduled', date: null, reason: 'no_date' }] },
   content: { total: 30, in_review: 5, scheduled: 2, published: 6, approved: 3, drafts: 9 },
   calendar_upcoming: [
-    { id: 'schedule-1', title: 'August product launch', date: '2026-08-20', item_kind: 'blog' },
+    { id: 'schedule-1', content_item_id: 77, title: 'August product launch', date: '2026-08-20', item_kind: 'blog' },
+    { id: 'calendar-5', content_item_id: null, title: 'Legacy webinar', date: '2026-08-22', item_kind: 'webinar' },
   ],
   generated_at: '2026-08-06T10:30:00+00:00',
 };
@@ -150,10 +151,37 @@ describe('DashboardPage', () => {
       .toBe('/content?workflow_status=scheduled,ready_for_publication');
   });
 
+  it('sends the queue and review tiles to the rows they counted', async () => {
+    renderWithAuth(<DashboardPage />);
+    await waitFor(() => expect(screen.getByText('Social — queue')).toBeInTheDocument());
+
+    const href = (label) => screen.getByText(label).closest('a').getAttribute('href');
+
+    // Linked straight to the calendar (not the /social/queue redirect).
+    expect(href('Social — queue')).toBe('/social/calendar?status=upcoming');
+    expect(href('Approvals — pending')).toBe('/approvals?area=ready_for_approval');
+    expect(href('Content — in review'))
+      .toBe('/content?workflow_status=validation_pending%2Creview_pending%2Cseo_review%2Cinternal_review');
+    expect(href('Campaigns — dispatch queue')).toBe('/distribution/orchestration?status=queued');
+    // The tile shows what the Approval Centre lists, not per-stage rows.
+    expect(screen.getByText('4 stage sign-offs open')).toBeInTheDocument();
+  });
+
+  it('opens an upcoming calendar item in Content Studio', async () => {
+    renderWithAuth(<DashboardPage />);
+    await waitFor(() => expect(screen.getByText('August product launch')).toBeInTheDocument());
+
+    expect(screen.getByText('August product launch').closest('a').getAttribute('href')).toBe('/content/77');
+    expect(screen.getByText('Legacy webinar').closest('a')).toBeNull();
+  });
+
   it('does not deep-link a zero tile into an empty filtered list', async () => {
     dashboardService.summary.mockResolvedValue({
       ...summary,
       jobs: { ...summary.jobs, failed: 0, stalled: 0 },
+      social: { ...summary.social, queue: 0 },
+      approvals: { ...summary.approvals, queue: 0 },
+      campaigns: { ...summary.campaigns, dispatches_queued: 0 },
     });
     renderWithAuth(<DashboardPage />);
     await waitFor(() => expect(screen.getByText('Failed (24 h)')).toBeInTheDocument());
@@ -162,5 +190,8 @@ describe('DashboardPage', () => {
 
     expect(href('Failed (24 h)')).toBe('/admin/jobs');
     expect(href('Stalled')).toBe('/admin/jobs');
+    expect(href('Social — queue')).toBe('/social/calendar');
+    expect(href('Approvals — pending')).toBe('/approvals');
+    expect(href('Campaigns — dispatch queue')).toBe('/distribution/orchestration');
   });
 });

@@ -89,14 +89,28 @@ class SuppressionService
         return trim($address);
     }
 
-    public function list(int $tenantId, int $page = 1, int $perPage = 25): array
+    /**
+     * @param array{channel?: string, reason?: string} $filters already
+     *        validated by the caller; the page and its total share them.
+     */
+    public function list(int $tenantId, int $page = 1, int $perPage = 25, array $filters = []): array
     {
         $offset = ($page - 1) * $perPage;
-        $rows   = $this->model->where('tenant_id', $tenantId)
+        $scope  = function () use ($tenantId, $filters) {
+            $q = $this->model->where('tenant_id', $tenantId);
+            if (($filters['channel'] ?? '') !== '') {
+                $q->where('channel', $filters['channel']);
+            }
+            if (($filters['reason'] ?? '') !== '') {
+                $q->where('reason', $filters['reason']);
+            }
+            return $q;
+        };
+        $rows   = $scope()
             ->orderBy('suppressed_at', 'DESC')
             ->limit($perPage, $offset)
             ->findAll();
-        $total  = $this->model->where('tenant_id', $tenantId)->countAllResults();
+        $total  = $scope()->countAllResults();
         return ['data' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
     }
 }

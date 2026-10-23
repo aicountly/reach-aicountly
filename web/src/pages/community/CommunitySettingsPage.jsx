@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeCommunityList } from './communityListUtils';
 
@@ -114,7 +115,12 @@ export default function CommunitySettingsPage() {
               ) : spaces.map(s => (
                 <tr key={s.id}>
                   <td><code>{s.slug}</code></td>
-                  <td>{s.title}</td>
+                  {/* A space opens its questions in the inbox. */}
+                  <td>
+                    <Link to={`/community/questions?space_id=${encodeURIComponent(s.id)}`} className="drill-link" title="Questions in this space">
+                      {s.title}
+                    </Link>
+                  </td>
                   <td>{s.visibility}</td>
                   <td>{s.moderation_mode}</td>
                   <td>{s.official_answer_policy}</td>

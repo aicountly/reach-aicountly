@@ -5,6 +5,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { DrillLink, drillHref, useDrillFilters } from '../../components/drill';
 
 const STATUS_TONE = {
   ready: 'var(--color-success)',
@@ -29,6 +30,21 @@ function Change({ value }) {
 }
 
 /**
+ * Keyword-table slices behind each summary tile. Same predicates as
+ * SeoTrackerService::tracker() counts them, so a tile's number and the rows
+ * it shows agree. `competitor` narrows to keywords where that competitor is
+ * in the top 10 (the "Share of top 10" rows).
+ */
+const SLICES = {
+  checked:          { label: 'Keywords checked', test: (k) => k.check_status === 'ok' },
+  ranked:           { label: 'We rank (top 100)', test: (k) => k.check_status === 'ok' && k.our_rank != null },
+  top10:            { label: 'We are top 10', test: (k) => k.check_status === 'ok' && k.our_rank != null && k.our_rank <= 10 },
+  up:               { label: 'Up vs 7 days', test: (k) => k.change != null && k.change > 0 },
+  down:             { label: 'Down vs 7 days', test: (k) => k.change != null && k.change < 0 },
+  competitor_leads: { label: 'Competitor leads', test: (k) => k.check_status === 'ok' && k.winner != null && !k.winner.ours },
+};
+
+/**
  * SEO Tracker — real Google India positions from DataForSEO for the tracked
  * keywords, for aicountly.com and each competitor. Without credentials the
  * page says so and shows no positions.
@@ -44,6 +60,10 @@ export function SeoTrackerPage() {
   const [busy, setBusy] = useState(false);
   const [newKeyword, setNewKeyword] = useState('');
   const [product, setProduct] = useState('');
+  // ?show= / ?competitor= narrow the keyword table; one URL update per click
+  // (drill pushes history, so Back returns to the full table).
+  const tableFilter = useDrillFilters(['show', 'competitor']);
+  const { show, competitor: competitorFilter } = tableFilter.filters;
 
   const load = useCallback(() => {
     setLoading(true);
@@ -78,6 +98,15 @@ export function SeoTrackerPage() {
   const summary = data?.summary || {};
   const share = data?.top10_share || [];
   const canRun = canManage && (status.status === 'ready' || status.status === 'disabled');
+  const slice = SLICES[show] || null;
+  const competitorName = competitors.find((c) => String(c.id) === competitorFilter)?.name;
+  const shownKeywords = keywords.filter((k) => (!slice || slice.test(k))
+    && (!competitorFilter || (k.check_status === 'ok' && k.competitor_ranks?.[competitorFilter] != null && k.competitor_ranks[competitorFilter] <= 10)));
+  const filtered = Boolean(slice || competitorFilter);
+  const narrow = (patch) => {
+    tableFilter.drill({ show: patch.show ?? '', competitor: patch.competitor ?? '' });
+    document.getElementById('tracked-keywords')?.scrollIntoView?.({ behavior: 'smooth' });
+  };
 
   return (
     <div>
@@ -121,18 +150,30 @@ export function SeoTrackerPage() {
       {data?.date && (
         <div className="grid grid-3" style={{ margin: '1.25rem 0' }}>
           {[
-            { label: 'Keywords checked', value: summary.checked ?? 0 },
-            { label: 'We rank (top 100)', value: summary.we_rank ?? 0 },
-            { label: 'We are top 10', value: summary.top10 ?? 0 },
-            { label: 'Up vs 7 days', value: summary.up ?? 0 },
-            { label: 'Down vs 7 days', value: summary.down ?? 0 },
-            { label: 'Competitor leads', value: summary.competitor_wins ?? 0 },
-          ].map((s) => (
-            <div key={s.label} className="stat-tile">
-              <div className="stat-tile__label">{s.label}</div>
-              <div className="stat-tile__value">{s.value}</div>
-            </div>
-          ))}
+            { key: 'checked', value: summary.checked ?? 0 },
+            { key: 'ranked', value: summary.we_rank ?? 0 },
+            { key: 'top10', value: summary.top10 ?? 0 },
+            { key: 'up', value: summary.up ?? 0 },
+            { key: 'down', value: summary.down ?? 0 },
+            { key: 'competitor_leads', value: summary.competitor_wins ?? 0 },
+          ].map((s) => {
+            const label = SLICES[s.key].label;
+            const body = (
+              <>
+                <div className="stat-tile__label">{label}</div>
+                <div className="stat-tile__value">{s.value}</div>
+              </>
+            );
+            // A tile narrows the keyword table below; zero has nothing to show.
+            return s.value > 0 ? (
+              <button key={s.key} type="button" className="stat-tile" onClick={() => narrow({ show: s.key })}
+                      aria-pressed={show === s.key} aria-label={`${label}: ${s.value} — show keywords`}>
+                {body}
+              </button>
+            ) : (
+              <div key={s.key} className="stat-tile">{body}</div>
+            );
+          })}
         </div>
       )}
 
@@ -148,7 +189,14 @@ export function SeoTrackerPage() {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div aria-hidden="true" style={{ height: '0.5rem', width: `${Math.max(2, (row.share || 0) * 100)}%`, background: row.ours ? 'var(--color-success)' : 'var(--color-info)', borderRadius: '2px' }} />
-                        <span className="text-sm">{row.top10}</span>
+                        <span className="text-sm">
+                          <DrillLink
+                            onClick={row.top10 > 0 ? () => narrow(row.ours ? { show: 'top10' } : { competitor: String(row.id) }) : undefined}
+                            title="Keywords where this domain is in the top 10"
+                          >
+                            {row.top10}
+                          </DrillLink>
+                        </span>
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>{row.share == null ? '—' : `${Math.round(row.share * 100)}%`}</td>
@@ -192,7 +240,24 @@ export function SeoTrackerPage() {
         </Card>
       )}
 
-      <Card title={`Tracked keywords (${keywords.length})`}>
+      <div id="tracked-keywords" />
+      <Card title={filtered ? `Tracked keywords (${shownKeywords.length} of ${keywords.length})` : `Tracked keywords (${keywords.length})`}>
+        {filtered && (
+          <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+            {slice && (
+              <button type="button" className="badge badge-secondary" onClick={() => tableFilter.clear('show')}
+                      aria-label={`Clear ${slice.label} filter`}>
+                {slice.label} ✕
+              </button>
+            )}
+            {competitorFilter && (
+              <button type="button" className="badge badge-secondary" onClick={() => tableFilter.clear('competitor')}
+                      aria-label="Clear competitor filter">
+                {competitorName || `Competitor #${competitorFilter}`} in top 10 ✕
+              </button>
+            )}
+          </div>
+        )}
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
@@ -207,10 +272,16 @@ export function SeoTrackerPage() {
               </tr>
             </thead>
             <tbody>
-              {keywords.map((k) => (
+              {filtered && shownKeywords.length === 0 && (
+                <tr><td colSpan={5 + competitors.length + (canManage ? 1 : 0)} className="text-sm text-muted">No keywords match this filter.</td></tr>
+              )}
+              {shownKeywords.map((k) => (
                 <tr key={k.id} style={{ opacity: k.enabled ? 1 : 0.55 }}>
                   <td style={{ fontWeight: 500 }}>
-                    {k.keyword}
+                    {/* Which of our pages Search Console shows for this keyword. */}
+                    <DrillLink to={drillHref('/seo-centre/search', { query: k.keyword, by: 'page' })} title="Search Console pages for this keyword">
+                      {k.keyword}
+                    </DrillLink>
                     {k.check_status === 'failed' && <div className="text-xs" style={{ color: 'var(--color-danger)' }}>Check failed: {k.error}</div>}
                   </td>
                   <td className="text-sm">{k.product || '—'}</td>

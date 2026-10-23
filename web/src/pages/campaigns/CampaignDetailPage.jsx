@@ -9,6 +9,8 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { ApprovalBadge } from '../../components/common/ApprovalBadge';
 import { ChannelBadge } from '../../components/common/ChannelBadge';
 import { formatDate } from '../../utils/formatDate';
+import { DrillLink, drillHref } from '../../components/drill';
+import { ROUTES } from '../../constants/routes';
 
 const NEXT_STATUS = ['draft','pending_approval','approved','scheduled','running','completed','paused','archived'];
 
@@ -59,7 +61,25 @@ export function CampaignDetailPage() {
             <div><div className="text-xs text-muted">Budget</div><div className="text-sm">{c.budget_amount ? `${c.currency || ''} ${c.budget_amount}` : '—'}</div></div>
             <div><div className="text-xs text-muted">Start</div><div className="text-sm">{formatDate(c.start_date)}</div></div>
             <div><div className="text-xs text-muted">End</div><div className="text-sm">{formatDate(c.end_date)}</div></div>
-            <div><div className="text-xs text-muted">Leads generated</div><div className="text-sm">{c.leads_generated ?? 0}</div></div>
+            {/* leads_generated is entered by hand; leads_captured / outcome_events are counted by the API
+                and open exactly those records. */}
+            <div><div className="text-xs text-muted">Leads generated (reported)</div><div className="text-sm">{c.leads_generated ?? 0}</div></div>
+            <div>
+              <div className="text-xs text-muted">Leads captured</div>
+              <div className="text-sm">
+                <DrillLink to={c.leads_captured > 0 ? drillHref(ROUTES.LEADS, { campaign_id: c.id }) : null} title="Leads attached to this campaign">
+                  {c.leads_captured ?? 0}
+                </DrillLink>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-muted">Engage outcomes</div>
+              <div className="text-sm">
+                <DrillLink to={c.outcome_events > 0 ? drillHref(ROUTES.LEAD_OUTCOMES, { campaign_id: c.id, days: 'all' }) : null} title="Outcome events attributed to this campaign">
+                  {c.outcome_events ?? 0}
+                </DrillLink>
+              </div>
+            </div>
             <div><div className="text-xs text-muted">Landing page URL</div><div className="text-sm" style={{ overflowWrap: 'anywhere' }}>{c.landing_page_url || '—'}</div></div>
           </div>
         </Card>

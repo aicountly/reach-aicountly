@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart2 } from 'lucide-react';
 import { listContentMetrics } from '../../services/intelligenceService.js';
 
@@ -6,6 +7,7 @@ export default function ContentPerformancePage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -65,8 +67,20 @@ export default function ContentPerformancePage() {
               {rows.map((c, i) => {
                 const engagement = Number(c.engagement_rate ?? 0);
                 const avgTime = Number(c.avg_time ?? c.avg_session_duration ?? 0);
+                // Each row opens that content identity's analytics detail.
+                const identityId = c.content_identity_id ?? c.identity_id;
+                const open = identityId ? () => navigate(`/intelligence/content/${identityId}`) : undefined;
                 return (
-                  <tr key={c.id || c.url || i}>
+                  <tr
+                    key={c.id || c.url || i}
+                    className={open ? 'is-drillable' : undefined}
+                    tabIndex={open ? 0 : undefined}
+                    aria-label={open ? `Open analytics for ${c.title || c.content_title || c.url || 'content'}` : undefined}
+                    onClick={open}
+                    onKeyDown={open ? (e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); }
+                    } : undefined}
+                  >
                     <td>
                       <p style={{ fontWeight: 600, margin: 0 }}>{c.title || c.content_title || 'Untitled'}</p>
                       <p className="text-xs text-muted" style={{ margin: '0.15rem 0 0', fontFamily: 'monospace' }}>

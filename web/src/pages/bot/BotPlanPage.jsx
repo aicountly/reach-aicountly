@@ -15,7 +15,7 @@ const RANGE_KEYS = PAST_RANGES.map((r) => r.key);
  * Bot → Plan & Performance (/bot/plan). What the bot plans for each period
  * with the expected outcome, and for past ranges what it achieved against
  * that plan, why it lagged and how it is adjusting itself. Read-only.
- * `?period=` and `?range=` keep the view linkable.
+ * `?period=`, `?range=` and the past view's `?status=` keep the view linkable.
  */
 export function BotPlanPage() {
   const [params, setParams] = useSearchParams();
@@ -38,7 +38,8 @@ export function BotPlanPage() {
   const select = (next) => {
     const p = new URLSearchParams(params);
     p.set('period', next);
-    if (next !== 'past') p.delete('range');
+    // ?status= filters the past view's metric cards only.
+    if (next !== 'past') { p.delete('range'); p.delete('status'); }
     setParams(p, { replace: true });
   };
   const selectRange = (next) => {

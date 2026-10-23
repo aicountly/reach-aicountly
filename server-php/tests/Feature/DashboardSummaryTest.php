@@ -246,7 +246,7 @@ final class DashboardSummaryTest extends ApiTestCase
         $tomorrow = date('Y-m-d', strtotime('+1 day'));
         $nextWeek = date('Y-m-d', strtotime('+7 days'));
 
-        $this->seedContentItem('blog', 'scheduled', ['scheduled_at' => $nextWeek . ' 09:00:00']);
+        $scheduledId = $this->seedContentItem('blog', 'scheduled', ['scheduled_at' => $nextWeek . ' 09:00:00']);
         $this->seedContentItem('blog', 'scheduled', ['scheduled_at' => date('Y-m-d', strtotime('-2 days')) . ' 09:00:00']);
 
         $db->table('reach_content_calendar_items')->insert([
@@ -263,6 +263,9 @@ final class DashboardSummaryTest extends ApiTestCase
         $this->assertSame($tomorrow, $upcoming[0]['date'], 'sorted by date across sources');
         $this->assertSame('Legacy calendar entry', $upcoming[0]['title']);
         $this->assertSame($nextWeek, $upcoming[1]['date']);
+        // Rows open their content item; the legacy calendar row has none.
+        $this->assertSame($scheduledId, $upcoming[1]['content_item_id']);
+        $this->assertArrayNotHasKey('content_item_id', $upcoming[0]);
     }
 
     /**
@@ -311,6 +314,7 @@ final class DashboardSummaryTest extends ApiTestCase
         $this->assertCount(1, $data['calendar_upcoming']);
         $this->assertSame('deployment', $data['calendar_upcoming'][0]['source']);
         $this->assertSame($nextWeek, $data['calendar_upcoming'][0]['date']);
+        $this->assertSame($viaDeployment, $data['calendar_upcoming'][0]['content_item_id']);
 
         $this->assertSame(2, $data['calendar_overdue']['count'], 'scheduled = upcoming + overdue/undated');
         $reasons = array_column($data['calendar_overdue']['items'], 'reason');
@@ -347,6 +351,36 @@ final class DashboardSummaryTest extends ApiTestCase
         $this->assertSame(0, $data['social_queue'], 'a content item is not in the Social queue page');
         $this->assertArrayHasKey('approvals', $data);
         $this->assertArrayHasKey('leads_pending_push', $data);
+    }
+
+    /**
+     * The Approvals tile links to the Approval Centre's "Ready for approval"
+     * area, so it counts that area's predicate — not reach_approvals rows,
+     * of which one item has several (one per open stage).
+     */
+    public function testApprovalsQueueMatchesTheApprovalCentreArea(): void
+    {
+        $db = \Config\Database::connect();
+        $inReview = $this->seedContentItem('blog', 'review_pending');
+        $this->seedContentItem('landing_page', 'seo_review');
+        $this->seedContentItem('blog', 'validation_pending');
+        $this->seedContentItem('blog', 'draft');
+        $this->seedContentItem('blog', 'internal_review', ['deleted_at' => date('Y-m-d H:i:s')]);
+        // Two open stages for one item. (subject_type blog: a content_item row
+        // left behind breaks the next migration regress's older CHECK.)
+        foreach (['editorial_review', 'final_approval'] as $stage) {
+            $db->table('reach_approvals')->insert([
+                'subject_type' => 'blog', 'subject_id' => $inReview, 'decision' => 'pending', 'stage' => $stage,
+            ]);
+        }
+
+        $approvals = $this->fetchSummary()['approvals'];
+        $this->assertSame(2, $approvals['queue']);
+        $this->assertSame(2, $approvals['pending']);
+
+        $headers = $this->authAs('super_admin');
+        $stats   = json_decode((string) $this->withHeaders($headers)->call('GET', 'v1/approval-queue/stats')->getJSON(), true);
+        $this->assertSame($approvals['queue'], $stats['data']['counts']['ready_for_approval']);
     }
 
     public function testSummaryCarriesAGeneratedAtStamp(): void

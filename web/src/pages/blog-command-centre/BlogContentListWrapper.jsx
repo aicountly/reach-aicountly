@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { contentService } from '../../services/contentService';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
+import { Pagination } from '../../components/common/Pagination';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
@@ -18,6 +19,9 @@ const WORKFLOW_STATUSES = [
   'ready_for_publication', 'refresh_due', 'archived', 'rejected', 'failed', 'blocked',
 ];
 
+/** "All statuses" on a page whose default is a status (Drafts → draft). */
+const ALL = 'all';
+
 /**
  * Thin blog-scoped content list — reuses Content Studio data patterns without duplicating CRUD.
  */
@@ -25,25 +29,44 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [workflowStatus, setWorkflowStatus] = useState(defaultWorkflowStatus || '');
+  // ?workflow_status= wins over the page's default so a dashboard count can
+  // open exactly the stages it added up (e.g. brief_ready,outline_ready).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlStatus = searchParams.get('workflow_status');
+  const workflowStatus = urlStatus === null ? (defaultWorkflowStatus || '') : (urlStatus === ALL ? '' : urlStatus);
+  const setWorkflowStatus = useCallback((value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === (defaultWorkflowStatus || '')) next.delete('workflow_status');
+      else next.set('workflow_status', value || ALL);
+      return next;
+    }, { replace: true });
+  }, [defaultWorkflowStatus, setSearchParams]);
+  // Paging belongs to one status filter; a new one starts again at page 1.
+  const [paging, setPaging] = useState({ status: workflowStatus, page: 1 });
+  const page = paging.status === workflowStatus ? paging.page : 1;
+  const [pager, setPager] = useState(null);
   const [totalAcrossStatuses, setTotalAcrossStatuses] = useState(null);
   const nav = useNavigate();
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     const params = { content_type: 'blog' };
     if (workflowStatus) params.workflow_status = workflowStatus;
+    if (page > 1) params.page = page;
     contentService.listItems(params)
       .then(async (d) => {
         const rows = d.items ?? d;
         setItems(rows);
+        setPager(d.pager ?? null);
         // An empty status filter used to render as "No blog content items
         // match this filter", which reads as an empty system. Find out whether
         // the library is actually empty so the empty state can say which.
         if (workflowStatus && (rows?.length ?? 0) === 0) {
           try {
             const all = await contentService.listItems({ content_type: 'blog' });
-            setTotalAcrossStatuses((all.items ?? all)?.length ?? 0);
+            setTotalAcrossStatuses(all.pager?.total ?? (all.items ?? all)?.length ?? 0);
           } catch {
             setTotalAcrossStatuses(0);
           }
@@ -53,7 +76,7 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [workflowStatus]);
+  }, [workflowStatus, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -93,14 +116,22 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
           {WORKFLOW_STATUSES.filter(Boolean).map((s) => (
             <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
           ))}
+          {workflowStatus && !WORKFLOW_STATUSES.includes(workflowStatus) && (
+            <option value={workflowStatus}>{workflowStatus.replace(/_/g, ' ').replace(/,/g, ' + ')}</option>
+          )}
         </select>
+        {pager?.total !== undefined && !loading && (
+          <span className="text-sm text-muted" style={{ alignSelf: 'center' }}>
+            {pager.total} item{pager.total === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
 
       {!loading && items.length === 0 && workflowStatus && totalAcrossStatuses > 0 && (
         <Alert variant="info">
-          No blog content is in <code>{workflowStatus.replace(/_/g, ' ')}</code> right now, but{' '}
+          No blog content is in <code>{workflowStatus.replace(/_/g, ' ').replace(/,/g, ' + ')}</code> right now, but{' '}
           {totalAcrossStatuses} blog item{totalAcrossStatuses === 1 ? '' : 's'} exist in other statuses.{' '}
           <button
             type="button"
@@ -119,9 +150,17 @@ export function BlogContentListWrapper({ title, subtitle, defaultWorkflowStatus 
           onRowClick={(r) => nav(ROUTES.CONTENT_DETAIL.replace(':id', r.id))}
           emptyMessage={
             workflowStatus
-              ? `No blog content items are in "${workflowStatus.replace(/_/g, ' ')}".`
+              ? `No blog content items are in "${workflowStatus.replace(/_/g, ' ').replace(/,/g, ' + ')}".`
               : 'No blog content items yet.'
           }
+        />
+      )}
+      {pager && (
+        <Pagination
+          page={page}
+          limit={pager.perPage}
+          total={pager.total}
+          onPage={(p) => setPaging({ status: workflowStatus, page: p })}
         />
       )}
     </div>

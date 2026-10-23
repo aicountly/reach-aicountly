@@ -66,6 +66,21 @@ class MarketingBotController extends BaseApiController
         }
         $total = $q->countAllResults(false);
         $rows  = $q->orderBy('created_at', 'DESC')->findAll($limit, $offset);
+
+        // The dispatch job's request_id, so BotQueuePage rows open the Job
+        // Monitor on that run (/admin/jobs?request_id=…).
+        $jobIds = array_values(array_filter(array_map(static fn ($r) => (int) ($r['generation_job_id'] ?? 0), $rows)));
+        $reqIds = [];
+        if ($jobIds !== []) {
+            foreach (\Config\Database::connect()->table('reach_jobs')->select('id, request_id')->whereIn('id', $jobIds)->get()->getResultArray() as $j) {
+                $reqIds[(int) $j['id']] = $j['request_id'];
+            }
+        }
+        foreach ($rows as &$r) {
+            $r['request_id'] = $reqIds[(int) ($r['generation_job_id'] ?? 0)] ?? null;
+        }
+        unset($r);
+
         return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }
 

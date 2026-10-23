@@ -54,6 +54,9 @@ class BrandRuleModel extends Model
         if (! empty($filters['rule_type'])) {
             $builder = $builder->where('rule_type', $filters['rule_type']);
         }
+        if (! empty($filters['q'])) {
+            $builder = $builder->like('rule_text', $filters['q'], 'both', null, true);
+        }
         $total = $builder->countAllResults(false);
         $items = $builder->orderBy('rule_type', 'ASC')->findAll($limit, ($page - 1) * $limit);
         return ['items' => $items, 'total' => $total];

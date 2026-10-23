@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithAuth } from '../../../test/renderWithAuth';
 
 vi.mock('../../../services/api', () => ({
@@ -58,7 +58,20 @@ describe('SuppressionPage', () => {
     });
     renderWithAuth(<SuppressionPage />, ctx);
     await waitFor(() => expect(screen.getByText('ab***@example.com')).toBeInTheDocument());
-    expect(screen.getByText('bounce')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('bounce')).toBeInTheDocument();
+  });
+
+  it('applies channel and reason from the URL (SMS overview links ?channel=sms)', async () => {
+    api.get.mockResolvedValueOnce({ data: [], total: 0 });
+    renderWithAuth(<SuppressionPage />, { ...ctx, route: '/distribution/suppressions?channel=sms&reason=opt_out' });
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('v1/distribution/suppressions', {
+        page: 1, per_page: 25, channel: 'sms', reason: 'opt_out',
+      }),
+    );
+    expect(screen.getByLabelText('Channel filter')).toHaveValue('sms');
+    expect(screen.getByLabelText('Reason filter')).toHaveValue('opt_out');
+    expect(screen.getByText(/No suppressions match this filter/i)).toBeInTheDocument();
   });
 
   it('shows empty state on 404 instead of hard error', async () => {

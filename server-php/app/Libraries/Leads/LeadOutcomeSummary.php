@@ -34,7 +34,7 @@ use InvalidArgumentException;
 final class LeadOutcomeSummary
 {
     private const LEAD_KEY  = "COALESCE('L' || o.lead_id::text, 'C' || o.engage_lead_code, 'E' || o.event_id)";
-    private const PAID      = "(o.stage = 'payment_confirmed' OR o.sales_status IN ('payment_confirmed', 'paid'))";
+    public const PAID       = "(o.stage = 'payment_confirmed' OR o.sales_status IN ('payment_confirmed', 'paid'))";
     private const CONVERTED = "o.stage = 'converted'";
 
     /**

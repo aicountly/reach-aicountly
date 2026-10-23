@@ -1,6 +1,25 @@
+import { Link } from 'react-router-dom';
+import { DrillLink, drillHref } from '../../../components/drill';
+import { ROUTES } from '../../../constants/routes';
 import {
-  SOURCE_LABELS, formatIstDate, formatIstDateTime, formatIstRange, formatValue, pctTone, splitPlanItems,
+  SOURCE_LABELS, formatIstDate, formatIstDateTime, formatIstRange, formatValue, pctTone, recordsHrefIfAny, splitPlanItems,
 } from './model';
+
+const SCHEDULED_SOCIAL = drillHref(ROUTES.SOCIAL_CALENDAR, { status: 'scheduled' });
+const PUBLISHING_CALENDAR = '/publishing/calendar';
+
+/** A scheduled-count tile: a link to what it counted, plain when zero. */
+function Tile({ label, value, to, children }) {
+  const body = <><div className="bp-tile__label">{label}</div><div className="bp-tile__value">{value}</div>{children}</>;
+  return to && Number(value) > 0 ? <Link className="bp-tile" to={to}>{body}</Link> : <div className="bp-tile">{body}</div>;
+}
+
+/** Where one scheduled item lives (social posts and calendar entries have no detail page). */
+function scheduledItemHref(it) {
+  if (it.kind === 'social') return drillHref(ROUTES.SOCIAL_CALENDAR, { status: 'scheduled', channel: it.channel });
+  if (it.kind === 'calendar') return PUBLISHING_CALENDAR;
+  return null;
+}
 
 function Badge({ tone = 'secondary', children, title }) {
   return <span className={`badge badge-${tone}`} title={title} style={{ textTransform: 'none' }}>{children}</span>;
@@ -31,7 +50,7 @@ function PlanCard({ item, started }) {
       )}
       {started && !off && (
         <div className="bp-card__line">
-          Achieved so far <strong>{formatValue(item.achieved_to_date, item.unit)}</strong>
+          Achieved so far <strong><DrillLink to={recordsHrefIfAny(item.metric_key, item.achieved_to_date)}>{formatValue(item.achieved_to_date, item.unit)}</DrillLink></strong>
           {item.expected_to_date !== null && item.expected_to_date !== undefined && <> of {formatValue(item.expected_to_date, item.unit)} expected by now</>}
           {p !== null && p !== undefined && <> · <span className={`bp-pct bp-pct--${pctTone(p)}`}>{p}%</span></>}
         </div>
@@ -92,25 +111,34 @@ export function PlanView({ data }) {
       <section className="bp-section" aria-labelledby="bp-scheduled">
         <h2 className="bp-section__title" id="bp-scheduled">Scheduled in this period</h2>
         <div className="bp-summary">
-          <div className="bp-tile"><div className="bp-tile__label">Social posts</div><div className="bp-tile__value">{scheduled.social_posts ?? 0}</div></div>
-          <div className="bp-tile"><div className="bp-tile__label">Email sends</div><div className="bp-tile__value">{scheduled.email_dispatches ?? 0}</div>
-            <div className="bp-muted">{formatValue(scheduled.email_recipients ?? 0)} recipients</div></div>
-          <div className="bp-tile"><div className="bp-tile__label">Calendar entries</div><div className="bp-tile__value">{scheduled.calendar_entries ?? 0}</div></div>
-          <div className="bp-tile"><div className="bp-tile__label">Content schedules</div><div className="bp-tile__value">{scheduled.content_schedules ?? 0}</div></div>
-          <div className="bp-tile"><div className="bp-tile__label">Topic queue</div><div className="bp-tile__value">{scheduled.topic_queue ? scheduled.topic_queue.available : '—'}</div>
-            {scheduled.topic_queue && <div className="bp-muted">{scheduled.topic_queue.roadmap_selected} roadmap-selected</div>}</div>
+          <Tile label="Social posts" value={scheduled.social_posts ?? 0} to={SCHEDULED_SOCIAL} />
+          <Tile label="Email sends" value={scheduled.email_dispatches ?? 0} to="/distribution/email">
+            <div className="bp-muted">{formatValue(scheduled.email_recipients ?? 0)} recipients</div>
+          </Tile>
+          <Tile label="Calendar entries" value={scheduled.calendar_entries ?? 0} to={PUBLISHING_CALENDAR} />
+          <Tile label="Content schedules" value={scheduled.content_schedules ?? 0} to={PUBLISHING_CALENDAR} />
+          <Tile label="Topic queue" value={scheduled.topic_queue ? scheduled.topic_queue.available : '—'} to={ROUTES.BCC_ROADMAP_CANDIDATES}>
+            {scheduled.topic_queue && <div className="bp-muted">{scheduled.topic_queue.roadmap_selected} roadmap-selected</div>}
+          </Tile>
         </div>
+        {scheduled.topic_queue?.roadmap_selected > 0 && (
+          <p className="bp-muted">
+            <Link to={drillHref(ROUTES.BCC_ROADMAP_CANDIDATES, { status: 'roadmap_selected' })}>
+              Open the {scheduled.topic_queue.roadmap_selected} roadmap-selected topic(s) ›
+            </Link>
+          </p>
+        )}
         {(scheduled.campaigns || []).length > 0 && (
           <ul className="bp-list">
             {scheduled.campaigns.map((c) => (
-              <li key={c.id}>Campaign <strong>{c.name}</strong> · {formatIstRange(c.start, c.end || c.start)} · {c.status}</li>
+              <li key={c.id}>Campaign <strong><Link to={ROUTES.CAMPAIGN_DETAIL.replace(':id', c.id)}>{c.name}</Link></strong> · {formatIstRange(c.start, c.end || c.start)} · {c.status}</li>
             ))}
           </ul>
         )}
         {(scheduled.items || []).length > 0 ? (
           <ul className="bp-list">
             {scheduled.items.slice(0, 15).map((it, i) => (
-              <li key={`${it.kind}-${it.id ?? i}`}>{formatIstDate(it.at)} · {it.kind === 'social' ? it.channel : it.item_kind} · {it.title}</li>
+              <li key={`${it.kind}-${it.id ?? i}`}>{formatIstDate(it.at)} · {it.kind === 'social' ? it.channel : it.item_kind} · <DrillLink to={scheduledItemHref(it)}>{it.title}</DrillLink></li>
             ))}
           </ul>
         ) : <div className="bp-empty">Nothing individually scheduled — volumes above come from the routines&apos; daily settings.</div>}

@@ -1,3 +1,5 @@
+import { DrillLink } from '../../components/drill';
+
 /**
  * Dependency-free SVG charts (no chart library is installed). Every chart has
  * a text alternative via role="img" + aria-label.
@@ -48,14 +50,20 @@ export function ForecastChart({ history = [], forecast = [], height = 120, label
   );
 }
 
-/** Horizontal bars for small categorical breakdowns. */
-export function Bars({ rows = [], label }) {
+/**
+ * Horizontal bars for small categorical breakdowns. A row's label drills when
+ * the row has `to` (a link) or `onSelect(row, i)` is given; a row without
+ * `to` (or with `drill: false`) stays plain, so callers decide what drills.
+ */
+export function Bars({ rows = [], label, onSelect }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
   return (
     <ul className="cc-bars" aria-label={label}>
-      {rows.map((r) => (
+      {rows.map((r, i) => (
         <li key={r.key ?? r.label}>
-          <span className="cc-bars__label" title={r.label}>{r.label}</span>
+          <span className="cc-bars__label" title={r.label}>
+            <DrillLink to={r.to} onClick={onSelect && r.drill !== false ? () => onSelect(r, i) : undefined}>{r.label}</DrillLink>
+          </span>
           <span className="cc-bars__track" aria-hidden="true">
             <span className="cc-bars__fill" style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }} />
           </span>

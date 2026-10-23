@@ -5,6 +5,9 @@ import {
   listSiteSearchPages,
   getSiteSearchPositions,
 } from '../../services/intelligenceService.js';
+import { DrillLink, useDrillFilters } from '../../components/drill';
+import SearchExplorer from './SearchExplorer.jsx';
+import { SEARCH_FILTER_KEYS } from './searchDrill.js';
 
 function num(value) {
   const n = Number(value ?? 0);
@@ -32,8 +35,19 @@ function shortUrl(url) {
  * (homepage, product, pricing, guides and blogs), not only blog-mapped pages.
  * Every figure is an aggregate of ingested rows — an empty store renders an
  * explanation, never placeholder numbers.
+ *
+ * Every number drills down: a day, a position band, a query or a page opens
+ * SearchExplorer narrowed to it (?date= / ?bucket= / ?query= / ?page=).
  */
 export default function SiteWideSearchPanel({ configured }) {
+  const drill = useDrillFilters(SEARCH_FILTER_KEYS);
+  if (drill.depth > 0 || drill.params.get('by')) {
+    return <SearchExplorer drill={drill} />;
+  }
+  return <SiteWideOverview configured={configured} drill={drill} />;
+}
+
+function SiteWideOverview({ configured, drill }) {
   const [state, setState] = useState({ loading: true, error: null, daily: null, queries: [], pages: [], buckets: [] });
 
   useEffect(() => {
@@ -86,23 +100,32 @@ export default function SiteWideSearchPanel({ configured }) {
 
       <div className="grid grid-3" style={{ marginBottom: '1.25rem' }}>
         {[
-          { label: 'Clicks', value: num(totals.clicks) },
-          { label: 'Impressions', value: num(totals.impressions) },
-          { label: 'CTR', value: pct(totals.ctr) },
-          { label: 'Avg position', value: pos(totals.avg_position) },
-          { label: 'Days with data', value: num(totals.days) },
-          { label: 'Freshest day', value: daily.latest_date || '—' },
-        ].map((s) => (
+          { label: 'Clicks', value: num(totals.clicks), go: { by: 'query', sort: 'clicks' } },
+          { label: 'Impressions', value: num(totals.impressions), go: { by: 'query', sort: 'impressions' } },
+          { label: 'CTR', value: pct(totals.ctr), go: { by: 'page', sort: 'ctr' } },
+          { label: 'Avg position', value: pos(totals.avg_position), go: { by: 'query', sort: 'position' } },
+          { label: 'Days with data', value: num(totals.days), go: { by: 'date' } },
+          { label: 'Freshest day', value: daily.latest_date || '—', go: daily.latest_date ? { date: daily.latest_date, by: 'query' } : null },
+        ].map((s) => (s.go ? (
+          <button key={s.label} type="button" className="stat-tile" onClick={() => drill.drill(s.go)}>
+            <div className="stat-tile__label">{s.label}</div>
+            <div className="stat-tile__value">{s.value}</div>
+            <div className="stat-tile__hint">View breakdown ›</div>
+          </button>
+        ) : (
           <div key={s.label} className="stat-tile">
             <div className="stat-tile__label">{s.label}</div>
             <div className="stat-tile__value">{s.value}</div>
           </div>
-        ))}
+        )))}
       </div>
 
       <div className="card" style={{ marginBottom: '1.25rem' }}>
         <div className="card-body">
-          <h2 style={{ fontSize: '1rem', fontWeight: 650, margin: '0 0 0.75rem' }}>Totals by day</h2>
+          <div className="flex items-center justify-between gap-2" style={{ flexWrap: 'wrap', margin: '0 0 0.75rem' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 650, margin: 0 }}>Totals by day</h2>
+            <span className="text-xs text-muted">Click a day to see the queries and pages behind it</span>
+          </div>
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -116,8 +139,12 @@ export default function SiteWideSearchPanel({ configured }) {
               </thead>
               <tbody>
                 {[...days].reverse().map((d) => (
-                  <tr key={d.date}>
-                    <td className="text-sm">{d.date}</td>
+                  <tr key={d.date} className="is-drillable" onClick={() => drill.drill({ date: d.date, by: 'query' })}>
+                    <td className="text-sm">
+                      <DrillLink onClick={() => drill.drill({ date: d.date, by: 'query' })} title={`Queries and pages behind ${d.date}`}>
+                        {d.date}
+                      </DrillLink>
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div
@@ -148,26 +175,38 @@ export default function SiteWideSearchPanel({ configured }) {
           <h2 style={{ fontSize: '1rem', fontWeight: 650, margin: '0 0 0.75rem' }}>Position buckets (queries)</h2>
           <div className="grid grid-3">
             {buckets.map((b) => (
-              <div key={b.bucket} className="stat-tile">
+              <button
+                key={b.bucket}
+                type="button"
+                className="stat-tile"
+                disabled={!b.queries}
+                onClick={() => drill.drill({ bucket: b.bucket, by: 'query' })}
+                aria-label={`Position ${b.bucket}: ${b.queries} queries — view them`}
+              >
                 <div className="stat-tile__label">Position {b.bucket}</div>
                 <div className="stat-tile__value">{num(b.queries)}</div>
                 <div className="text-xs text-muted">
                   {totalBucketQueries > 0 ? `${Math.round((b.queries / totalBucketQueries) * 100)}% of queries · ` : ''}
                   {num(b.clicks)} clicks
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
       </div>
 
       {[
-        { title: 'Top queries', rows: queries, label: (r) => r.dimension_value },
-        { title: 'Top pages', rows: pages, label: (r) => shortUrl(r.dimension_value) },
+        { title: 'Top queries', dim: 'query', next: 'page', rows: queries, label: (r) => r.dimension_value },
+        { title: 'Top pages', dim: 'page', next: 'query', rows: pages, label: (r) => shortUrl(r.dimension_value) },
       ].map((block) => (
         <div key={block.title} className="card" style={{ marginBottom: '1.25rem' }}>
           <div className="card-body">
-            <h2 style={{ fontSize: '1rem', fontWeight: 650, margin: '0 0 0.75rem' }}>{block.title}</h2>
+            <div className="flex items-center justify-between gap-2" style={{ flexWrap: 'wrap', margin: '0 0 0.75rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 650, margin: 0 }}>{block.title}</h2>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => drill.drill({ by: block.dim })}>
+                View all {block.dim === 'query' ? 'queries' : 'pages'}
+              </button>
+            </div>
             {block.rows.length === 0 ? (
               <p className="text-sm text-muted" style={{ margin: 0 }}>No rows in this window.</p>
             ) : (
@@ -184,8 +223,16 @@ export default function SiteWideSearchPanel({ configured }) {
                   </thead>
                   <tbody>
                     {block.rows.map((row) => (
-                      <tr key={row.dimension_value}>
-                        <td style={{ fontWeight: 500, wordBreak: 'break-all' }}>{block.label(row)}</td>
+                      <tr
+                        key={row.dimension_value}
+                        className="is-drillable"
+                        onClick={() => drill.drill({ [block.dim]: row.dimension_value, by: block.next })}
+                      >
+                        <td style={{ fontWeight: 500, wordBreak: 'break-all' }}>
+                          <DrillLink onClick={() => drill.drill({ [block.dim]: row.dimension_value, by: block.next })}>
+                            {block.label(row)}
+                          </DrillLink>
+                        </td>
                         <td style={{ textAlign: 'right' }}>{num(row.clicks)}</td>
                         <td style={{ textAlign: 'right' }}>{num(row.impressions)}</td>
                         <td style={{ textAlign: 'right' }}>{pct(row.ctr)}</td>

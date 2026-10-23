@@ -178,3 +178,10 @@ const intelligenceService = {
 };
 
 export default intelligenceService;
+
+// One drill-down step over the site-wide facts: ?date&query&page&device&country
+// &bucket narrow, ?group_by (date|query|page|device|country) groups, and
+// ?sort&dir&q&limit&offset page through the groups.
+export function exploreSiteSearch(params = {}) {
+  return api.get('v1/intelligence/search/site/explore', params);
+}

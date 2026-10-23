@@ -1,4 +1,5 @@
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 
 /**
  * `comparison` is `{ previous, delta, delta_pct }` for the same metric over
@@ -33,18 +34,27 @@ function ComparisonBadge({ comparison, invert, periodLabel }) {
   );
 }
 
+/**
+ * `to` makes the card a drill-down into the records it counts (a route with
+ * the narrowing filters, see utils/drill.js); `onClick` does the same in-page.
+ */
 export function KPICard({
   title, value, subtitle, icon: Icon, color = 'var(--color-primary)',
-  comparison, invert = false, periodLabel,
+  comparison, invert = false, periodLabel, to, onClick,
 }) {
-  return (
-    <div className="card" style={{ padding: '1.25rem' }}>
+  const body = (
+    <div className={`card${to || onClick ? ' kpi-card--drill' : ''}`} style={{ padding: '1.25rem', height: '100%' }}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted" style={{ marginBottom: '0.25rem' }}>{title}</p>
           <p style={{ fontSize: '1.75rem', fontWeight: 700, color }}>{value}</p>
           {subtitle && <p className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>{subtitle}</p>}
           <ComparisonBadge comparison={comparison} invert={invert} periodLabel={periodLabel} />
+          {(to || onClick) && (
+            <p className="text-xs text-muted flex items-center gap-1" style={{ marginTop: '0.35rem' }}>
+              View records <ChevronRight size={12} aria-hidden="true" />
+            </p>
+          )}
         </div>
         {Icon && (
           <div style={{
@@ -57,4 +67,16 @@ export function KPICard({
       </div>
     </div>
   );
+
+  if (to) {
+    return <Link to={to} className="kpi-card-link">{body}</Link>;
+  }
+  if (onClick) {
+    return (
+      <button type="button" className="kpi-card-link" onClick={onClick}>
+        {body}
+      </button>
+    );
+  }
+  return body;
 }

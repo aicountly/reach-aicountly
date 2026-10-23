@@ -158,10 +158,33 @@ describe('QuestionInboxPage', () => {
     expect(closed.textContent).toContain('Already answered');
     expect(screen.getByRole('link', { name: 'View the existing answer' })).toHaveAttribute('href', DUPLICATE.answered_by_public_url);
 
-    // Nobody is asked to act: no Open button, and titles are plain text for non-admins.
+    // Nobody is asked to act: no Open button. The title still opens the
+    // (read-only for them) workspace, as it does for anyone with community.view.
     expect(screen.queryByRole('link', { name: 'Open' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
-    expect(screen.queryByRole('link', { name: PUBLISHED.title })).toBeNull();
+    expect(screen.getByRole('link', { name: PUBLISHED.title })).toHaveAttribute('href', `/community/questions/${PUBLISHED.uuid}`);
+  });
+
+  it('starts filtered by the space in the URL, as the Settings spaces list links it', async () => {
+    const fetch = stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
+    renderWithAuth(<QuestionInboxPage />, { ...ctx, route: '/community/questions?space_id=3' });
+    await screen.findByText(QUESTION.title);
+
+    expect(requestedUrls(fetch)[0]).toContain('space_id=3');
+    const chip = screen.getByRole('button', { name: 'Clear space filter' });
+    expect(chip).toHaveTextContent('GST help');
+
+    await userEvent.setup().click(chip);
+    await waitFor(() => expect(requestedUrls(fetch).at(-1)).not.toContain('space_id'));
+  });
+
+  it('narrows to a space from its cell', async () => {
+    const fetch = stubApi({ 'GET v1/community/questions': [200, listBody([QUESTION])] });
+    renderWithAuth(<QuestionInboxPage />, ctx);
+    await screen.findByText(QUESTION.title);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'gst-help' }));
+    await waitFor(() => expect(requestedUrls(fetch).at(-1)).toContain('space_id=3'));
   });
 
   it('keeps the manual workspace one click away for super admins', async () => {

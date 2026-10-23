@@ -4,6 +4,7 @@ import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
 import { formatDate } from '../../utils/formatDate';
+import { DrillLink, drillHref } from '../../components/drill';
 
 export function TrackedKeywordsPage() {
   const [keywords, setKeywords] = useState([]);
@@ -70,12 +71,21 @@ export function TrackedKeywordsPage() {
                   const snap = keyword.latest_snapshot;
                   return (
                     <tr key={keyword.id}>
-                      <td>{keyword.keyword}</td>
+                      <td>
+                        <DrillLink to={drillHref('/seo-centre/search', { query: keyword.keyword, by: 'page' })} title="Pages ranking for this keyword">
+                          {keyword.keyword}
+                        </DrillLink>
+                      </td>
                       <td>{keyword.status}</td>
                       <td>{snap?.avg_position ? Number(snap.avg_position).toFixed(1) : '—'}</td>
                       <td>{snap?.clicks ?? '—'}</td>
                       <td>{snap?.impressions ?? '—'}</td>
-                      <td className="text-sm" style={{ maxWidth: '20rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{snap?.best_page_url || '—'}</td>
+                      <td className="text-sm" style={{ maxWidth: '20rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <DrillLink to={snap?.best_page_url ? drillHref('/seo-centre/search', { page: snap.best_page_url, by: 'query' }) : undefined}
+                                   title="Queries bringing people to this page">
+                          {snap?.best_page_url || '—'}
+                        </DrillLink>
+                      </td>
                       <td className="text-sm">{formatDate(snap?.metric_date)}</td>
                     </tr>
                   );

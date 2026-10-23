@@ -71,7 +71,12 @@ class ProductClaimModel extends Model
             $builder = $builder->where('risk_level', $filters['risk_level']);
         }
         if (! empty($filters['q'])) {
-            $builder = $builder->like('claim_summary', $filters['q']);
+            // The list shows claim_text; matching the summary alone missed
+            // claims that have none.
+            $builder = $builder->groupStart()
+                ->like('claim_text', $filters['q'], 'both', null, true)
+                ->orLike('claim_summary', $filters['q'], 'both', null, true)
+                ->groupEnd();
         }
         $total = $builder->countAllResults(false);
         $items = $builder->orderBy('risk_level', 'DESC')->findAll($limit, ($page - 1) * $limit);

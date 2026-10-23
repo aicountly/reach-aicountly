@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { knowledgeService } from '../../services/knowledgeService';
+import { useUrlFilter } from '../../components/drill';
+import { KnowledgeFilterChip } from './KnowledgeFilterChip';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { DataTable } from '../../components/common/DataTable';
@@ -13,24 +16,28 @@ import { formatDate } from '../../utils/formatDate';
 const STATUS_OPTIONS = ['', 'draft', 'needs_review', 'approved', 'rejected', 'deprecated', 'archived'];
 const RISK_OPTIONS   = ['', 'low', 'medium', 'high', 'critical'];
 
+const productName = (id) => knowledgeService.getProduct?.(id).then((p) => p?.name);
+
 export function ClaimListPage() {
   const [rows, setRows]         = useState([]);
   const [total, setTotal]       = useState(0);
   const [page, setPage]         = useState(1);
   const [limit]                 = useState(25);
-  const [status, setStatus]     = useState('');
-  const [riskLevel, setRisk]    = useState('');
-  const [search, setSearch]     = useState('');
+  // Filters live in the URL: a product's "Claims (N)" links here with product_id.
+  const [status, setStatus]     = useUrlFilter('status');
+  const [riskLevel, setRisk]    = useUrlFilter('risk_level');
+  const [search, setSearch]     = useUrlFilter('search');
+  const [productId, setProductId] = useUrlFilter('product_id');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listClaims({ page, limit, status, risk_level: riskLevel, search })
+    knowledgeService.listClaims({ page, limit, status, risk_level: riskLevel, search, product_id: productId || undefined })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, limit, status, riskLevel, search]);
+  }, [page, limit, status, riskLevel, search, productId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -40,7 +47,9 @@ export function ClaimListPage() {
         <div className="text-sm" style={{ maxWidth: 340, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {r.claim_text || '—'}
         </div>
-        <div className="text-xs text-muted">Product #{r.product_id}</div>
+        {r.product_id && (
+          <Link to={`/knowledge/products/${r.product_id}`} className="text-xs drill-link">Product #{r.product_id}</Link>
+        )}
       </div>
     )},
     { key: 'risk_level', label: 'Risk', render: (r) => <ClaimRiskBadge risk={r.risk_level} /> },
@@ -69,6 +78,8 @@ export function ClaimListPage() {
         <SearchBar value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search claim text…" />
         <button className="btn btn-secondary" onClick={() => { setPage(1); load(); }}>Search</button>
       </FilterBar>
+
+      <KnowledgeFilterChip label="Product" value={productId} resolve={productName} onClear={() => { setPage(1); setProductId(''); }} />
 
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (

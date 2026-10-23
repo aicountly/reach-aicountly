@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Target } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDate } from '../../utils/formatDate';
+import { DrillLink, useUrlFilter } from '../../components/drill';
 import {
   listRefreshOutcomes,
   getRefreshOutcome,
@@ -73,7 +74,10 @@ export default function RefreshOutcomePage() {
   const { has } = usePermission();
   const canMeasure = has('refresh_outcome.trigger');
 
-  const [filter, setFilter] = useState('');
+  // Filters live in the URL: the operations dashboard's "Pending Outcomes"
+  // card links here with ?measurement_status=pending.
+  const [filter, setFilter] = useUrlFilter('measurement_status');
+  const [identityFilter, setIdentityFilter] = useUrlFilter('content_identity_id');
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -87,7 +91,9 @@ export default function RefreshOutcomePage() {
   const loadWindows = () => {
     setLoading(true);
     setError(null);
-    const params = filter ? { measurement_status: filter } : {};
+    const params = {};
+    if (filter) params.measurement_status = filter;
+    if (identityFilter) params.content_identity_id = identityFilter;
     listRefreshOutcomes(params)
       .then((data) => {
         const rows = normalizeList(data);
@@ -107,7 +113,7 @@ export default function RefreshOutcomePage() {
   useEffect(() => {
     loadWindows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [filter, identityFilter]);
 
   const loadDetail = (id) => {
     if (!id) return;
@@ -185,6 +191,15 @@ export default function RefreshOutcomePage() {
         ))}
       </div>
 
+      {identityFilter && (
+        <div className="mb-4">
+          <button type="button" className="badge badge--neutral" onClick={() => setIdentityFilter('')}
+                  aria-label={`Clear content identity ${identityFilter} filter`}>
+            Content identity #{identityFilter} ✕
+          </button>
+        </div>
+      )}
+
       {error && <div className="alert alert-danger mb-4">{error}</div>}
       {actionError && <div className="alert alert-danger mb-4">{actionError}</div>}
       {actionMsg && <div className="alert alert-success mb-4">{actionMsg}</div>}
@@ -228,13 +243,28 @@ export default function RefreshOutcomePage() {
                       <tr
                         key={w.id}
                         onClick={() => loadDetail(w.id)}
+                        onKeyDown={(e) => {
+                          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            loadDetail(w.id);
+                          }
+                        }}
+                        tabIndex={0}
+                        aria-label={`Show outcome window ${w.id}`}
+                        className="is-drillable"
                         style={{
                           cursor: 'pointer',
                           background: active ? 'var(--color-primary-light)' : undefined,
                         }}
                       >
                         <td style={{ fontWeight: 600 }}>
-                          Identity #{w.content_identity_id}
+                          {/* Opens that content's analytics; the row itself shows the measurement. */}
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <DrillLink to={w.content_identity_id ? `/intelligence/content/${w.content_identity_id}` : undefined}
+                                       title="Content analytics">
+                              Identity #{w.content_identity_id}
+                            </DrillLink>
+                          </span>
                           <div className="text-sm text-muted">Window #{w.id}</div>
                         </td>
                         <td className="text-sm">
@@ -289,7 +319,11 @@ export default function RefreshOutcomePage() {
               <div className="card__body" style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <dl className="definition-list">
                   <dt>Content identity</dt>
-                  <dd>#{selectedWindow.content_identity_id}</dd>
+                  <dd>
+                    <DrillLink to={selectedWindow.content_identity_id ? `/intelligence/content/${selectedWindow.content_identity_id}` : undefined}>
+                      #{selectedWindow.content_identity_id}
+                    </DrillLink>
+                  </dd>
                   <dt>Baseline window</dt>
                   <dd className="text-sm">
                     {formatDate(selectedWindow.baseline_from)} → {formatDate(selectedWindow.baseline_to)}

@@ -167,6 +167,20 @@ describe('QuestionWorkspacePage', () => {
     expect(screen.queryByRole('button', { name: /Create official answer/ })).not.toBeInTheDocument();
   });
 
+  it('is read-only for a viewer opening it from the inbox', async () => {
+    stubApi({ [SHOW]: [200, { data: QUESTION }], [ANSWERS]: [200, { data: [], meta: { total: 0 } }] });
+    renderWithAuth(
+      <Routes>
+        <Route path="/community/questions/:uuid" element={<QuestionWorkspacePage />} />
+      </Routes>,
+      { auth: { user: { id: 2, role: 'marketing' }, permissions: ['community.view'] }, route: `/community/questions/${QUESTION.uuid}` },
+    );
+
+    expect(await screen.findByRole('heading', { name: QUESTION.title })).toBeInTheDocument();
+    expect(screen.queryByText('Change status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Create official answer/ })).not.toBeInTheDocument();
+  });
+
   it('offers only the status moves the API accepts from the current status', async () => {
     stubApi({ [SHOW]: [200, { data: QUESTION }], [ANSWERS]: [200, { data: [], meta: { total: 0 } }] });
     renderWorkspace();

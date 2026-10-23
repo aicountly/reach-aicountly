@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Save, ExternalLink } from 'lucide-react';
 import { landingService } from '../../services/landingService';
 import { Card } from '../../components/common/Card';
@@ -18,6 +19,7 @@ export function LandingListPage() {
   const [open, setOpen]  = useState(false);
   const [form, setForm]  = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
 
   const load = () => {
     setLoading(true);
@@ -53,7 +55,7 @@ export function LandingListPage() {
       </div>
     )},
     { key: 'url', label: 'URL', render: (r) => r.meta?.url ? (
-      <a href={r.meta.url} target="_blank" rel="noopener noreferrer">{r.meta.url} <ExternalLink size={12}/></a>
+      <a href={r.meta.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>{r.meta.url} <ExternalLink size={12}/></a>
     ) : '—' },
     { key: 'purpose', label: 'Purpose', render: (r) => r.meta?.purpose || '—' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
@@ -73,7 +75,9 @@ export function LandingListPage() {
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
         <Card padding={false}>
-          <DataTable columns={columns} rows={rows} emptyMessage="No landing pages registered." />
+          <DataTable columns={columns} rows={rows}
+            onRowClick={(r) => navigate(`/landing/${r.id}`)} rowLabel={(r) => `Open landing page ${r.title || r.id}`}
+            emptyMessage="No landing pages registered." />
         </Card>
       )}
 

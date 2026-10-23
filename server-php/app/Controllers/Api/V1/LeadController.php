@@ -19,6 +19,46 @@ class LeadController extends BaseApiController
                 $q->where($f, $v);
             }
         }
+        // Drill links: a campaign's / landing page's leads, one lead (lead_id), and
+        // "captured in the last N days" — the same predicate as analytics/summary.
+        foreach (['lead_id' => 'id', 'campaign_id' => 'campaign_id', 'landing_page_id' => 'landing_page_id'] as $key => $col) {
+            $v = trim((string) $this->request->getGet($key));
+            if ($v !== '' && ctype_digit($v)) {
+                $q->where($col, (int) $v);
+            }
+        }
+        $days = trim((string) $this->request->getGet('days'));
+        if ($days !== '' && ctype_digit($days) && (int) $days >= 1 && (int) $days <= 365) {
+            $q->where('created_at >=', date('Y-m-d H:i:s', strtotime('-' . (int) $days . ' days')));
+        }
+        // An ad campaign's leads, with the same predicate AdsSummary::leads()
+        // counts by: case- and space-insensitive UTM match, a blank medium also
+        // matches, and created_from..created_to inclusive.
+        $utmSource   = strtolower(trim((string) $this->request->getGet('utm_source')));
+        $utmCampaign = strtolower(trim((string) $this->request->getGet('utm_campaign')));
+        $utmMedium   = strtolower(trim((string) $this->request->getGet('utm_medium')));
+        if ($utmSource !== '') {
+            $q->where('LOWER(TRIM(utm_source))', $utmSource);
+        }
+        if ($utmCampaign !== '') {
+            $q->where('LOWER(TRIM(utm_campaign))', $utmCampaign);
+        }
+        if ($utmMedium !== '') {
+            $q->groupStart()
+                ->where('utm_medium', null)
+                ->orWhere("TRIM(utm_medium) = ''", null, false)
+                ->orWhere('LOWER(TRIM(utm_medium))', $utmMedium)
+              ->groupEnd();
+        }
+        $isDate = static fn (string $v): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $v);
+        $createdFrom = trim((string) $this->request->getGet('created_from'));
+        $createdTo   = trim((string) $this->request->getGet('created_to'));
+        if ($isDate($createdFrom)) {
+            $q->where('created_at >=', $createdFrom);
+        }
+        if ($isDate($createdTo)) {
+            $q->where('created_at <', date('Y-m-d', strtotime($createdTo . ' +1 day')));
+        }
         $search = trim((string) $this->request->getGet('search'));
         if ($search !== '') {
             $q->groupStart()
@@ -26,6 +66,8 @@ class LeadController extends BaseApiController
                 ->orLike('email', $search)
                 ->orLike('mobile', $search)
                 ->orLike('organization', $search)
+                ->orLike('engage_lead_code', $search)
+                ->orLike('ref_code', $search)
               ->groupEnd();
         }
         $total = $q->countAllResults(false);

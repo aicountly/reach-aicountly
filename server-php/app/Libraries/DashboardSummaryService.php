@@ -53,6 +53,9 @@ class DashboardSummaryService
 
     private const APPROVED = ['approved'];
 
+    /** The Approval Centre's "Ready for approval" area (ApprovalQueueController::buildAreaFilters). */
+    private const APPROVAL_QUEUE = ['review_pending', 'internal_review', 'seo_review'];
+
     /**
      * Content with a publish date: `scheduled`, and `ready_for_publication`
      * (ContentScheduleReadinessJob's state for a schedule whose date came).
@@ -287,7 +290,15 @@ class DashboardSummaryService
             'where' => ['decision' => 'pending'],
         ]);
 
+        // `pending` counts one reach_approvals row per open stage, which no
+        // list shows; `queue` is what the Approval Centre's "Ready for
+        // approval" area lists, so the dashboard tile and its page agree.
+        $items = $this->groupCounts('reach_content_items', 'workflow_status', [
+            'raw' => ['deleted_at IS NULL'],
+        ]);
+
         return [
+            'queue'         => $this->pick($items, self::APPROVAL_QUEUE),
             'pending'       => $this->pick($a, ['pending']),
             'approved'      => $this->pick($a, ['approved']),
             'rejected'      => $this->pick($a, ['rejected']),
@@ -389,6 +400,7 @@ class DashboardSummaryService
                 $seen[(int) $r['item_id']] = true;
                 $rows[] = [
                     'id'        => 'schedule-' . $r['id'],
+                    'content_item_id' => (int) $r['item_id'],
                     'title'     => $r['title'],
                     'date'      => substr((string) $r['scheduled_at'], 0, 10),
                     'item_kind' => $r['content_type'],
@@ -416,6 +428,7 @@ class DashboardSummaryService
                 $seen[(int) $r['id']] = true;
                 $rows[] = [
                     'id'        => 'item-' . $r['id'],
+                    'content_item_id' => (int) $r['id'],
                     'title'     => $r['title'],
                     'date'      => substr((string) $r['scheduled_at'], 0, 10),
                     'item_kind' => $r['content_type'],
@@ -448,6 +461,7 @@ class DashboardSummaryService
                 $seen[(int) $r['item_id']] = true;
                 $rows[] = [
                     'id'        => 'deployment-' . $r['id'],
+                    'content_item_id' => (int) $r['item_id'],
                     'title'     => $r['title'],
                     'date'      => substr((string) $r['scheduled_at'], 0, 10),
                     'item_kind' => $r['content_type'],

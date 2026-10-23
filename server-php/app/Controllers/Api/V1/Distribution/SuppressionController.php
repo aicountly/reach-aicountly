@@ -14,6 +14,8 @@ use App\Libraries\Database\SchemaGuard;
 
 class SuppressionController extends BaseApiController
 {
+    private const CHANNELS = ['email', 'sms', 'whatsapp', 'social'];
+
     private SuppressionService $service;
 
     public function initController(
@@ -46,7 +48,7 @@ class SuppressionController extends BaseApiController
                 ]);
             }
 
-            return $this->ok($this->service->list($this->tenantId(), $page, $perPage));
+            return $this->ok($this->service->list($this->tenantId(), $page, $perPage, $this->listFilters()));
         } catch (\Throwable $e) {
             log_message('error', 'SuppressionController::index: ' . $e->getMessage());
             return $this->ok([
@@ -56,6 +58,26 @@ class SuppressionController extends BaseApiController
                 'per_page' => $perPage,
             ]);
         }
+    }
+
+    /**
+     * ?channel= and ?reason= narrow the list (SMS overview and analytics
+     * link with them). Unknown values are ignored rather than matching nothing.
+     *
+     * @return array{channel?: string, reason?: string}
+     */
+    private function listFilters(): array
+    {
+        $filters = [];
+        $channel = strtolower(trim((string) $this->request->getGet('channel')));
+        if (in_array($channel, self::CHANNELS, true)) {
+            $filters['channel'] = $channel;
+        }
+        $reason = SuppressionReason::tryFrom(strtolower(trim((string) $this->request->getGet('reason'))));
+        if ($reason !== null) {
+            $filters['reason'] = $reason->value;
+        }
+        return $filters;
     }
 
     public function store(): ResponseInterface

@@ -15,30 +15,86 @@ use App\Controllers\BaseApiController;
  */
 class AiUsageController extends BaseApiController
 {
+    /**
+     * GET /api/v1/ai/usage
+     *
+     * Filters: provider (provider_key), model (model_key), task_type,
+     * content_type, date / from / to (usage_date, Y-m-d or "today"),
+     * billing_month (YYYY-MM or "current"). Provider/model/content_type are
+     * the scope references AiBudgetService checks, so a budget row can open
+     * exactly the spend it counts.
+     */
     public function usage(): \CodeIgniter\HTTP\ResponseInterface
     {
         $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = 50;
         $offset  = ($page - 1) * $perPage;
 
+        $where = [];
+        $binds = [];
+        $text  = [
+            'provider'     => 'p.provider_key',
+            'model'        => 'm.model_key',
+            'task_type'    => 'l.task_type',
+            'content_type' => 'l.content_type',
+        ];
+        foreach ($text as $param => $column) {
+            $value = trim((string) ($this->request->getGet($param) ?? ''));
+            if ($value !== '') {
+                $where[] = "{$column} = ?";
+                $binds[] = mb_substr($value, 0, 128);
+            }
+        }
+        foreach (['date' => '=', 'from' => '>=', 'to' => '<='] as $param => $op) {
+            if (($day = self::day($this->request->getGet($param))) !== null) {
+                $where[] = "l.usage_date {$op} ?";
+                $binds[] = $day;
+            }
+        }
+        $month = trim((string) ($this->request->getGet('billing_month') ?? ''));
+        if ($month === 'current') {
+            $month = date('Y-m');
+        }
+        if (preg_match('/^\d{4}-\d{2}$/', $month) === 1) {
+            $where[] = 'l.billing_month = ?';
+            $binds[] = $month;
+        }
+
+        $from = "FROM reach_ai_usage_ledger l
+             LEFT JOIN reach_ai_providers p ON p.id = l.provider_id
+             LEFT JOIN reach_ai_models m    ON m.id = l.model_id";
+        $whereSql = $where === [] ? '' : ' WHERE ' . implode(' AND ', $where);
+
         $db = \Config\Database::connect();
 
-        $total = (int) $db->query("SELECT COUNT(*) AS cnt FROM reach_ai_usage_ledger")->getRowArray()['cnt'];
+        $total = (int) $db->query("SELECT COUNT(*) AS cnt {$from}{$whereSql}", $binds)->getRowArray()['cnt'];
 
         $rows = $db->query(
             "SELECT l.id, l.usage_date, l.billing_month, l.task_type, l.content_type,
                     l.input_tokens, l.output_tokens, l.total_tokens,
                     l.estimated_cost, l.currency,
-                    p.provider_key, m.model_key
-             FROM reach_ai_usage_ledger l
-             LEFT JOIN reach_ai_providers p ON p.id = l.provider_id
-             LEFT JOIN reach_ai_models m    ON m.id = l.model_id
+                    p.provider_key, m.model_key, r.uuid AS generation_uuid
+             {$from}
+             LEFT JOIN reach_ai_generation_requests r ON r.id = l.generation_request_id
+             {$whereSql}
              ORDER BY l.created_at DESC
              LIMIT ? OFFSET ?",
-            [$perPage, $offset]
+            [...$binds, $perPage, $offset]
         )->getResultArray();
 
         return $this->ok(['usage' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage]);
+    }
+
+    /** A Y-m-d day from a query value; "today" is the server's today. Anything else is ignored. */
+    private static function day(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === 'today') {
+            return date('Y-m-d');
+        }
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $parsed !== false && $parsed->format('Y-m-d') === $value ? $value : null;
     }
 
     public function budgets(): \CodeIgniter\HTTP\ResponseInterface

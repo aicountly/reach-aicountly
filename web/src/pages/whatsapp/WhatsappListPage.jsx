@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Save } from 'lucide-react';
 import { whatsappService } from '../../services/whatsappService';
 import { Card } from '../../components/common/Card';
@@ -18,6 +19,7 @@ export function WhatsappListPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
 
   const load = () => {
     setLoading(true);
@@ -68,7 +70,9 @@ export function WhatsappListPage() {
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
         <Card padding={false}>
-          <DataTable columns={columns} rows={rows} emptyMessage="No WhatsApp campaigns yet." />
+          <DataTable columns={columns} rows={rows}
+            onRowClick={(r) => navigate(`/whatsapp/${r.id}`)} rowLabel={(r) => `Open WhatsApp campaign ${r.template_name || r.id}`}
+            emptyMessage="No WhatsApp campaigns yet." />
         </Card>
       )}
 

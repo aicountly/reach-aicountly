@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { normalizeVideoList, normalizeVideoTotal } from './videoListUtils';
+import { useUrlFilter } from '../../components/drill';
 
 function VideoStatusBadge({ status }) {
   const colorMap = {
@@ -37,7 +38,8 @@ export default function VideoIdeaBacklogPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('');
+  // Status lives in the URL so a link (?status=ready) lands on that slice.
+  const [filter, setFilter] = useUrlFilter('status');
   const [expanded, setExpanded] = useState(null);
   const navigate = useNavigate();
   const perPage = 25;

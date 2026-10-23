@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { knowledgeService } from '../../services/knowledgeService';
+import { drillHref, useUrlFilter } from '../../components/drill';
+import { KnowledgeFilterChip } from './KnowledgeFilterChip';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { DataTable } from '../../components/common/DataTable';
@@ -16,18 +19,21 @@ export function CitationListPage() {
   const [total, setTotal]     = useState(0);
   const [page, setPage]       = useState(1);
   const [limit]               = useState(25);
-  const [status, setStatus]   = useState('');
-  const [search, setSearch]   = useState('');
+  // Filters live in the URL so a source can link to its citations (source_id).
+  const [searchParams]        = useSearchParams();
+  const [status, setStatus]   = useUrlFilter('status');
+  const [search, setSearch]   = useUrlFilter('search');
+  const [sourceId, setSourceId] = useUrlFilter('source_id');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    knowledgeService.listCitations({ page, limit, status, search })
+    knowledgeService.listCitations({ page, limit, status, search, source_id: sourceId || undefined })
       .then((d) => { setRows(d.items || d.data || []); setTotal(d.total ?? 0); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, limit, status, search]);
+  }, [page, limit, status, search, sourceId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -38,7 +44,11 @@ export function CitationListPage() {
         <div className="text-xs text-muted">{r.page_reference || ''}</div>
       </div>
     )},
-    { key: 'source_id', label: 'Source ID', render: (r) => r.source_id ?? '—' },
+    // There is no source detail page: a source narrows this list to its citations.
+    { key: 'source_id', label: 'Source ID', render: (r) => r.source_id ?? '—',
+      drill: (r) => (r.source_id && String(r.source_id) !== sourceId
+        ? drillHref(`/knowledge/citations?${searchParams}`, { source_id: r.source_id })
+        : null) },
     { key: 'accessed_at', label: 'Accessed', render: (r) => r.accessed_at ? formatDate(r.accessed_at) : '—' },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDate(r.updated_at) : '—' },
@@ -60,6 +70,8 @@ export function CitationListPage() {
         <SearchBar value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search citation text…" />
         <button className="btn btn-secondary" onClick={() => { setPage(1); load(); }}>Search</button>
       </FilterBar>
+
+      <KnowledgeFilterChip label="Source" value={sourceId} onClear={() => { setPage(1); setSourceId(''); }} />
 
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
