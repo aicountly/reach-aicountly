@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithAuth } from '../../../test/renderWithAuth';
 
 vi.mock('../../../services/dashboardService', () => ({
-  dashboardService: { summary: vi.fn(), counts: vi.fn(), commandCentre: vi.fn() },
+  dashboardService: { summary: vi.fn(), counts: vi.fn(), commandCentre: vi.fn(), commandCentreActivity: vi.fn() },
 }));
 // The embedded pipeline tiles have their own tests (DashboardPage.test.jsx).
 vi.mock('../../DashboardPage', () => ({ DashboardPage: () => <div data-testid="pipeline-stub" /> }));
@@ -87,6 +87,11 @@ const ctx = { auth: { user: { id: 1, email: 'o@x', role: 'super_admin' }, permis
 beforeEach(() => {
   vi.clearAllMocks();
   dashboardService.summary.mockResolvedValue({ blog: {}, jobs: {}, calendar_upcoming: [] });
+  // The activity list is the drill-down endpoint (ActivityFeed.test.jsx covers it in depth).
+  dashboardService.commandCentreActivity.mockImplementation(({ kind }) => {
+    const items = full.activity.events.filter((e) => kind === 'all' || e.kind === kind);
+    return Promise.resolve({ kind, total: items.length, page: 1, has_more: false, grouped: false, items, counters: full.activity.counters });
+  });
 });
 
 describe('CommandCentrePage', () => {
@@ -109,19 +114,17 @@ describe('CommandCentrePage', () => {
     expect(screen.getByText('6/day · 84 in 14 d')).toBeInTheDocument();
   });
 
-  it('filters the activity feed by window and kind', async () => {
+  it('opens the items behind an activity counter', async () => {
     dashboardService.commandCentre.mockResolvedValue(full);
     const user = userEvent.setup();
     renderWithAuth(<CommandCentrePage />, ctx);
     await waitFor(() => expect(screen.getByText('GST e-invoicing explained')).toBeInTheDocument());
 
     const feed = screen.getByTestId('cc-activity');
-    expect(within(feed).getByText('blog blog:9')).toBeInTheDocument();          // 3 days ago, in 7 d
-    await user.click(within(feed).getByRole('button', { name: '24 h' }));
-    expect(within(feed).queryByText('blog blog:9')).not.toBeInTheDocument();
-    await user.click(within(feed).getByRole('button', { name: '30 days' }));
+    expect(within(feed).getByText('blog blog:9')).toBeInTheDocument();
     await user.click(within(feed).getByRole('button', { name: /Blog published/ }));
-    expect(within(feed).queryByText('blog blog:9')).not.toBeInTheDocument();
+    expect(dashboardService.commandCentreActivity).toHaveBeenLastCalledWith({ kind: 'blog_published', window: '7d', page: 1, per_page: 25 });
+    await waitFor(() => expect(within(feed).queryByText('blog blog:9')).not.toBeInTheDocument());
     expect(within(feed).getByText('GST e-invoicing explained')).toBeInTheDocument();
   });
 
