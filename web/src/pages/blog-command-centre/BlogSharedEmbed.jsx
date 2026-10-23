@@ -75,7 +75,7 @@ const EMBED_MAP = {
   'approvals-history': () => (
     <div>
       <Alert variant="info">Approval history is shared with the Daily Approval Centre.</Alert>
-      <ApprovalsPage />
+      <UrlPreset params={{ area: 'recently_approved' }}><ApprovalsPage /></UrlPreset>
     </div>
   ),
   published: () => <BlogPublishingListPage />,

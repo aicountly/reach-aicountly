@@ -62,3 +62,28 @@ CSS: `.drill-link`, `.drill-path`, `tr.is-drillable`, `th.is-sortable`,
 - [ ] The destination reads every linked param from the URL and the API
       honours it — add a test like `pages/__tests__/DashboardTileDeepLinks.test.jsx`.
 - [ ] Active filters are visible and removable.
+
+## Coverage (October 2026 rollout)
+
+Every area follows the rules above; the notable chains:
+
+| Area | From → to the record |
+|---|---|
+| Search Console | overview tile / day / position band / query / page → `SearchExplorer` (day → queries → pages → device → country) → single row; open the page or search Google |
+| Command centre & dashboard | tiles, bars, quotas, roadmap items → filtered lists (`/content`, `/social/calendar`, `/approvals?area=`, `/admin/jobs?…`, `/distribution/orchestration?status=`) → detail |
+| Bot plan | each plan metric (`metricRecordsHref` in `pages/bot/botPlan/model.js`) → the records that metric counts |
+| Analytics & outcomes | outcome tiles and breakdown rows → `/leads/outcomes?campaign_id|source|seller_code|content_identity_id|stage|paid` → `/leads?lead_id=` |
+| Leads | campaign, landing page, ad (`utm_*` + `created_from/to`), social inbox → `/leads?…` (no lead detail page; `lead_id` is the deepest level) |
+| Blog Command Centre | each pipeline metric → the stages it summed; roadmap run → scored topics / decisions → `/content/:id` |
+| Social | performance cells → `/social/calendar?status=&channel=`; inbox day tiles filter in place |
+| AI | dashboard tiles, budgets, usage rows → `/ai/generations?…` → `/ai/generations/:uuid` |
+| Community & knowledge | status rows → questions/answers lists → workspace; product → claims / brand rules; source → citations |
+| Distribution, video, SEO, readiness | counts → dispatches, suppressions (`channel`, `reason`), pipeline (`status`, `format`), SEO tracker `?show=`, findings (`severity`, `resolution_status`), failing jobs |
+
+Known gaps (no records behind the number, or no list page yet): GA4 traffic
+aggregates, legacy blog-table analytics tiles, engagement snapshots,
+backlink/sitemap/IndexNow snapshot counts, attribution channel splits,
+product/user AI budgets, ad spend/clicks, and the two sample-data
+visibility pages (run history, observations). Where a count and its list
+cannot share a predicate the link says so in its title (dispatch bounces →
+per-channel suppressions; command-centre revenue → all outcomes).
