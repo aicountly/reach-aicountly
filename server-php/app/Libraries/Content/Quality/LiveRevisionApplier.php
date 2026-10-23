@@ -6,6 +6,7 @@ namespace App\Libraries\Content\Quality;
 
 use App\Libraries\AuditLogger;
 use App\Libraries\Automation\Routine\KbSteps;
+use App\Libraries\Automation\Routine\RoutineCoverService;
 use App\Libraries\Automation\Routine\RoutineFlags;
 use App\Libraries\Automation\SystemApprover;
 use App\Libraries\Blog\BlogContentApprovalService;
@@ -70,9 +71,16 @@ final class LiveRevisionApplier
 
     private BaseConnection $db;
 
-    public function __construct(?BaseConnection $db = null, private readonly ?PublicationDeploymentService $deployments = null)
-    {
-        $this->db = $db ?? Database::connect();
+    /** @var (callable(int $contentItemId): array{ok: bool, reason?: ?string})|null */
+    private $coverProvider;
+
+    public function __construct(
+        ?BaseConnection $db = null,
+        private readonly ?PublicationDeploymentService $deployments = null,
+        ?callable $coverProvider = null,
+    ) {
+        $this->db            = $db ?? Database::connect();
+        $this->coverProvider = $coverProvider;
     }
 
     /**
@@ -207,6 +215,13 @@ final class LiveRevisionApplier
             return $this->failed($c, $verdict, 'auto-publish is off (' . ($flag['kill_switch'] ?? 'Settings → AI & Automation') . '), so the corrected text was not republished.');
         }
 
+        // An older live post can predate the cover rule; the publish gate
+        // refuses it without one, so give it the routine's cover first.
+        $coverWhy = $this->ensureCover($c);
+        if ($coverWhy !== null) {
+            return $this->failed($c, $verdict, $coverWhy);
+        }
+
         $itemId = $c['id'];
         $now    = date('Y-m-d H:i:s');
         $this->db->transBegin();
@@ -279,6 +294,29 @@ final class LiveRevisionApplier
 
         return ['action' => self::APPLIED, 'note' => $plan['note'] . " New version #{$versionId}; republish queued as deployment #{$deploymentId}.",
                 'version_id' => $versionId, 'deployment_id' => $deploymentId];
+    }
+
+    /** Null when the blog has a cover (or now has one); otherwise why not. */
+    private function ensureCover(array $c): ?string
+    {
+        if ($c['type'] !== 'blog') {
+            return null;
+        }
+        $profile = $this->db->table('reach_blog_publication_profiles')->select('featured_image_reference')
+            ->where('content_item_id', $c['id'])->get()->getRowArray();
+        if ($profile === null || trim((string) ($profile['featured_image_reference'] ?? '')) !== '') {
+            return null; // no profile: the publish gate reports that itself
+        }
+        try {
+            $result = $this->coverProvider !== null
+                ? ($this->coverProvider)($c['id'])
+                : (new RoutineCoverService())->provide($c['id']);
+        } catch (\Throwable $e) {
+            return 'the post has no cover and one could not be assigned: ' . mb_substr($e->getMessage(), 0, 200);
+        }
+
+        return ! empty($result['ok']) ? null
+            : 'the post has no cover and none could be assigned (' . ($result['reason'] ?? 'unknown') . ').';
     }
 
     /** Approval of record for the corrected version, under the system bot. Workflow state is not touched: the item stays live. */

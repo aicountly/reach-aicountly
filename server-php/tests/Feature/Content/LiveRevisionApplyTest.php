@@ -339,6 +339,45 @@ final class LiveRevisionApplyTest extends DatabaseTestCase
         $this->assertTrue((new BlogPublishVetGate($this->vetting()))->status($itemId, $version)['vetted'], 'the live version keeps its approval');
     }
 
+    public function testALivePostWithoutACoverGetsOneBeforeTheCorrectionIsRepublished(): void
+    {
+        $itemId = $this->publishLiveArticle();
+        $db     = Database::connect();
+        $db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->update(['featured_image_reference' => null]);
+        $asked  = [];
+        $covers = function (int $id) use (&$asked, $db): array {
+            $asked[] = $id;
+            $db->table('reach_blog_publication_profiles')->where('content_item_id', $id)
+                ->update(['featured_image_reference' => 'https://cdn.example.test/cover.png', 'featured_image_alt' => 'Cover']);
+
+            return ['ok' => true];
+        };
+
+        $this->reviseThenApprove(['body_html' => $this->correctedBody()]);
+        $report = (new ContentRevetService($this->vetting(), null, null, new LiveRevisionApplier(null, null, $covers)))
+            ->run(['scope' => 'live', 'ids' => [$itemId]]);
+
+        $this->assertSame([$itemId], $asked);
+        $this->assertSame('revision_applied+republish_queued', $report['items'][0]['action']);
+    }
+
+    public function testALivePostThatCannotGetACoverIsLeftAsItIs(): void
+    {
+        $itemId  = $this->publishLiveArticle();
+        $db      = Database::connect();
+        $version = (int) $this->item($itemId)['current_version_id'];
+        $db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->update(['featured_image_reference' => '']);
+
+        $this->reviseThenApprove(['body_html' => $this->correctedBody()]);
+        $report = (new ContentRevetService($this->vetting(), null, null, new LiveRevisionApplier(null, null, static fn (): array => ['ok' => false, 'reason' => 'no_cover: fixture'])))
+            ->run(['scope' => 'live', 'ids' => [$itemId]]);
+
+        $this->assertSame('revision_failed', $report['items'][0]['action']);
+        $this->assertStringContainsString('no_cover: fixture', implode(' ', $report['items'][0]['reasons']));
+        $this->assertSame($version, (int) $this->item($itemId)['current_version_id']);
+        $this->assertSame(BlogStateMachine::LIVE, $this->item($itemId)['workflow_status']);
+    }
+
     public function testALiveKbArticleTakesTheCorrectedStepsAndIsRepublishedAtTheSameSlug(): void
     {
         $body = '';
