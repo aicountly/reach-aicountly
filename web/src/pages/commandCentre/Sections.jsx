@@ -8,7 +8,7 @@ import { api } from '../../services/api';
 import { usePermission } from '../../hooks/usePermission';
 import { formatAge } from '../../utils/formatAge';
 import { Bars, ForecastChart, Sparkline } from './Charts';
-import { ago, change, inr, num, pct, WINDOWS } from './format';
+import { ago, change, epochMs, inr, num, pct, WINDOWS } from './format';
 
 /* ───────────────────────────── shared bits ───────────────────────────── */
 
@@ -186,7 +186,7 @@ export function ActivityFeed({ section }) {
     const ms = WINDOWS.find((w) => w.id === win).ms;
     const since = Date.now() - ms;
     return (section?.events || []).filter((e) => (!kind || e.kind === kind)
-      && new Date(String(e.at).replace(' ', 'T')).getTime() >= since);
+      && epochMs(e.at) >= since);
   }, [section, win, kind]);
 
   return (
