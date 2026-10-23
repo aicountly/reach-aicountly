@@ -22,13 +22,13 @@ const items = [
     id: 7, network: 'linkedin', kind: 'comment', author_name: 'Asha Verma', author_handle: 'asha_v', text: 'Your GST export has been broken for a week',
     post_url: 'https://www.linkedin.com/feed/update/1', received_at: '2026-10-18 09:00:00+00', status: 'ticket_created',
     status_reason: 'Lodged in Flow as TCK-2026-00042. Acknowledged publicly.', classification: 'complaint', confidence: 91, severity: 'high',
-    severity_reason: 'legal threat', personal_data: false, reply_status: 'sent', reply_text: "We're sorry about this. We've logged it as TCK-2026-00042 — AICOUNTLY team",
+    severity_reason: 'legal threat', personal_data: false, reply_status: 'sent', reply_text: "We're sorry about this. We've logged it as TCK-2026-00042 — Aicountly team",
     replied_at: '2026-10-18 09:10:00+00', ticket_number: 'TCK-2026-00042', ticket_url: 'https://flow.aicountly.org/desk/tickets/42', vetting_reasons: [],
   },
   {
     id: 8, network: 'x', kind: 'comment', author_handle: 'raj', text: 'How do I file GSTR-1?', received_at: '2026-10-18 08:00:00+00',
     status: 'failed', status_reason: 'Comments are closed', classification: 'question', confidence: 88, reply_status: 'failed',
-    reply_text: 'From Returns → GSTR-1. — AICOUNTLY team', reply_reason: 'social-api.ai reply failed (HTTP 422)', vetting_decision: 'approve', vetting_reasons: ['Accurate.'],
+    reply_text: 'From Returns → GSTR-1. — Aicountly team', reply_reason: 'social-api.ai reply failed (HTTP 422)', vetting_decision: 'approve', vetting_reasons: ['Accurate.'],
   },
 ];
 

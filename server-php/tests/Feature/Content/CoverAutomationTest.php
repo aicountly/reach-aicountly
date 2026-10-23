@@ -177,7 +177,7 @@ final class CoverAutomationTest extends ApiTestCase
             $this->assertSame('active', $asset['status']);
             $this->assertContains($asset['source_key'], $keys);
             $this->assertSame('aicountly_generated', $asset['provenance']);
-            $this->assertTrue(in_array($asset['branded'], [true, 't', 1, '1'], true), 'the AICOUNTLY logo is composited');
+            $this->assertTrue(in_array($asset['branded'], [true, 't', 1, '1'], true), 'the Aicountly logo is composited');
             $this->assertFileExists((string) $asset['file_path']);
             $this->assertFileExists((string) $asset['original_file_path'], 'the unbranded original is kept');
             $this->assertNotSame('[]', $asset['category_tags']);
@@ -460,7 +460,7 @@ final class CoverAutomationTest extends ApiTestCase
         $profile = Database::connect()->table('reach_blog_publication_profiles')->where('content_item_id', $a)->get()->getRowArray();
         $this->assertStringContainsString('/api/v1/public/media/', (string) $profile['featured_image_reference']);
         $this->assertNull((new CoverRefreshService(new CoverGenerator($provider)))->reason((string) $profile['featured_image_reference']),
-            'a branded AICOUNTLY-generated cover is left alone next time');
+            'a branded Aicountly-generated cover is left alone next time');
         $this->assertStringContainsString('GSTR-3B for September 2026', $provider->prompts[0]);
     }
 }

@@ -70,9 +70,9 @@ final class AdsApiTest extends ApiTestCase
         $bad = $this->api('POST', 'v1/ads/campaigns', ['platform' => 'google_search', 'name' => 'X', 'start_date' => '2026-10-18', 'landing_url' => 'https://example.com/']);
         $this->assertSame(422, $bad->response()->getStatusCode());
 
-        $upd = $this->api('PUT', 'v1/ads/campaigns/' . $c['id'], ['status' => 'paused', 'external_ref' => 'AICOUNTLY | Search | Launch']);
+        $upd = $this->api('PUT', 'v1/ads/campaigns/' . $c['id'], ['status' => 'paused', 'external_ref' => 'Aicountly | Search | Launch']);
         $this->assertSame('paused', $this->json($upd)['data']['status']);
-        $this->assertSame('AICOUNTLY | Search | Launch', $this->json($upd)['data']['external_ref']);
+        $this->assertSame('Aicountly | Search | Launch', $this->json($upd)['data']['external_ref']);
 
         $list = $this->json($this->api('GET', 'v1/ads/campaigns'))['data'];
         $this->assertSame(1, $list['total']);
@@ -123,13 +123,13 @@ final class AdsApiTest extends ApiTestCase
 
     public function testCsvImportDryRunStoreReimportAndSignups(): void
     {
-        $search = $this->campaign(['external_ref' => 'AICOUNTLY Search Launch']);
+        $search = $this->campaign(['external_ref' => 'Aicountly Search Launch']);
         $meta = $this->campaign(['platform' => 'meta', 'name' => 'Soft launch FB+IG', 'daily_budget_inr' => 300, 'creatives' => [['id' => 'fb-reel-01']]]);
 
         $csv = "Campaign report\nDay,Campaign,Currency code,Cost,Impr.,Clicks,Conversions\n"
-            . "2026-10-18,AICOUNTLY Search Launch,INR,598.40,1234,41,3\n"
-            . "2026-10-18,AICOUNTLY Search Launch,INR,1.60,6,1,0\n"
-            . "2026-10-19,AICOUNTLY Search Launch,INR,612.00,1100,38,2\n"
+            . "2026-10-18,Aicountly Search Launch,INR,598.40,1234,41,3\n"
+            . "2026-10-18,Aicountly Search Launch,INR,1.60,6,1,0\n"
+            . "2026-10-19,Aicountly Search Launch,INR,612.00,1100,38,2\n"
             . "2026-10-19,Someone else's campaign,INR,10,10,1,0\n"
             . "Total: Campaigns,,,1222,2350,81,5\n";
 

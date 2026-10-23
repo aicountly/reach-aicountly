@@ -68,7 +68,7 @@ class CommunityOperationalAgentService
     private const PRODUCT_DESK      = 'aicountly-product-guide';
     private const SMART_BOOKS_SLUGS = ['smart_books', 'smart-books', 'books'];
 
-    /** Categories that are about using an AICOUNTLY app rather than a tax or accounting topic. */
+    /** Categories that are about using an Aicountly app rather than a tax or accounting topic. */
     private const PRODUCT_CATEGORIES = ['saas-product-help', 'product-guides', 'books', 'technical-api'];
 
     /**

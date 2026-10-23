@@ -18,10 +18,13 @@ final class SocialReplyPolicyTest extends CIUnitTestCase
     {
         $r = SocialReplyPolicy::finalize('<b>Thanks</b> for the kind words!', 'linkedin');
         $this->assertTrue($r['ok']);
-        $this->assertSame('Thanks for the kind words! — AICOUNTLY team', $r['text']);
+        $this->assertSame('Thanks for the kind words! — Aicountly team', $r['text']);
+
+        $r = SocialReplyPolicy::finalize('Glad it helps. — Aicountly team', 'x');
+        $this->assertSame('Glad it helps. — Aicountly team', $r['text'], 'not signed twice');
 
         $r = SocialReplyPolicy::finalize('Glad it helps. — AICOUNTLY team', 'x');
-        $this->assertSame('Glad it helps. — AICOUNTLY team', $r['text'], 'not signed twice');
+        $this->assertSame('Glad it helps. — AICOUNTLY team', $r['text'], 'an older upper-case sign-off is not signed twice');
     }
 
     public function testLengthLimitsPerNetwork(): void

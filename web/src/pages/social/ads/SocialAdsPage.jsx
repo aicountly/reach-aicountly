@@ -26,7 +26,7 @@ const CSV_FORMATS = [
   { key: 'google_ads', label: 'Google Ads — campaign report by Day' },
   { key: 'meta', label: 'Meta Ads Manager — Breakdown by Day' },
   { key: 'linkedin', label: 'LinkedIn Campaign Manager — daily campaign performance' },
-  { key: 'aicountly_signups', label: 'AICOUNTLY sign-ups report (my.aicountly.com)' },
+  { key: 'aicountly_signups', label: 'Aicountly sign-ups report (my.aicountly.com)' },
 ];
 const STATUSES = ['planned', 'live', 'paused', 'ended'];
 const OBJECTIVES = ['signups', 'leads', 'traffic', 'video_views', 'awareness'];

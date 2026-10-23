@@ -7,7 +7,7 @@ namespace App\Libraries\Media;
 use App\Libraries\Settings\ReachConfig;
 
 /**
- * Puts the AICOUNTLY logo on a cover (or a video still / thumbnail) as a
+ * Puts the Aicountly logo on a cover (or a video still / thumbnail) as a
  * corner mark.
  *
  * The logo is the official asset from aicountly.com (assests/images/ai-logo.png,

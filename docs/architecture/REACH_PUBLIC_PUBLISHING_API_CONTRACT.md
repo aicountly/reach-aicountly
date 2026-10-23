@@ -349,12 +349,12 @@ Rate limit exceeded: HTTP 429 with `Retry-After: <seconds>`.
   "payload_checksum": "a3f2d1...",
   "publication_target": "aicountly_com_blog",
   "payload": {
-    "title": "How AICOUNTLY Simplifies Statutory Reporting",
+    "title": "How Aicountly Simplifies Statutory Reporting",
     "slug": "aicountly-statutory-reporting",
     "excerpt": "A concise guide to statutory compliance...",
     "body_html": "<h2>Introduction</h2><p>...</p>",
-    "meta_title": "Statutory Reporting Made Simple | AICOUNTLY Blog",
-    "meta_description": "Learn how AICOUNTLY automates statutory filing...",
+    "meta_title": "Statutory Reporting Made Simple | Aicountly Blog",
+    "meta_description": "Learn how Aicountly automates statutory filing...",
     "canonical_preference": "self_canonical",
     "robots_directive": "index,follow",
     "category": "compliance",
@@ -425,7 +425,7 @@ Rate limit exceeded: HTTP 429 with `Retry-After: <seconds>`.
     "related_articles": [
       {"title": "Manual Bank Reconciliation", "slug": "manual-bank-reconciliation"}
     ],
-    "meta_title": "Automated Bank Reconciliation Setup | AICOUNTLY Help",
+    "meta_title": "Automated Bank Reconciliation Setup | Aicountly Help",
     "meta_description": "Learn how to configure automated bank reconciliation in Smart Books.",
     "canonical_preference": "self_canonical",
     "robots_directive": "index,follow",
@@ -451,7 +451,7 @@ Rate limit exceeded: HTTP 429 with `Retry-After: <seconds>`.
   "public_version": 4,
   "payload_checksum": "a3f2d1...",
   "reach_content_version": 4,
-  "title": "How AICOUNTLY Simplifies Statutory Reporting",
+  "title": "How Aicountly Simplifies Statutory Reporting",
   "body_hash": "e5f6a7...",
   "structured_data_types": ["BlogPosting"],
   "sitemap_status": "included",

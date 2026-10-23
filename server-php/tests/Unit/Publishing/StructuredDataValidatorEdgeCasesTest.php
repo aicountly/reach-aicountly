@@ -51,7 +51,7 @@ class StructuredDataValidatorEdgeCasesTest extends CIUnitTestCase
         $schema = [
             '@context' => 'https://schema.org',
             '@type'    => 'WebPage',
-            'name'     => 'AICOUNTLY Platform',
+            'name'     => 'Aicountly Platform',
         ];
         $result = $this->validator->validate($schema);
         $this->assertTrue($result['valid']);
@@ -62,7 +62,7 @@ class StructuredDataValidatorEdgeCasesTest extends CIUnitTestCase
         $schema = [
             '@context'            => 'https://schema.org',
             '@type'               => 'SoftwareApplication',
-            'name'                => 'AICOUNTLY',
+            'name'                => 'Aicountly',
             'applicationCategory' => 'BusinessApplication',
         ];
         $result = $this->validator->validate($schema);
@@ -141,7 +141,7 @@ class StructuredDataValidatorEdgeCasesTest extends CIUnitTestCase
 
     public function testOrganizationIsAllowedType(): void
     {
-        $schema = ['@context' => 'https://schema.org', '@type' => 'Organization', 'name' => 'AICOUNTLY'];
+        $schema = ['@context' => 'https://schema.org', '@type' => 'Organization', 'name' => 'Aicountly'];
         $result = $this->validator->validate($schema);
         $this->assertTrue($result['valid']);
     }

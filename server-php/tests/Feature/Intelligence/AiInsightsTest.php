@@ -80,7 +80,7 @@ final class AiInsightsTest extends ApiTestCase
             'gaps'          => [['area' => 'AI visibility', 'finding' => 'No answers stored yet', 'evidence' => 'ai_visibility.available = false']],
             'recommendations' => [
                 ['title' => 'Publish llms.txt', 'detail' => 'Add /llms.txt listing products.', 'expected_impact' => 'high', 'impact_rationale' => 'Assistants read it.', 'effort' => 'S', 'owner_type' => 'engineering', 'horizon_days' => 3],
-                ['title' => 'Write AICOUNTLY vs Tally page', 'detail' => 'Comparison page.', 'expected_impact' => 'medium', 'impact_rationale' => 'Gap prompts.', 'effort' => 'M', 'owner_type' => 'bogus-owner', 'horizon_days' => 99],
+                ['title' => 'Write Aicountly vs Tally page', 'detail' => 'Comparison page.', 'expected_impact' => 'medium', 'impact_rationale' => 'Gap prompts.', 'effort' => 'M', 'owner_type' => 'bogus-owner', 'horizon_days' => 99],
             ],
             'ai_readiness_checklist' => [
                 ['key' => 'llms_txt', 'item' => 'llms.txt', 'status' => 'done', 'evidence' => 'model guess', 'next_step' => 'Publish /llms.txt'],
@@ -237,7 +237,7 @@ final class AiInsightsTest extends ApiTestCase
         $report = $this->runReport();
         $res    = (new MarketingBotService())->execute('recommend_campaign_improvements', [], $userId);
         $this->assertNotSame('failed', $res['status']);
-        $this->assertSame(['Publish llms.txt', 'Write AICOUNTLY vs Tally page'], array_column($res['result']['content_generated']['recommendations'], 'title'));
+        $this->assertSame(['Publish llms.txt', 'Write Aicountly vs Tally page'], array_column($res['result']['content_generated']['recommendations'], 'title'));
         $this->assertSame($report['id'], $res['result']['evidence']['insights_report_id']);
 
         $sum = (new MarketingBotService())->execute('generate_analytics_summary', [], $userId);

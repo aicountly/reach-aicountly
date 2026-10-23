@@ -162,7 +162,7 @@ export function BlogReviewDetailPage() {
               className="btn btn-primary"
               disabled={!!actioning}
               onClick={() => {
-                if (!window.confirm('Publish this blog to AICOUNTLY.com now?')) return;
+                if (!window.confirm('Publish this blog to aicountly.com now?')) return;
                 run('publish', () => contentService.publishItem(id, item.current_version_id));
               }}
             >

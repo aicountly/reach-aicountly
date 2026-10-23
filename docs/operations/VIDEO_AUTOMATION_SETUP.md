@@ -10,7 +10,7 @@ routine ──POST v1/automation/video-scripts──▶ validate ─▶ Gemini v
    approve → approved by "Reach System Bot" (reach_approvals row + vetting run id)
         ▼  jobs on the `video` queue, one short step per cron run
   tts            OpenAI text-to-speech per scene (MP3 stored by Reach)
-  visuals        product screenshots (Worker) / GPT Image stills / title cards + GPT Image thumbnail (AICOUNTLY logo composited)
+  visuals        product screenshots (Worker) / GPT Image stills / title cards + GPT Image thumbnail (Aicountly logo composited)
   render_submit  Shotstack timeline (branded template, captions burned in) → render
   render_poll    Shotstack status (the render callback brings the poll forward)
   youtube_upload video.youtube.publisher = social_api (default): MP4 → social-api.ai media store
@@ -25,7 +25,7 @@ routine ──POST v1/automation/video-scripts──▶ validate ─▶ Gemini v
 
 | | `social_api` (default) | `direct` (fallback) |
 |---|---|---|
-| Needs | social-api.ai key + the AICOUNTLY YouTube channel connected in social-api.ai (§ 0) | Google Cloud project, OAuth client, connected channel (§ 3–4) |
+| Needs | social-api.ai key + the Aicountly YouTube channel connected in social-api.ai (§ 0) | Google Cloud project, OAuth client, connected channel (§ 3–4) |
 | Google verification / YouTube audit | not needed — social-api.ai's YouTube app is verified | needed, or uploads stay private |
 | Privacy, category | `social.socialapi.platform_data.youtube` (keys from docs.social-api.ai) | `video.youtube.privacy`, `video.youtube.category_id` |
 | Custom thumbnail, caption track | not set (warning on the item; captions are burned in) | `thumbnails.set`, `captions.insert` |
@@ -47,7 +47,7 @@ YouTube post published (social_api).
 
 ## 0. social-api.ai (default YouTube path)
 
-1. In social-api.ai connect the AICOUNTLY YouTube channel (and the Instagram / Facebook / LinkedIn
+1. In social-api.ai connect the Aicountly YouTube channel (and the Instagram / Facebook / LinkedIn
    accounts the Shorts are offered to) and create an API key.
 2. Settings → AI & Automation → **Social**: paste the key; leave *How videos reach YouTube* on
    `social_api`; set *account id: YouTube* only if more than one YouTube account is connected.
@@ -103,7 +103,7 @@ Skip this section and § 4 when `video.youtube.publisher = social_api` (the defa
 1. <https://console.cloud.google.com> → create (or pick) a project, e.g. `aicountly-reach`.
 2. **APIs & Services → Library → YouTube Data API v3 → Enable.**
 3. **OAuth consent screen** (Google Auth Platform → Branding / Audience / Data access):
-   - User type **External**; app name "AICOUNTLY Reach"; support and developer email; app domain
+   - User type **External**; app name "Aicountly Reach"; support and developer email; app domain
      `aicountly.org` / authorised domain `aicountly.org`; privacy policy and terms URLs.
    - Scopes: `https://www.googleapis.com/auth/youtube.upload` and
      `https://www.googleapis.com/auth/youtube.force-ssl` (captions and channel lookup need it).
@@ -135,7 +135,7 @@ Skip this section and § 4 when `video.youtube.publisher = social_api` (the defa
 ## 4. Connect the channel in Reach (direct upload only)
 
 Reach → **Video** → **Connect YouTube channel** (needs `video_connections.manage`) → sign in with
-the Google account that owns the AICOUNTLY channel → allow → you return to Reach → Video with
+the Google account that owns the Aicountly channel → allow → you return to Reach → Video with
 "YouTube channel connected". Reach stores the refresh token encrypted
 (`video.youtube.refresh_token`) and records the channel. **Disconnect** revokes it at Google.
 If Google later revokes access, items block at the upload step and the channel shows the error —
@@ -240,7 +240,7 @@ runner; if it is missing, screenshot scenes become title cards with a warning).
   navy `#071a33`, blue `#145490`, green `#8cc854`, no text, no logos). The thumbnail prompt is the
   title + topic + `thumbnail_prompt`.
 - **The logo is never drawn by the model.** The Shotstack template (`TimelineBuilder`) puts the
-  AICOUNTLY corner mark (the official logo on a white plate — `CoverBranding::badgePng`, served from
+  Aicountly corner mark (the official logo on a white plate — `CoverBranding::badgePng`, served from
   Reach's video media store) top-right on **every scene** in both 16:9 vlogs and 9:16 Shorts; the
   vlog intro card and every end card carry the full logo, the end card adds the CTA and
   `aicountly.com` (brand green). Title cards are navy text on the brand's soft green panel

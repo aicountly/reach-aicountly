@@ -12,7 +12,7 @@ use CodeIgniter\Test\CIUnitTestCase;
  */
 final class MentionParserTest extends CIUnitTestCase
 {
-    private const BRAND = ['AICOUNTLY', 'aicountly.com', 'AI Countly'];
+    private const BRAND = ['Aicountly', 'aicountly.com', 'AI Countly'];
 
     /** @return list<array{id:int, name:string, aliases:list<string>}> */
     private function competitors(): array
@@ -73,7 +73,7 @@ final class MentionParserTest extends CIUnitTestCase
         $text = "Here are the top options:\n\n"
             . "1. **Zoho Books** – cloud accounting, a good Tally alternative.\n"
             . "2. **Vyapar**: billing and inventory for small shops.\n"
-            . "3. **AICOUNTLY Smart Books** — AI-first GST accounting.\n"
+            . "3. **Aicountly Smart Books** — AI-first GST accounting.\n"
             . "4. TallyPrime (desktop)\n\n"
             . "QuickBooks is also used but less common in India.";
         $r = $this->parse($text);
@@ -87,14 +87,14 @@ final class MentionParserTest extends CIUnitTestCase
         $this->assertSame(4, $byName['Tally']);
         // Mentioned only in prose after the list: no rank.
         $this->assertNull($byName['QuickBooks']);
-        $this->assertSame(['Zoho Books', 'Vyapar', 'AICOUNTLY', 'Tally'], array_column($r['ranked'], 'name'));
+        $this->assertSame(['Zoho Books', 'Vyapar', 'Aicountly', 'Tally'], array_column($r['ranked'], 'name'));
     }
 
     public function testRankFromBulletsWithBoldLabels(): void
     {
         $text = "- **Best overall:** Zoho Books — strong GST support\n"
             . "- **Best for traders:** Vyapar\n"
-            . "- **Best AI option:** AICOUNTLY\n";
+            . "- **Best AI option:** Aicountly\n";
         $r = $this->parse($text);
         $this->assertSame(3, $r['brand']['rank']);
         $this->assertSame(1, array_column($r['competitors'], 'rank', 'name')['Zoho Books']);
@@ -102,14 +102,14 @@ final class MentionParserTest extends CIUnitTestCase
 
     public function testRankFromHeadingsIgnoresSectionTitles(): void
     {
-        $text = "## Overview\nSome intro.\n\n### Zoho Books\nGood.\n\n### AICOUNTLY\nNewer.\n\n## Conclusion\nPick one.";
+        $text = "## Overview\nSome intro.\n\n### Zoho Books\nGood.\n\n### Aicountly\nNewer.\n\n## Conclusion\nPick one.";
         $r = $this->parse($text);
         $this->assertSame(2, $r['brand']['rank']);
     }
 
     public function testRankFromMarkdownTable(): void
     {
-        $text = "| Software | Best for |\n|---|---|\n| Tally | Desktop |\n| AICOUNTLY | AI GST |\n";
+        $text = "| Software | Best for |\n|---|---|\n| Tally | Desktop |\n| Aicountly | AI GST |\n";
         $r = $this->parse($text);
         $this->assertSame(2, $r['brand']['rank']);
         $this->assertSame(1, $r['competitors'][0]['rank']);
@@ -117,15 +117,15 @@ final class MentionParserTest extends CIUnitTestCase
 
     public function testNumberedListRestartStartsANewList(): void
     {
-        $text = "Accounting:\n1. Zoho Books\n2. Tally\n\nBilling:\n1. AICOUNTLY\n2. Vyapar\n";
+        $text = "Accounting:\n1. Zoho Books\n2. Tally\n\nBilling:\n1. Aicountly\n2. Vyapar\n";
         $r = $this->parse($text);
         $this->assertSame(1, $r['brand']['rank']);
-        $this->assertSame(['Zoho Books', 'Tally', 'AICOUNTLY', 'Vyapar'], array_column($r['ranked'], 'name'));
+        $this->assertSame(['Zoho Books', 'Tally', 'Aicountly', 'Vyapar'], array_column($r['ranked'], 'name'));
     }
 
     public function testEntitiesNamedInTheQuestionAreFlagged(): void
     {
-        $r = $this->parse('Alternatives include Zoho Books and AICOUNTLY. Tally remains popular.', 'What are the best Tally alternatives?');
+        $r = $this->parse('Alternatives include Zoho Books and Aicountly. Tally remains popular.', 'What are the best Tally alternatives?');
         $flags = array_column($r['competitors'], 'in_question', 'name');
         $this->assertTrue($flags['Tally']);
         $this->assertFalse($flags['Zoho Books']);
@@ -147,8 +147,8 @@ final class MentionParserTest extends CIUnitTestCase
 
     public function testExcerptSurroundsFirstMention(): void
     {
-        $r = $this->parse(str_repeat('Filler text. ', 30) . 'AICOUNTLY offers AI bookkeeping. ' . str_repeat('More. ', 60));
-        $this->assertStringContainsString('AICOUNTLY offers AI bookkeeping', (string) $r['brand']['excerpt']);
+        $r = $this->parse(str_repeat('Filler text. ', 30) . 'Aicountly offers AI bookkeeping. ' . str_repeat('More. ', 60));
+        $this->assertStringContainsString('Aicountly offers AI bookkeeping', (string) $r['brand']['excerpt']);
         $this->assertStringStartsWith('…', (string) $r['brand']['excerpt']);
         $this->assertLessThanOrEqual(400, mb_strlen((string) $r['brand']['excerpt']));
     }

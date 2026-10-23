@@ -1,4 +1,4 @@
-# AICOUNTLY Blog Base
+# Aicountly Blog Base
 
 This file is the strategy base for the Claude routines that write blogs. It
 is edited in git (the server copy is replaced on every deploy). The Reach
@@ -18,7 +18,7 @@ from `GET v1/automation/content-base` (`base_markdown`).
 2. Ground every factual/compliance claim in current Indian law or an
    authoritative source (incometax.gov.in, gst.gov.in, mca.gov.in, rbi.org.in,
    sebi.gov.in). Unverifiable claims get removed, not hedged.
-3. Mention the relevant AICOUNTLY product where it genuinely helps, with a
+3. Mention the relevant Aicountly product where it genuinely helps, with a
    link — never force a product into an unrelated topic.
 4. Use plain language; define jargon on first use; prefer short sections,
    numbered steps and tables.
@@ -27,7 +27,7 @@ from `GET v1/automation/content-base` (`base_markdown`).
 ## Portfolio mix (enforced by the roadmap optimizer)
 
 - 45% marketing (compliance/tax/accounting questions our buyers search for)
-- 35% product (how AICOUNTLY products solve specific workflows)
+- 35% product (how Aicountly products solve specific workflows)
 - 20% problem-to-product (problem deep-dive that lands on a product answer)
 
 ## Blog categories (aicountly.com taxonomy, 23 Oct 2026)
@@ -50,9 +50,9 @@ else with HTTP 422). Source of truth in code: `App\Libraries\Blog\BlogTaxonomy`
 | Business | `sales-crm` | Sales & CRM | leads, customers, pipelines, follow-ups |
 | Business | `productivity-collaboration` | Productivity & Collaboration | notes, documents, file storage, sharing, team work (Notes, Drive) |
 | Business | `business-operations` | Business Operations | cash flow, funding, schemes, processes, growth |
-| AICOUNTLY | `product-guides` | Product Guides | how to do a job in an AICOUNTLY app, step by step |
-| AICOUNTLY | `product-updates` | Product Updates | what shipped recently in an app (from its git log) |
-| AICOUNTLY | `ai-for-finance` | AI for Finance | AI in accounting, tax and compliance work — practical, no hype |
+| Aicountly | `product-guides` | Product Guides | how to do a job in an Aicountly app, step by step |
+| Aicountly | `product-updates` | Product Updates | what shipped recently in an app (from its git log) |
+| Aicountly | `ai-for-finance` | AI for Finance | AI in accounting, tax and compliance work — practical, no hype |
 
 Old values still map (aliases, never dropped): financial-reporting →
 accounting, audit → audit-assurance, ai-finance-compliance / ai /

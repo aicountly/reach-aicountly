@@ -43,7 +43,7 @@ class BlogMetadataServiceWorkflowTest extends CIUnitTestCase
     {
         $html = '<article>
             <h2>Getting Started with Bank Reconciliation</h2>
-            <p>Bank reconciliation in AICOUNTLY ensures your accounting records match your bank statements.
+            <p>Bank reconciliation in Aicountly ensures your accounting records match your bank statements.
             This process helps detect discrepancies, prevent fraud, and maintain accurate financial records for your business.</p>
             </article>';
 
@@ -54,18 +54,18 @@ class BlogMetadataServiceWorkflowTest extends CIUnitTestCase
 
     public function testExcerptDoesNotIncludeHtmlAttributes(): void
     {
-        $html = '<p class="intro" style="font-size:16px"><strong>AICOUNTLY</strong> helps businesses.</p>';
+        $html = '<p class="intro" style="font-size:16px"><strong>Aicountly</strong> helps businesses.</p>';
         $excerpt = $this->service->deriveExcerpt($html);
         $this->assertStringNotContainsString('class=', $excerpt);
         $this->assertStringNotContainsString('style=', $excerpt);
-        $this->assertStringContainsString('AICOUNTLY', $excerpt);
+        $this->assertStringContainsString('Aicountly', $excerpt);
     }
 
     public function testExcerptForStructuredContent(): void
     {
         $html = '<section>
             <h2>Introduction</h2>
-            <p>GST compliance is critical for Indian businesses. AICOUNTLY automates the entire GST workflow,
+            <p>GST compliance is critical for Indian businesses. Aicountly automates the entire GST workflow,
             from invoice generation to return filing, saving hours of manual work each month.</p>
             <h2>Key Features</h2>
             <ul>

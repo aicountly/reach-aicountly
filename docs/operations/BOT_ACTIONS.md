@@ -6,7 +6,7 @@ Every bot activity in Reach keeps running on its own schedule. Two pages let the
 | Page | What it does | Permission |
 |---|---|---|
 | **Bot → Activities** (`/bot/activities`) | Lists every scheduled / automated activity — schedule in IST and UTC, last run and its status, next run, whether it is safe to run now, the cost — with a **Run now** button. | view: `bot.view`, `bot.run` or `settings.view`; run: `bot.run` or `settings.manage` |
-| **Bot → Ask the bot** (`/bot/ask`) | The owner types an instruction ("Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social platforms today"); Reach fires the **reach-command** Claude Routine once with it; the routine does the work through Reach's automation API and reports back. History with session links, live status of what was made. | view: `bot.view`; send: `bot.command` or `settings.manage` |
+| **Bot → Ask the bot** (`/bot/ask`) | The owner types an instruction ("Post a 30-second soft-launch reel announcing Aicountly on all connected social platforms today"); Reach fires the **reach-command** Claude Routine once with it; the routine does the work through Reach's automation API and reports back. History with session links, live status of what was made. | view: `bot.view`; send: `bot.command` or `settings.manage` |
 
 `super_admin` holds everything (`*`); migration `2026-10-18-290001` adds `bot.run` and
 `bot.command` to `reach_admin`. Both are in the `bot` permission group

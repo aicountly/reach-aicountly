@@ -15,7 +15,7 @@ export function ReachLogo({ height = 32, compact = false }) {
       </svg>
       <div style={{ lineHeight: 1 }}>
         <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text)' }}>Reach</div>
-        <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>AICOUNTLY</div>
+        <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', letterSpacing: '0.06em' }}>Aicountly</div>
       </div>
     </div>
   );

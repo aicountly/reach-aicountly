@@ -93,7 +93,7 @@ export function BlogListPage() {
       <div className="page-header">
         <div>
           <h1>Blog management</h1>
-          <p className="text-sm text-muted">Drafts, approvals & publishing to AICOUNTLY.com.</p>
+          <p className="text-sm text-muted">Drafts, approvals & publishing to aicountly.com.</p>
         </div>
         {!isBlogLegacyCreateDisabled() && (
           <Link to={ROUTES.BLOG_NEW} className="btn btn-primary"><Plus size={14}/> New post</Link>

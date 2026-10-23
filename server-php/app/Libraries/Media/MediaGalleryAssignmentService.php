@@ -127,7 +127,7 @@ class MediaGalleryAssignmentService
                 continue;
             }
 
-            // Covers carry the AICOUNTLY corner mark. Older uploads predate
+            // Covers carry the Aicountly corner mark. Older uploads predate
             // that; brand them now (the original is kept). If branding cannot
             // run, the relevant cover is still better than none.
             $locked = $this->store->ensureBranded($locked);

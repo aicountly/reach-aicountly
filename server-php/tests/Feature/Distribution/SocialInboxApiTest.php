@@ -30,7 +30,7 @@ final class SocialInboxApiTest extends ApiTestCase
     public function testListFiltersAndTicketLinks(): void
     {
         $this->item(['external_id' => 'c1', 'status' => 'ticket_created', 'classification' => 'complaint', 'ticket_number' => 'TCK-2026-00042', 'ticket_id' => 42, 'severity' => 'high', 'vetting_reasons_json' => '["ok"]']);
-        $this->item(['external_id' => 'c2', 'status' => 'replied', 'classification' => 'question', 'reply_status' => 'sent', 'reply_text' => 'Hi — AICOUNTLY team']);
+        $this->item(['external_id' => 'c2', 'status' => 'replied', 'classification' => 'question', 'reply_status' => 'sent', 'reply_text' => 'Hi — Aicountly team']);
         $h = $this->authAs('super_admin');
 
         $all = json_decode((string) $this->withHeaders($h)->call('GET', 'v1/social/inbox')->getJSON(), true)['data'];

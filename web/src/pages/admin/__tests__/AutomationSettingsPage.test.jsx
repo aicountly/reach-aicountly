@@ -111,7 +111,7 @@ describe('AutomationSettingsPage', () => {
     adminService.runLiveChecks.mockResolvedValue({
       ok: false, passed: 1, failed: 1, ran_at: '2026-10-18T09:00:00+00:00',
       results: [
-        { target: 'youtube', ok: true, message: 'Token refresh OK; channel “AICOUNTLY” (UC1).', detail: { long_uploads: 'allowed', render: { id: 'x' } }, duration_ms: 10 },
+        { target: 'youtube', ok: true, message: 'Token refresh OK; channel “Aicountly” (UC1).', detail: { long_uploads: 'allowed', render: { id: 'x' } }, duration_ms: 10 },
         { target: 'shotstack', ok: false, message: 'Shotstack rejected the key for the stage environment (HTTP 403).', detail: {}, duration_ms: 5 },
       ],
     });

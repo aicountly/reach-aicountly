@@ -9,7 +9,7 @@ needs them. Cloud Routines fire at most **hourly**.
 The routines only **write**. Reach decides: every submission is vetted by
 **Gemini** (Settings → AI & Automation picks the model; its decision is final,
 no human review), approved under the login-disabled *Reach System Bot*, given
-an AICOUNTLY-branded GPT Image cover (blogs) and published to aicountly.com. The old two-model rule
+an Aicountly-branded GPT Image cover (blogs) and published to aicountly.com. The old two-model rule
 (Opus writes, a Sonnet subagent fact-checks, Reach requires a
 `verification_report` from a different model) is retired: a
 `verification_report` is still accepted and stored if a routine sends one, but
@@ -132,12 +132,12 @@ they appear as recommendations for the owner. Each routine reads the briefing fi
    (possibly corrected) text; blog approval rows carry `vetting_run_id`. This
    replaces CROSS_REVIEW and HUMAN_REVIEW_GATE for routine items.
 4. **Profiles** — SEO profile, publication profile with author
-   `automation.blog.author_name` ("AICOUNTLY Editorial Team").
+   `automation.blog.author_name` ("Aicountly Editorial Team").
 5. **Cover (blogs)** — a relevant, preferably unused Cover Gallery cover
    (one Reach stocked for this entry's `content_base_key` wins outright);
    otherwise a fresh GPT Image cover (`ai.image.model`, prompt from
    `CoverPromptBuilder`: title, summary, section headings, category, the
-   routine's `cover_prompt`; no text in the image), the AICOUNTLY logo
+   routine's `cover_prompt`; no text in the image), the Aicountly logo
    composited, added to the gallery — with alt text. Rule and tuning:
    `docs/operations/REACH_BLOG_PUBLISHING_OPERATIONS.md` → Cover images. With
    neither (no OpenAI key, provider failing), the article waits
@@ -198,7 +198,7 @@ items default to LOW risk.
 | `automation.blog.ai_cover` | on | `BLOG_IMAGE_GENERATION_ENABLED` |
 | `covers.auto.enabled` (group Images) — hourly Cover Gallery stocking, capped by `covers.auto.daily_limit` (10) | on | `BLOG_IMAGE_GENERATION_ENABLED` |
 | `automation.knowledge_base.auto_publish` | on | `KB_AUTO_PUBLISH_ENABLED` |
-| `automation.blog.author_name` | AICOUNTLY Editorial Team | — |
+| `automation.blog.author_name` | Aicountly Editorial Team | — |
 | `automation.vetting.min_compliance_score` | 5 | — |
 
 An env variable that is unset (or `true`) defers to the setting. Older

@@ -120,7 +120,7 @@ export function BotQueuePage() {
             <label className="text-xs text-secondary">Payload (JSON)</label>
             <textarea rows={8} value={payload} onChange={(e) => setPayload(e.target.value)} style={{ fontFamily: 'monospace', fontSize: '0.8rem' }} />
             <p className="text-xs text-muted mt-1">
-              Examples: <code>{'{ "topic": "AICOUNTLY features" }'}</code> ·
+              Examples: <code>{'{ "topic": "Aicountly features" }'}</code> ·
               <code>{' { "campaign_id": 12 }'}</code>
             </p>
           </div>

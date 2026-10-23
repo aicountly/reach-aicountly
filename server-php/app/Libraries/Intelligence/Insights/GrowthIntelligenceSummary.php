@@ -98,7 +98,7 @@ final class GrowthIntelligenceSummary
             'rules'              => [
                 'Use only numbers present in this payload; label anything else as an assumption.',
                 'ai_visibility figures are a small sample of API answers, not market share.',
-                'Read the product repositories for what AICOUNTLY actually does; never invent features.',
+                'Read the product repositories for what Aicountly actually does; never invent features.',
             ],
         ];
     }

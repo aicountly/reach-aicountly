@@ -2,7 +2,7 @@
 
 ## Overview
 
-Phase 5 adds a Community and Official Q&A Automation subsystem to AICOUNTLY Reach. It enables authorised operators to collect genuine community questions, generate grounded official answers with AI assistance, route drafts through validation and human approval, and securely publish approved answers to `aicountly.com/community` via the existing Phase 4 HMAC publishing protocol.
+Phase 5 adds a Community and Official Q&A Automation subsystem to Aicountly Reach. It enables authorised operators to collect genuine community questions, generate grounded official answers with AI assistance, route drafts through validation and human approval, and securely publish approved answers to `aicountly.com/community` via the existing Phase 4 HMAC publishing protocol.
 
 This document covers system boundaries, data flow, component responsibilities, and key architectural decisions.
 
@@ -99,7 +99,7 @@ Every answer version stores a `SHA-256` checksum of its content. Approval is bou
 
 ### 5. Official Identity ≠ Customer Account
 
-Official responder identities (AICOUNTLY Support, AICOUNTLY Product Team, etc.) are stored in `reach_community_official_identities` (Reach) and `community_official_identities` (public site). They are never linked to customer accounts and are administratively managed only.
+Official responder identities (Aicountly Support, Aicountly Product Team, etc.) are stored in `reach_community_official_identities` (Reach) and `community_official_identities` (public site). They are never linked to customer accounts and are administratively managed only.
 
 ### 6. No Fake Engagement
 
@@ -220,7 +220,7 @@ Every content edit creates a new version record in `reach_community_answer_versi
 
 Every published official answer carries:
 
-- `official_identity_id` — the controlled AICOUNTLY identity that responded
+- `official_identity_id` — the controlled Aicountly identity that responded
 - `ai_assisted` — boolean flag (true if AI materially assisted drafting)
 - `human_reviewed` — boolean flag (true when a human reviewer approved)
 - `approved_at` — approval timestamp

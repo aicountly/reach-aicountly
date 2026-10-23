@@ -146,13 +146,13 @@
     },
     {
       "id": "blog_publish",
-      "name": "Blog Publishing to AICOUNTLY.com",
+      "name": "Blog Publishing to aicountly.com",
       "status": "Stub/Placeholder",
       "frontend_evidence": ["web/src/pages/blog/BlogDetailPage.jsx"],
       "backend_evidence": ["server-php/app/Libraries/AicountlySitePublisher.php", "server-php/app/Controllers/Api/V1/BlogController.php::publish"],
       "database_evidence": ["reach_blog_posts.publishing_status"],
       "test_evidence": [],
-      "risks": ["AICOUNTLY.com has no write API today"],
+      "risks": ["aicountly.com has no write API today"],
       "notes": "Falls back to pending_publishing when env unset"
     },
     {
@@ -401,7 +401,7 @@
     {"channel": "Engage lead push", "status": "Implemented", "auth": "X-Portal-Token", "evidence": "EngageClient.php"},
     {"channel": "Worker Playwright", "status": "Implemented", "auth": "WORKER_API_TOKEN", "evidence": "WorkerPlaywrightClient.php"},
     {"channel": "GA4 analytics", "status": "Substantially Implemented", "auth": "Service account JSON", "evidence": "Ga4AnalyticsClient.php"},
-    {"channel": "AICOUNTLY.com blog", "status": "Stub/Placeholder", "auth": "Bearer token", "evidence": "AicountlySitePublisher.php"},
+    {"channel": "aicountly.com blog", "status": "Stub/Placeholder", "auth": "Bearer token", "evidence": "AicountlySitePublisher.php"},
     {"channel": "LinkedIn", "status": "Stub/Placeholder", "auth": "LINKEDIN_API_TOKEN", "evidence": "SocialPostController.php:78-88"},
     {"channel": "Twitter/X", "status": "Stub/Placeholder", "auth": "TWITTER_API_TOKEN", "evidence": "SocialPostController.php"},
     {"channel": "Email provider", "status": "Stub/Placeholder", "auth": "EMAIL_PROVIDER_API_KEY", "evidence": "EmailCampaignController::markSent"},
@@ -448,7 +448,7 @@
   ],
   "misleading_implementations": [
     {"feature": "Marketing Bot AI generation", "appears": "AI-powered drafts", "actually": "Hardcoded placeholder", "path": "server-php/app/Libraries/MarketingBotService.php:266-283"},
-    {"feature": "Blog publish", "appears": "Live publishing to AICOUNTLY.com", "actually": "HTTP placeholder or pending_publishing", "path": "server-php/app/Libraries/AicountlySitePublisher.php:10-15"},
+    {"feature": "Blog publish", "appears": "Live publishing to aicountly.com", "actually": "HTTP placeholder or pending_publishing", "path": "server-php/app/Libraries/AicountlySitePublisher.php:10-15"},
     {"feature": "Social approve", "appears": "Auto-post to channels", "actually": "manual_queue + markPosted", "path": "server-php/app/Controllers/Api/V1/SocialPostController.php:78-88"},
     {"feature": "Email/WhatsApp send", "appears": "Campaign delivery", "actually": "mark-sent status only", "path": "server-php/app/Controllers/Api/V1/EmailCampaignController.php"},
     {"feature": "Login page", "appears": "Local auth", "actually": "Orphaned; API returns 403", "path": "web/src/pages/LoginPage.jsx"}

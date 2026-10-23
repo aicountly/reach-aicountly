@@ -9,7 +9,7 @@ Every action is tagged with an owner lane:
 |---|---|
 | CURSOR/CODE | Already implemented in git; deploy the build |
 | WHM ROOT | WHM / SSH root |
-| AICOUNTLY.COM CPANEL | `aicountlycom` account |
+| aicountly.com CPANEL | `aicountlycom` account |
 | REACH CPANEL | Reach account hosting `reach.aicountly.org` |
 | POSTGRESQL | DBA / root with DB access |
 | REACH UI | Operator in Reach Blog Command Centre |
@@ -80,7 +80,7 @@ pg_dump -Fc -d aicountly_reach -f ~/backups/aicountly_reach_pre_blog_$(date +%Y%
 ### Public site DB (`aicountly_community`)
 
 ```bash
-# AICOUNTLY.COM CPANEL / POSTGRESQL
+# aicountly.com CPANEL / POSTGRESQL
 cd ~/public_html   # or site root
 php scripts/migrate.php
 # dry-run first:
@@ -116,7 +116,7 @@ Rollback (PostgreSQL): restore dump; for Reach, `php spark migrate:rollback` onl
 
 ---
 
-## 3. AICOUNTLY.COM CPANEL — env, deploy, backfill
+## 3. aicountly.com CPANEL — env, deploy, backfill
 
 ### Environment
 
@@ -595,13 +595,13 @@ claim `CONNECTED` while nothing ingests.
 
 | Item | Owner |
 |---|---|
-| Service token + signing key generation | REACH + AICOUNTLY.COM CPANEL |
+| Service token + signing key generation | REACH + aicountly.com CPANEL |
 | Gemini / Perplexity / image API keys | REACH CPANEL (deferred adapters) |
 | Search Console property + SA JSON | REACH CPANEL |
 | GA4 property linkage for blogs | REACH CPANEL |
 | Confirm Flow production `DB_NAME` | WHM ROOT |
 | Live WHM `open_basedir` / backup inclusion | WHM ROOT |
-| DNS / CDN cache purge after 301 flip | AICOUNTLY.COM CPANEL |
+| DNS / CDN cache purge after 301 flip | aicountly.com CPANEL |
 
 ---
 

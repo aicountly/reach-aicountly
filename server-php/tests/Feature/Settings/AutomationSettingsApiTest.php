@@ -135,7 +135,7 @@ final class AutomationSettingsApiTest extends ApiTestCase
         ReachConfig::flush();
         \App\Libraries\Distribution\Providers\SocialApi\SocialApiAccounts::forget();
         $http = (new FakeHttpTransport())->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, [
-            ['id' => 'acc_yt', 'name' => 'AICOUNTLY', 'platform' => 'youtube', 'status' => 'active'],
+            ['id' => 'acc_yt', 'name' => 'Aicountly', 'platform' => 'youtube', 'status' => 'active'],
         ]))->on('GET', '#^https://api\.social-api\.ai/v1/inbox/(comments|conversations)\?#', FakeHttpTransport::json(200, ['data' => null, 'pagination' => ['has_more' => false]]));
         VideoProviders::override('http', $http);
         try {

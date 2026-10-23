@@ -25,7 +25,7 @@ class BlogMetadataExcerptWorkflowTest extends CIUnitTestCase
         $html = '<article>
             <h1>How AI is Transforming Accounting for Indian SMBs</h1>
             <p>Artificial Intelligence is rapidly changing how businesses manage their finances.
-            For Indian small and medium businesses, AI-powered accounting software like AICOUNTLY
+            For Indian small and medium businesses, AI-powered accounting software like Aicountly
             is making compliance easier, faster, and more accurate than ever before.</p>
             <h2>Key Benefits</h2>
             <p>From automated GST filing to intelligent bank reconciliation, AI removes the burden
@@ -43,7 +43,7 @@ class BlogMetadataExcerptWorkflowTest extends CIUnitTestCase
         $html = '<div class="case-study">
             <p><strong>Company:</strong> Sharma Textiles Pvt Ltd</p>
             <p><strong>Challenge:</strong> Manual GST reconciliation taking 3 days per month.</p>
-            <p><strong>Solution:</strong> AICOUNTLY automated the entire GST workflow,
+            <p><strong>Solution:</strong> Aicountly automated the entire GST workflow,
             reducing reconciliation time from 3 days to 2 hours.</p>
             </div>';
 
@@ -54,10 +54,10 @@ class BlogMetadataExcerptWorkflowTest extends CIUnitTestCase
 
     public function testExcerptFromSingleParagraph(): void
     {
-        $html    = '<p>AICOUNTLY delivers AI-powered accounting solutions designed specifically for Indian businesses, helping them comply with GST, TDS, and other regulatory requirements.</p>';
+        $html    = '<p>Aicountly delivers AI-powered accounting solutions designed specifically for Indian businesses, helping them comply with GST, TDS, and other regulatory requirements.</p>';
         $excerpt = $this->service->deriveExcerpt($html, 100);
 
-        $this->assertStringStartsWith('AICOUNTLY', $excerpt);
+        $this->assertStringStartsWith('Aicountly', $excerpt);
         $this->assertLessThanOrEqual(103, strlen($excerpt));
     }
 

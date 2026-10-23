@@ -18,7 +18,7 @@ const PAD_B = 28;
 const pct = (v) => `${Math.round((Number(v) || 0) * 1000) / 10}%`;
 
 /**
- * Share of voice per day for one assistant: AICOUNTLY vs up to three
+ * Share of voice per day for one assistant: Aicountly vs up to three
  * competitors. `points` = [{ date, sov: { name: 0..1 } }].
  */
 export default function ShareOfVoiceChart({ points, entities, height = 220 }) {

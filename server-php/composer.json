@@ -1,6 +1,6 @@
 {
     "name": "aicountly/reach-api",
-    "description": "AICOUNTLY Reach Marketing Portal API (CodeIgniter 4.6 + PostgreSQL)",
+    "description": "Aicountly Reach Marketing Portal API (CodeIgniter 4.6 + PostgreSQL)",
     "type": "project",
     "license": "proprietary",
     "require": {

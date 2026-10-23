@@ -730,7 +730,7 @@ class WorkBlockService
      *   1. a relevant gallery cover (operator upload or one of Reach's own
      *      stocked ai_gallery covers), never-used first, branded on the way out;
      *   2. otherwise a fresh GPT Image cover (ai.image.model) drawn from the
-     *      article's title, summary and headings, branded with the AICOUNTLY
+     *      article's title, summary and headings, branded with the Aicountly
      *      mark and added to the gallery;
      *   3. otherwise image_failed with the reason.
      *

@@ -11,7 +11,7 @@ namespace App\Libraries\Video\Automation\Visuals;
  *
  * The routine's own visual note (visual.url_or_prompt) is kept as the scene to
  * depict. Brand style (navy / blue / green palette, no text, no logos) is
- * appended by OpenAiStillSource::STYLE; the AICOUNTLY logo is added by the
+ * appended by OpenAiStillSource::STYLE; the Aicountly logo is added by the
  * render template (corner mark on every scene) and composited onto the
  * thumbnail, never drawn by the image model.
  */
@@ -31,7 +31,7 @@ final class StillPromptBuilder
         $format  = ($script['format'] ?? 'vlog') === 'short' ? 'vertical 9:16 frame' : 'landscape 16:9 frame';
 
         $parts = [
-            sprintf('One still for a scene of the AICOUNTLY explainer video "%s"%s.', $title, $topic !== '' ? ' about ' . $topic : ''),
+            sprintf('One still for a scene of the Aicountly explainer video "%s"%s.', $title, $topic !== '' ? ' about ' . $topic : ''),
             $depict !== '' ? 'Depict: ' . rtrim($depict, '. ') . '.' : null,
             $voice !== '' ? 'The narrator says in this scene: "' . $voice . '" — illustrate exactly that idea.' : null,
             $onScr !== '' ? 'The scene\'s caption (added later, do not draw it): "' . $onScr . '".' : null,
@@ -48,7 +48,7 @@ final class StillPromptBuilder
         $topic  = self::topic($script);
         $depict = self::clip((string) ($script['thumbnail_prompt'] ?? ''), 600);
 
-        return trim(sprintf('YouTube thumbnail for the AICOUNTLY video "%s"%s.', $title, $topic !== '' ? ' about ' . $topic : '')
+        return trim(sprintf('YouTube thumbnail for the Aicountly video "%s"%s.', $title, $topic !== '' ? ' about ' . $topic : '')
             . ($depict !== '' ? ' Depict: ' . rtrim($depict, '. ') . '.' : '')
             . ' Bold, high-contrast single focal concept readable at small size; leave the bottom-right corner calm (the logo is placed there).');
     }

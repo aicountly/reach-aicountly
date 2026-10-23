@@ -157,7 +157,7 @@ period, not sixty times.
 
 | When | Job | Queue | Key |
 |------|-----|-------|-----|
-| every hour | `reach.cover_gallery_autofill` — generates the covers the upcoming blog index is missing (GPT Image, AICOUNTLY logo), capped by `covers.auto.daily_limit` | blog | `cover-gallery-autofill-<Y-m-d-H>` |
+| every hour | `reach.cover_gallery_autofill` — generates the covers the upcoming blog index is missing (GPT Image, Aicountly logo), capped by `covers.auto.daily_limit` | blog | `cover-gallery-autofill-<Y-m-d-H>` |
 | every hour | `reach.blog_cover_sweep` — re-attempts parked articles (re-armed when a new cover lands) | blog | `blog-cover-sweep-<Y-m-d-H>` |
 | every hour | `reach.content_due_date_reminder`, `reach.content_overdue_escalation` | notifications | `<type>-<Y-m-d-H>` |
 | every hour | `reach.content_schedule_readiness` | default | `content-schedule-readiness-<Y-m-d-H>` |

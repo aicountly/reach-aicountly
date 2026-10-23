@@ -195,7 +195,7 @@ final class EmailDispatcherTest extends CIUnitTestCase
             };
         };
         $prov = static fn (string $url, string $format): array => ['code' => 'itwalk_api', 'type' => 'http_api', 'config' => ['api_url' => $url, 'api_format' => $format], 'secret' => 'k-123456'];
-        $msg  = ['to' => 'a@example.com', 'subject' => 'S', 'html' => '<p>h</p>', 'text' => 'h', 'from_email' => 'support@aicountly.com', 'from_name' => 'AICOUNTLY Reach'];
+        $msg  = ['to' => 'a@example.com', 'subject' => 'S', 'html' => '<p>h</p>', 'text' => 'h', 'from_email' => 'support@aicountly.com', 'from_name' => 'Aicountly Reach'];
 
         $r = (new HttpApiProviderTransport($http([$ok])))->send($prov('https://e.api.itwalk.in/email/1/send', ''), $msg);
         $this->assertTrue($r['ok']);

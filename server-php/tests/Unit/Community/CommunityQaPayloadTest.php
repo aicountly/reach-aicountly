@@ -58,7 +58,7 @@ final class CommunityQaPayloadTest extends CIUnitTestCase
             'bad key'           => [['external_key' => 'has spaces in it'], 'external_key must be'],
             'short title'       => [['question_title' => 'GST?'], 'question_title is required'],
             'unknown category'  => [['category_slug' => 'crypto'], 'category_slug must be one of'],
-            'unknown product'   => [['product_slug' => 'spaceship'], 'product_slug is not an AICOUNTLY product'],
+            'unknown product'   => [['product_slug' => 'spaceship'], 'product_slug is not an Aicountly product'],
             'no answer'         => [['answer_html' => ''], 'answer_html is required'],
             'script in answer'  => [['answer_html' => '<p>Fine.</p><script>alert(1)</script><p>More text here please.</p>'], 'markup the site removes'],
             'one word answer'   => [['answer_html' => '<p>Yes.</p>'], 'answer_html is too short'],

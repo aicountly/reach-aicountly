@@ -29,7 +29,7 @@ final class BotCommandsApiTest extends ApiTestCase
 
     private const URL   = 'https://api.anthropic.com/v1/claude_code/routines/trig_01SoftLaunch/fire';
     private const TOKEN = 'sk-ant-oat01-test-routine-token';
-    private const ASK   = 'Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social platforms today';
+    private const ASK   = 'Post a 30-second soft-launch reel announcing Aicountly on all connected social platforms today';
 
     private FakeHttpTransport $http;
 
@@ -38,7 +38,7 @@ final class BotCommandsApiTest extends ApiTestCase
         parent::setUp();
         $this->setVideoEnv(['BOT_COMMAND_ROUTINE_FIRE_URL' => null, 'BOT_COMMAND_ROUTINE_TOKEN' => null, 'REACH_APP_URL' => 'https://reach.example.test']);
         SocialChannelReadiness::override(static fn (): array => [
-            ['channel' => 'youtube', 'platform' => 'youtube', 'label' => 'YouTube', 'ready' => true, 'account' => 'AICOUNTLY', 'reason' => null],
+            ['channel' => 'youtube', 'platform' => 'youtube', 'label' => 'YouTube', 'ready' => true, 'account' => 'Aicountly', 'reason' => null],
             ['channel' => 'instagram', 'platform' => 'instagram', 'label' => 'Instagram', 'ready' => true, 'account' => 'aicountly', 'reason' => null],
             ['channel' => 'linkedin', 'platform' => 'linkedin', 'label' => 'LinkedIn', 'ready' => false, 'account' => null, 'reason' => 'No active LinkedIn account is connected in social-api.ai.'],
         ]);

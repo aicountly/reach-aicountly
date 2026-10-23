@@ -55,12 +55,12 @@ const keywords = {
 };
 
 const aiAnswers = {
-  available: true, measured: false, mention_rate: null, brand: 'AICOUNTLY',
+  available: true, measured: false, mention_rate: null, brand: 'Aicountly',
   period: { from: '2026-09-26', to: '2026-10-23', days: 28 },
   totals: { answers: 2, counted: 0, brand_mentions: 0, failed: 0 },
   providers: [{ key: 'perplexity', label: 'Perplexity', will_run: false, reason: 'No key.' }],
   prompts: [{
-    prompt_id: 1, name: 'brand-what-is-aicountly', market: 'India', question: 'What is AICOUNTLY and is it good for small businesses?',
+    prompt_id: 1, name: 'brand-what-is-aicountly', market: 'India', question: 'What is Aicountly and is it good for small businesses?',
     answers: 2, counted: 0, brand_mentions: 0, competitors: [],
     providers: [{ provider: 'gemini', model: 'gemini-2.5-flash', answers: 1, counted: 0, brand_mentions: 0, failed: 0, competitors: [{ name: 'Zoho Books', answers: 1 }], last_asked_at: '2026-10-23T06:10:00+05:30' }],
   }],
@@ -160,8 +160,8 @@ describe('Rankings', () => {
 
     await user.click(tile);
     const panel = await screen.findByRole('region', { name: 'AI-visibility questions and answers' });
-    await waitFor(() => expect(within(panel).getByText(/What is AICOUNTLY and is it good/)).toBeInTheDocument());
-    expect(within(panel).getByText(/Not measured: every answer was to a question that already names AICOUNTLY/)).toBeInTheDocument();
+    await waitFor(() => expect(within(panel).getByText(/What is Aicountly and is it good/)).toBeInTheDocument());
+    expect(within(panel).getByText(/Not measured: every answer was to a question that already names Aicountly/)).toBeInTheDocument();
     expect(within(panel).getByText('gemini (gemini-2.5-flash)')).toBeInTheDocument();
     expect(within(panel).getByText(/named: Zoho Books 1×/)).toBeInTheDocument();
     expect(within(panel).getByText(/Not asked: Perplexity \(No key\.\)/)).toBeInTheDocument();

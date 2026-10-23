@@ -295,7 +295,7 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         if (! $existingConn) {
             $db->table('reach_publication_connections')->insert([
                 'connection_key' => 'aicountly_com',
-                'display_name'   => 'AICOUNTLY.com (test)',
+                'display_name'   => 'aicountly.com (test)',
                 'base_url'       => 'https://example.test',
                 'enabled'        => true,
                 'created_at'     => date('Y-m-d H:i:s'),
@@ -664,7 +664,7 @@ final class BlogAutomationPipelineAcceptanceTest extends ApiTestCase
         if (! $existingConn) {
             $db->table('reach_publication_connections')->insert([
                 'connection_key' => 'aicountly_com',
-                'display_name'   => 'AICOUNTLY.com (test)',
+                'display_name'   => 'aicountly.com (test)',
                 'base_url'       => 'https://example.test',
                 'enabled'        => true,
                 'created_at'     => date('Y-m-d H:i:s'),

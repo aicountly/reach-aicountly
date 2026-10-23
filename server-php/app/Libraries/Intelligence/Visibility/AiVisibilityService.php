@@ -308,10 +308,10 @@ final class AiVisibilityService
     /**
      * Share of voice, mention rate and rank per assistant over the last
      * $days IST days, with a per-day series and the prompts where competitors
-     * are named but AICOUNTLY is not.
+     * are named but Aicountly is not.
      *
      * Entities named in the question itself ("Tally alternatives",
-     * "What is AICOUNTLY?") are left out of that answer's counts, so asking
+     * "What is Aicountly?") are left out of that answer's counts, so asking
      * about a brand does not inflate its numbers.
      *
      * @return array<string, mixed>
@@ -474,7 +474,7 @@ final class AiVisibilityService
     /**
      * What was asked, of which assistant, and who each answer named — per
      * prompt and assistant over the last $days IST days. Counted exactly like
-     * summary(): an answer to a question that itself names AICOUNTLY is not
+     * summary(): an answer to a question that itself names Aicountly is not
      * counted for the brand, and entities named in the question are left out
      * of that answer's competitor list.
      *

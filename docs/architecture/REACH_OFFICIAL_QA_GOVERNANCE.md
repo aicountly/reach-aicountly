@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the governance rules, ethical constraints, approval matrix, disclosure policy, and quality controls for official Q&A content produced by AICOUNTLY Reach.
+This document defines the governance rules, ethical constraints, approval matrix, disclosure policy, and quality controls for official Q&A content produced by Aicountly Reach.
 
 ---
 
@@ -21,7 +21,7 @@ Official questions created by Reach are explicitly marked `source_type = 'offici
 
 ### No AI Impersonation
 
-AI-generated content may only be used as a draft for an authorised official AICOUNTLY response. AI content must never be presented as:
+AI-generated content may only be used as a draft for an authorised official Aicountly response. AI content must never be presented as:
 - Written by a customer or community member
 - Written by a Chartered Accountant or professional advisor
 - Written by a regulator or government authority
@@ -40,7 +40,7 @@ The `ai_assisted` flag is mandatory when AI materially contributed to the final 
 
 ### Grounding Requirement
 
-Official answers must be grounded in approved AICOUNTLY sources. Unsupported claims block approval.
+Official answers must be grounded in approved Aicountly sources. Unsupported claims block approval.
 
 Grounding must be traceable to one or more of:
 - Approved knowledge-base articles
@@ -64,11 +64,11 @@ Pre-configured official identities:
 
 | Slug | Display Name | Department |
 |------|-------------|------------|
-| `aicountly-support` | AICOUNTLY Support | Customer Support |
-| `aicountly-product` | AICOUNTLY Product Team | Product |
-| `aicountly-compliance` | AICOUNTLY Compliance Team | Compliance |
-| `aicountly-engineering` | AICOUNTLY Engineering | Engineering |
-| `aicountly-official` | AICOUNTLY Official | General |
+| `aicountly-support` | Aicountly Support | Customer Support |
+| `aicountly-product` | Aicountly Product Team | Product |
+| `aicountly-compliance` | Aicountly Compliance Team | Compliance |
+| `aicountly-engineering` | Aicountly Engineering | Engineering |
+| `aicountly-official` | Aicountly Official | General |
 
 ### Identity Management Rules
 
@@ -114,7 +114,7 @@ Every official public answer must carry machine-readable metadata and visible te
 | Field | Description |
 |-------|-------------|
 | `is_official_answer` | TRUE for all Reach-published official answers |
-| `official_identity_slug` | Slug of the official AICOUNTLY identity |
+| `official_identity_slug` | Slug of the official Aicountly identity |
 | `official_identity_name` | Display name for rendering |
 | `ai_assisted` | TRUE if AI materially assisted drafting |
 | `human_reviewed` | TRUE when a human reviewer explicitly approved |
@@ -126,9 +126,9 @@ Every official public answer must carry machine-readable metadata and visible te
 ### Visible Disclosure Requirements
 
 All public-facing official answers must display:
-1. Official identity badge (AICOUNTLY identity name + department)
+1. Official identity badge (Aicountly identity name + department)
 2. "AI-assisted draft" label when `ai_assisted = true`
-3. "Reviewed by AICOUNTLY team" label when `human_reviewed = true`
+3. "Reviewed by Aicountly team" label when `human_reviewed = true`
 4. Correction notice (styled banner) when `correction_note` is set
 5. Withdrawn state notice when `withdrawn_at` is set
 
@@ -146,7 +146,7 @@ When `requires_professional_review = true` or `risk_classification` is `high`:
 
 Before approval, `OfficialAnswerValidationService` verifies:
 - Each material factual claim has at least one approved source reference
-- No claimed AICOUNTLY feature is absent from approved product feature records
+- No claimed Aicountly feature is absent from approved product feature records
 - No compliance assertion lacks an approved source
 - No source in the grounding snapshot has been withdrawn or expired
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updated_at": "2026-08-05",
-  "notes": "Approved source for the question_curator community agent. Each seed becomes at most one curated question, posted by the disclosed AICOUNTLY Question Curator identity with the mandatory AI disclosure. Seeds must be genuinely useful questions our users search for — never engagement bait.",
+  "notes": "Approved source for the question_curator community agent. Each seed becomes at most one curated question, posted by the disclosed Aicountly Question Curator identity with the mandatory AI disclosure. Seeds must be genuinely useful questions our users search for — never engagement bait.",
   "seeds": [
     { "key": "q-gst-late-fee-waiver", "category": "gst", "question": "Is there any late-fee relief if I missed filing GSTR-3B for two months?", "context": "Small trader, regular scheme" },
     { "key": "q-itc-blocked-17-5", "category": "gst", "question": "Which input tax credits are permanently blocked under Section 17(5)?", "context": "New accountant asking for a practical list" },

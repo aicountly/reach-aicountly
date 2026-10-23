@@ -308,7 +308,7 @@ final class CommunityInboxAutomationTest extends ApiTestCase
 
     public function testTheRoutineCanDeclineAQuestionItCannotAnswerAndTheBotClosesIt(): void
     {
-        $member = $this->member('How do I sync my Tally data into AICOUNTLY Notes?', 'saas-product-help');
+        $member = $this->member('How do I sync my Tally data into Aicountly Notes?', 'saas-product-help');
         $this->pendingIds();
 
         $bad = $this->postAuto("v1/automation/community/pending/{$member['uuid']}/decline", ['reason' => 'short']);

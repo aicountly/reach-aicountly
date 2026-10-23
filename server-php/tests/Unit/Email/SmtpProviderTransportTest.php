@@ -23,7 +23,7 @@ final class SmtpProviderTransportTest extends CIUnitTestCase
 
     private const MSG = [
         'from_email' => 'reach@aicountly.com',
-        'from_name'  => 'AICOUNTLY Reach',
+        'from_name'  => 'Aicountly Reach',
         'to'         => 'lead@example.com',
         'subject'    => 'Campaign — नमस्ते',
         'html'       => "<p>Hello</p>\n.\n<p>footer</p>",

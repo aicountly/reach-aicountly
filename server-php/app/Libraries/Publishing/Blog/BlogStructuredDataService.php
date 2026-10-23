@@ -42,7 +42,7 @@ class BlogStructuredDataService
             'inLanguage'       => $item['language'] ?? 'en',
             'publisher'        => [
                 '@type' => 'Organization',
-                'name'  => 'AICOUNTLY',
+                'name'  => 'Aicountly',
                 'url'   => 'https://aicountly.com',
             ],
         ];

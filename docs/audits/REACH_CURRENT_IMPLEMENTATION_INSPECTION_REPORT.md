@@ -1,4 +1,4 @@
-# AICOUNTLY Reach — Current Implementation Inspection Report
+# Aicountly Reach — Current Implementation Inspection Report
 
 **Audit date:** 2026-07-12  
 **Repository:** reach-aicountly  
@@ -199,7 +199,7 @@ Three sections, 24 nav items: Marketing (15), Marketing Bot (3), Administration 
 | Multi-tenant/company isolation | Missing | No `company_id` in schema |
 | Blog CRUD + workflow | Substantially Implemented | `BlogController`, `reach_blog_posts` |
 | Blog versioning | Implemented | `BlogVersionController`, `reach_blog_versions` |
-| Blog publish to AICOUNTLY.com | Stub/Placeholder | `AicountlySitePublisher.php` |
+| Blog publish to aicountly.com | Stub/Placeholder | `AicountlySitePublisher.php` |
 | Campaign management | Implemented | `CampaignController`, `reach_campaigns` |
 | Landing pages | Implemented | `LandingPageController` |
 | Social planner | Substantially Implemented | CRUD + manual queue |
@@ -539,8 +539,8 @@ All return hardcoded placeholder content with stub note (`MarketingBotService.ph
 
 | Channel | Integration detected | Auth method | Draft support | Approval enforcement | Scheduling | Publishing | Analytics | Status |
 |---------|---------------------|-------------|---------------|---------------------|------------|------------|-----------|--------|
-| AICOUNTLY.com blog | Yes | Bearer token (`AICOUNTLY_SITE_API_TOKEN`) | Yes (workflow states) | Yes (approved status required) | `scheduled_at` field | HTTP POST placeholder | No | Stub/Placeholder |
-| AICOUNTLY community | No | — | — | — | — | — | — | Missing |
+| aicountly.com blog | Yes | Bearer token (`AICOUNTLY_SITE_API_TOKEN`) | Yes (workflow states) | Yes (approved status required) | `scheduled_at` field | HTTP POST placeholder | No | Stub/Placeholder |
+| Aicountly community | No | — | — | — | — | — | — | Missing |
 | Product websites | No | — | — | — | — | — | — | Missing |
 | WordPress/headless CMS | No | — | — | — | — | — | — | Missing |
 | LinkedIn | Env token only | `LINKEDIN_API_TOKEN` | Yes | Yes (approve endpoint) | `scheduled_at` | No API call | No | Stub/Placeholder |
@@ -745,7 +745,7 @@ No `TODO`, `FIXME`, `HACK`, or `NOT IMPLEMENTED` comments found in application c
 | Screen/Feature | Appears to | Actually is | Risk | Evidence |
 |----------------|------------|-------------|------|----------|
 | Marketing Bot content generation | AI-powered drafts | Hardcoded placeholder text | High — unreviewed stub content could be approved | `MarketingBotService.php:266-283` |
-| Blog "Publish to AICOUNTLY.com" | Live publishing | HTTP placeholder or `pending_publishing` | High | `AicountlySitePublisher.php:10-15` |
+| Blog "Publish to aicountly.com" | Live publishing | HTTP placeholder or `pending_publishing` | High | `AicountlySitePublisher.php:10-15` |
 | Social approve | Auto-post to channels | Routes to `manual_queue`; manual mark-posted | Medium | `SocialPostController.php:78-88` |
 | Email/WhatsApp campaigns | Send campaigns | `mark-sent` status update only | Medium | `EmailCampaignController`, `WhatsAppCampaignController` |
 | Login page | Local auth | Orphaned; `/login` redirects; API 403 | Low | `LoginPage.jsx`, `AuthController::login` |
@@ -773,7 +773,7 @@ Current bot stubs can produce thin, unverified content (generic accounting autom
 5. **No product knowledge grounding** — AI (when integrated) could generate unsupported claims
 6. **No background job infrastructure** — LLM/publishing will block HTTP requests
 7. **No community safeguards** — architecture cannot prevent fake personas (module missing)
-8. **Blog publish assumes non-existent API** — AICOUNTLY.com has no write API today
+8. **Blog publish assumes non-existent API** — aicountly.com has no write API today
 
 ### Medium
 
@@ -792,7 +792,7 @@ Current bot stubs can produce thin, unverified content (generic accounting autom
 
 ## W. Final Current-State Conclusion
 
-**AICOUNTLY Reach today is a functional internal marketing operations portal** for a single superadmin user, with end-to-end CRUD for blog posts, campaigns, landing pages, social posts, email/WhatsApp campaigns, SEO plans, keywords, creative briefs, content calendar, leads, and marketing bot dispatch.
+**Aicountly Reach today is a functional internal marketing operations portal** for a single superadmin user, with end-to-end CRUD for blog posts, campaigns, landing pages, social posts, email/WhatsApp campaigns, SEO plans, keywords, creative briefs, content calendar, leads, and marketing bot dispatch.
 
 **What it can genuinely do today:**
 

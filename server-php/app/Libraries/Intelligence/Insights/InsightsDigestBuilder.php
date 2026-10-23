@@ -139,14 +139,14 @@ final class InsightsDigestBuilder
 
         $entities = $wiki['entities'] ?? null;
         $add('wikidata', 'Wikidata entity (Wikipedia needs independent press coverage first)', $entities === null ? 'unknown' : ($entities !== [] ? 'done' : 'missing'),
-            $entities === null ? 'Wikidata could not be queried.' : ($entities !== [] ? 'Wikidata: ' . implode(', ', array_column($entities, 'id')) . '.' : 'No Wikidata item labelled ' . ($digest['brand'] ?? 'AICOUNTLY') . '.'));
+            $entities === null ? 'Wikidata could not be queried.' : ($entities !== [] ? 'Wikidata: ' . implode(', ', array_column($entities, 'id')) . '.' : 'No Wikidata item labelled ' . ($digest['brand'] ?? 'Aicountly') . '.'));
 
         $blocked = $robots['blocked_ai_crawlers'] ?? null;
         $add('ai_crawlers_allowed', 'robots.txt lets AI crawlers (GPTBot, Google-Extended, PerplexityBot, ClaudeBot…) read the site', $blocked === null ? 'unknown' : ($blocked === [] ? 'done' : 'missing'),
             $blocked === null ? 'robots.txt could not be read.' : ($blocked === [] ? 'No AI crawler is blocked site-wide.' : 'Blocked site-wide: ' . implode(', ', $blocked) . '.'));
 
         $cmp = $sitemap['comparison_pages'] ?? null;
-        $add('comparison_pages', 'Comparison / alternative pages (e.g. "AICOUNTLY vs Tally", "Tally alternative")', $cmp === null ? 'unknown' : ($cmp >= 3 ? 'done' : ($cmp > 0 ? 'partial' : 'missing')),
+        $add('comparison_pages', 'Comparison / alternative pages (e.g. "Aicountly vs Tally", "Tally alternative")', $cmp === null ? 'unknown' : ($cmp >= 3 ? 'done' : ($cmp > 0 ? 'partial' : 'missing')),
             $cmp === null ? 'Sitemap could not be read.' : $cmp . ' comparison/alternative URLs in the sitemap (' . (int) ($sitemap['urls'] ?? 0) . ' URLs total).');
 
         $docs = $sitemap['help_docs_pages'] ?? null;

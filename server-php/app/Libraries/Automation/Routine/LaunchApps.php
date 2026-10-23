@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Automation\Routine;
 
 /**
- * The apps AICOUNTLY launches with — the routines write about these first.
+ * The apps Aicountly launches with — the routines write about these first.
  * Names, KB product slugs, source repositories and public pages only; what an
  * app does must come from its repository, never from this list.
  *

@@ -42,7 +42,7 @@ describe('SeoEditorPage', () => {
   it('renders SEO form after loading', async () => {
     api.get.mockResolvedValueOnce({
       primary_keyword: 'bank reconciliation',
-      meta_title: 'Bank Reconciliation in AICOUNTLY',
+      meta_title: 'Bank Reconciliation in Aicountly',
       meta_description: 'Learn how to reconcile bank statements.',
       slug: 'bank-reconciliation-guide',
       canonical_preference: 'self_canonical',

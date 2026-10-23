@@ -83,7 +83,7 @@ export function BotSettingsPage() {
 
         <Card title="Auto-mode allowed actions">
           <p className="text-xs text-muted mb-3">
-            Only used when mode is Auto. Public publishing to AICOUNTLY.com or social channels is <em>never</em> auto-approved.
+            Only used when mode is Auto. Public publishing to aicountly.com or social channels is <em>never</em> auto-approved.
           </p>
           <div className="grid grid-2">
             {ALL_ACTIONS.map((a) => (

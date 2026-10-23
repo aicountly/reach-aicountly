@@ -134,7 +134,7 @@ final class DailyReportTest extends ApiTestCase
 
         $this->assertSame('sent', $first['status']);
         $this->assertSame([['to' => 'pno@aicountly.com', 'subject' => $this->sent[0]['subject']]], $this->sent);
-        $this->assertStringStartsWith('AICOUNTLY daily report', $this->sent[0]['subject']);
+        $this->assertStringStartsWith('Aicountly daily report', $this->sent[0]['subject']);
 
         $second = $svc->runScheduled('2026-10-17');
         $this->assertSame('skipped', $second['status']);

@@ -2,10 +2,10 @@ import { Telescope, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { formatDateTime } from '../../utils/formatDate';
 
 const OBSERVATIONS = [
-  { id: 1, prompt: '"Best accounting software"', model: 'gpt-4o', entity: 'AiCountly', coverage: 'mentioned', citation_url: null, ran_at: '2026-07-15T07:30:00Z' },
+  { id: 1, prompt: '"Best accounting software"', model: 'gpt-4o', entity: 'Aicountly', coverage: 'mentioned', citation_url: null, ran_at: '2026-07-15T07:30:00Z' },
   { id: 2, prompt: '"Best accounting software"', model: 'gpt-4o', entity: 'QuickBooks India', coverage: 'mentioned', citation_url: null, ran_at: '2026-07-15T07:30:00Z' },
-  { id: 3, prompt: '"GST filing tools"', model: 'gpt-4o', entity: 'AiCountly', coverage: 'not_mentioned', citation_url: null, ran_at: '2026-07-14T18:00:00Z' },
-  { id: 4, prompt: 'Startup bookkeeping tools', model: 'gpt-4o-mini', entity: 'AiCountly', coverage: 'mentioned', citation_url: 'https://aicountly.com/features', ran_at: '2026-07-14T12:00:00Z' },
+  { id: 3, prompt: '"GST filing tools"', model: 'gpt-4o', entity: 'Aicountly', coverage: 'not_mentioned', citation_url: null, ran_at: '2026-07-14T18:00:00Z' },
+  { id: 4, prompt: 'Startup bookkeeping tools', model: 'gpt-4o-mini', entity: 'Aicountly', coverage: 'mentioned', citation_url: 'https://aicountly.com/features', ran_at: '2026-07-14T12:00:00Z' },
 ];
 
 const CoverageIcon = ({ coverage }) => {

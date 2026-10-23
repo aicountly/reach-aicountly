@@ -8,14 +8,14 @@ namespace App\Libraries\Video\Automation\Render;
  * Builds the Shotstack edit (timeline + output) for one pipeline item from
  * its vetted script and the stored voice-overs / visuals.
  *
- * Branded template (AICOUNTLY colours from aicountly.com's aic-brand.css and
+ * Branded template (Aicountly colours from aicountly.com's aic-brand.css and
  * Montserrat; the official logo, video.brand.logo_url, default
  * https://aicountly.com/assests/images/ai-logo.png):
  *   - white canvas; intro card (logo + title, vlog only) and an end card
  *     (logo + CTA + aicountly.com) — in both 16:9 and 9:16
  *   - each scene: its screenshot / still full-frame (stills slowly zoom),
  *     or a title card (navy text on the brand's soft green panel), the
- *     voice-over clip, and the AICOUNTLY corner mark (logo_badge_url: the
+ *     voice-over clip, and the Aicountly corner mark (logo_badge_url: the
  *     logo on a white plate, legible over dark stills; the plain logo when
  *     no badge URL is given)
  *   - lower third from the scene's on_screen_text (blue bar, white text)

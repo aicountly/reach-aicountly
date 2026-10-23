@@ -45,7 +45,7 @@ class CoverPromptBuilder
         return 'Flat editorial illustration for a professional finance and accounting blog article about "'
             . $subject . '".' . $theme . $scene . $context . $covers
             . ' Style: modern minimal vector illustration, clean geometric shapes,'
-            . ' calm green and white brand palette (AICOUNTLY greens #8cc854 and #1b7f00, navy #071a33 accents) with soft accents, generous negative space,'
+            . ' calm green and white brand palette (Aicountly greens #8cc854 and #1b7f00, navy #071a33 accents) with soft accents, generous negative space,'
             . ' subtle Indian business setting where people appear.'
             . ' Composition: 3:2 landscape, single clear focal concept, keep the bottom-right corner calm (a logo is placed there afterwards).'
             . ' Strictly no text, no words, no letters, no numbers, no logos, no watermarks.';

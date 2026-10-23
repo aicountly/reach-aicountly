@@ -19,12 +19,12 @@ use Config\Database;
  *                 BlogTaxonomy). Only when it maps to nothing: the content-base
  *                 entry's topic category, else one unambiguous title keyword.
  *   product_slug  kept (canonicalised) when set. Else, with evidence:
- *                   - the title names a live app ("Smart Books", "AICOUNTLY
+ *                   - the title names a live app ("Smart Books", "Aicountly
  *                     Billing", "Notes app") → that app;
  *                   - the topic candidate's "[product]" note or the content-base
  *                     entry's product_slug → that app, but only when the post is
  *                     app-led (stream product / problem_to_product, or an
- *                     AICOUNTLY category). A marketing-stream post only has a
+ *                     Aicountly category). A marketing-stream post only has a
  *                     product affinity and stays a topic article.
  *                 Anything less certain stays NULL.
  *

@@ -9,7 +9,7 @@ use App\Libraries\Video\Automation\VideoProviderException;
 use App\Libraries\Video\Automation\YouTubeChannelService;
 
 /**
- * Connect Reach to the AICOUNTLY YouTube channel.
+ * Connect Reach to the Aicountly YouTube channel.
  *
  *   GET  v1/video/youtube/status                 connection state (no secrets)
  *   GET  v1/video/youtube/connect                Google consent URL (admin)

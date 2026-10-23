@@ -20,18 +20,18 @@ const feed = {
   items: [
     {
       submission_id: 3, kind: 'faq', question_title: 'When is GSTR-1 due?', category_slug: 'gst', product_slug: null,
-      desk: 'AICOUNTLY GST Guide', outcome: 'pending', decision: 'pending', reasons: [], attempts: 2,
+      desk: 'Aicountly GST Guide', outcome: 'pending', decision: 'pending', reasons: [], attempts: 2,
       next_retry_at: '2026-10-17 12:00:00+00', last_error: 'Vetting model returned HTTP 503', public_url: null,
       answer_id: 'a3', question_id: 'q3', risk_tier: 2, created_at: '2026-10-17 10:00:00+00',
     },
     {
       submission_id: 2, kind: 'member_answer', question_title: 'Can I claim ITC on a car?', category_slug: 'gst',
-      desk: 'AICOUNTLY GST Guide', outcome: 'withdrawn', decision: 'reject', reasons: ['The ITC rule cited is wrong.'],
+      desk: 'Aicountly GST Guide', outcome: 'withdrawn', decision: 'reject', reasons: ['The ITC rule cited is wrong.'],
       attempts: 1, public_url: null, answer_id: 'a2', question_id: 'q2', risk_tier: 1, created_at: '2026-10-17 09:00:00+00',
     },
     {
       submission_id: 1, kind: 'faq', question_title: 'How do I add a godown in Inventory?', category_slug: 'saas-product-help',
-      product_slug: 'inventory', desk: 'AICOUNTLY Product Guide', outcome: 'published', decision: 'approve', reasons: ['Accurate.'],
+      product_slug: 'inventory', desk: 'Aicountly Product Guide', outcome: 'published', decision: 'approve', reasons: ['Accurate.'],
       attempts: 1, public_url: 'https://aicountly.com/community/question/godown#official-answer', answer_id: 'a1', question_id: 'q1',
       risk_tier: 0, created_at: '2026-10-17 08:00:00+00',
     },

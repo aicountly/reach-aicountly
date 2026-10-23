@@ -455,7 +455,7 @@ class AiGenerationOrchestrator
             $lines[] = "{$label}: {$value}";
         }
 
-        return 'Write ' . ($request['content_type'] ?? 'content') . ' for AICOUNTLY readers'
+        return 'Write ' . ($request['content_type'] ?? 'content') . ' for Aicountly readers'
             . ($lines !== [] ? " on exactly this topic:\n" . implode("\n", $lines) . "\n" : '. ')
             . 'The text must be about that topic only. Never describe this request, its task, intent, context or pipeline, and never mention being an AI. '
             . (string) ($params['instructions'] ?? '');

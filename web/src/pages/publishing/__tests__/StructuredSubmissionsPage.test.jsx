@@ -15,7 +15,7 @@ const viewer = { auth: { user: { id: 2, role: 'viewer' }, permissions: ['publish
 
 const published = {
   id: 7, product_slug: 'billing', product_name: 'Billing', version: '1.1', slug: 'billing-v1-1',
-  title: 'Release Notes for AICOUNTLY Billing Version 1.1', status: 'published', vetting_decision: 'approve',
+  title: 'Release Notes for Aicountly Billing Version 1.1', status: 'published', vetting_decision: 'approve',
   vetting_run_id: 41, approved_by: 'Reach System Bot', reasons: ['Simplified two bullets.'],
   public_url: 'https://aicountly.com/releases/billing-v1-1', retryable: false, updated_at: '2026-10-17T15:30:00Z',
 };
@@ -41,7 +41,7 @@ describe('Release notes publishing page', () => {
     api.get.mockResolvedValueOnce({ items: [published, rejected, failed], total: 3 });
     renderWithAuth(<ReleaseNotesPublishingPage />, publisher);
 
-    await waitFor(() => expect(screen.getByText('Release Notes for AICOUNTLY Billing Version 1.1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Release Notes for Aicountly Billing Version 1.1')).toBeInTheDocument());
     expect(api.get).toHaveBeenCalledWith('v1/publishing/release-notes', undefined);
     expect(screen.getByText('billing-v1-1').closest('a')).toHaveAttribute('href', 'https://aicountly.com/releases/billing-v1-1');
     expect(screen.getByText('Describes a security fix in detail.')).toBeInTheDocument();

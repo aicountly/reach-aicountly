@@ -2,7 +2,7 @@
 
 ## Objective
 
-Build a production-grade community Q&A automation subsystem for AICOUNTLY Reach. Collect genuine community questions, generate grounded official answers, route through human approval, and publish securely to aicountly.com/community.
+Build a production-grade community Q&A automation subsystem for Aicountly Reach. Collect genuine community questions, generate grounded official answers, route through human approval, and publish securely to aicountly.com/community.
 
 ## Frozen Baselines
 

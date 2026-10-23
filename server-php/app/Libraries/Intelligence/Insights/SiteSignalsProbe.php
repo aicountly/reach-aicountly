@@ -26,7 +26,7 @@ final class SiteSignalsProbe
     }
 
     /** @return array<string, mixed> */
-    public function probe(string $siteUrl, string $brand = 'AICOUNTLY'): array
+    public function probe(string $siteUrl, string $brand = 'Aicountly'): array
     {
         $site = rtrim($siteUrl, '/');
 

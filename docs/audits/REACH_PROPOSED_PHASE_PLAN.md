@@ -1,4 +1,4 @@
-# AICOUNTLY Reach — Proposed Phase Plan
+# Aicountly Reach — Proposed Phase Plan
 
 **Audit date:** 2026-07-12  
 **Repository:** reach-aicountly  
@@ -155,7 +155,7 @@ Phase 0 (roles, tests).
 
 ### Acceptance Criteria
 
-- [ ] All active AICOUNTLY products represented with at least name, slug, description
+- [ ] All active Aicountly products represented with at least name, slug, description
 - [ ] Each product has ≥1 module and ≥1 feature documented
 - [ ] Search-intent library has ≥20 intents mapped to products
 - [ ] Brand voice rules documented and editable
@@ -350,7 +350,7 @@ Complete blog workflow automation and introduce knowledge-base generation with S
 ### Missing Capabilities
 
 - Knowledge-base module (tables, routes, UI)
-- Real AICOUNTLY.com publishing API
+- Real aicountly.com publishing API
 - Structured data (JSON-LD) generation
 - Internal link recommendations
 - Sitemap generation
@@ -359,7 +359,7 @@ Complete blog workflow automation and introduce knowledge-base generation with S
 
 1. Create knowledge-base tables (`reach_kb_articles`, `reach_kb_categories`)
 2. Build KB CRUD API and frontend pages
-3. Integrate real AICOUNTLY.com blog write API (or shared PostgreSQL publish path via Flow)
+3. Integrate real aicountly.com blog write API (or shared PostgreSQL publish path via Flow)
 4. Implement structured data generator (Article, FAQPage schemas)
 5. Build internal link recommendation engine from content index
 6. Add automated SEO scoring to blog/KB before approval
@@ -402,7 +402,7 @@ Phase 1 (product mapping), Phase 2 (content studio), Phase 3 (AI generation, val
 
 ### Acceptance Criteria
 
-- [ ] Blog published to AICOUNTLY.com (or documented staging target) with real API
+- [ ] Blog published to aicountly.com (or documented staging target) with real API
 - [ ] KB articles creatable, approvable, and publishable
 - [ ] JSON-LD generated for blog and KB articles
 - [ ] Internal link suggestions appear in editor
@@ -420,7 +420,7 @@ Phase 1 (product mapping), Phase 2 (content studio), Phase 3 (AI generation, val
 
 ### Objective
 
-Integrate with AICOUNTLY community platform for transparent official Q&A publishing with moderation and safeguards against fabricated users.
+Integrate with Aicountly community platform for transparent official Q&A publishing with moderation and safeguards against fabricated users.
 
 ### Existing Reusable Components
 
