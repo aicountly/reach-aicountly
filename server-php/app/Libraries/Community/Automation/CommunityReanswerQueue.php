@@ -40,10 +40,15 @@ class CommunityReanswerQueue
     public const MAX_ATTEMPTS = 2;
     public const CORRECTION_NOTE = 'Updated for accuracy.';
 
-    /** Answer-row fields a failed correction puts back. */
+    /**
+     * Answer-row fields a failed correction puts back. ai_assisted and
+     * human_reviewed describe the approved version (the correction sets
+     * ai_assisted, its system approval clears human_reviewed), so they go back
+     * with it. Snapshots taken before these were added simply lack them.
+     */
     private const SNAPSHOT_FIELDS = [
         'status', 'publication_status', 'approved_version', 'approved_version_checksum', 'current_version',
-        'correction_state', 'correction_note', 'withdrawal_state',
+        'correction_state', 'correction_note', 'withdrawal_state', 'ai_assisted', 'human_reviewed',
     ];
 
     private BaseConnection $db;
@@ -224,6 +229,24 @@ class CommunityReanswerQueue
             'reanswer_id' => (int) $row['id'], 'answer_id' => $answerId, 'outcome' => $outcome,
             'mode' => $row['mode'], 'reasons' => array_slice($reasons, 0, 3),
         ]);
+    }
+
+    /**
+     * Put an answer back as it was before the correction this request made
+     * (its replaced_state). For community:revet-repair; the pipeline itself
+     * does this in onNotPublished().
+     *
+     * @param array<string, mixed> $row a reach_community_reanswers row
+     */
+    public function restoreReplacedState(array $row): bool
+    {
+        $snapshot = self::decode($row['replaced_state'] ?? null);
+        if ($snapshot === []) {
+            return false;
+        }
+        $this->restore((int) $row['answer_id'], $snapshot);
+
+        return true;
     }
 
     /** @param array<string, mixed> $snapshot */
