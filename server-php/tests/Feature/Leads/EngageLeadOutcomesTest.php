@@ -268,6 +268,20 @@ final class EngageLeadOutcomesTest extends ApiTestCase
         $this->assertSame(1, $items('search=LD-000200')['total'], 'search covers the Engage lead code');
         $this->assertSame(1, $items('search=SLR-000123')['total'], 'and the seller referral code');
 
+        // An ad campaign's leads: the AdsSummary predicate (trimmed, case-insensitive
+        // UTM, blank medium matches, inclusive date window).
+        $db->table('reach_leads')->insertBatch([
+            ['name' => 'Ad A', 'priority' => 'normal', 'utm_source' => ' Facebook', 'utm_campaign' => 'GST-Oct', 'utm_medium' => 'paid_social', 'created_at' => '2026-10-05 10:00:00'],
+            ['name' => 'Ad B', 'priority' => 'normal', 'utm_source' => 'facebook', 'utm_campaign' => 'gst-oct', 'utm_medium' => '', 'created_at' => '2026-10-14 23:30:00'],
+            ['name' => 'Ad C', 'priority' => 'normal', 'utm_source' => 'facebook', 'utm_campaign' => 'gst-oct', 'utm_medium' => 'email', 'created_at' => '2026-10-06 10:00:00'],
+            ['name' => 'Ad D', 'priority' => 'normal', 'utm_source' => 'facebook', 'utm_campaign' => 'gst-oct', 'utm_medium' => 'paid_social', 'created_at' => '2026-10-15 00:00:00'],
+        ]);
+        $ads = $items('utm_source=facebook&utm_medium=paid_social&utm_campaign=gst-oct&created_from=2026-10-01&created_to=2026-10-14');
+        $names = array_column($ads['items'], 'name');
+        sort($names);
+        $this->assertSame(['Ad A', 'Ad B'], $names, 'C has another medium; D is a day past the window.');
+        $this->assertSame(2, $ads['total']);
+
         // The campaign page's "Leads captured" count is the list it links to.
         $campaign = self::data($this->withHeaders($h)->call('GET', 'v1/campaigns/' . $this->campaignId))['data'];
         $this->assertSame($items('campaign_id=' . $this->campaignId)['total'], $campaign['leads_captured']);

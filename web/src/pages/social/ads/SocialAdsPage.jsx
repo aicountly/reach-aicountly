@@ -6,6 +6,8 @@ import { Alert } from '../../../components/common/Alert';
 import { Loader } from '../../../components/common/Loader';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { usePermission } from '../../../hooks/usePermission';
+import { DrillLink, drillHref } from '../../../components/drill';
+import { ROUTES } from '../../../constants/routes';
 import { formatInr } from '../../../utils/formatInr';
 import { formatDate, todayInputValue } from '../../../utils/formatDate';
 import { ADS_PLATFORM_LIST, ADS_PLATFORMS, DEFAULT_CAMPAIGN, DEFAULT_LANDING, buildAdsLink } from './adsUtm';
@@ -45,15 +47,38 @@ function emptyForm(platform = 'google_search') {
   };
 }
 
-function Tile({ label, value, hint, testId }) {
-  return (
-    <div className="stat-tile" data-testid={testId}>
+/**
+ * The leads AdsSummary counted for one campaign: its UTM set, captured within
+ * the campaign's dates inside the summary period. Zero is not a link.
+ */
+function campaignLeadsHref(figure, period) {
+  if (!figure?.leads || !figure.utm) return undefined;
+  const later = (a, b) => (a && b ? (a > b ? a : b) : a || b);
+  const earlier = (a, b) => (a && b ? (a < b ? a : b) : a || b);
+  return drillHref(ROUTES.LEADS, {
+    utm_source: figure.utm.source,
+    utm_medium: figure.utm.medium,
+    utm_campaign: figure.utm.campaign,
+    created_from: later(period?.from, figure.start_date),
+    created_to: earlier(period?.to, figure.end_date),
+  });
+}
+
+/** Totals have no single list behind them; `href` points at the per-campaign split. */
+function Tile({ label, value, hint, testId, href }) {
+  const body = (
+    <>
       <div className="stat-tile__label">{label}</div>
       <div className="stat-tile__value">{value}</div>
       {hint && <div className="stat-tile__hint">{hint}</div>}
-    </div>
+    </>
   );
+  return href
+    ? <a className="stat-tile" data-testid={testId} href={href} title="See it per campaign">{body}</a>
+    : <div className="stat-tile" data-testid={testId}>{body}</div>;
 }
+
+const REGISTER = '#ads-campaign-register';
 
 export function SocialAdsPage() {
   const { hasAny } = usePermission();
@@ -153,6 +178,7 @@ export function SocialAdsPage() {
   };
 
   const t = summary?.totals;
+  const perCampaign = campaigns.length > 0 ? REGISTER : undefined;
   const live = campaigns.filter((c) => c.status === 'live').length;
 
   return (
@@ -181,10 +207,10 @@ export function SocialAdsPage() {
 
       {loading && !summary ? <Loader /> : (
         <div className="stat-grid" data-testid="ads-summary">
-          <Tile testId="tile-spend" label="Spend (30 days)" value={inr(t?.spend_inr)} hint={summary?.has_results ? 'from entered / imported results' : 'no results entered yet'} />
-          <Tile testId="tile-clicks" label="Clicks" value={num(t?.clicks)} hint={`CTR ${pct(t?.ctr)} · CPC ${inr(t?.cpc_inr)}`} />
-          <Tile testId="tile-leads" label="Leads (Reach capture)" value={num(t?.leads)} hint={`Cost per lead ${inr(t?.cost_per_lead_inr)}`} />
-          <Tile testId="tile-signups" label="Sign-ups (my.aicountly)" value={num(t?.signups)} hint={`Cost per sign-up ${inr(t?.cost_per_signup_inr)}`} />
+          <Tile testId="tile-spend" label="Spend (30 days)" href={perCampaign} value={inr(t?.spend_inr)} hint={summary?.has_results ? 'from entered / imported results' : 'no results entered yet'} />
+          <Tile testId="tile-clicks" label="Clicks" href={perCampaign} value={num(t?.clicks)} hint={`CTR ${pct(t?.ctr)} · CPC ${inr(t?.cpc_inr)}`} />
+          <Tile testId="tile-leads" label="Leads (Reach capture)" href={t?.leads ? perCampaign : undefined} value={num(t?.leads)} hint={`Cost per lead ${inr(t?.cost_per_lead_inr)}`} />
+          <Tile testId="tile-signups" label="Sign-ups (my.aicountly)" href={perCampaign} value={num(t?.signups)} hint={`Cost per sign-up ${inr(t?.cost_per_signup_inr)}`} />
           <Tile testId="tile-budget" label="Live daily budget" value={inr(summary?.budget?.live_daily_inr)}
             hint={`${live} live · plan ${inr(summary?.budget?.launch_plan?.daily_total_inr)}/day (a plan, not spend)`} />
         </div>
@@ -227,6 +253,7 @@ export function SocialAdsPage() {
         </Card>
       )}
 
+      <div id="ads-campaign-register" />
       <Card title="Campaign register">
         {campaigns.length === 0 ? (
           <EmptyState message="No paid campaigns registered. Register each campaign after placing it in its ads manager, or add the launch plan." />
@@ -249,7 +276,7 @@ export function SocialAdsPage() {
                       <td>{formatDate(c.start_date)} → {c.end_date ? formatDate(c.end_date) : 'open'}</td>
                       <td>{inr(f.spend_inr)}</td>
                       <td>{num(f.clicks)}</td>
-                      <td>{num(f.leads)}</td>
+                      <td><DrillLink to={campaignLeadsHref(f, summary?.period)} label={`${f.leads} leads for ${c.name}`}>{num(f.leads)}</DrillLink></td>
                       <td>{num(f.signups)}</td>
                       <td>{(c.tracking_links || []).map((l) => (
                         <div key={l.url} className="text-xs">

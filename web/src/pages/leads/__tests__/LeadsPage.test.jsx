@@ -21,6 +21,16 @@ beforeEach(() => {
 });
 
 describe('LeadsPage drill-down', () => {
+  it("narrows to an ad campaign's leads in the window the ads summary counted", async () => {
+    renderWithAuth(<LeadsPage />, { route: '/leads?utm_source=facebook&utm_medium=paid_social&utm_campaign=gst-oct&created_from=2026-10-01&created_to=2026-10-14' });
+
+    await waitFor(() => expect(leadsService.list).toHaveBeenCalled());
+    expect(leadsService.list).toHaveBeenCalledWith(expect.objectContaining({
+      utm_source: 'facebook', utm_medium: 'paid_social', utm_campaign: 'gst-oct', created_from: '2026-10-01', created_to: '2026-10-14',
+    }));
+    expect(screen.getByRole('link', { name: /clear utm_campaign filter/i })).toBeInTheDocument();
+  });
+
   it('applies every filter a drill link can carry', async () => {
     renderWithAuth(<LeadsPage />, { route: '/leads?campaign_id=7&days=30&engage_push_status=failed&source_kind=social&search=asha' });
 

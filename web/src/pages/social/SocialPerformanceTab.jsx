@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BarChart3, RefreshCw } from 'lucide-react';
 import api from '../../services/api';
+import { DrillLink, drillHref } from '../../components/drill';
+import { ROUTES } from '../../constants/routes';
 import { postedWithin, successRate, tabulate } from './socialAdsModel';
 
 const STATUSES = ['posted', 'failed', 'publishing', 'scheduled'];
 const LIMIT = 200;
+
+/** The calendar narrowed to one status (and network); zero is not a link. */
+const calendarHref = (count, status, channel) => (
+  count > 0 ? drillHref(ROUTES.SOCIAL_CALENDAR, { status, channel }) : undefined
+);
 
 /**
  * Performance — what Reach actually stores about social posts: delivery
@@ -57,14 +64,14 @@ export default function SocialPerformanceTab() {
       {totals && (
         <>
           <div className="as-summary" data-testid="performance-tiles">
-            <div className="as-tile"><span className="as-tile__label">Posted</span><span className="as-tile__value">{totals.posted}</span>
+            <div className="as-tile"><span className="as-tile__label">Posted</span><span className="as-tile__value"><DrillLink to={calendarHref(totals.posted, 'posted')}>{totals.posted}</DrillLink></span>
               <span className="as-tile__hint">{postedWithin(data.posted.items, 7)} in the last 7 days · {postedWithin(data.posted.items, 30)} in 30</span></div>
-            <div className="as-tile"><span className="as-tile__label">Failed</span><span className="as-tile__value">{totals.failed}</span>
+            <div className="as-tile"><span className="as-tile__label">Failed</span><span className="as-tile__value"><DrillLink to={calendarHref(totals.failed, 'failed')}>{totals.failed}</DrillLink></span>
               <span className="as-tile__hint">Retry from Calendar &amp; queue</span></div>
-            <div className="as-tile"><span className="as-tile__label">Publishing now</span><span className="as-tile__value">{totals.publishing}</span>
+            <div className="as-tile"><span className="as-tile__label">Publishing now</span><span className="as-tile__value"><DrillLink to={calendarHref(totals.publishing, 'publishing')}>{totals.publishing}</DrillLink></span>
               <span className="as-tile__hint">Accepted, waiting for confirmation</span></div>
             <div className="as-tile"><span className="as-tile__label">Delivery success</span><span className="as-tile__value">{rate == null ? '—' : `${rate}%`}</span>
-              <span className="as-tile__hint">posted ÷ (posted + failed){totals.scheduled ? ` · ${totals.scheduled} scheduled` : ''}</span></div>
+              <span className="as-tile__hint">posted ÷ (posted + failed){totals.scheduled ? <> · <DrillLink to={calendarHref(totals.scheduled, 'scheduled')}>{totals.scheduled} scheduled</DrillLink></> : ''}</span></div>
           </div>
 
           {anything ? (
@@ -79,7 +86,17 @@ export default function SocialPerformanceTab() {
                     {table.rows.map((r) => (
                       <tr key={r.key}>
                         <th scope="row"><span className="sa-netcell"><r.icon size={15} aria-hidden="true" /> {r.label}</span></th>
-                        {STATUSES.map((s) => <td key={s}>{r.counts[s]}</td>)}
+                        {/* "Other" networks have no channel value to filter on. */}
+                        {STATUSES.map((s) => (
+                          <td key={s}>
+                            <DrillLink
+                              to={r.key === 'other' ? undefined : calendarHref(r.counts[s], s, r.key)}
+                              label={`${r.counts[s]} ${s} on ${r.label}`}
+                            >
+                              {r.counts[s]}
+                            </DrillLink>
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

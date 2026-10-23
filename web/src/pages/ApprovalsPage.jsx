@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, X, RotateCcw, AlertTriangle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { approvalService } from '../services/approvalService';
 import { Card } from '../components/common/Card';
@@ -8,11 +9,13 @@ import { DataTable } from '../components/common/DataTable';
 import { ApprovalBadge } from '../components/common/ApprovalBadge';
 import { usePermission } from '../hooks/usePermission';
 import { formatDate, isPast } from '../utils/formatDate';
+import { DrillLink, useUrlFilter } from '../components/drill';
+import { ROUTES } from '../constants/routes';
 
 /** Fetch approval queue from Phase 2 endpoint, fall back to Phase 0 list. */
 async function fetchQueue(area) {
   try {
-    const res = await fetch(`/api/v1/approval-queue?area=${area}`, {
+    const res = await fetch(`/api/v1/approval-queue?area=${encodeURIComponent(area)}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('reach_token')}` },
     });
     if (res.ok) {
@@ -87,6 +90,15 @@ function RiskBadge({ level }) {
   );
 }
 
+/**
+ * The content item a row is about: queue rows are content items; Phase 0
+ * fallback rows are reach_approvals rows pointing at their subject.
+ */
+function contentItemId(row) {
+  if (row.subject_type) return row.subject_type === 'content_item' ? row.subject_id : null;
+  return row.id;
+}
+
 function WorkflowBadge({ status }) {
   const colors = {
     review_pending:    '#3b82f6',
@@ -107,7 +119,9 @@ function WorkflowBadge({ status }) {
 }
 
 export function ApprovalsPage() {
-  const [activeArea, setActiveArea]     = useState('today');
+  // ?area= — the dashboard links straight to an area, and the view is shareable.
+  const [areaParam, setActiveArea]      = useUrlFilter('area', 'today');
+  const activeArea = AREAS.some((a) => a.id === areaParam) ? areaParam : 'today';
   const [rows, setRows]                 = useState([]);
   const [stats, setStats]               = useState({});
   const [loading, setLoading]           = useState(true);
@@ -204,12 +218,18 @@ export function ApprovalsPage() {
       ),
     },
     { key: 'id', label: '#', render: (r) => r.id },
-    { key: 'title', label: 'Title', render: (r) => (
+    { key: 'title', label: 'Title', render: (r) => {
+      const title = r.title || r.summary || r.subject_type + ' #' + r.subject_id;
+      const itemId = contentItemId(r);
+      return (
       <div>
-        <div style={{ fontWeight: 600, fontSize: 13 }}>{r.title || r.summary || r.subject_type + ' #' + r.subject_id}</div>
+        <div style={{ fontWeight: 600, fontSize: 13 }}>
+          {itemId ? <Link to={ROUTES.CONTENT_DETAIL.replace(':id', itemId)}>{title}</Link> : title}
+        </div>
         {r.content_type && <div style={{ fontSize: 11, color: '#6b7280' }}>{r.content_type?.replace(/_/g, ' ')}</div>}
       </div>
-    )},
+      );
+    }},
     { key: 'status', label: 'Status', render: (r) => <WorkflowBadge status={r.workflow_status || r.decision} /> },
     { key: 'risk', label: 'Risk', render: (r) => r.risk_level ? <RiskBadge level={r.risk_level} /> : '—' },
     { key: 'due', label: 'Review Due', render: (r) => r.review_due_at ? (
@@ -217,7 +237,11 @@ export function ApprovalsPage() {
         {formatDate(r.review_due_at)}
       </span>
     ) : '—' },
-    { key: 'product', label: 'Product', render: (r) => r.primary_product_id ? `#${r.primary_product_id}` : '—' },
+    { key: 'product', label: 'Product', render: (r) => r.primary_product_id ? (
+      <DrillLink to={ROUTES.KNOWLEDGE_PRODUCT.replace(':id', r.primary_product_id)} label={`Open product #${r.primary_product_id}`}>
+        #{r.primary_product_id}
+      </DrillLink>
+    ) : '—' },
     { key: 'expand', label: '', render: (r) => (
       <button className="btn btn-ghost btn-sm" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
         {expandedId === r.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}

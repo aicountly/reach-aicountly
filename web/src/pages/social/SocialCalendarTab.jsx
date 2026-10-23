@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, RefreshCw, RotateCcw } from 'lucide-react';
+import { ExternalLink, RefreshCw, RotateCcw, X } from 'lucide-react';
 import api from '../../services/api';
+import { useUrlFilter } from '../../components/drill';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDate, formatDateTime } from '../../utils/formatDate';
 import {
-  CALENDAR_FILTERS, NETWORKS, canRetry, groupByDay, isPipelineVideo, networkMeta, postStatusMeta, postTitle,
+  CALENDAR_FILTERS, NETWORKS, calendarFilter, canRetry, groupByDay, isPipelineVideo, networkMeta, postStatusMeta, postTitle,
   postWhen, sortPosts,
 } from './socialAdsModel';
 
@@ -73,8 +74,10 @@ function PostRow({ post, canDispatch, confirming, busy, onRetry, onAskRetry, onC
 export default function SocialCalendarTab() {
   const { has } = usePermission();
   const canDispatch = has('distribution.dispatch');
-  const [filterId, setFilterId] = useState('upcoming');
-  const [network, setNetwork] = useState('');
+  // ?status= / ?channel= — Performance and the dashboard link here narrowed
+  // (?status=failed&channel=linkedin), and a filtered view stays shareable.
+  const [filterId, setFilterId] = useUrlFilter('status', 'upcoming');
+  const [network, setNetwork] = useUrlFilter('channel');
   const [posts, setPosts] = useState([]);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -83,7 +86,7 @@ export default function SocialCalendarTab() {
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  const filter = CALENDAR_FILTERS.find((f) => f.id === filterId) ?? CALENDAR_FILTERS[0];
+  const filter = useMemo(() => calendarFilter(filterId), [filterId]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -147,13 +150,24 @@ export default function SocialCalendarTab() {
           <button
             key={f.id}
             type="button"
-            className={`sa-chip${f.id === filterId ? ' sa-chip--active' : ''}`}
-            aria-pressed={f.id === filterId}
+            className={`sa-chip${f.id === filter.id ? ' sa-chip--active' : ''}`}
+            aria-pressed={f.id === filter.id}
             onClick={() => { setFilterId(f.id); setConfirmId(null); }}
           >
             {f.label}
           </button>
         ))}
+        {filter.narrowed && (
+          <button
+            type="button"
+            className="sa-chip sa-chip--active"
+            onClick={() => { setFilterId(''); setConfirmId(null); }}
+            aria-label={`Clear ${filter.label} filter`}
+            title="Show all upcoming posts"
+          >
+            {filter.label} <X size={12} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {notice && <div className={`alert ${notice.ok ? 'alert-success' : 'alert-danger'}`} role="status">{notice.text}</div>}

@@ -56,6 +56,20 @@ export const CALENDAR_FILTERS = [
   { id: 'failed',     label: 'Failed',     statuses: ['failed'], order: 'desc' },
 ];
 
+/**
+ * The calendar view for ?status= — a chip id, or a single post status a drill
+ * link narrows to (?status=scheduled lists scheduled only, not all of
+ * Upcoming). Anything else falls back to Upcoming.
+ */
+export function calendarFilter(value) {
+  const chip = CALENDAR_FILTERS.find((f) => f.id === value);
+  if (chip) return chip;
+  if (value && POST_STATUS_META[value]) {
+    return { id: value, label: POST_STATUS_META[value].label, statuses: [value], order: 'asc', narrowed: true };
+  }
+  return CALENDAR_FILTERS[0];
+}
+
 /** The time that matters for a post in a calendar: when it goes / went out. */
 export function postWhen(post) {
   if (!post) return null;

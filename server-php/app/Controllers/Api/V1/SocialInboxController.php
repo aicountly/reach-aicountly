@@ -14,7 +14,8 @@ use Config\Database;
 /**
  * Social → Inbox: what the social inbox bot read and did.
  *
- *   GET  v1/social/inbox               list (status, classification, network, severity, search, page, limit)
+ *   GET  v1/social/inbox               list (status, classification, network, severity, reply_status, has=ticket|lead,
+ *                                      since_hours, replied_since_hours, search, page, limit)
  *   GET  v1/social/inbox/summary       24 h / 7 day counts, the last run, configuration state
  *   POST v1/social/inbox/{id}/retry    handle a failed item again (social.dispatch)
  */
@@ -37,6 +38,20 @@ class SocialInboxController extends BaseApiController
             $v = trim((string) $this->request->getGet($f));
             if ($v !== '' && preg_match('/^[a-z_]{1,32}$/', $v)) {
                 $q->where($f, $v);
+            }
+        }
+        // The summary tiles' predicates (SocialInboxService::stats), so a tile
+        // opens exactly the rows it counted.
+        $has = (string) $this->request->getGet('has');
+        if ($has === 'ticket') {
+            $q->where('ticket_number IS NOT NULL', null, false);
+        } elseif ($has === 'lead') {
+            $q->where('lead_id IS NOT NULL', null, false);
+        }
+        foreach (['since_hours' => 'fetched_at', 'replied_since_hours' => 'replied_at'] as $param => $col) {
+            $h = trim((string) $this->request->getGet($param));
+            if ($h !== '' && ctype_digit($h) && (int) $h >= 1 && (int) $h <= 24 * 90) {
+                $q->where($col . ' >=', gmdate('Y-m-d H:i:sP', time() - (int) $h * 3600));
             }
         }
         $search = trim((string) $this->request->getGet('search'));

@@ -22,7 +22,12 @@ const STATES = ['','pending_push','pushed','failed','duplicate','rejected','retr
 const SOURCE_KINDS = ['form', 'landing', 'campaign', 'social', 'social_inbox', 'email', 'whatsapp', 'event', 'referral', 'manual'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 // Drill filters with no control of their own — shown as removable chips.
-const CHIP_FILTERS = { lead_id: 'Lead #', campaign_id: 'Campaign #', landing_page_id: 'Landing page #', days: 'Captured in the last' };
+const CHIP_FILTERS = {
+  lead_id: 'Lead #', campaign_id: 'Campaign #', landing_page_id: 'Landing page #', days: 'Captured in the last',
+  // An ad campaign's leads (Social → Ads links with the window AdsSummary counted).
+  utm_source: 'utm_source: ', utm_medium: 'utm_medium: ', utm_campaign: 'utm_campaign: ',
+  created_from: 'From ', created_to: 'To ',
+};
 
 export function LeadsPage() {
   const [rows, setRows] = useState([]);
@@ -160,7 +165,7 @@ export function LeadsPage() {
       {activeChips.length > 0 && (
         <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
           {activeChips.map(([k, chip]) => (
-            <Link key={k} to={here({ [k]: '' })} className="badge badge-secondary" aria-label={`Clear ${chip.replace(' #', '')} filter`}>
+            <Link key={k} to={here({ [k]: '' })} className="badge badge-secondary" aria-label={`Clear ${chip.replace(/[ #:]+$/, '')} filter`}>
               {k === 'days' ? `${chip} ${chipValues[k]} days` : `${chip}${chipValues[k]}`} ✕
             </Link>
           ))}

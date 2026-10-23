@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { socialInboxService } from '../../services/socialInboxService';
+import { DrillLink, drillHref, useDrillFilters } from '../../components/drill';
+import { ROUTES } from '../../constants/routes';
 import { usePermission } from '../../hooks/usePermission';
 import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
@@ -13,6 +16,25 @@ const STATUSES = ['', 'new', 'retry', 'deferred', 'replied', 'ticket_created', '
 const CLASSES = ['', 'question', 'praise', 'complaint', 'sales_lead', 'spam_abuse', 'sensitive', 'other'];
 const NETWORKS = ['', 'linkedin', 'x', 'facebook', 'instagram', 'youtube', 'tiktok'];
 const LIMIT = 25;
+
+/**
+ * URL filters. The first four have controls; the rest come from the "Last 24
+ * hours" tiles and match SocialInboxService::stats() predicates (has=ticket /
+ * has=lead, since_hours on fetched_at, replied_since_hours on replied_at), so
+ * a tile's number and the list it opens agree.
+ */
+const FILTER_KEYS = ['status', 'classification', 'network', 'search', 'reply_status', 'has', 'since_hours', 'replied_since_hours'];
+const NONE = Object.fromEntries(FILTER_KEYS.map((k) => [k, '']));
+
+/** Lead rows the social inbox bot creates (SocialInboxService). */
+const SOCIAL_LEAD_SOURCE = 'social_inbox';
+
+const CHIP_LABELS = {
+  reply_status: (v) => `Reply ${label(v)}`,
+  has: (v) => (v === 'ticket' ? 'Has a Flow ticket' : v === 'lead' ? 'Created a lead' : `Has ${v}`),
+  since_hours: (v) => `Read in the last ${v} h`,
+  replied_since_hours: (v) => `Replied in the last ${v} h`,
+};
 
 const label = (s) => (s ? String(s).replace(/_/g, ' ') : '—');
 
@@ -29,12 +51,20 @@ function Badge({ tone, children, testId }) {
   return <span className={`badge badge-${tone || 'secondary'}`} data-testid={testId}>{children}</span>;
 }
 
-function Tile({ title, value, testId }) {
-  return (
-    <div className="stat-tile" data-testid={testId}>
+/** A day tile; with onDrill (and a non-zero value) it narrows the list below. */
+function Tile({ title, value, testId, onDrill, active }) {
+  const body = (
+    <>
       <div className="stat-tile__label">{title}</div>
       <div className="stat-tile__value">{value ?? 0}</div>
-    </div>
+    </>
+  );
+  if (!onDrill || !value) return <div className="stat-tile" data-testid={testId}>{body}</div>;
+  return (
+    <button type="button" className={`stat-tile${active ? ' is-active' : ''}`} data-testid={testId}
+            onClick={onDrill} aria-pressed={!!active} title="Show these messages">
+      {body}
+    </button>
   );
 }
 
@@ -52,10 +82,14 @@ export function SocialInboxPage() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('');
-  const [classification, setClassification] = useState('');
-  const [network, setNetwork] = useState('');
-  const [search, setSearch] = useState('');
+  // Filters live in the URL so a tile drill is shareable and Back undoes it.
+  const drill = useDrillFilters(FILTER_KEYS);
+  const f = drill.filters;
+  const { status, classification, network, search } = f;
+  // Typed / selected filters replace the entry; tile drills push one.
+  const setFilter = (key, value) => { setPage(1); drill.set(key, value); };
+  const narrow = (patch) => { setPage(1); drill.drill({ ...NONE, ...patch }); };
+  const isOnly = (patch) => FILTER_KEYS.every((k) => (patch[k] ?? '') === f[k]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -64,9 +98,11 @@ export function SocialInboxPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
+    const params = { status, classification, network, search, page, limit: LIMIT };
+    ['reply_status', 'has', 'since_hours', 'replied_since_hours'].forEach((k) => { if (f[k]) params[k] = f[k]; });
     Promise.all([
       socialInboxService.summary(),
-      socialInboxService.list({ status, classification, network, search, page, limit: LIMIT }),
+      socialInboxService.list(params),
     ])
       .then(([s, list]) => {
         setSummary(s);
@@ -75,7 +111,7 @@ export function SocialInboxPage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [status, classification, network, search, page]);
+  }, [f, status, classification, network, search, page]);
   useEffect(() => { load(); }, [load]);
 
   const retry = async (row) => {
@@ -126,7 +162,7 @@ export function SocialInboxPage() {
             Flow {r.ticket_url ? <a href={r.ticket_url} target="_blank" rel="noopener noreferrer">{r.ticket_number}</a> : r.ticket_number}
           </div>
         )}
-        {r.lead_id && <div className="text-xs mt-1">Lead #{r.lead_id}</div>}
+        {r.lead_id && <div className="text-xs mt-1"><DrillLink to={drillHref(ROUTES.LEADS, { lead_id: r.lead_id })}>Lead #{r.lead_id}</DrillLink></div>}
         {r.status_reason && <div className="text-xs text-muted mt-1">{r.status_reason}</div>}
       </div>
     )},
@@ -172,15 +208,27 @@ export function SocialInboxPage() {
       {day && (
         <Card title="Last 24 hours">
           <div className="grid grid-4">
-            <Tile title="Read" value={day.received} testId="tile-read" />
-            <Tile title="Replies posted" value={day.replies_sent} testId="tile-replies" />
-            <Tile title="Flow tickets" value={day.tickets} testId="tile-tickets" />
-            <Tile title="Leads" value={day.leads} testId="tile-leads" />
+            {[
+              { title: 'Read', value: day.received, testId: 'tile-read', patch: { since_hours: '24' } },
+              { title: 'Replies posted', value: day.replies_sent, testId: 'tile-replies', patch: { reply_status: 'sent', replied_since_hours: '24' } },
+              { title: 'Flow tickets', value: day.tickets, testId: 'tile-tickets', patch: { has: 'ticket', since_hours: '24' } },
+              { title: 'Leads', value: day.leads, testId: 'tile-leads', patch: { has: 'lead', since_hours: '24' } },
+            ].map((t) => (
+              <Tile key={t.testId} title={t.title} value={t.value} testId={t.testId}
+                    onDrill={() => narrow(t.patch)} active={isOnly(t.patch)} />
+            ))}
           </div>
           <div className="flex gap-2 mt-3" style={{ flexWrap: 'wrap' }}>
+            {/* "unclassified" is a NULL classification — no value to filter on. */}
             {Object.entries(day.by_classification || {}).map(([k, n]) => (
-              <span key={k} className="text-xs">{label(k)}: <strong>{n}</strong></span>
+              <span key={k} className="text-xs">{label(k)}: <strong>
+                <DrillLink onClick={k !== 'unclassified' && n > 0 ? () => narrow({ classification: k, since_hours: '24' }) : undefined}
+                           label={`Show ${n} ${label(k)} messages from the last 24 hours`}>{n}</DrillLink>
+              </strong></span>
             ))}
+            {day.leads > 0 && (
+              <Link className="text-xs" to={drillHref(ROUTES.LEADS, { source_kind: SOCIAL_LEAD_SOURCE })}>All social inbox leads ›</Link>
+            )}
             {day.reply_failures > 0 && <span className="text-xs">reply failures: <strong>{day.reply_failures}</strong></span>}
             {day.waiting_for_flow > 0 && <span className="text-xs">complaints waiting for Flow: <strong>{day.waiting_for_flow}</strong></span>}
           </div>
@@ -197,17 +245,28 @@ export function SocialInboxPage() {
 
       <div className="mt-3">
         <FilterBar>
-          <select aria-label="Outcome" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
+          <select aria-label="Outcome" value={status} onChange={(e) => setFilter('status', e.target.value)}>
             {STATUSES.map((s) => <option key={s} value={s}>{s ? label(s) : 'All outcomes'}</option>)}
           </select>
-          <select aria-label="Classification" value={classification} onChange={(e) => { setPage(1); setClassification(e.target.value); }}>
+          <select aria-label="Classification" value={classification} onChange={(e) => setFilter('classification', e.target.value)}>
             {CLASSES.map((s) => <option key={s} value={s}>{s ? label(s) : 'All types'}</option>)}
           </select>
-          <select aria-label="Network" value={network} onChange={(e) => { setPage(1); setNetwork(e.target.value); }}>
+          <select aria-label="Network" value={network} onChange={(e) => setFilter('network', e.target.value)}>
             {NETWORKS.map((s) => <option key={s} value={s}>{s ? label(s) : 'All networks'}</option>)}
           </select>
-          <input aria-label="Search" placeholder="Text, @handle or TCK-…" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
+          <input aria-label="Search" placeholder="Text, @handle or TCK-…" value={search} onChange={(e) => setFilter('search', e.target.value)} />
         </FilterBar>
+        {/* Tile-only filters have no control above: show them, removable. */}
+        {Object.keys(CHIP_LABELS).some((k) => f[k]) && (
+          <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+            {Object.entries(CHIP_LABELS).filter(([k]) => f[k]).map(([k, fmt]) => (
+              <button key={k} type="button" className="badge badge-secondary"
+                      onClick={() => { setPage(1); drill.clear(k); }} aria-label={`Clear ${fmt(f[k])} filter`}>
+                {fmt(f[k])} ✕
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading && !summary ? <Loader /> : (

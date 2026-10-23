@@ -65,3 +65,39 @@ describe('ApprovalsPage', () => {
     expect(global.fetch).toHaveBeenCalled();
   });
 });
+
+describe('ApprovalsPage deep links', () => {
+  const queueRows = [
+    { id: 301, title: 'GST e-invoicing guide', content_type: 'blog', workflow_status: 'review_pending', risk_level: 'low', primary_product_id: 4 },
+  ];
+
+  beforeEach(() => {
+    global.fetch = vi.fn((url) => Promise.resolve({
+      ok: true,
+      json: async () => (String(url).includes('/stats')
+        ? { data: { counts: { ready_for_approval: 1 } } }
+        : { data: { items: queueRows } }),
+    }));
+  });
+
+  it('reads the area from the URL and asks the queue for it', async () => {
+    renderWithAuth(<ApprovalsPage />, { route: '/approvals?area=ready_for_approval', auth: { permissions: ['approval.view'] } });
+
+    await waitFor(() => expect(screen.getByText('GST e-invoicing guide')).toBeInTheDocument());
+    expect(global.fetch).toHaveBeenCalledWith('/api/v1/approval-queue?area=ready_for_approval', expect.anything());
+    expect(screen.getByRole('button', { name: /Ready for Approval/ })).toBeInTheDocument();
+  });
+
+  it('falls back to Today for an unknown area', async () => {
+    renderWithAuth(<ApprovalsPage />, { route: '/approvals?area=bogus', auth: { permissions: ['approval.view'] } });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/approval-queue?area=today', expect.anything()));
+  });
+
+  it('rows open the content item and the product cell opens the product', async () => {
+    renderWithAuth(<ApprovalsPage />, { route: '/approvals', auth: { permissions: ['approval.view'] } });
+
+    const title = await screen.findByRole('link', { name: 'GST e-invoicing guide' });
+    expect(title).toHaveAttribute('href', '/content/301');
+    expect(screen.getByRole('link', { name: 'Open product #4' })).toHaveAttribute('href', '/knowledge/products/4');
+  });
+});

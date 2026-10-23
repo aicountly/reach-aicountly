@@ -49,6 +49,38 @@ final class SocialInboxApiTest extends ApiTestCase
         $this->assertStringContainsString('key is not set', $sum['config']['flow']);
     }
 
+    /** Each "Last 24 hours" tile opens the rows it counted. */
+    public function testTileFiltersMatchTheSummaryCounts(): void
+    {
+        $db = Database::connect();
+        $db->table('reach_leads')->insert(['name' => 'Inbox lead', 'source_kind' => 'social_inbox', 'created_at' => gmdate('Y-m-d H:i:s'), 'updated_at' => gmdate('Y-m-d H:i:s')]);
+        $leadId = (int) $db->insertID();
+        $now = gmdate('Y-m-d H:i:s') . '+00';
+        $old = gmdate('Y-m-d H:i:s', time() - 3 * 86400) . '+00';
+
+        $this->item(['external_id' => 't1', 'status' => 'ticket_created', 'ticket_number' => 'TCK-1']);
+        $this->item(['external_id' => 'l1', 'status' => 'lead_created', 'lead_id' => $leadId]);
+        $this->item(['external_id' => 'r1', 'status' => 'replied', 'reply_status' => 'sent', 'replied_at' => $now]);
+        // Read three days ago, replied just now: counts as a reply today, not as read today.
+        $this->item(['external_id' => 'r2', 'status' => 'replied', 'reply_status' => 'sent', 'replied_at' => $now, 'fetched_at' => $old]);
+        $this->item(['external_id' => 'o1', 'status' => 'ticket_created', 'ticket_number' => 'TCK-0', 'fetched_at' => $old]);
+        $h = $this->authAs('super_admin');
+
+        $day = json_decode((string) $this->withHeaders($h)->call('GET', 'v1/social/inbox/summary')->getJSON(), true)['data']['last_24h'];
+        $total = fn (string $qs): int => json_decode((string) $this->withHeaders($h)->call('GET', 'v1/social/inbox?' . $qs)->getJSON(), true)['data']['total'];
+
+        $this->assertSame(3, $day['received']);
+        $this->assertSame($day['received'], $total('since_hours=24'));
+        $this->assertSame(2, $day['replies_sent']);
+        $this->assertSame($day['replies_sent'], $total('reply_status=sent&replied_since_hours=24'));
+        $this->assertSame(1, $day['tickets']);
+        $this->assertSame($day['tickets'], $total('has=ticket&since_hours=24'));
+        $this->assertSame(1, $day['leads']);
+        $this->assertSame($day['leads'], $total('has=lead&since_hours=24'));
+        // Unknown / out-of-range values are ignored, not an error.
+        $this->assertSame(5, $total('has=everything&since_hours=abc'));
+    }
+
     public function testRetryIsOnlyForFailedItemsAndNeedsDispatch(): void
     {
         $ok = $this->item(['external_id' => 'c3', 'status' => 'replied', 'reply_status' => 'sent']);
