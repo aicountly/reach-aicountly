@@ -91,7 +91,17 @@ class PlanBriefing
             }
         }
 
-        $mix = (array) ($review['topic_mix'] ?? []);
+        $mix  = (array) ($review['topic_mix'] ?? []);
+        $blog = [
+            // Canonical category slugs (BlogTaxonomy) — the values blog-drafts accepts.
+            'prefer' => $mix['blog']['prefer'] ?? [],
+            'avoid'  => $mix['blog']['avoid'] ?? [],
+            // App-led vs topic against the owner's 50/50 target (about one
+            // app-led post in five about a Beta app), from the review window;
+            // blog-plan's `mix` has the same figures live.
+            'steer'  => $mix['blog']['steer'] ?? null,
+            'mix'    => isset($mix['blog']['mix']) ? array_intersect_key((array) $mix['blog']['mix'], array_flip(['posts', 'topic', 'app_led', 'app_led_beta', 'app_led_share', 'beta_share_of_app_led', 'by_group', 'target'])) : null,
+        ];
 
         return [
             'date'              => $today,
@@ -100,7 +110,7 @@ class PlanBriefing
             'review_date'       => $review['review_date'] ?? $yesterday,
             'review_live'       => $live,
             'self_tune_enabled' => SelfTuner::enabled(),
-            'read_me'           => 'Read lessons first. Avoid the listed vetting reasons in what you write today, prefer the topics in topic_mix.prefer, and stay inside today\'s plan targets. This briefing informs; Reach still enforces quotas and Gemini still decides.',
+            'read_me'           => 'Read lessons first. Avoid the listed vetting reasons in what you write today, prefer the categories in topic_mix.prefer (blog: topic_mix.steer says whether the next article should be app-led or a topic article), and stay inside today\'s plan targets. This briefing informs; Reach still enforces quotas and Gemini still decides.',
             'today'             => $pick(array_values($todayRows)),
             'yesterday'         => $pick(array_values((array) ($review['day'] ?? []))),
             'lessons'           => $type === null ? $lessons : array_values(array_merge(
@@ -109,9 +119,9 @@ class PlanBriefing
             )),
             'avoid_reasons'     => $avoid,
             'topic_mix'         => match ($type) {
-                'blog'           => ['prefer' => $mix['blog']['prefer'] ?? [], 'avoid' => $mix['blog']['avoid'] ?? []],
+                'blog'           => $blog,
                 'knowledge_base' => ['prefer' => $mix['knowledge_base']['prefer'] ?? []],
-                null             => ['blog' => ['prefer' => $mix['blog']['prefer'] ?? [], 'avoid' => $mix['blog']['avoid'] ?? []], 'knowledge_base' => ['prefer' => $mix['knowledge_base']['prefer'] ?? []]],
+                null             => ['blog' => $blog, 'knowledge_base' => ['prefer' => $mix['knowledge_base']['prefer'] ?? []]],
                 default          => [],
             },
             'bot_changes'       => array_map(static fn ($a) => ['action' => $a['action'], 'metric' => $a['label'], 'reason' => $a['reason'], 'run_date' => $a['run_date']], array_slice($recentActions, 0, 10)),
@@ -132,7 +142,7 @@ class PlanBriefing
             'publish_failures'   => 'Publishing failed for some approved items; Reach retries. Do not resubmit the same article.',
             'integration_missing' => 'An integration this needs is not configured; the owner has been told. Submissions may wait until it is.',
             'automation_off'     => 'This automation is switched off — stop.',
-            'no_topics'          => 'The topic queue is empty — propose your own topic from the strategy, preferring topic_mix.prefer.',
+            'no_topics'          => 'The topic queue is empty — propose your own topic from the strategy, preferring topic_mix.prefer and the kind topic_mix.steer asks for (app-led or topic).',
             'job_failures'       => 'Background jobs failed; Reach re-queues the safe ones. No change needed in what you write.',
             'upstream_output'    => 'Outcomes follow output: the content lags above are what to fix.',
             'demand_driven'      => 'Volume follows product changes — only write when there is a real change.',

@@ -71,6 +71,7 @@ final class RoutineAutomationApiTest extends ApiTestCase
             'body_html'        => $body,
             'seo'              => ['slug' => 'monthly-gst-review-checklist', 'meta_title' => 'Monthly GST review checklist', 'meta_description' => 'Eight checks to run every month before filing GST returns, so Indian small businesses file on time without last-minute corrections.'],
             'content_base_key' => 'blog-20261017-gst-review-checklist',
+            'category'         => 'gst',
             'provenance'       => ['generated_by_model' => 'claude-sonnet'],
         ];
     }
@@ -87,6 +88,14 @@ final class RoutineAutomationApiTest extends ApiTestCase
         $this->assertNotEmpty($plan['priority_topics']['compliance_calendar']);
         $this->assertArrayHasKey('links', $plan['internal_links']);
         $this->assertIsArray($plan['existing_titles']);
+        // The taxonomy the routine files under and the mix it steers by.
+        $this->assertSame('accounting', $plan['taxonomy']['categories'][0]['slug']);
+        $this->assertCount(15, $plan['taxonomy']['categories']);
+        $this->assertSame('docs', $plan['taxonomy']['products']['live'][4]['product_slug']);
+        $this->assertNotEmpty($plan['taxonomy']['products']['beta']);
+        $this->assertSame(0.5, $plan['mix']['target']['app_led_share']);
+        $this->assertSame('either', $plan['mix']['next']['kind']);
+        $this->assertArrayHasKey('by_group', $plan['mix']['last_7_days']);
     }
 
     public function testASubmissionWithoutVettingStaysPendingAndShowsUpForOperators(): void
@@ -141,6 +150,10 @@ final class RoutineAutomationApiTest extends ApiTestCase
     public function testRefusalsAreSpecific(): void
     {
         $this->withHeaders($this->routine())->withBodyFormat('json')->call('POST', 'v1/automation/blog-drafts', $this->draft(['content_base_key' => '']))->assertStatus(422);
+        $bad = $this->withHeaders($this->routine())->withBodyFormat('json')->call('POST', 'v1/automation/blog-drafts', $this->draft(['category' => 'Compliance']));
+        $bad->assertStatus(422);
+        $this->assertStringContainsString('Use one of: accounting, gst, income-tax, tds-tcs', (string) $bad->getJSON());
+        $this->withHeaders($this->routine())->withBodyFormat('json')->call('POST', 'v1/automation/blog-drafts', $this->draft(['product_slug' => 'tally']))->assertStatus(422);
 
         ReachConfig::set('automation.blog.daily_limit', 0);
         $this->withHeaders($this->routine())->withBodyFormat('json')->call('POST', 'v1/automation/blog-drafts', $this->draft())->assertStatus(429);

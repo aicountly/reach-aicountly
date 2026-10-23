@@ -55,12 +55,12 @@ Endpoints the routines use:
 | Endpoint | Purpose |
 |---|---|
 | `GET  https://reach.aicountly.org/api/v1/automation/plan/briefing?type=<blog\|knowledge_base\|community\|release_note\|workflow_guide\|video\|growth>` | **read first (step 0 of every routine)**: today's plan for the routine, yesterday vs plan, the top 3 lags of the last 7 days with cause, guidance and what the bot changed, Gemini's recent reject/revise reasons, topic mix — see "Plan & Performance" below |
-| `GET  https://reach.aicountly.org/api/v1/automation/blog-plan` | blog quota left today (`stop`), last 200 titles/slugs for de-duplication, priority topics (launch apps; Indian compliance calendar for the next 30 days), internal links |
+| `GET  https://reach.aicountly.org/api/v1/automation/blog-plan` | blog quota left today (`stop`), last 200 titles/slugs (with category and product_slug) for de-duplication, priority topics (launch apps; Indian compliance calendar for the next 30 days), `taxonomy` (the 15 blog category slugs, live / Beta apps), `mix` (last 7 / 30 days vs the 50/50 app-led/topic target, `next`), internal links |
 | `GET  https://reach.aicountly.org/api/v1/automation/kb-plan` | KB quota, per-product cadence (launch apps first), topic seeds, existing articles |
 | `GET  https://reach.aicountly.org/api/v1/automation/link-registry` | linkable URLs for internal links |
 | `GET  https://reach.aicountly.org/api/v1/automation/content-base` | strategy base, topic counts per type, last proposal per type, routine activity |
 | `GET  https://reach.aicountly.org/api/v1/automation/content-base/next?type=blog\|kb\|community` | the next topics in order (blog: roadmap-selected → content base; rewrites come from `regenerate/next`), each with the `content_base_key` to submit under |
-| `POST https://reach.aicountly.org/api/v1/automation/content-base/propose` | add topics `{type, items:[{key, title, brief, product_slug?, category?, target_date?, evidence:[…]}], routine_run_id}` |
+| `POST https://reach.aicountly.org/api/v1/automation/content-base/propose` | add topics `{type, items:[{key, title, brief, product_slug?, category?, topic_category? (blog: a category slug), target_date?, evidence:[…]}], routine_run_id}` |
 | `POST https://reach.aicountly.org/api/v1/automation/content-base/produced` | `{type, key, outcome: submitted\|not_applicable, content_base_key?, reason?, routine_run_id}` |
 | `GET  https://reach.aicountly.org/api/v1/automation/gallery/status` | cover-gallery deficit (informational — Reach fills it itself every hour) |
 | `POST https://reach.aicountly.org/api/v1/automation/blog-drafts` | submit a blog draft |

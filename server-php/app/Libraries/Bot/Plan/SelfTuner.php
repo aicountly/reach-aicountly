@@ -28,7 +28,8 @@ use Config\Services;
  *   retry_job       dead-lettered jobs of idempotent ingest/sync types from
  *                   the last 48 h (MAX_RETRY a run, each job once)
  *   topic_mix       the categories / products the routine briefing steers
- *                   towards, when they change
+ *                   towards, and the blog's app-led vs topic steer towards
+ *                   the owner's 50/50 target, when they change
  *
  * bot.self_tune.enabled = false: nothing is applied; each action is logged
  * with applied = false (skipped_reason self_tune_disabled) so the owner sees
@@ -256,13 +257,22 @@ class SelfTuner
 
     private function topicMix(string $runDate, array $mix, ?array $previous, bool $enabled): void
     {
-        $now  = ['blog_prefer' => $mix['blog']['prefer'] ?? [], 'blog_avoid' => $mix['blog']['avoid'] ?? [], 'kb_prefer' => $mix['knowledge_base']['prefer'] ?? []];
-        $then = ['blog_prefer' => $previous['blog']['prefer'] ?? [], 'blog_avoid' => $previous['blog']['avoid'] ?? [], 'kb_prefer' => $previous['knowledge_base']['prefer'] ?? []];
-        if ($now === $then || ($now['blog_prefer'] === [] && $now['blog_avoid'] === [] && $now['kb_prefer'] === [])) {
+        $steer = static fn (?array $m): ?string => isset($m['blog']['steer']['kind'])
+            ? $m['blog']['steer']['kind'] . ($m['blog']['steer']['kind'] !== 'topic' && ! empty($m['blog']['steer']['app_status']) ? ':' . $m['blog']['steer']['app_status'] : '')
+            : null;
+        $now  = ['blog_prefer' => $mix['blog']['prefer'] ?? [], 'blog_avoid' => $mix['blog']['avoid'] ?? [], 'kb_prefer' => $mix['knowledge_base']['prefer'] ?? [], 'blog_steer' => $steer($mix)];
+        $then = ['blog_prefer' => $previous['blog']['prefer'] ?? [], 'blog_avoid' => $previous['blog']['avoid'] ?? [], 'kb_prefer' => $previous['knowledge_base']['prefer'] ?? [], 'blog_steer' => $steer($previous)];
+        if ($now === $then || ($now['blog_prefer'] === [] && $now['blog_avoid'] === [] && $now['kb_prefer'] === [] && $now['blog_steer'] === null)) {
             return;
         }
-        $this->act($runDate, 'topic_mix', null, 'briefing', null, $then, $now,
-            'Routine briefing now steers topics towards the blog categories with the best approval rate and clicks per post, away from the most-rejected, and towards KB products furthest behind their cadence.',
+        $reason = 'Routine briefing now steers topics towards the blog categories with the best approval rate and clicks per post, away from the most-rejected, and towards KB products furthest behind their cadence.';
+        if ($now['blog_steer'] !== $then['blog_steer'] && $now['blog_steer'] !== null) {
+            // The owner's target (50/50 app-led vs topic, ~1 in 5 app-led on a
+            // Beta app) is fixed; the bot only points the routine at the side
+            // that is behind — it changes no limit or setting.
+            $reason .= ' Blog mix: ' . ($mix['blog']['steer']['why'] ?? $now['blog_steer']);
+        }
+        $this->act($runDate, 'topic_mix', null, 'briefing', null, $then, $now, $reason,
             $enabled, static function (): void {
                 // Applied by being in the stored review the briefing reads.
             });

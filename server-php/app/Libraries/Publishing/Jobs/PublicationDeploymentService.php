@@ -555,12 +555,15 @@ class PublicationDeploymentService
                     // Release notes are not offered as internal-link targets.
                 } elseif ($slug !== '') {
                     $isKb = ($item['content_type'] ?? 'blog') === 'knowledge_base';
+                    // A blog's canonical category and app make it a
+                    // same-category / same-product suggestion for later posts.
+                    [$linkProduct, $linkCategory] = $isKb ? [null, null] : $this->blogLinkAffinity((int) $deployment['content_item_id']);
                     (new \App\Libraries\Publishing\LinkRegistryService($this->db))->recordPublished(
                         ($isKb ? '/help/' : '/blogs/') . rawurlencode($slug),
                         (string) ($item['title'] ?? $slug),
                         $isKb ? 'knowledge_base' : 'blog',
-                        null,
-                        null,
+                        $linkProduct,
+                        $linkCategory,
                         (int) $deployment['content_item_id'],
                     );
                 }
@@ -581,6 +584,18 @@ class PublicationDeploymentService
         if ($status === 'published' && ($deployment['content_item_id'] ?? null)) {
             $this->tryTrackBlogStateTransition((int) $deployment['content_item_id']);
         }
+    }
+
+    /** @return array{0:?string, 1:?string} [product_slug, category] of a blog, canonical */
+    private function blogLinkAffinity(int $contentItemId): array
+    {
+        $profile = $this->db->table('reach_blog_publication_profiles')
+            ->where('content_item_id', $contentItemId)->get()->getRowArray() ?? [];
+
+        return [
+            \App\Libraries\Blog\BlogTaxonomy::canonicalProduct($profile['product_slug'] ?? null),
+            \App\Libraries\Blog\BlogTaxonomy::canonical($profile['category'] ?? null),
+        ];
     }
 
     /**

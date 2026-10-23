@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Libraries\Media;
 
+use App\Libraries\Blog\BlogTaxonomy;
+
 /**
  * Scores curated gallery assets against the article they would front.
  *
@@ -60,7 +62,10 @@ class CoverRelevanceScorer
      */
     public function articleKeywords(string $title, string $category = '', array $tags = [], string $summary = ''): array
     {
-        $source = implode(' ', array_filter([$title, $category, implode(' ', $tags), $summary]));
+        // The category's label ("TDS/TCS", "Income Tax"), so a slug and an
+        // old label give the same keywords.
+        $category = $category !== '' ? BlogTaxonomy::displayLabel($category) : '';
+        $source   = implode(' ', array_filter([$title, $category, implode(' ', $tags), $summary]));
 
         return $this->tokenize($source);
     }
@@ -90,7 +95,7 @@ class CoverRelevanceScorer
         $category    = strtolower(trim($category));
         $stream      = strtolower(trim($stream));
 
-        if ($category !== '' && in_array($category, $assetTags, true)) {
+        if ($category !== '' && $this->categoryTagged($category, $assetTags)) {
             $score += self::W_CATEGORY_TAG;
             $reasons[] = 'category_tag';
         }
@@ -209,6 +214,32 @@ class CoverRelevanceScorer
         }
 
         return $token;
+    }
+
+    /**
+     * The asset carries the article's category as a tag — under any of its
+     * spellings: covers tagged with the old labels ("income tax", "tds",
+     * "payroll") still match a post filed under the new slug ("income-tax",
+     * "tds-tcs", "payroll-hr"), and the other way round.
+     *
+     * @param list<string> $assetTags lower-cased
+     */
+    private function categoryTagged(string $category, array $assetTags): bool
+    {
+        if (in_array($category, $assetTags, true)) {
+            return true;
+        }
+        $canonical = BlogTaxonomy::canonical($category);
+        if ($canonical === null) {
+            return false;
+        }
+        foreach ($assetTags as $tag) {
+            if (BlogTaxonomy::canonical($tag) === $canonical) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -8,6 +8,11 @@ namespace App\Libraries\Automation\Routine;
  * The apps AICOUNTLY launches with — the routines write about these first.
  * Names, KB product slugs, source repositories and public pages only; what an
  * app does must come from its repository, never from this list.
+ *
+ * `product_slug` here is the KB / reach_products slug, which calls Drive
+ * `drive`. The aicountly.com catalogue (and so a blog's product_slug) calls it
+ * `docs`: forRoutine() also gives `site_product_slug`, resolved through
+ * BlogTaxonomy / ProductCatalog, so the two never drift.
  */
 final class LaunchApps
 {
@@ -44,6 +49,7 @@ final class LaunchApps
         return array_map(static fn (array $a): array => [
             'name'         => $a['name'],
             'product_slug' => $a['product_slug'],
+            'site_product_slug' => \App\Libraries\Blog\BlogTaxonomy::canonicalProduct($a['product_slug']),
             'repo'         => $a['repo'],
             'page_url'     => $a['page'] !== null ? rtrim($siteBase, '/') . $a['page'] : null,
         ], self::APPS);

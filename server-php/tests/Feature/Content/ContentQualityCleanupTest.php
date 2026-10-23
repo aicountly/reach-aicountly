@@ -165,7 +165,7 @@ final class ContentQualityCleanupTest extends DatabaseTestCase
             'body_html'        => $this->body(),
             'seo'              => ['slug' => 'tds-compliance-basics-for-growing-companies', 'meta_title' => 'TDS compliance basics for growing companies',
                                    'meta_description' => 'TDS deduction, deposit, returns and certificates explained for growing Indian companies, with a monthly checklist to stay compliant.'],
-            'category'         => 'TDS',
+            'category'         => 'tds-tcs',
             'content_base_key' => 'blog-20261018-tds-basics',
             'provenance'       => ['generated_by_model' => 'claude-sonnet', 'routine_run_id' => 'session_test'],
         ];
@@ -331,9 +331,16 @@ final class ContentQualityCleanupTest extends DatabaseTestCase
 
         // The rewrite goes onto the same item, slug ignored, fresh cover requested.
         $oldCover = $db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->get()->getRowArray()['featured_image_reference'];
+        // An article filed before the taxonomy (old label "TDS"); the rewrite
+        // sends a category that maps to nothing — a rewrite never 422s on that
+        // and keeps the post where it was filed, canonicalised.
+        $db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->update(['category' => 'TDS']);
         $rewrite  = (new AutomationDraftIngestService())->ingestBlogDraft($this->payload([
             'regeneration_id' => $next['regeneration_id'], 'content_base_key' => 'blog-other-key', 'seo' => ['slug' => 'a-new-slug'] + $this->payload()['seo'],
+            'category' => 'Marketing',
         ]));
+        $this->assertSame('tds-tcs', $db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->get()->getRowArray()['category']);
+        $this->assertSame('tds-tcs', ((array) (new RoutineSubmissions())->findByItem($itemId)['submission_json'])['category'] ?? null);
         $this->assertSame('ingested', $rewrite['status']);
         $this->assertSame($itemId, $rewrite['content_item_id']);
         $this->assertSame('tds-compliance-basics-for-growing-companies', $rewrite['slug']);

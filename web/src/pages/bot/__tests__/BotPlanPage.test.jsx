@@ -144,5 +144,9 @@ describe('botPlan model', () => {
       .toBe('reach.seo_snapshot: dead_letter → pending');
     expect(describeChange({ action: 'topic_mix', before: {}, after: { blog_prefer: ['GST'], blog_avoid: [], kb_prefer: ['books'] } }))
       .toBe('blog prefer: GST; avoid: none; KB prefer: books');
+    expect(describeChange({ action: 'topic_mix', before: {}, after: { blog_prefer: ['gst'], blog_avoid: [], kb_prefer: [], blog_steer: 'app_led:beta' } }))
+      .toBe('blog prefer: gst; avoid: none; KB prefer: none; blog next: app-led (beta app)');
+    expect(describeChange({ action: 'topic_mix', before: {}, after: { blog_prefer: [], blog_avoid: [], kb_prefer: [], blog_steer: 'topic' } }))
+      .toBe('blog prefer: none; avoid: none; KB prefer: none; blog next: topic');
   });
 });

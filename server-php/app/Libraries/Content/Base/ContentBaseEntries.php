@@ -6,6 +6,7 @@ namespace App\Libraries\Content\Base;
 
 use App\Libraries\Automation\Routine\LaunchApps;
 use App\Libraries\Blog\AutomationDraftIngestService;
+use App\Libraries\Blog\BlogTaxonomy;
 use App\Libraries\Blog\ContentBaseService;
 use App\Libraries\Settings\ReachConfig;
 use CodeIgniter\Database\BaseConnection;
@@ -45,7 +46,7 @@ final class ContentBaseEntries
     private const KEY_PATTERN   = '/^[a-z0-9][a-z0-9._-]{2,119}$/';
     private const MAX_ATTEMPTS  = 2;
     private const PAYLOAD_FIELDS = ['slug_hint', 'seed_keyword', 'funnel_stage', 'search_intent', 'audience', 'portfolio_stream',
-        'cover_prompt', 'article_type', 'context', 'tier', 'difficulty_level'];
+        'cover_prompt', 'article_type', 'context', 'tier', 'difficulty_level', 'topic_category'];
 
     private BaseConnection $db;
     private ContentBaseService $files;
@@ -529,7 +530,11 @@ final class ContentBaseEntries
             'status_reason'    => $row['status_reason'],
             'attempts'         => (int) $row['attempts'],
             'details'          => $payload,
-        ];
+        ] + (($row['content_type'] ?? '') === 'blog'
+            // For blogs `category` is the portfolio stream; `taxonomy` says
+            // which blog category and app (if any) the topic is filed under.
+            ? ['taxonomy' => BlogTaxonomy::queueHints($row['category'] ?? null, $row['product_slug'] ?? null, $payload)]
+            : []);
     }
 
     // ─────────────────────────────────────────────────────────── propose
@@ -633,6 +638,9 @@ final class ContentBaseEntries
         $product = trim((string) ($item['product_slug'] ?? ''));
         if ($type === 'knowledge_base' && ! isset($kbEnabled[$product])) {
             return "product_slug: '{$product}' is not an enabled KB product";
+        }
+        if ($type === 'blog' && trim((string) ($item['topic_category'] ?? '')) !== '' && BlogTaxonomy::canonical((string) $item['topic_category']) === null) {
+            return 'topic_category: one of ' . BlogTaxonomy::allowedList();
         }
         if ($type === 'community' && trim((string) ($item['category'] ?? '')) === '') {
             return 'category: the community category slug is required';

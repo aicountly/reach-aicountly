@@ -8,6 +8,8 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Automation\Routine\KbSteps;
 use App\Libraries\Automation\Routine\RoutineSubmissions;
 use App\Libraries\Blog\BlogStateMachine;
+use App\Libraries\Blog\BlogTaxonomy;
+use App\Libraries\Database\SchemaGuard;
 use App\Libraries\ContentVersionService;
 use App\Libraries\HtmlSanitizer;
 use CodeIgniter\Database\BaseConnection;
@@ -104,12 +106,22 @@ class RegenerationIngestService
         $this->resetWorkflow($contentType, $itemId);
         $this->applySeo($itemId, (array) ($payload['seo'] ?? []), $now);
 
+        $taxonomy = null;
         if ($contentType === 'blog') {
+            // A rewrite keeps the post where it is filed: the stored category
+            // (canonicalised), else the routine's if it is a valid one; never a
+            // 422 here — a rewrite of a live post must not fail on taxonomy.
+            $taxonomy = $this->blogTaxonomy($itemId, $payload);
             // A fresh cover for the rewrite: the pipeline's cover stage asks the
             // cover hook for one whenever the profile has none.
-            $this->db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->update([
-                'featured_image_reference' => null, 'featured_image_alt' => null, 'updated_at' => $now,
-            ]);
+            $profile = ['featured_image_reference' => null, 'featured_image_alt' => null, 'updated_at' => $now];
+            if ($taxonomy['category'] !== null) {
+                $profile['category'] = $taxonomy['category'];
+            }
+            if (SchemaGuard::hasColumn($this->db, 'reach_blog_publication_profiles', 'product_slug')) {
+                $profile['product_slug'] = $taxonomy['product_slug'];
+            }
+            $this->db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->update($profile);
         } else {
             $kb = [];
             foreach (['prerequisites', 'troubleshooting'] as $f) {
@@ -126,7 +138,8 @@ class RegenerationIngestService
         }
 
         $submissionJson = array_filter([
-            'product_slug'    => $payload['product_slug'] ?? $regen['product_slug'],
+            'category'        => $taxonomy['category'] ?? null,
+            'product_slug'    => $taxonomy !== null ? $taxonomy['product_slug'] : ($payload['product_slug'] ?? $regen['product_slug']),
             'product_facts'   => array_values(array_filter(array_map('strval', (array) ($payload['product_facts'] ?? [])))),
             'sources'         => array_values(array_filter(array_map('strval', (array) ($payload['sources'] ?? [])))),
             'cover_prompt'    => isset($payload['cover_prompt']) ? mb_substr((string) $payload['cover_prompt'], 0, 300) : null,
@@ -175,6 +188,23 @@ class RegenerationIngestService
             'slug'               => (string) $item['slug'],
             'regeneration_id'    => $regenId,
             'quota'              => ['daily_limit' => $quota['daily_limit'], 'used_today' => $quota['used_today'] + 1, 'remaining_today' => max(0, $quota['remaining_today'] - 1)],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{category:?string, product_slug:?string}
+     */
+    private function blogTaxonomy(int $itemId, array $payload): array
+    {
+        $hasProduct = SchemaGuard::hasColumn($this->db, 'reach_blog_publication_profiles', 'product_slug');
+        $stored     = $this->db->table('reach_blog_publication_profiles')
+            ->select($hasProduct ? 'category, product_slug' : 'category')
+            ->where('content_item_id', $itemId)->get()->getRowArray() ?? [];
+
+        return [
+            'category'     => BlogTaxonomy::canonical($stored['category'] ?? null) ?? BlogTaxonomy::canonical((string) ($payload['category'] ?? '')),
+            'product_slug' => BlogTaxonomy::canonicalProduct($stored['product_slug'] ?? null) ?? BlogTaxonomy::canonicalProduct((string) ($payload['product_slug'] ?? '')),
         ];
     }
 

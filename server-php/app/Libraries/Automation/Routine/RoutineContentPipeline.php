@@ -280,7 +280,26 @@ class RoutineContentPipeline
             'product_facts' => array_values(array_filter(array_map('strval', (array) ($sub['product_facts'] ?? [])))),
             'sources'       => array_values(array_filter(array_map('strval', (array) ($sub['sources'] ?? [])))),
             'product_slug'  => $sub['product_slug'] ?? null,
-        ], static fn ($v) => $v !== null && $v !== []);
+        ] + ($row['content_type'] === 'blog' ? self::blogTaxonomyContext($sub) : []), static fn ($v) => $v !== null && $v !== []);
+    }
+
+    /**
+     * The blog's category and the app it is about, as facts for the vetting
+     * model — a Beta app must be presented as Beta.
+     *
+     * @param array<string, mixed> $sub
+     * @return array<string, ?string>
+     */
+    private static function blogTaxonomyContext(array $sub): array
+    {
+        $product = \App\Libraries\Blog\BlogTaxonomy::product(isset($sub['product_slug']) ? (string) $sub['product_slug'] : null);
+
+        return [
+            'blog_category' => \App\Libraries\Blog\BlogTaxonomy::label(isset($sub['category']) ? (string) $sub['category'] : null),
+            'about_app'     => $product === null ? null : ($product['status'] === 'beta'
+                ? $product['name'] . ' — a Beta app: the article must present it as Beta and claim only what its repository shows'
+                : $product['name'] . ' — a live app'),
+        ];
     }
 
     /**
