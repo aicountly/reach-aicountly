@@ -61,8 +61,9 @@ final class QualityCheckLog
                 $out['passed']      += $r['decision'] === 'pass' ? 1 : 0;
                 $out['failed']      += $r['decision'] === 'fail' ? 1 : 0;
                 $out['unavailable'] += $r['decision'] === 'unavailable' ? 1 : 0;
-                $out['unpublished'] += str_contains((string) $r['action'], 'unpublished') ? 1 : 0;
-                $out['queued_regeneration'] += str_contains((string) $r['action'], 'regeneration') ? 1 : 0;
+                // Blogs/KB: unpublished(+queued_regeneration); community answers: withdrawn+requeued, kept_live+requeued.
+                $out['unpublished'] += str_contains((string) $r['action'], 'unpublished') || str_starts_with((string) $r['action'], 'withdrawn') ? 1 : 0;
+                $out['queued_regeneration'] += str_contains((string) $r['action'], 'regeneration') || str_contains((string) $r['action'], 'requeued') ? 1 : 0;
             }
         } catch (\Throwable) {
         }

@@ -166,8 +166,8 @@ rejects bodies that do not deliver their title, filler, and text about how the c
 produced (`OFF_TOPIC:` reasons).
 
 `php spark reach:content-revet [--dry-run]` re-vets every approved-but-unpublished and every
-live blog/KB/release note/workflow guide (`--community` adds a report of live community
-answers): heuristics first (`ContentQualityHeuristics`), then Gemini on the current version.
+live blog/KB/release note/workflow guide (`--community` adds live community answers, fixed
+the same way — see `routines/reach-community-qa.md`, "Re-answers"): heuristics first (`ContentQualityHeuristics`), then Gemini on the current version.
 Unpublished passes are adopted into this pipeline (no quota), unpublished fails are rejected and
 queued for a rewrite; a live page is taken down only on a Gemini **reject** — withdrawn through
 the publisher (reversible, the slug stays reserved) and queued for a rewrite. The routines take

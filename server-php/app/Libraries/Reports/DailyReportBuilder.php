@@ -340,8 +340,10 @@ class DailyReportBuilder
         }
         $summary = (new \App\Libraries\Content\Quality\QualityCheckLog($this->db))->summarySince($window['start']);
         $open    = (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))->counts();
+        // Community answers waiting for (or going through) a re-answer count as open rewrites too.
+        $reanswers = (new \App\Libraries\Community\Automation\CommunityReanswerQueue($this->db))->counts();
 
-        return $summary + ['rewrites_open' => array_sum($open)];
+        return $summary + ['rewrites_open' => array_sum($open) + array_sum($reanswers)];
     }
 
     /**
