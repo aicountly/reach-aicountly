@@ -24,6 +24,16 @@ use RuntimeException;
  * runs unconditionally before each publish rather than tracking "already
  * provisioned" state that could drift. That also means edits made in Reach
  * after a first publish reach the public site on the next publish.
+ *
+ * Idempotency keys are derived from the request body (see idempotencyKey()).
+ * The receiver keeps every key it has seen and answers 409 "Idempotency key
+ * was already used with a different request body." when one comes back with
+ * other content; it never expires them. The keys used to be one per record
+ * ("reach-question-<uuid>"), so the first time a record's envelope changed —
+ * the desk disclosure was added to the question payload on 17 Oct, a category
+ * was remapped, a desk was renamed — every later publish touching that record
+ * failed for good. That is what dead-lettered all seven re-vet corrections on
+ * 23 Oct ("Public question provisioning failed … (version_conflict)").
  */
 class CommunityPublicRecordProvisioner
 {
@@ -183,12 +193,11 @@ class CommunityPublicRecordProvisioner
             $payload['avatar_url'] = $avatar;
         }
 
-        $result = $this->publisher->createIdentity([
+        $result = $this->publisher->createIdentity(self::keyed([
             'reach_identity_uuid' => (string) $identity['uuid'],
             'operation'           => 'create_identity',
-            'idempotency_key'     => $this->idempotencyKey('identity', (string) $identity['uuid']),
             'payload'             => array_filter($payload, static fn ($v) => $v !== ''),
-        ]);
+        ], 'identity', (string) $identity['uuid']));
 
         $this->assertOk($result, 'identity', (string) $identity['uuid']);
 
@@ -220,7 +229,6 @@ class CommunityPublicRecordProvisioner
             'content_type'                 => 'community_question',
             'official_identity_slug'       => $identitySlug,
             'reach_content_version_number' => 1,
-            'idempotency_key'              => $this->idempotencyKey('question', (string) $question['uuid']),
             'payload'                      => [
                 'title'            => (string) $question['title'],
                 'body'             => $body,
@@ -233,7 +241,7 @@ class CommunityPublicRecordProvisioner
             ],
         ];
 
-        $result = $this->publisher->createQuestion($envelope);
+        $result = $this->publisher->createQuestion(self::keyed($envelope, 'question', (string) $question['uuid']));
 
         // An unknown category is the one rejection worth recovering from: the
         // receiver falls back to its default category when none is supplied, so
@@ -241,7 +249,6 @@ class CommunityPublicRecordProvisioner
         // rather than a failed publication. Anything else is a real error.
         if (! ($result['success'] ?? false) && $this->isUnknownCategory($result)) {
             unset($envelope['payload']['category_slug']);
-            $envelope['idempotency_key'] = $this->idempotencyKey('question-nocat', (string) $question['uuid']);
 
             AuditLogger::record(AuditLogger::COMMUNITY_QUESTION_INTAKE, [
                 'question_id'      => (int) $question['id'],
@@ -249,7 +256,7 @@ class CommunityPublicRecordProvisioner
                 'category_offered' => (string) ($question['category'] ?? ''),
             ]);
 
-            $result = $this->publisher->createQuestion($envelope);
+            $result = $this->publisher->createQuestion(self::keyed($envelope, 'question', (string) $question['uuid']));
         }
 
         $this->assertOk($result, 'question', (string) $question['uuid']);
@@ -278,7 +285,7 @@ class CommunityPublicRecordProvisioner
             );
         }
 
-        $result = $this->publisher->createAnswer(array_filter([
+        $result = $this->publisher->createAnswer(self::keyed(array_filter([
             'reach_answer_uuid'            => (string) $answer['uuid'],
             'reach_question_uuid'          => (string) $question['uuid'],
             // Answer the member's post itself (the receiver links it to the uuid above).
@@ -287,10 +294,6 @@ class CommunityPublicRecordProvisioner
             'content_type'                 => 'community_answer',
             'official_identity_slug'       => $identitySlug,
             'reach_content_version_number' => (int) ($answer['approved_version'] ?? 1),
-            'idempotency_key'              => $this->idempotencyKey(
-                'answer-v' . (int) ($answer['approved_version'] ?? 1),
-                (string) $answer['uuid'],
-            ),
             'payload' => [
                 'body'             => $body,
                 'excerpt'          => (string) ($version['excerpt'] ?? ''),
@@ -306,7 +309,7 @@ class CommunityPublicRecordProvisioner
                 'ai_disclosure'    => self::DESK_DISCLOSURE,
                 'robots_directive' => 'index,follow',
             ],
-        ], static fn ($v) => $v !== null));
+        ], static fn ($v) => $v !== null), 'answer', (string) $answer['uuid']));
 
         $this->assertOk($result, 'answer', (string) $answer['uuid']);
 
@@ -343,12 +346,31 @@ class CommunityPublicRecordProvisioner
         ));
     }
 
-    /**
-     * Stable per-record key so a retried publish re-sends the same upsert
-     * instead of minting a new one the receiver would treat as fresh work.
-     */
-    private function idempotencyKey(string $kind, string $uuid): string
+    /** The envelope with its idempotency key (computed over everything else in it). */
+    private static function keyed(array $envelope, string $kind, string $uuid): array
     {
-        return substr('reach-' . $kind . '-' . $uuid, 0, 64);
+        unset($envelope['idempotency_key']);
+        $envelope['idempotency_key'] = self::idempotencyKey($kind, $uuid, $envelope);
+
+        return $envelope;
+    }
+
+    /**
+     * One key per record AND content: "reach-{i|q|a}-<uuid>-<16 hex of the body>".
+     *
+     * A retry re-sends the identical upsert, so it carries the same key and
+     * the receiver replays its first answer; a record whose envelope has
+     * changed since it was last sent gets a new key, so the receiver applies
+     * the upsert instead of refusing it as a reused key with a different body
+     * (409, kept forever). Public and static so it is testable without a
+     * database. At most 64 characters (a Reach UUID is 36).
+     */
+    public static function idempotencyKey(string $kind, string $uuid, array $envelope): string
+    {
+        unset($envelope['idempotency_key']);
+        $hash   = substr(hash('sha256', (string) json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)), 0, 16);
+        $prefix = 'reach-' . (['identity' => 'i', 'question' => 'q', 'answer' => 'a'][$kind] ?? substr($kind, 0, 1)) . '-' . $uuid;
+
+        return substr($prefix, 0, 64 - 17) . '-' . $hash;
     }
 }

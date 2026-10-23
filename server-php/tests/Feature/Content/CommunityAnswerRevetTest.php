@@ -9,16 +9,19 @@ use App\Libraries\Automation\SystemApprover;
 use App\Libraries\Community\Automation\CommunityQaAutomationService;
 use App\Libraries\Community\CommunityPublicRecordProvisioner;
 use App\Libraries\Community\CommunityPublisherFactory;
-use App\Libraries\Community\MockCommunityPublisher;
+use App\Libraries\Community\OfficialAnswerPublishingService;
 use App\Libraries\Content\Quality\ContentRevetService;
 use App\Libraries\Settings\ReachConfig;
 use Config\Database;
 use Tests\Support\ApiTestCase;
+use Tests\Support\Community\ReceiverLikeCommunityPublisher;
 
 /**
  * reach:content-revet --community fixes live community answers with nobody in
  * the loop, through the community machinery, with fakes only at the Gemini
- * HTTP boundary and the community publisher:
+ * HTTP boundary and the community publisher. The publisher fake keeps state
+ * and applies the receiver's rules (idempotency keys kept with a body hash,
+ * upserts, the correction contract, 404s) — ReceiverLikeCommunityPublisher:
  *
  *   - a Gemini REJECT takes the answer down reversibly (unpublished on the
  *     site, withdrawn in Reach) and queues a priority re-answer; the routine's
@@ -28,7 +31,13 @@ use Tests\Support\ApiTestCase;
  *   - a REVISE without text keeps the answer live and queues a re-answer; a
  *     re-answer that is then rejected leaves the old answer live;
  *   - a dry run changes nothing but says what it would do;
- *   - a failed take-down is reported as the action and does not stop the run.
+ *   - a failed take-down is reported as the action and does not stop the run;
+ *   - a correction of an answer first published under an older envelope goes
+ *     live (it used to 409 on the question upsert's reused idempotency key and
+ *     dead-letter: production, 23 Oct, answers 1–6 and 8);
+ *   - while a correction is being published the old text stays live, and a
+ *     correction that gives up leaves the site untouched and the answer
+ *     published in Reach with its previous approved version.
  *
  * @internal
  */
@@ -36,7 +45,7 @@ final class CommunityAnswerRevetTest extends ApiTestCase
 {
     private const TOKEN = 'test-automation-token-0123456789abcdef';
 
-    private MockCommunityPublisher $publisher;
+    private ReceiverLikeCommunityPublisher $publisher;
 
     /** @var list<array{status: int, body: string}> */
     private array $gemini = [];
@@ -58,7 +67,7 @@ final class CommunityAnswerRevetTest extends ApiTestCase
         putenv('REACH_AUTOMATION_TOKEN=' . self::TOKEN);
         ReachConfig::flush();
 
-        $this->publisher = new MockCommunityPublisher();
+        $this->publisher = new ReceiverLikeCommunityPublisher();
         CommunityPublisherFactory::setOverride($this->publisher);
         $this->gemini   = [];
         $this->vetCalls = 0;
@@ -149,7 +158,12 @@ final class CommunityAnswerRevetTest extends ApiTestCase
         $this->assertStringContainsString('CGST Act', $version['content']);
         $this->assertSame('live', $this->db()->table('reach_community_reanswers')->where('id', $reanswer['id'])->get()->getRow()->status);
 
-        // What aicountly.com received: the new text, still AI-assisted with the desk disclosure.
+        // What aicountly.com received: the corrected text through the correction
+        // contract (revision kept, note shown), then put back up — still
+        // AI-assisted with the desk disclosure.
+        $this->assertCount(1, $this->publisher->getCallsFor('applyCorrection'));
+        $this->assertStringContainsString('CGST Act', (string) $this->publisher->liveBody($live['answer_id']));
+        $this->assertSame('Updated for accuracy.', $this->publisher->answers[$live['answer_id']]['correction_note']);
         $publish = $this->publisher->getCallsFor('publishAnswer');
         $this->assertCount(2, $publish);
         $this->assertSame($live['answer_id'], $publish[1]['args'][0]);
@@ -190,9 +204,25 @@ final class CommunityAnswerRevetTest extends ApiTestCase
         $this->assertStringContainsString('₹500', $version['content']);
         $this->assertStringStartsWith('vetting-revision:', (string) $version['model_route']);
 
-        // Never taken down; approved by the system bot under the tier-2 rule.
+        // Never taken down: the receiver's correction contract swapped the text
+        // in one step (old text kept as a revision, note shown, still the
+        // desk's AI-assisted answer); identity and question were not re-sent.
         $this->assertFalse($this->publisher->wasCalledWith('unpublishAnswer'));
-        $this->assertStringContainsString('₹500', $this->publisher->getCallsFor('publishAnswer')[1]['args'][1]['payload']['body']);
+        $this->assertCount(1, $this->publisher->getCallsFor('publishAnswer'), 'only the first publication');
+        $this->assertCount(1, $this->publisher->getCallsFor('createQuestion'), 'only the first publication');
+        $correction = $this->publisher->getCallsFor('applyCorrection');
+        $this->assertCount(1, $correction);
+        $this->assertSame($live['answer_id'], $correction[0]['args'][0]['reach_answer_uuid']);
+        $this->assertSame(2, $correction[0]['args'][0]['reach_content_version_number']);
+        $this->assertSame($answer['approved_version_checksum'], $correction[0]['args'][0]['payload_checksum']);
+        $this->assertSame('Updated for accuracy.', $correction[0]['args'][0]['payload']['correction_note']);
+        $this->assertTrue($correction[0]['args'][0]['payload']['ai_assisted']);
+        $site = $this->publisher->answers[$live['answer_id']];
+        $this->assertSame('published', $site['status']);
+        $this->assertTrue($site['ai_assisted']);
+        $this->assertStringContainsString('₹500', $site['body']);
+        $this->assertStringContainsString('confirm with your CA', $site['revisions'][1], 'the previous text is kept as revision 1');
+        $this->assertSame(2, $site['revision']);
         $approval = $this->db()->table('reach_community_answer_approvals')->where('answer_id', $answer['id'])
             ->where('answer_version_number', 2)->get()->getRowArray();
         $this->assertSame('compliance_review', $approval['approval_type']);
@@ -279,7 +309,7 @@ final class CommunityAnswerRevetTest extends ApiTestCase
     {
         $a = $this->publishLiveFaq('faq-fail-1', 'Which input tax credits are blocked for a trader?');
         $b = $this->publishLiveFaq('faq-fail-2', 'Do I need to pay advance tax on presumptive income?');
-        $this->publisher->setErrorFor('unpublishAnswer', 'network_error');
+        $this->publisher->failNext('unpublishAnswer', 'network_error', 'Could not reach the public site.');
 
         $this->vettingSays('reject', ['Materially wrong.']);
         $this->vettingSays('revise', ['Mention 15 March.'], []);
@@ -292,7 +322,214 @@ final class CommunityAnswerRevetTest extends ApiTestCase
         $this->assertSame('withdraw_failed', $this->db()->table('reach_content_quality_checks')->where('subject_id', $this->answerRow($a['answer_id'])['id'])->get()->getRow()->action);
     }
 
+    /**
+     * Production, 23 Oct: seven corrections approved by Gemini all dead-lettered
+     * with "Public question provisioning failed …: Idempotency key was already
+     * used with a different request body. (version_conflict)". The answers had
+     * first been published before the question envelope gained the desk
+     * disclosure, so the receiver still held "reach-question-<uuid>" with the
+     * older body. Reproduced here by leaving those keys on the fake site.
+     */
+    public function testACorrectionOfAnAnswerFirstPublishedUnderAnOlderEnvelopeGoesLive(): void
+    {
+        $live     = $this->publishLiveFaq('faq-legacy-envelope', 'Is there late-fee relief for a delayed GSTR-1?');
+        $answer   = $this->answerRow($live['answer_id']);
+        $identity = $this->db()->table('reach_community_official_identities')->where('id', $answer['identity_id'])->get()->getRow()->uuid;
+        foreach (['reach-question-' . $live['question_id'], 'reach-identity-' . $identity, 'reach-answer-v2-' . $live['answer_id']] as $key) {
+            $this->publisher->rememberKey($key);
+        }
+        $before = (string) $this->publisher->liveBody($live['answer_id']);
+
+        $revised = '<p>Yes. The GSTR-1 late fee is ₹50 a day (₹20 for a nil return), capped by turnover under the late-fee waiver notifications; the return must still be filed.</p>';
+        $this->vettingSays('revise', ['Add the late-fee amounts.'], ['answer_html' => $revised, 'short_answer' => 'Yes — capped by turnover.']);
+        $this->vettingSays('approve', ['Accurate.']);
+        $report = $this->revet()->run(['types' => [], 'community' => true]);
+
+        $this->assertSame('corrected', $report['items'][0]['action'], json_encode($report['items'][0]));
+        $this->assertStringContainsString('₹50 a day', (string) $this->publisher->liveBody($live['answer_id']));
+        $this->assertNotSame($before, $this->publisher->liveBody($live['answer_id']));
+        $answer = $this->answerRow($live['answer_id']);
+        $this->assertSame('published', $answer['status']);
+        $this->assertSame(2, (int) $answer['approved_version']);
+        $deployment = $this->db()->table('reach_community_deployments')->where('answer_id', $answer['id'])
+            ->orderBy('id', 'DESC')->get()->getRowArray();
+        $this->assertSame('succeeded', $deployment['status']);
+        $this->assertSame($live['public_url'], $deployment['public_url']);
+        $this->assertNotEmpty($answer['public_external_id']);
+        $this->assertSame('published', $this->db()->table('reach_community_automation_submissions')->where('kind', 'correction')->get()->getRow()->status);
+
+        // Nothing was sent under a key the site had already seen with another body.
+        foreach ($this->publisher->getCalls() as $call) {
+            $this->assertNotSame('version_conflict', $call['response']['error_category'] ?? null, $call['method']);
+        }
+    }
+
+    /**
+     * The first-publication path re-sends identity and question upserts; a
+     * record that changed since (a renamed desk, an edited or re-categorised
+     * question) must reach the site, and an unchanged one must replay.
+     */
+    public function testRepublishingAfterTheQuestionChangedUpdatesItInsteadOfReusingTheKey(): void
+    {
+        $live   = $this->publishLiveFaq('faq-retitle', 'Is a GST invoice needed for exempt supplies?');
+        $answer = $this->answerRow($live['answer_id']);
+        $this->db()->table('reach_community_questions')->where('uuid', $live['question_id'])
+            ->update(['title' => 'Do I issue a bill of supply for exempt supplies under GST?']);
+
+        $provisioner = new CommunityPublicRecordProvisioner($this->publisher);
+        $version     = $this->db()->table('reach_community_answer_versions')->where('answer_id', $answer['id'])
+            ->where('version_number', $answer['approved_version'])->get()->getRowArray();
+        $provisioner->ensureAnswerExists($answer, $version);   // used to throw: 409 on reach-question-<uuid>
+        $this->assertSame('Do I issue a bill of supply for exempt supplies under GST?', $this->publisher->questions[$live['question_id']]['title']);
+
+        $keys = count($this->publisher->seenKeys());
+        $provisioner->ensureAnswerExists($answer, $version);   // nothing changed: same keys, replayed
+        $this->assertCount($keys, $this->publisher->seenKeys());
+        $this->assertTrue($this->publisher->getCallsFor('createQuestion')[2]['response']['idempotent_replay'] ?? false);
+        foreach ($this->publisher->seenKeys() as $key) {
+            $this->assertLessThanOrEqual(64, strlen($key));
+        }
+    }
+
+    public function testWhileACorrectionIsPublishedTheOldTextStaysLiveAndGivingUpRestoresTheAnswer(): void
+    {
+        $live    = $this->publishLiveFaq('faq-giveup', 'Do I need to pay advance tax on presumptive business income?');
+        $current = $this->answerRow($live['answer_id']);
+        $oldText = (string) $this->publisher->liveBody($live['answer_id']);
+        $this->publisher->failNext('applyCorrection', 'server_error', 'Internal error on the public site.');
+
+        $this->vettingSays('revise', ['Name the 15 March single instalment.'], [
+            'answer_html'  => '<p>Under Sections 44AD and 44ADA the whole advance tax is paid in one instalment by 15 March of the financial year; anything paid by 31 March counts as advance tax too.</p>',
+            'short_answer' => 'One instalment by 15 March.',
+        ]);
+        $this->vettingSays('approve', ['Accurate.']);
+        $report = $this->revet()->run(['types' => [], 'community' => true]);
+        $this->assertSame('correction_pending', $report['items'][0]['action'], json_encode($report['items'][0]));
+
+        // Approved in Reach, publication retrying — and the reader still sees the old text.
+        $answer = $this->answerRow($live['answer_id']);
+        $this->assertSame('verification_failed', $answer['status']);
+        $this->assertSame($oldText, $this->publisher->liveBody($live['answer_id']));
+        $this->assertCount(1, $this->publisher->getCallsFor('createAnswer'), 'the live answer is not rewritten by an upsert');
+
+        // The retry sweep gives up after five attempts …
+        $svc = new OfficialAnswerPublishingService();
+        for ($i = 0; $i < 10; $i++) {
+            $deployment = $this->db()->table('reach_community_deployments')->where('answer_id', $answer['id'])
+                ->orderBy('id', 'DESC')->get()->getRowArray();
+            if ($deployment['status'] === 'dead_letter') {
+                break;
+            }
+            $svc->retryDeployment($deployment);
+            $this->assertSame($oldText, $this->publisher->liveBody($live['answer_id']));
+        }
+        $this->assertSame('dead_letter', $deployment['status']);
+        $this->assertSame(5, (int) $deployment['attempt_count']);
+
+        // … and community:schedule's sweep closes the submission and puts the answer back.
+        $sub = $this->db()->table('reach_community_automation_submissions')->where('kind', 'correction')->get()->getRowArray();
+        $this->db()->table('reach_community_automation_submissions')->where('id', $sub['id'])->update(['next_retry_at' => null]);
+        $this->service()->sweep();
+        $sub = $this->db()->table('reach_community_automation_submissions')->where('id', $sub['id'])->get()->getRowArray();
+        $this->assertSame('failed', $sub['status']);
+        $this->assertStringContainsString('Publication gave up', (string) $sub['last_error']);
+
+        $answer = $this->answerRow($live['answer_id']);
+        $this->assertSame('published', $answer['status']);
+        $this->assertSame('published', $answer['publication_status']);
+        $this->assertSame((int) $current['approved_version'], (int) $answer['approved_version']);
+        $this->assertSame($current['approved_version_checksum'], $answer['approved_version_checksum']);
+        $this->assertSame((int) $current['current_version'], (int) $answer['current_version']);
+        $this->assertSame($current['human_reviewed'], $answer['human_reviewed']);
+        $this->assertSame($oldText, $this->publisher->liveBody($live['answer_id']), 'never unpublished, never rewritten');
+        $this->assertFalse($this->publisher->wasCalledWith('unpublishAnswer'));
+        $this->assertSame('queued', $this->db()->table('reach_community_reanswers')->where('answer_id', $answer['id'])->get()->getRow()->status);
+
+        // A stray retry of that deployment cannot publish the abandoned text over the restored version.
+        $this->db()->table('reach_community_deployments')->where('id', $deployment['id'])->update(['status' => 'retrying', 'attempt_count' => 1]);
+        $this->publisher->clearFailures();
+        $retry = $svc->retryDeployment($this->db()->table('reach_community_deployments')->where('id', $deployment['id'])->get()->getRowArray());
+        $this->assertSame('superseded', $retry['outcome']);
+        $this->assertSame($oldText, $this->publisher->liveBody($live['answer_id']));
+        $this->assertSame('published', $this->answerRow($live['answer_id'])['status']);
+    }
+
+    /**
+     * community:revet-repair on the state production was left in: the answer
+     * back to published with its previous version, the re-answer request
+     * queued with "Replacement failed: Publication gave up …".
+     */
+    public function testTheRepairReleasesWhatAGivenUpCorrectionLeftQueuedSoItCanBeReVetted(): void
+    {
+        $live = $this->giveUpOnACorrection('faq-repair', 'Is GST payable on advances received for services?');
+        $other = $this->publishLiveFaq('faq-repair-untouched', 'Is GST payable on a gift to an employee?');
+        $id   = (int) $this->answerRow($live['answer_id'])['id'];
+        $repair = new \App\Libraries\Community\Automation\CommunityRevetRepairService(null, $this->publisher);
+
+        $this->assertSame([$id], $repair->affectedAnswerIds());
+        $dry = $repair->run([], false);
+        $this->assertTrue($dry['dry_run']);
+        $this->assertSame(['release'], $dry['items'][0]['actions']);
+        $this->assertSame('published', $dry['items'][0]['site']['public_status']);
+        $this->assertSame('dead_letter', $dry['items'][0]['deployment']['status']);
+        $this->assertSame([$id], $dry['released']);
+        $this->assertSame('queued', $this->db()->table('reach_community_reanswers')->where('answer_id', $id)->get()->getRow()->status, 'a dry run changes nothing');
+
+        // A restore the pipeline did not get to is done too — only because the site says it is live.
+        $this->db()->table('reach_community_official_answers')->where('id', $id)->update(['status' => 'verification_failed']);
+        $this->assertSame(['restore', 'release'], $repair->run([$id], false)['items'][0]['actions']);
+        $this->assertSame([], $repair->run([$id], false, false)['items'][0]['actions'], 'without the site\'s word nothing is restored');
+
+        $applied = $repair->run([], true);
+        $this->assertSame(['restore', 'release'], $applied['items'][0]['done']);
+        $this->assertSame('published', $this->answerRow($live['answer_id'])['status']);
+        $this->assertSame('cancelled', $this->db()->table('reach_community_reanswers')->where('answer_id', $id)->get()->getRow()->status);
+        $this->assertSame([], $repair->run([], true)['items'][0]['done'], 'idempotent');
+
+        // Re-vetting it now publishes Gemini's revision through the fixed path.
+        $this->vettingSays('revise', ['Name the time of supply rule.'], [
+            'answer_html'  => '<p>For services, GST is due on an advance when it is received: the time of supply is the earlier of the invoice date or the date of payment, so tax is paid on the advance in that month.</p>',
+            'short_answer' => 'Yes — on receipt.',
+        ]);
+        $this->vettingSays('approve', ['Accurate.']);
+        $report = $this->revet()->run(['types' => [], 'community' => true, 'answer_ids' => [$id]]);
+        $this->assertCount(1, $report['items']);
+        $this->assertSame('corrected', $report['items'][0]['action'], json_encode($report['items'][0]));
+        $this->assertStringContainsString('time of supply', (string) $this->publisher->liveBody($live['answer_id']));
+        $this->assertStringContainsString('confirm with your CA', (string) $this->publisher->liveBody($other['answer_id']));
+    }
+
     // ---------------------------------------------------------------- helpers
+
+    /** A live FAQ whose correction was approved and then given up at publication (the production state). */
+    private function giveUpOnACorrection(string $key, string $title): array
+    {
+        $live = $this->publishLiveFaq($key, $title);
+        $this->publisher->failNext('applyCorrection', 'server_error', 'Internal error on the public site.');
+        $this->vettingSays('revise', ['Be specific.'], [
+            'answer_html'  => '<p>A specific corrected answer that names the provision, the conditions and the time limit, so a reader can act on it without guessing.</p>',
+            'short_answer' => 'Specific.',
+        ]);
+        $this->vettingSays('approve', ['Accurate.']);
+        $this->revet()->run(['types' => [], 'community' => true]);
+
+        $answerId = (int) $this->answerRow($live['answer_id'])['id'];
+        $svc      = new OfficialAnswerPublishingService();
+        for ($i = 0; $i < 10; $i++) {
+            $d = $this->db()->table('reach_community_deployments')->where('answer_id', $answerId)->orderBy('id', 'DESC')->get()->getRowArray();
+            if ($d['status'] === 'dead_letter') {
+                break;
+            }
+            $svc->retryDeployment($d);
+        }
+        $this->db()->table('reach_community_automation_submissions')->where('kind', 'correction')->update(['next_retry_at' => null]);
+        $this->service()->sweep();
+        $this->publisher->clearFailures();
+        $this->assertSame('published', $this->answerRow($live['answer_id'])['status']);
+
+        return $live;
+    }
+
 
     /** @return array{answer_id: string, question_id: string, public_url: ?string} */
     private function publishLiveFaq(string $key, string $title): array

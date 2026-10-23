@@ -178,13 +178,7 @@ class OfficialAnswerPublishingService
         ], $actorId);
 
         try {
-            // The receiver publishes an answer that already exists; it does not
-            // create one. Identity, question and answer must be upserted first
-            // or the publish call 404s.
-            $this->provisioner->ensureAnswerExists($answer, $version);
-
-            $envelope = $this->buildPublishEnvelope($answer, $version, $idempotency);
-            $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);
+            $result = $this->deliver($answer, $version, $idempotency);
 
             if (!($result['success'] ?? false)) {
                 $this->handlePublishFailure($deploymentId, $answerId, $answer['status'], $result);
@@ -281,6 +275,23 @@ class OfficialAnswerPublishingService
             return ['success' => false, 'outcome' => 'risk_blocked'];
         }
 
+        // A deployment is for one approved version. If the answer has moved on
+        // since — a failed correction put the previous version back, or a newer
+        // version was approved — sending this one would publish text that is no
+        // longer the approved text of the answer.
+        if ((int) $deployment['answer_version_number'] !== (int) $answer['approved_version']
+            || ! hash_equals((string) $answer['approved_version_checksum'], (string) ($deployment['version_checksum'] ?? ''))
+        ) {
+            $this->deployModel->update($deploymentId, [
+                'status'              => 'dead_letter',
+                'last_error'          => "superseded: answer #{$answerId}'s approved version is now v{$answer['approved_version']}, not v{$deployment['answer_version_number']}",
+                'last_error_category' => 'validation_error',
+                'next_retry_at'       => null,
+                'updated_at'          => date('Y-m-d H:i:s'),
+            ]);
+            return ['success' => false, 'outcome' => 'superseded'];
+        }
+
         $attempts++;
         $version = $this->answerRepo->getVersion($answerId, (int) $deployment['answer_version_number']);
 
@@ -290,10 +301,10 @@ class OfficialAnswerPublishingService
             'updated_at'    => date('Y-m-d H:i:s'),
         ]);
 
-        // Same ordering requirement as the first attempt — and if the original
-        // failure was the missing public records, this is what fixes it.
+        // Same path as the first attempt — and if the original failure was the
+        // missing public records, provisioning them again is what fixes it.
         try {
-            $this->provisioner->ensureAnswerExists($answer, $version);
+            $result = $this->deliver($answer, $version, (string) $deployment['idempotency_key']);
         } catch (\RuntimeException $e) {
             $exhausted = $attempts >= $maxAttempts;
             $this->deployModel->update($deploymentId, [
@@ -312,9 +323,6 @@ class OfficialAnswerPublishingService
                 'safe_error_message' => $e->getMessage(),
             ];
         }
-
-        $envelope = $this->buildPublishEnvelope($answer, $version, (string) $deployment['idempotency_key']);
-        $result   = $this->publisher->publishAnswer($answer['uuid'], $envelope);
 
         if ($result['success'] ?? false) {
             $this->handlePublishSuccess($deploymentId, $answerId, $result, $actorId);
@@ -422,6 +430,95 @@ class OfficialAnswerPublishingService
         return $result;
     }
 
+    /**
+     * Send one approved version to aicountly.com. Used by the first attempt and
+     * by every retry (same idempotency key), so both take the same path.
+     *
+     * A correction of an answer the site already has goes through the
+     * receiver's correction contract (POST …/community/corrections): one
+     * transaction there swaps the body, keeps the previous text as a revision,
+     * bumps the revision number and shows the correction note. Until that call
+     * the old text stays live; if it fails nothing on the site has changed. The
+     * identity and question are not touched — a correction is of the answer.
+     *
+     * Everything else (a first publication, an answer the site does not have)
+     * provisions identity → question → answer and then publishes, as before.
+     * The receiver publishes an answer that already exists; it does not create
+     * one, so the upserts must come first or the publish call 404s.
+     *
+     * @throws \RuntimeException when provisioning is refused or the site's
+     *         state cannot be read — the caller records it as a failed attempt.
+     */
+    private function deliver(array $answer, ?array $version, string $idempotency): array
+    {
+        if (($version['creation_reason'] ?? null) === 'correction') {
+            $live = $this->publisher->getAnswerStatus((string) $answer['uuid']);
+            if ($live['success'] ?? false) {
+                return $this->deliverCorrection($answer, $version, $idempotency, $live);
+            }
+            $notFound = ($live['remote_error_code'] ?? null) === 'not_found' || ($live['error_category'] ?? null) === 'not_found';
+            if (! $notFound) {
+                throw new \RuntimeException('Could not read the answer\'s state on the public site before correcting it: '
+                    . ($live['safe_error_message'] ?? $live['error_category'] ?? 'unknown error'));
+            }
+            // The site has no such answer: publish the correction as a new one.
+        }
+
+        $this->provisioner->ensureAnswerExists($answer, $version);
+
+        return $this->publisher->publishAnswer($answer['uuid'], $this->buildPublishEnvelope($answer, $version, $idempotency));
+    }
+
+    /** @param array<string, mixed> $live the receiver's GET …/answers/{uuid}/status */
+    private function deliverCorrection(array $answer, array $version, string $idempotency, array $live): array
+    {
+        $publicStatus = strtolower((string) ($live['public_status'] ?? ''));
+        if (in_array($publicStatus, ['hidden', 'removed'], true)) {
+            // Re-publishing would undo a moderator's decision on the site.
+            return [
+                'success'            => false,
+                'error_category'     => 'validation_error',
+                'safe_error_message' => "The answer is {$publicStatus} by moderation on the public site; the correction was not sent.",
+            ];
+        }
+
+        $note = trim((string) ($answer['correction_note'] ?? ''));
+        $result = $this->publisher->applyCorrection([
+            'reach_answer_uuid'            => (string) $answer['uuid'],
+            'operation'                    => 'correct',
+            'content_type'                 => 'community_answer',
+            'reach_content_version_number' => (int) $answer['approved_version'],
+            // Distinct from the publish call's key (same deployment, different body).
+            'idempotency_key'              => $idempotency . '-correction',
+            'payload_checksum'             => (string) $answer['approved_version_checksum'],
+            'payload' => [
+                'body'            => (string) ($version['content'] ?? ''),
+                'correction_note' => $note !== '' ? $note : 'Updated for accuracy.',
+                // The receiver's correction leaves the answer's AI-assisted flag
+                // and desk badge as they are; sent so the request says what it is.
+                'ai_assisted'     => PgBoolean::isTrue($answer['ai_assisted'] ?? false),
+                'ai_disclosure'   => CommunityPublicRecordProvisioner::DESK_DISCLOSURE,
+            ],
+        ]);
+
+        if (! ($result['success'] ?? false)) {
+            return $result;
+        }
+
+        if ($publicStatus !== 'published') {
+            // Down on the site (a re-answer of a withdrawn answer, or never
+            // made live): the corrected text is in place, now put it up.
+            return $this->publisher->publishAnswer($answer['uuid'], $this->buildPublishEnvelope($answer, $version, $idempotency));
+        }
+
+        return array_merge($result, [
+            'public_status'    => 'published',
+            'public_answer_id' => $result['public_answer_id'] ?? $live['public_answer_id'] ?? ($answer['public_external_id'] ?? null),
+            'canonical_url'    => $result['canonical_url'] ?? $live['canonical_url'] ?? ($answer['public_url'] ?? null),
+            'payload_checksum' => $result['payload_checksum'] ?? $answer['approved_version_checksum'],
+        ]);
+    }
+
     private function buildPublishEnvelope(array $answer, ?array $version, string $idempotency): array
     {
         $content = $version['content'] ?? '';
@@ -442,7 +539,9 @@ class OfficialAnswerPublishingService
                 'ai_assisted'      => PgBoolean::isTrue($answer['ai_assisted'] ?? false),
                 'human_reviewed'   => PgBoolean::isTrue($answer['human_reviewed'] ?? false),
                 'ai_disclosure'    => CommunityPublicRecordProvisioner::DESK_DISCLOSURE,
-                'approved_at'      => $version['approval_timestamp'] ?? date('c'),
+                // Deterministic: a retry re-sends this body under the same key,
+                // and the receiver refuses a reused key with a different body.
+                'approved_at'      => $version['approval_timestamp'] ?? $version['created_at'] ?? null,
                 'answer_version'   => $answer['approved_version'],
                 'robots_directive' => 'index,follow',
                 'structured_data'  => [],
