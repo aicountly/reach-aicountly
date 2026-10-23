@@ -50,6 +50,20 @@ class DashboardController extends BaseApiController
         return $this->ok($activity->drilldown($kind, $window, $page, $perPage));
     }
 
+    /** Command centre → Rankings drill-down: every tracked keyword, our position, competitors. */
+    public function commandCentreKeywords()
+    {
+        return $this->ok((new \App\Libraries\Dashboard\RankingsDrilldown())->keywords());
+    }
+
+    /** Command centre → Rankings drill-down: AI-visibility questions, assistants and who was named. */
+    public function commandCentreAiAnswers()
+    {
+        $days = (int) ($this->request->getGet('days') ?? 28);
+
+        return $this->ok((new \App\Libraries\Dashboard\RankingsDrilldown())->aiAnswers($days > 0 ? $days : 28));
+    }
+
     /** Used by the sidebar to badge menu items. */
     public function counts()
     {

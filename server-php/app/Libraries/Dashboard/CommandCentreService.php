@@ -403,97 +403,80 @@ final class CommandCentreService
     /** @return array<string, mixed> */
     private function rankings(): array
     {
+        // Built from the same rows as the drill-down (RankingsDrilldown), so the
+        // tiles, their tooltips and the keyword table never disagree.
         $tracker = ['available' => false, 'note' => 'The SEO Tracker has not recorded a SERP check yet.'];
-        if (SchemaGuard::hasTable($this->db, 'reach_seo_serp_checks')) {
-            $dates = array_column($this->db->query(
-                "SELECT DISTINCT check_date::text AS d FROM reach_seo_serp_checks WHERE status = 'ok' ORDER BY d DESC LIMIT 8"
-            )->getResultArray(), 'd');
-            if ($dates !== []) {
-                $latest = $dates[0];
-                // Compare with the check about a week earlier, else the previous one.
-                $prev = null;
-                foreach (array_slice($dates, 1) as $d) {
-                    $prev = $d;
-                    if ((strtotime($latest) - strtotime($d)) >= 6 * 86400) {
-                        break;
-                    }
-                }
-                $rows = $this->db->query(
-                    "SELECT k.id, k.keyword, k.priority, cur.our_rank AS rank, cur.our_url AS url, prev.our_rank AS prev_rank
-                       FROM reach_seo_serp_checks cur
-                       JOIN reach_seo_tracked_keywords k ON k.id = cur.keyword_id
-                  LEFT JOIN reach_seo_serp_checks prev ON prev.keyword_id = cur.keyword_id AND prev.check_date = ? AND prev.status = 'ok'
-                      WHERE cur.check_date = ? AND cur.status = 'ok'",
-                    [$prev, $latest]
-                )->getResultArray();
+        if (RankingsDrilldown::comparisonDates($this->db)['latest'] !== null) {
+            $kw   = (new RankingsDrilldown($this->db))->keywords();
+            $sum  = $kw['summary'];
+            $rows = $kw['keywords'];
+            $ok   = array_values(array_filter($rows, static fn ($r) => $r['status'] === 'ok'));
+            $pick = static fn (array $r): array => ['keyword' => $r['keyword'], 'rank' => $r['our_rank'], 'url' => $r['our_url']];
+            $ranked = array_values(array_filter($ok, static fn ($r) => $r['our_rank'] !== null));
+            $movers = array_values(array_filter($ok, static fn ($r) => $r['change'] !== null && $r['change'] !== 0));
+            $mover  = static fn (array $r): array => ['keyword' => $r['keyword'], 'rank' => $r['our_rank'], 'previous_rank' => $r['previous_rank'], 'change' => $r['change'], 'url' => $r['our_url']];
+            $up   = array_values(array_filter($movers, static fn ($r) => $r['change'] > 0));
+            $down = array_values(array_filter($movers, static fn ($r) => $r['change'] < 0));
+            usort($up, static fn ($a, $b) => $b['change'] <=> $a['change']);
+            usort($down, static fn ($a, $b) => $a['change'] <=> $b['change']);
 
-                $checked = count($rows);
-                $ranked  = array_values(array_filter($rows, static fn ($r) => $r['rank'] !== null));
-                $top10   = count(array_filter($ranked, static fn ($r) => (int) $r['rank'] <= 10));
-                $movers  = [];
-                foreach ($rows as $r) {
-                    $cur  = $r['rank'] !== null ? (int) $r['rank'] : null;
-                    $was  = $r['prev_rank'] !== null ? (int) $r['prev_rank'] : null;
-                    if ($prev === null || ($cur === null && $was === null)) {
-                        continue;
-                    }
-                    // Unranked counts as 101 so entering/leaving the top 100 is a move.
-                    $delta = ($was ?? 101) - ($cur ?? 101);
-                    if ($delta !== 0) {
-                        $movers[] = ['keyword' => $r['keyword'], 'rank' => $cur, 'previous_rank' => $was, 'change' => $delta, 'url' => $r['url']];
-                    }
-                }
-                usort($movers, static fn ($a, $b) => $b['change'] <=> $a['change']);
-
-                $competitors = [];
-                if (SchemaGuard::hasTable($this->db, 'reach_seo_serp_rankings') && SchemaGuard::hasTable($this->db, 'reach_competitors')) {
-                    $competitors = array_map(static fn ($r) => [
-                        'name'      => $r['name'],
-                        'domain'    => $r['website_domain'],
-                        'keywords'  => (int) $r['keywords'],
-                        'top10'     => (int) $r['top10'],
-                        'avg_rank'  => $r['avg_rank'] !== null ? round((float) $r['avg_rank'], 1) : null,
-                    ], $this->db->query(
-                        "SELECT c.name, c.website_domain, COUNT(DISTINCT r.keyword_id) AS keywords,
-                                COUNT(DISTINCT r.keyword_id) FILTER (WHERE r.best <= 10) AS top10, AVG(r.best) AS avg_rank
-                           FROM (SELECT keyword_id, competitor_id, MIN(rank_absolute) AS best FROM reach_seo_serp_rankings
-                                  WHERE check_date = ? AND competitor_id IS NOT NULL GROUP BY keyword_id, competitor_id) r
-                           JOIN reach_competitors c ON c.id = r.competitor_id
-                          GROUP BY c.name, c.website_domain ORDER BY top10 DESC, avg_rank ASC LIMIT 6",
-                        [$latest]
-                    )->getResultArray());
-                }
-
-                $sortedRanked = $ranked;
-                usort($sortedRanked, static fn ($a, $b) => (int) $a['rank'] <=> (int) $b['rank']);
-
-                $tracker = [
-                    'available'      => true,
-                    'latest_date'    => $latest,
-                    'compared_with'  => $prev,
-                    'keywords_checked' => $checked,
-                    'ranked'         => count($ranked),
-                    'top10'          => $top10,
-                    'top10_share'    => $checked > 0 ? round($top10 / $checked, 4) : null,
-                    'avg_rank'       => $ranked !== [] ? round(array_sum(array_map(static fn ($r) => (int) $r['rank'], $ranked)) / count($ranked), 1) : null,
-                    'best'           => array_map(static fn ($r) => ['keyword' => $r['keyword'], 'rank' => (int) $r['rank'], 'url' => $r['url']], array_slice($sortedRanked, 0, 5)),
-                    'movers_up'      => array_slice(array_values(array_filter($movers, static fn ($m) => $m['change'] > 0)), 0, 5),
-                    'movers_down'    => array_slice(array_reverse(array_values(array_filter($movers, static fn ($m) => $m['change'] < 0))), 0, 5),
-                    'competitors'    => $competitors,
-                ];
-            }
+            $tracker = [
+                'available'        => true,
+                'latest_date'      => $kw['latest_date'],
+                'compared_with'    => $kw['compared_with'],
+                'depth'            => $kw['depth'],
+                'tracked'          => $sum['tracked'],
+                'keywords_checked' => $sum['checked'],
+                'failed'           => $sum['failed'],
+                'not_checked'      => $sum['not_checked'],
+                'ranked'           => $sum['ranked'],
+                'top10'            => $sum['top10'],
+                'top10_share'      => $sum['checked'] > 0 ? round($sum['top10'] / $sum['checked'], 4) : null,
+                // Mean of our position over the keywords we rank for (not over every checked keyword).
+                'avg_rank'         => $sum['avg_rank'],
+                'avg_rank_over'    => $sum['ranked'],
+                'top10_keywords'   => array_map($pick, array_values(array_filter($ranked, static fn ($r) => $r['our_rank'] <= 10))),
+                'ranked_keywords'  => array_map($pick, array_slice($ranked, 0, 50)),
+                'unranked_keywords' => array_slice(array_column(array_filter($ok, static fn ($r) => $r['our_rank'] === null), 'keyword'), 0, 50),
+                'best'             => array_map($pick, array_slice($ranked, 0, 5)),
+                'compared'         => count(array_filter($ok, static fn ($r) => $r['change'] !== null)),
+                'unchanged'        => count(array_filter($ok, static fn ($r) => $r['change'] === 0)),
+                'no_previous'      => count(array_filter($ok, static fn ($r) => ! $r['previous_checked'])),
+                'movers_up'        => array_map($mover, array_slice($up, 0, 10)),
+                'movers_down'      => array_map($mover, array_slice($down, 0, 10)),
+                'competitors'      => array_map(static fn (array $c): array => [
+                    'name'           => $c['name'],
+                    'domain'         => $c['domain'],
+                    'keywords'       => $c['keywords'],
+                    'top10'          => $c['top10'],
+                    // Mean of their best position over the `keywords` they appear for in the checked depth.
+                    'avg_rank'       => $c['avg_rank'],
+                    'top10_keywords' => array_map(static fn ($p) => ['keyword' => $p['keyword'], 'rank' => $p['rank'], 'our_rank' => $p['our_rank']],
+                        array_values(array_filter($c['placements'], static fn ($p) => $p['rank'] <= 10))),
+                ], array_slice($kw['competitors'], 0, 6)),
+            ];
         }
 
         $visibility = ['available' => false, 'note' => 'No AI-visibility answers recorded yet.'];
         if (SchemaGuard::hasTable($this->db, 'reach_ai_visibility_runs')) {
             $sum = (new \App\Libraries\Intelligence\Visibility\AiVisibilityService($this->db))->summary(28);
-            if ((int) ($sum['overall']['answers'] ?? 0) > 0) {
+            $answers = (int) ($sum['overall']['answers'] ?? 0);
+            if ($answers > 0) {
+                $counted = (int) ($sum['overall']['brand_answers_counted'] ?? 0);
                 $visibility = [
                     'available'     => true,
                     'period'        => $sum['period'],
-                    'answers'       => (int) $sum['overall']['answers'],
-                    'mention_rate'  => $sum['overall']['brand_mention_rate'] ?? null,
+                    'answers'       => $answers,
+                    // Answers to questions that name AICOUNTLY are not counted for the brand.
+                    'brand_answers_counted' => $counted,
+                    'brand_mentions' => (int) ($sum['overall']['brand_mentions'] ?? 0),
+                    'measured'      => $counted > 0,
+                    'mention_rate'  => $counted > 0 ? ($sum['overall']['brand_mention_rate'] ?? null) : null,
                     'avg_rank'      => $sum['overall']['brand_avg_rank'] ?? null,
+                    'by_provider'   => array_map(static fn (array $p): array => [
+                        'provider' => $p['provider'], 'answers' => $p['answers'], 'counted' => $p['brand_answers_counted'], 'brand_mentions' => $p['brand_mentions'],
+                    ], $sum['by_provider'] ?? []),
+                    'failed_runs'   => array_sum(array_column($sum['failures'] ?? [], 'failed_runs')),
                     'top_competitors' => array_slice($sum['top_competitors'] ?? [], 0, 5),
                     'note'          => $sum['sample_note'] ?? null,
                 ];

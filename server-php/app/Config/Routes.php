@@ -205,6 +205,8 @@ $routes->group('v1', static function ($routes) {
         $routes->get('dashboard/counts',  'Api\\V1\\DashboardController::counts',  ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/command-centre', 'Api\\V1\\DashboardController::commandCentre', ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/command-centre/activity', 'Api\\V1\\DashboardController::commandCentreActivity', ['filter' => 'permission:dashboard.view']);
+        $routes->get('dashboard/command-centre/rankings/keywords',   'Api\\V1\\DashboardController::commandCentreKeywords',  ['filter' => 'permission:dashboard.view']);
+        $routes->get('dashboard/command-centre/rankings/ai-answers', 'Api\\V1\\DashboardController::commandCentreAiAnswers', ['filter' => 'permission:dashboard.view']);
 
         // Blog
         $routes->get('blog/posts',                        'Api\\V1\\BlogController::index',          ['filter' => 'permission:blog.view']);

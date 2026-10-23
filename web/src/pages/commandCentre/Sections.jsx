@@ -370,59 +370,7 @@ export function Impact({ section }) {
   );
 }
 
-/* ─────────────────────────────── rankings ────────────────────────────── */
-
-export function Rankings({ section }) {
-  const t = section?.tracker || {};
-  const v = section?.visibility || {};
-  return (
-    <Section id="rankings" icon={Trophy} title="Rankings" section={section}
-             subtitle={t.available ? `SEO Tracker (DataForSEO) ${t.latest_date}${t.compared_with ? ` vs ${t.compared_with}` : ''}.` : null}>
-      {section?.status === 'empty' && <Empty>{section.note}</Empty>}
-      {t.available && (
-        <>
-          <div className="cc-kpis">
-            <Kpi label="Keywords in top 10" value={`${t.top10}/${t.keywords_checked}`} hint={pct(t.top10_share, 0)} to="/seo-centre/tracker" />
-            <Kpi label="Ranked (top 100)" value={num(t.ranked)} hint={t.avg_rank != null ? `avg position ${t.avg_rank}` : ''} />
-          </div>
-          <div className="grid grid-2 mt-2">
-            <div>
-              <div className="cc-mini-title">Movers up</div>
-              {(t.movers_up || []).length === 0 ? <p className="text-xs text-muted">No gains since the last check.</p> : (
-                <ul className="cc-list">{t.movers_up.map((m) => (
-                  <li key={m.keyword}><span>{m.keyword}</span><span className="cc-delta cc-delta--good"><ArrowUpRight size={12} aria-hidden="true" /> {m.previous_rank ?? '>100'} → {m.rank ?? '>100'}</span></li>
-                ))}</ul>
-              )}
-            </div>
-            <div>
-              <div className="cc-mini-title">Movers down</div>
-              {(t.movers_down || []).length === 0 ? <p className="text-xs text-muted">No drops since the last check.</p> : (
-                <ul className="cc-list">{t.movers_down.map((m) => (
-                  <li key={m.keyword}><span>{m.keyword}</span><span className="cc-delta cc-delta--bad"><ArrowDownRight size={12} aria-hidden="true" /> {m.previous_rank ?? '>100'} → {m.rank ?? '>100'}</span></li>
-                ))}</ul>
-              )}
-            </div>
-          </div>
-          {(t.competitors || []).length > 0 && (
-            <div className="mt-2">
-              <div className="cc-mini-title">Competitors on the same keywords (top-10 placements)</div>
-              <Bars label="Competitor top-10 placements"
-                    rows={[{ key: 'us', label: 'AICOUNTLY', value: t.top10, display: `${t.top10}` },
-                      ...t.competitors.map((c) => ({ key: c.domain, label: c.name, value: c.top10, display: `${c.top10}${c.avg_rank != null ? ` · avg ${c.avg_rank}` : ''}` }))]} />
-            </div>
-          )}
-        </>
-      )}
-      {section && !t.available && section.status !== 'empty' && <Empty>{t.note}</Empty>}
-      {v.available && (
-        <div className="cc-kpis mt-2">
-          <Kpi label="AI assistants mention us" value={pct(v.mention_rate, 0)} hint={`${v.answers} answers in ${v.period?.days ?? 28} days${v.avg_rank ? ` · avg rank ${v.avg_rank}` : ''}`} to="/intelligence/visibility" />
-        </div>
-      )}
-      {section && !v.available && section.status !== 'empty' && <p className="text-xs text-muted mt-1"><Radar size={12} aria-hidden="true" /> {v.note}</p>}
-    </Section>
-  );
-}
+/* Rankings lives in ./Rankings.jsx (tooltips + drill-downs). */
 
 /* ────────────────────────────── projections ──────────────────────────── */
 
