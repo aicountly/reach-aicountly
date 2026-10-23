@@ -205,6 +205,17 @@ Every call goes to https://reach.aicountly.org/api — no auth header of your ow
   and is republished at the same URL. A re-answer that is not published puts the answer back as it
   was and is offered again, up to two routine answers, then cancelled (reasons kept). Tier 4 topics
   are never re-answered.
+  On the wire, a correction of an answer aicountly.com already has goes through the receiver's
+  correction contract (`POST /api/reach/v1/community/corrections`: body swapped in one transaction,
+  previous text kept as a revision, "Updated for accuracy." shown, AI-assisted badge unchanged);
+  identity and question are not re-sent, and nothing on the site changes until that call succeeds.
+  An answer that is down on the site (a re-answer of a withdrawn one) is then put back up with the
+  usual publish call. Provisioning upserts (identity → question → answer) carry idempotency keys
+  derived from their body (`reach-{i|q|a}-<uuid>-<hash>`): the receiver keeps every key forever and
+  answers 409 to a reused key with a new body, which is what dead-lettered every correction on
+  23 Oct 2026 (old per-record key `reach-question-<uuid>`). `php spark community:revet-repair`
+  (dry run unless `--apply`) reports what such a failure left behind and releases the queued
+  re-answer so `reach:content-revet --community --answer-ids=…` can re-vet it.
 - `php spark community:legacy-drafts` still lists answers stranded by the old in-Reach drafting;
   the sweep now releases them on its own after `stuck_hours`, so `--clear --confirm` is only a
   shortcut.

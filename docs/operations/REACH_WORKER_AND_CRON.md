@@ -298,7 +298,17 @@ weekly cron:
    community:legacy-drafts` still lists them and `--clear --confirm` does the
    same at once. Routine submissions themselves are tracked in Community →
    Automated feed.
-9. **Daily report `failed`:** open Reach → Reports; the row's error says why
+9. **A re-vet correction of a live community answer `failed` with "Publication
+   gave up after its retries"** (its deployment is `dead_letter`): the answer is
+   put back as it was (published, previous approved version; nothing changed on
+   aicountly.com) and the question is queued for a routine re-answer. `php spark
+   community:revet-repair [--answer-ids=1,2]` reports each such answer (Reach,
+   deployment, submission, re-answer request, live status on the site);
+   `--apply` restores one still not published in Reach (only when the site says
+   it is live) and releases the queued re-answer so `php spark
+   reach:content-revet --community --scope=live --type=none --answer-ids=…`
+   re-vets it. Dry run by default; safe to re-run.
+10. **Daily report `failed`:** open Reach → Reports; the row's error says why
    (usually `EMAIL_API_KEY is not configured`). Fix the env, then "Send now"
    (super admin) or `php spark reach:daily-report --send`.
 
