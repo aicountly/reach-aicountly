@@ -136,6 +136,59 @@ final class SearchSiteWideTest extends DatabaseTestCase
         $this->assertEqualsWithDelta(2.0, $movers['improved'][0]['change'], 0.01);
     }
 
+    /**
+     * Drill-down: every row of one step is a filter for the next, and the rows
+     * of a step always add up to that step's totals.
+     */
+    public function testExploreNarrowsStepByStepUntilOneFactIsLeft(): void
+    {
+        $id = $this->connection();
+        (new SearchSiteFactStore())->upsertFacts($id, 'sc-domain:example.com', null, [
+            ['metric_date' => '2026-10-10', 'page_url' => 'https://example.com/', 'query' => 'aicountly', 'device' => 'MOBILE', 'country' => 'IND', 'clicks' => 40, 'impressions' => 100, 'avg_position' => 1.2],
+            ['metric_date' => '2026-10-10', 'page_url' => 'https://example.com/billing', 'query' => 'gst billing software', 'device' => 'DESKTOP', 'country' => 'IND', 'clicks' => 5, 'impressions' => 500, 'avg_position' => 8.0],
+            ['metric_date' => '2026-10-11', 'page_url' => 'https://example.com/billing', 'query' => 'gst billing software', 'device' => 'MOBILE', 'country' => 'IND', 'clicks' => 7, 'impressions' => 500, 'avg_position' => 6.0],
+            ['metric_date' => '2026-10-11', 'page_url' => 'https://example.com/pricing', 'query' => 'gst billing software', 'device' => 'DESKTOP', 'country' => 'USA', 'clicks' => 1, 'impressions' => 50, 'avg_position' => 12.0],
+            ['metric_date' => '2026-10-11', 'page_url' => 'https://example.com/inventory', 'query' => 'stock software', 'device' => 'DESKTOP', 'country' => 'IND', 'clicks' => 0, 'impressions' => 30, 'avg_position' => 35.0],
+        ]);
+        $svc = new SearchSiteAnalyticsService();
+
+        // Step 1: a day → the queries behind it.
+        $day = $svc->explore('query', '2026-10-01', '2026-10-31', ['date' => '2026-10-11']);
+        $this->assertSame(['gst billing software', 'stock software'], array_column($day['rows'], 'dimension_value'));
+        $this->assertSame(2, $day['total_rows']);
+        $this->assertSame(8, $day['totals']['clicks']);
+        $this->assertSame(array_sum(array_column($day['rows'], 'clicks')), $day['totals']['clicks']);
+
+        // Step 2: that query on that day → its pages.
+        $pages = $svc->explore('page', '2026-10-01', '2026-10-31', ['date' => '2026-10-11', 'query' => 'gst billing software']);
+        $this->assertSame(['https://example.com/billing', 'https://example.com/pricing'], array_column($pages['rows'], 'dimension_value'));
+
+        // Step 3: one page → device; a single fact is left.
+        $leaf = $svc->explore('device', '2026-10-01', '2026-10-31', ['date' => '2026-10-11', 'query' => 'gst billing software', 'page' => 'https://example.com/pricing']);
+        $this->assertSame(1, $leaf['totals']['rows']);
+        $this->assertSame('DESKTOP', $leaf['rows'][0]['dimension_value']);
+
+        // A query over time, newest first by default.
+        $trend = $svc->explore('date', '2026-10-01', '2026-10-31', ['query' => 'gst billing software']);
+        $this->assertSame(['2026-10-11', '2026-10-10'], array_column($trend['rows'], 'dimension_value'));
+        $this->assertSame(13, $trend['totals']['clicks']);
+
+        // Position band is the query's band over the window, as in positionBuckets().
+        $band = $svc->explore('query', '2026-10-01', '2026-10-31', ['bucket' => '4-10']);
+        $this->assertSame(['gst billing software'], array_column($band['rows'], 'dimension_value'));
+
+        // Search, sort and paging.
+        $this->assertSame(['stock software'], array_column($svc->explore('query', '2026-10-01', '2026-10-31', [], ['search' => 'stock'])['rows'], 'dimension_value'));
+        $byPos = $svc->explore('query', '2026-10-01', '2026-10-31', [], ['sort' => 'position']);
+        $this->assertSame('aicountly', $byPos['rows'][0]['dimension_value']);
+        $page2 = $svc->explore('query', '2026-10-01', '2026-10-31', [], ['limit' => 1, 'offset' => 1]);
+        $this->assertCount(1, $page2['rows']);
+        $this->assertSame(3, $page2['total_rows']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $svc->explore('nonsense', '2026-10-01', '2026-10-31');
+    }
+
     public function testSnapshotUsesFreshestIngestedDayAndPlannedKeywords(): void
     {
         $id   = $this->connection();

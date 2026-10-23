@@ -234,6 +234,149 @@ class SearchSiteAnalyticsService
         ];
     }
 
+    /** Dimensions a site-wide slice can be grouped or filtered by → their fact column. */
+    public const EXPLORE_DIMENSIONS = [
+        'date'    => 'metric_date',
+        'query'   => 'query',
+        'page'    => 'page_url',
+        'device'  => 'device',
+        'country' => 'country',
+    ];
+
+    /** Position bands, as positionBuckets() names them → [min exclusive, max inclusive]. */
+    public const POSITION_BANDS = [
+        '1-3'   => [0, 3],
+        '4-10'  => [3, 10],
+        '11-20' => [10, 20],
+        '21-50' => [20, 50],
+        '51+'   => [50, null],
+    ];
+
+    private const EXPLORE_SORTS = ['clicks', 'impressions', 'ctr', 'position', 'key'];
+
+    /**
+     * One step of a drill-down: the row-level facts in [$from, $to] narrowed by
+     * every filter already chosen (date, query, page, device, country, and the
+     * query's position band over the window), grouped by one more dimension.
+     * Each returned row is itself a filter value for the next step, so a viewer
+     * can keep narrowing — day → query → page → device — until one fact is left.
+     *
+     * Totals are summed from the same narrowed facts, so the rows always add up
+     * to them. They can sit below the property-level daily totals: Google drops
+     * anonymised queries from query-level rows.
+     *
+     * @param array<string, string> $filters keys of EXPLORE_DIMENSIONS plus `bucket`
+     * @param array{sort?:string, dir?:string, limit?:int, offset?:int, search?:string} $opts
+     * @return array{group_by:string, rows:list<array<string,mixed>>, total_rows:int, totals:array<string,mixed>, filters:array<string,string>}
+     */
+    public function explore(string $groupBy, string $from, string $to, array $filters = [], array $opts = []): array
+    {
+        if (! isset(self::EXPLORE_DIMENSIONS[$groupBy])) {
+            throw new \InvalidArgumentException("Unknown dimension `{$groupBy}`.");
+        }
+        $filters = array_filter(
+            array_intersect_key($filters, self::EXPLORE_DIMENSIONS + ['bucket' => true]),
+            static fn ($v): bool => is_string($v) && $v !== ''
+        );
+        if (isset($filters['bucket']) && ! isset(self::POSITION_BANDS[$filters['bucket']])) {
+            throw new \InvalidArgumentException("Unknown position band `{$filters['bucket']}`.");
+        }
+
+        $empty = [
+            'group_by'   => $groupBy,
+            'rows'       => [],
+            'total_rows' => 0,
+            'totals'     => array_diff_key(self::shape([]), ['date' => true]) + ['rows' => 0],
+            'filters'    => $filters,
+        ];
+        if (! $this->isAvailable()) {
+            return $empty;
+        }
+
+        [$where, $binds] = $this->scope('metric_date BETWEEN ? AND ?', [$from, $to]);
+        foreach ($filters as $key => $value) {
+            if ($key === 'bucket') {
+                continue;
+            }
+            $where  .= ' AND ' . self::EXPLORE_DIMENSIONS[$key] . ($key === 'date' ? ' = ?::date' : ' = ?');
+            $binds[] = $value;
+        }
+        if (isset($filters['bucket'])) {
+            // The band is a property of the query over the whole window (as in
+            // positionBuckets()), not of each day's row.
+            [$min, $max] = self::POSITION_BANDS[$filters['bucket']];
+            [$bandWhere, $bandBinds] = $this->scope("metric_date BETWEEN ? AND ? AND query <> ''", [$from, $to]);
+            $having = 'SUM(avg_position * impressions) / NULLIF(SUM(impressions), 0) > ' . (int) $min
+                . ($max !== null ? ' AND SUM(avg_position * impressions) / NULLIF(SUM(impressions), 0) <= ' . (int) $max : '');
+            $where .= " AND query IN (SELECT query FROM reach_search_site_facts WHERE {$bandWhere} GROUP BY query HAVING {$having})";
+            $binds  = array_merge($binds, $bandBinds);
+        }
+
+        $column = self::EXPLORE_DIMENSIONS[$groupBy];
+        $key    = $groupBy === 'date' ? 'metric_date::text' : $column;
+        $search = trim((string) ($opts['search'] ?? ''));
+        $groupWhere = $where;
+        $groupBinds = $binds;
+        if ($search !== '') {
+            $groupWhere  .= " AND {$key} ILIKE ?";
+            $groupBinds[] = '%' . addcslashes($search, '%_\\') . '%';
+        }
+
+        $sort  = in_array($opts['sort'] ?? '', self::EXPLORE_SORTS, true) ? $opts['sort'] : ($groupBy === 'date' ? 'key' : 'clicks');
+        $dir   = strtolower((string) ($opts['dir'] ?? '')) === 'asc' ? 'ASC' : (strtolower((string) ($opts['dir'] ?? '')) === 'desc' ? 'DESC' : null);
+        $dir ??= match ($sort) {
+            'position' => 'ASC',
+            'key'      => $groupBy === 'date' ? 'DESC' : 'ASC',
+            default    => 'DESC',
+        };
+        $order = match ($sort) {
+            'impressions' => "SUM(impressions) {$dir}, SUM(clicks) DESC",
+            'ctr'         => "SUM(clicks)::numeric / NULLIF(SUM(impressions), 0) {$dir} NULLS LAST, SUM(impressions) DESC",
+            'position'    => "SUM(avg_position * impressions) / NULLIF(SUM(impressions), 0) {$dir} NULLS LAST, SUM(impressions) DESC",
+            'key'         => "{$key} {$dir}",
+            default       => "SUM(clicks) {$dir}, SUM(impressions) DESC",
+        };
+        $limit  = max(1, min(500, (int) ($opts['limit'] ?? 50)));
+        $offset = max(0, (int) ($opts['offset'] ?? 0));
+
+        $rows = $this->db()->query(
+            "SELECT {$key} AS dimension_value, SUM(clicks) AS clicks, SUM(impressions) AS impressions,
+                    CASE WHEN SUM(impressions) > 0 THEN SUM(avg_position * impressions) / SUM(impressions) END AS avg_position,
+                    COUNT(DISTINCT metric_date) AS days
+             FROM reach_search_site_facts WHERE {$groupWhere}
+             GROUP BY {$key}
+             ORDER BY {$order}, {$key}
+             LIMIT {$limit} OFFSET {$offset}",
+            $groupBinds
+        )->getResultArray();
+
+        $count = $this->db()->query(
+            "SELECT COUNT(DISTINCT {$key}) AS c FROM reach_search_site_facts WHERE {$groupWhere}",
+            $groupBinds
+        )->getRowArray();
+
+        $totals = $this->db()->query(
+            "SELECT SUM(clicks) AS clicks, SUM(impressions) AS impressions,
+                    CASE WHEN SUM(impressions) > 0 THEN SUM(avg_position * impressions) / SUM(impressions) END AS avg_position,
+                    COUNT(*) AS rows
+             FROM reach_search_site_facts WHERE {$where}",
+            $binds
+        )->getRowArray() ?? [];
+
+        return [
+            'group_by'   => $groupBy,
+            'rows'       => array_map(static function (array $r): array {
+                $shaped = ['dimension_value' => (string) $r['dimension_value']] + self::shape($r);
+                unset($shaped['date']);
+
+                return $shaped + ['days' => (int) $r['days']];
+            }, $rows),
+            'total_rows' => (int) ($count['c'] ?? 0),
+            'totals'     => array_diff_key(self::shape($totals), ['date' => true]) + ['rows' => (int) ($totals['rows'] ?? 0)],
+            'filters'    => $filters,
+        ];
+    }
+
     /** @return list<array<string, mixed>> */
     private function top(string $column, string $from, string $to, int $limit): array
     {

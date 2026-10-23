@@ -391,6 +391,42 @@ class SearchConsoleController extends BaseApiController
     }
 
     /**
+     * One drill-down step: facts narrowed by ?date&query&page&device&country&bucket,
+     * grouped by ?group_by (date|query|page|device|country). ?sort, ?dir, ?q
+     * (contains), ?limit, ?offset page through the groups.
+     */
+    public function siteExplore(): ResponseInterface
+    {
+        $groupBy = (string) ($this->request->getGet('group_by') ?? 'query');
+        if (! isset(\App\Libraries\Intelligence\SearchSiteAnalyticsService::EXPLORE_DIMENSIONS[$groupBy])) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => '`group_by` must be one of: '
+                . implode(', ', array_keys(\App\Libraries\Intelligence\SearchSiteAnalyticsService::EXPLORE_DIMENSIONS)) . '.']);
+        }
+        $bucket = (string) ($this->request->getGet('bucket') ?? '');
+        if ($bucket !== '' && ! isset(\App\Libraries\Intelligence\SearchSiteAnalyticsService::POSITION_BANDS[$bucket])) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'Unknown position band.']);
+        }
+        $date = (string) ($this->request->getGet('date') ?? '');
+        if ($date !== '' && $this->validDate($date, '') === '') {
+            return $this->response->setStatusCode(422)->setJSON(['error' => '`date` must be YYYY-MM-DD.']);
+        }
+
+        $filters = ['date' => $date, 'bucket' => $bucket];
+        foreach (['query', 'page', 'device', 'country'] as $key) {
+            $filters[$key] = trim((string) ($this->request->getGet($key) ?? ''));
+        }
+        $opts = [
+            'sort'   => (string) ($this->request->getGet('sort') ?? ''),
+            'dir'    => (string) ($this->request->getGet('dir') ?? ''),
+            'search' => (string) ($this->request->getGet('q') ?? ''),
+            'limit'  => (int) ($this->request->getGet('limit') ?? 50),
+            'offset' => (int) ($this->request->getGet('offset') ?? 0),
+        ];
+
+        return $this->siteResponse(static fn ($s, string $from, string $to): array => $s->explore($groupBy, $from, $to, $filters, $opts));
+    }
+
+    /**
      * @param callable(\App\Libraries\Intelligence\SearchSiteAnalyticsService, string, string): array<string, mixed> $build
      */
     private function siteResponse(callable $build): ResponseInterface

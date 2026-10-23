@@ -8,13 +8,14 @@ import { useTweenedSeries } from './useChartAnimation';
  *
  * Bars grow from zero on load and re-length when the data changes; hovering a
  * row anywhere — label, track or count — shows the same readout the SVG charts
- * use.
+ * use. `onSelect(row, index)` makes each bar a drill-down (click / Enter).
  */
 export function BarChart({
   data,
   labelKey = 'label',
   valueKey = 'value',
   color = 'var(--color-primary)',
+  onSelect,
 }) {
   const { containerRef, tooltip, showTooltip, hideTooltip } = useChartTooltip();
   const [activeIndex, setActiveIndex] = useState(null);
@@ -50,8 +51,11 @@ export function BarChart({
             className="chart-bar-row chart-hit flex items-center gap-4"
             style={{ opacity: activeIndex === null || activeIndex === i ? 1 : 0.6 }}
             tabIndex={0}
-            role="img"
-            aria-label={`${item?.[labelKey] ?? `Item ${i + 1}`}: ${series[i]}`}
+            role={onSelect ? 'button' : 'img'}
+            aria-label={`${item?.[labelKey] ?? `Item ${i + 1}`}: ${series[i]}${onSelect ? ' — view records' : ''}`}
+            onClick={onSelect ? () => onSelect(item, i) : undefined}
+            onKeyDown={onSelect ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(item, i); } } : undefined}
+            data-drill={onSelect ? 'true' : undefined}
             onMouseEnter={(e) => activate(e, i)}
             onMouseMove={(e) => activate(e, i)}
             onMouseLeave={clear}
