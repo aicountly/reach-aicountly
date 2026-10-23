@@ -30,11 +30,51 @@ from `GET v1/automation/content-base` (`base_markdown`).
 - 35% product (how AICOUNTLY products solve specific workflows)
 - 20% problem-to-product (problem deep-dive that lands on a product answer)
 
-## Categories in use on aicountly.com
+## Blog categories (aicountly.com taxonomy, 23 Oct 2026)
 
-accounting, gst, income-tax, tds-tcs, audit, financial-reporting,
-company-law, payroll-hr, product-guides, product-updates,
-ai-finance-compliance, business-operations
+Every post is filed under exactly ONE category slug (Reach refuses anything
+else with HTTP 422). Source of truth in code: `App\Libraries\Blog\BlogTaxonomy`
+(the aicountly.com side keeps the same list).
+
+| Group | Slug | Label | Use for |
+|---|---|---|---|
+| Compliance | `accounting` | Accounting | bookkeeping, ledgers, bank reconciliation, closing, financial statements and reporting |
+| Compliance | `gst` | GST | GST returns, ITC, GSTR-2B reconciliation, e-invoicing, e-way bills |
+| Compliance | `income-tax` | Income Tax | ITR, advance tax, presumptive tax, new laws and provisions |
+| Compliance | `tds-tcs` | TDS/TCS | TDS/TCS sections, deposits, returns, certificates |
+| Compliance | `audit-assurance` | Audit & Assurance | statutory/tax/internal audit, audit trails, audit readiness |
+| Compliance | `company-law` | Company Law | MCA/ROC filings, LLP and private company compliance |
+| Compliance | `payroll-hr` | Payroll & HR | payroll, PF, ESI, PT, LWF, payslips, HR compliance |
+| Business | `billing-invoicing` | Billing & Invoicing | invoices, quotations, credit notes, collections |
+| Business | `inventory-stock` | Inventory & Stock | stock tracking, warehouses, reorder levels, valuation |
+| Business | `sales-crm` | Sales & CRM | leads, customers, pipelines, follow-ups |
+| Business | `productivity-collaboration` | Productivity & Collaboration | notes, documents, file storage, sharing, team work (Notes, Drive) |
+| Business | `business-operations` | Business Operations | cash flow, funding, schemes, processes, growth |
+| AICOUNTLY | `product-guides` | Product Guides | how to do a job in an AICOUNTLY app, step by step |
+| AICOUNTLY | `product-updates` | Product Updates | what shipped recently in an app (from its git log) |
+| AICOUNTLY | `ai-for-finance` | AI for Finance | AI in accounting, tax and compliance work — practical, no hype |
+
+Old values still map (aliases, never dropped): financial-reporting →
+accounting, audit → audit-assurance, ai-finance-compliance / ai /
+ai_promotions → ai-for-finance, "TDS" → tds-tcs, "Payroll" → payroll-hr,
+funding_promotions / subsidies_promotions → business-operations,
+new_laws_provisions → income-tax, erp → product-guides, platform →
+product-updates.
+
+## Topic vs app-led mix (owner, 23 Oct 2026)
+
+- **50 % compliance/finance topic articles** — no `product_slug`; the closing
+  paragraph may still mention the relevant app once.
+- **50 % app-led articles** — the app is the subject; send its
+  `product_slug` (aicountly.com catalogue slug).
+  - Live apps first: books (Smart Books), billing, inventory, notes, docs
+    (Drive), manage.
+  - About **1 app-led article in 5 is about a Beta app** (every other
+    aicountly.com product). Beta apps are described only from their
+    repository and are always presented as Beta ("HRMS (Beta)").
+- `GET v1/automation/blog-plan` → `mix` shows the last 7 / 30 days by
+  category group and the app-led share, and `mix.next` says which kind to
+  write next.
 
 ## Topics (the living content base)
 

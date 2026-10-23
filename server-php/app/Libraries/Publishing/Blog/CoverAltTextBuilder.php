@@ -18,6 +18,7 @@ class CoverAltTextBuilder
     public static function build(string $title, string $category = ''): string
     {
         $title    = trim(preg_replace('/\s+/u', ' ', $title) ?? $title);
+        $category = \App\Libraries\Blog\BlogTaxonomy::displayLabel($category);
         $category = trim(preg_replace('/\s+/u', ' ', $category) ?? $category);
 
         if ($title === '') {

@@ -150,6 +150,13 @@ final class RoutineTopicQueue
                 'title'            => (string) $row['title'],
                 'product_slug'     => $entry['product_slug'] ?? ($product[1] ?? null),
                 'category'         => $row['portfolio_stream'],
+                'taxonomy'         => \App\Libraries\Blog\BlogTaxonomy::queueHints(
+                    $row['portfolio_stream'] ?? null,
+                    $entry['product_slug'] ?? ($product[1] ?? null),
+                    $entry !== null
+                        ? (array) (json_decode((string) ($entry['payload_json'] ?? '{}'), true) ?: []) + ['topic_category' => $entry['category'] ?? null]
+                        : [],
+                ),
                 'brief'            => $entry['brief'] ?? ($brief[1] ?? null),
                 'target_date'      => $entry['target_date'] ?? null,
                 'origin'           => $entry['origin'] ?? 'roadmap',

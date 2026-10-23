@@ -348,6 +348,30 @@ If a blog post's slug is changed after publication:
 3. The new canonical URL is used for the update deployment.
 4. The public site (if configured) should serve a 301 redirect from the old URL.
 
+## Blog categories and product_slug (taxonomy of 23 Oct 2026)
+
+Every blog carries ONE canonical category slug (15, in three groups) and, when app-led, the
+`product_slug` of the app it is about — `App\Libraries\Blog\BlogTaxonomy` is the source of
+truth (aliases map every old value/label; products come from `ProductCatalog`, the copy of
+aicountly.com's `saas_products()`). The payload to aicountly.com sends both; the routine is
+refused (422) for an unknown category / product_slug. The table and the 50/50 app-led/topic
+mix are in `docs/automation/routines/reach-blog.md`.
+
+Existing posts are refiled once with:
+
+```bash
+php spark reach:blog-recategorise                        # dry run: each change + evidence, before/after counts
+php spark reach:blog-recategorise --apply                # write category / product_slug on the profiles (text untouched)
+php spark reach:blog-recategorise --apply --republish    # …and queue a republish of every changed live post
+php spark reach:work --queue=publishing --once --limit=20   # (the worker cron does this on its own)
+```
+
+product_slug is only filled when derivable with evidence: the title names a live app, or the
+topic candidate's `[product]` note / content-base entry names one AND the post is app-led
+(stream product / problem_to_product, or an AICOUNTLY category). A marketing-stream post with
+only a product affinity stays a topic article (product_slug NULL). Posts whose category maps to
+nothing are listed and left as they are.
+
 ## Content clean-up (re-vetting live and approved content)
 
 Every blog publish is gated by `BlogPublishVetGate` (Gemini must approve the exact version; see

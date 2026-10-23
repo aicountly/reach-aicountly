@@ -148,7 +148,7 @@ final class RootCauseClassifier
         // Topic supply (blog).
         if ($metric === 'content.blog.published' && isset($signals['topic_queue']['available']) && (int) $signals['topic_queue']['available'] === 0) {
             $add('no_topics', 30, 'Topic queue empty', 'No unused topic candidates are queued (the routine still proposes its own topics).', false, null,
-                'The briefing points the routine at the best-performing categories.');
+                'The briefing points the routine at the best-performing categories and at the side of the 50/50 app-led/topic mix that is behind.');
         }
 
         // Search: Google's reporting lag is not a lag of ours.

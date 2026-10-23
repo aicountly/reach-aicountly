@@ -75,6 +75,7 @@ class AutomationDraftIngestService
             throw new \InvalidArgumentException('content_base_key is required: 3-120 chars of a-z, 0-9, ".", "_" or "-" (e.g. blog-2026-10-gstr-3b-due-dates)');
         }
         $slugHint = trim((string) ($payload['seo']['slug'] ?? $payload['slug_hint'] ?? ''));
+        $taxonomy = self::resolveTaxonomy($payload, $title, $plain);
 
         $existing = $this->existingForKey($contentKey);
         if ($existing !== null) {
@@ -132,7 +133,7 @@ class AutomationDraftIngestService
 
         // SEO + publication profiles (category/tags land on the profile).
         $this->workBlocks->ensurePublicationProfilesForItem($contentItemId);
-        $this->applySeoAndProfile($contentItemId, $payload);
+        $this->applySeoAndProfile($contentItemId, $payload, $taxonomy);
 
         // Link back to the content-base candidate when one exists.
         $this->db->table('reach_topic_candidates')
@@ -141,6 +142,8 @@ class AutomationDraftIngestService
             ->update(['content_item_id' => $contentItemId, 'status' => 'roadmap_selected', 'updated_at' => $now]);
 
         $submissionId = $this->submissions->create('blog', $contentItemId, $contentKey, array_filter([
+            'category'       => $taxonomy['category'],
+            'product_slug'   => $taxonomy['product_slug'],
             'product_facts'  => array_values(array_filter(array_map('strval', (array) ($payload['product_facts'] ?? [])))),
             'sources'        => array_values(array_filter(array_map('strval', (array) ($payload['sources'] ?? [])))),
             'cover_prompt'   => isset($payload['cover_prompt']) ? mb_substr((string) $payload['cover_prompt'], 0, 300) : null,
@@ -265,9 +268,47 @@ class AutomationDraftIngestService
     }
 
     /**
+     * The post's topic category and the app it is about, checked against
+     * BlogTaxonomy. The routine can fix and resend a 422, so unknown values
+     * are refused here with the allowed list rather than guessed.
+     *
      * @param array<string,mixed> $payload
+     * @return array{category:string, product_slug:?string}
+     * @throws \InvalidArgumentException
      */
-    private function applySeoAndProfile(int $contentItemId, array $payload): void
+    public static function resolveTaxonomy(array $payload, string $title, string $plainBody): array
+    {
+        $raw = trim((string) ($payload['category'] ?? ''));
+        if ($raw === '') {
+            throw new \InvalidArgumentException('category is required: one of ' . BlogTaxonomy::allowedList() . ' (see blog-plan taxonomy.categories for when to use each)');
+        }
+        $category = BlogTaxonomy::canonical($raw);
+        if ($category === null) {
+            throw new \InvalidArgumentException('category "' . mb_substr($raw, 0, 60) . '" is not a blog category. Use one of: ' . BlogTaxonomy::allowedList());
+        }
+
+        $product = null;
+        $rawProduct = trim((string) ($payload['product_slug'] ?? ''));
+        if ($rawProduct !== '') {
+            $product = BlogTaxonomy::canonicalProduct($rawProduct);
+            if ($product === null) {
+                throw new \InvalidArgumentException('product_slug "' . mb_substr($rawProduct, 0, 60) . '" is not an aicountly.com app. Use one of: '
+                    . implode(', ', BlogTaxonomy::productSlugs()) . ' — or leave product_slug out for a compliance/finance topic article');
+            }
+            if (BlogTaxonomy::isBetaProduct($product) && preg_match('/\bbeta\b/i', $title . ' ' . $plainBody) !== 1) {
+                $name = BlogTaxonomy::product($product)['name'] ?? $product;
+                throw new \InvalidArgumentException("{$name} is a Beta app: present it as Beta in the article (e.g. \"{$name} (Beta)\") and describe only what its repository shows");
+            }
+        }
+
+        return ['category' => $category, 'product_slug' => $product];
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @param array{category:string, product_slug:?string} $taxonomy
+     */
+    private function applySeoAndProfile(int $contentItemId, array $payload, array $taxonomy): void
     {
         $now = date('Y-m-d H:i:s');
         $seo = (array) ($payload['seo'] ?? []);
@@ -283,18 +324,16 @@ class AutomationDraftIngestService
                 ->update($update + ['updated_at' => $now]);
         }
 
-        $profileUpdate = [];
-        if (! empty($payload['category'])) {
-            $profileUpdate['category'] = mb_substr((string) $payload['category'], 0, 100);
+        $profileUpdate = ['category' => $taxonomy['category']];
+        if (\App\Libraries\Database\SchemaGuard::hasColumn($this->db, 'reach_blog_publication_profiles', 'product_slug')) {
+            $profileUpdate['product_slug'] = $taxonomy['product_slug'];
         }
         if (! empty($payload['tags']) && is_array($payload['tags'])) {
             $profileUpdate['tags_json'] = json_encode(array_values(array_map('strval', $payload['tags'])), JSON_UNESCAPED_SLASHES);
         }
-        if ($profileUpdate !== []) {
-            $this->db->table('reach_blog_publication_profiles')
-                ->where('content_item_id', $contentItemId)
-                ->update($profileUpdate + ['updated_at' => $now]);
-        }
+        $this->db->table('reach_blog_publication_profiles')
+            ->where('content_item_id', $contentItemId)
+            ->update($profileUpdate + ['updated_at' => $now]);
     }
 
     private function normalizeFunnelStage(mixed $stage): ?string
