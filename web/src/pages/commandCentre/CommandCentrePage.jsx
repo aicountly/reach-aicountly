@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, LayoutDashboard, RefreshCw } from 'lucide-react';
 import { dashboardService } from '../../services/dashboardService';
 import { DashboardPage } from '../DashboardPage';
-import { ActivityFeed, HealthStrip, Impact, Projections, Rankings, Recommendations } from './Sections';
+import { ActivityFeed, HealthStrip, Impact, Projections, Recommendations } from './Sections';
+import { Rankings } from './Rankings';
 import { ago } from './format';
 
 /** Refresh cadence; the API caches each section on its own TTL. */
