@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { listAiBudgets } from '../../services/aiService.js';
+import { DrillLink, drillHref } from '../../components/drill';
 
-function BudgetBar({ used, hard }) {
+// Budget scope → the usage-ledger filter AiBudgetService counts it with.
+// Product and user budgets have no ledger filter yet, so they don't drill.
+const SCOPE_PARAM = { provider: 'provider', model: 'model', content_type: 'content_type', task_type: 'task_type' };
+const PERIOD_PARAMS = { daily: { date: 'today' }, monthly: { billing_month: 'current' } };
+
+function budgetUsageHref(b) {
+  if (!(parseFloat(b.used_amount) > 0)) return null;
+  const scope = b.scope_type === 'global' ? {} : (SCOPE_PARAM[b.scope_type] ? { [SCOPE_PARAM[b.scope_type]]: b.scope_reference } : null);
+  if (!scope) return null;
+  return drillHref('/ai/usage', { ...scope, ...(PERIOD_PARAMS[b.period_type] || {}) });
+}
+
+function BudgetBar({ used, hard, to }) {
   const hardLimit = parseFloat(hard) || 0;
   const usedAmount = parseFloat(used) || 0;
   const pct = hardLimit > 0 ? Math.min(100, (usedAmount / hardLimit) * 100) : 0;
@@ -13,7 +26,7 @@ function BudgetBar({ used, hard }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
-      <span>${usedAmount.toFixed(4)}</span>
+      <DrillLink to={to || undefined} title="Usage records behind this amount">${usedAmount.toFixed(4)}</DrillLink>
       {hardLimit > 0 && (
         <div
           style={{
@@ -80,7 +93,7 @@ export default function AiBudgetsPage() {
                   <td className="text-muted">{b.period_type}</td>
                   <td className="text-muted">${parseFloat(b.warning_limit).toFixed(2)}</td>
                   <td className="text-muted">${parseFloat(b.hard_limit).toFixed(2)}</td>
-                  <td><BudgetBar used={b.used_amount} hard={b.hard_limit} /></td>
+                  <td><BudgetBar used={b.used_amount} hard={b.hard_limit} to={budgetUsageHref(b)} /></td>
                   <td className="text-muted">{b.currency}</td>
                   <td>
                     <span className={`badge ${b.enabled ? 'badge--success' : 'badge--neutral'}`}>

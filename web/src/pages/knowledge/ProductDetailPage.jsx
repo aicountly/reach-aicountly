@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, X, Send } from 'lucide-react';
 import { knowledgeService } from '../../services/knowledgeService';
 import { Card } from '../../components/common/Card';
@@ -9,6 +9,8 @@ import { KnowledgeStatusBadge } from '../../components/knowledge/KnowledgeStatus
 import { CompletenessGauge } from '../../components/knowledge/CompletenessGauge';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDateTime } from '../../utils/formatDate';
+import { drillHref } from '../../utils/drill';
+import { ROUTES } from '../../constants/routes';
 
 export function ProductDetailPage() {
   const { id } = useParams();
@@ -18,6 +20,7 @@ export function ProductDetailPage() {
   const [product, setProduct]     = useState(null);
   const [modules, setModules]     = useState([]);
   const [claims, setClaims]       = useState([]);
+  const [claimsTotal, setClaimsTotal] = useState(0);
   const [completeness, setCompl]  = useState(null);
   const [error, setError]         = useState(null);
   const [busy, setBusy]           = useState(false);
@@ -25,11 +28,15 @@ export function ProductDetailPage() {
   const load = useCallback(() => {
     knowledgeService.getProduct(id).then(setProduct).catch((e) => setError(e.message));
     knowledgeService.listModules({ product_id: id, limit: 50 }).then((d) => setModules(d.items || [])).catch(() => {});
-    knowledgeService.listClaims({ product_id: id, limit: 50 }).then((d) => setClaims(d.items || [])).catch(() => {});
+    knowledgeService.listClaims({ product_id: id, limit: 50 })
+      .then((d) => { setClaims(d.items || []); setClaimsTotal(d.total ?? (d.items || []).length); })
+      .catch(() => {});
     knowledgeService.completenessProduct(id).then(setCompl).catch(() => {});
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const claimsHref = drillHref(ROUTES.KNOWLEDGE_CLAIMS, { product_id: id });
 
   const submit = async () => {
     setBusy(true);
@@ -139,7 +146,11 @@ export function ProductDetailPage() {
             </Card>
           )}
 
-          <Card title={`Claims (${claims.length})`}>
+          {/* The count opens this product's claims in the claim list (same product_id filter). */}
+          <Card title={claimsTotal > 0
+            ? <Link to={claimsHref} className="drill-link">Claims ({claimsTotal})</Link>
+            : `Claims (${claimsTotal})`}
+          >
             {claims.length === 0 && <div className="text-sm text-muted">No claims defined.</div>}
             {claims.slice(0, 5).map((c) => (
               <div key={c.id} style={{ padding: '0.35rem 0', borderBottom: '1px solid var(--color-border)' }}>
@@ -147,7 +158,11 @@ export function ProductDetailPage() {
                 <div className="text-xs text-muted">Risk: {c.risk_level}</div>
               </div>
             ))}
-            {claims.length > 5 && <div className="text-xs text-muted" style={{ marginTop: 4 }}>+{claims.length - 5} more…</div>}
+            {claimsTotal > 5 && (
+              <div className="text-xs" style={{ marginTop: 4 }}>
+                <Link to={claimsHref} className="drill-link">+{claimsTotal - 5} more…</Link>
+              </div>
+            )}
           </Card>
 
           <Card title="Metadata">

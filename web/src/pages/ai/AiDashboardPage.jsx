@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAiDashboard } from '../../services/aiService.js';
 import AiGenerationBadge from '../../components/ai/AiGenerationBadge.jsx';
+import { DrillLink, drillHref } from '../../components/drill';
 import { formatDateTime } from '../../utils/formatDate';
+
+// Zero is not a link: there is nothing behind it to open.
+function StatCard({ value, label, to, warning = false, count = value }) {
+  return (
+    <div className={`stat-card${warning ? ' stat-card--warning' : ''}`}>
+      <div className="stat-card__value">{value}</div>
+      <div className="stat-card__label">{label}</div>
+      {Number(count) > 0 && (
+        <Link to={to} className="stat-card__link" aria-label={`View ${label.toLowerCase()}`}>View →</Link>
+      )}
+    </div>
+  );
+}
 
 export default function AiDashboardPage() {
   const [data, setData] = useState(null);
@@ -32,23 +46,27 @@ export default function AiDashboardPage() {
         <p className="page-header__subtitle">Generation volume, failures, and spend for today.</p>
       </div>
 
+      {/* Each count opens the records it counted, with the same server-side
+          predicate (created_on / completed_on resolve "today" on the API). */}
       <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-card__value">{stats.total_generations ?? 0}</div>
-          <div className="stat-card__label">Total Generations</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__value">{stats.completed_today ?? 0}</div>
-          <div className="stat-card__label">Completed Today</div>
-        </div>
-        <div className="stat-card stat-card--warning">
-          <div className="stat-card__value">{stats.failed_today ?? 0}</div>
-          <div className="stat-card__label">Failed Today</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__value">{todayCost}</div>
-          <div className="stat-card__label">Today&apos;s Cost</div>
-        </div>
+        <StatCard value={stats.total_generations ?? 0} label="Total Generations" to="/ai/generations" />
+        <StatCard
+          value={stats.completed_today ?? 0}
+          label="Completed Today"
+          to={drillHref('/ai/generations', { status: 'completed', completed_on: 'today' })}
+        />
+        <StatCard
+          value={stats.failed_today ?? 0}
+          label="Failed Today"
+          warning
+          to={drillHref('/ai/generations', { status: 'failed', created_on: 'today' })}
+        />
+        <StatCard
+          value={todayCost}
+          label="Today's Cost"
+          count={Number(stats.today_cost) || 0}
+          to={drillHref('/ai/usage', { date: 'today' })}
+        />
       </div>
 
       {recentRequests.length > 0 && (
@@ -74,7 +92,11 @@ export default function AiDashboardPage() {
                         {r.uuid?.slice(0, 8)}…
                       </Link>
                     </td>
-                    <td>{r.content_type}</td>
+                    <td>
+                      <DrillLink to={r.content_type ? drillHref('/ai/generations', { content_type: r.content_type }) : undefined}>
+                        {r.content_type}
+                      </DrillLink>
+                    </td>
                     <td><AiGenerationBadge status={r.status} /></td>
                     <td className="text-muted text-xs">{formatDateTime(r.created_at)}</td>
                   </tr>

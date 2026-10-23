@@ -50,6 +50,9 @@ export function SourceListPage() {
     { key: 'authority_score', label: 'Authority', render: (r) => <SourceAuthorityBadge score={r.authority_score} sourceType={r.source_type} /> },
     { key: 'status', label: 'Status', render: (r) => <KnowledgeStatusBadge status={r.knowledge_status || r.status} /> },
     { key: 'updated_at', label: 'Updated', render: (r) => r.updated_at ? formatDate(r.updated_at) : '—' },
+    // Sources have no detail page; their citations are the next level down.
+    { key: 'citations', label: 'Citations', render: () => 'View →',
+      drill: (r) => (r.id ? `/knowledge/citations?source_id=${encodeURIComponent(r.id)}` : null) },
   ];
 
   return (

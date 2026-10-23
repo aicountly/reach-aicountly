@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { listAiModels } from '../../services/aiService.js';
 
 export default function AiModelsPage() {
@@ -45,7 +46,11 @@ export default function AiModelsPage() {
               {models.map(m => (
                 <tr key={m.id}>
                   <td><code className="text-xs">{m.model_key}</code></td>
-                  <td className="text-muted">{m.provider_id}</td>
+                  <td>
+                    {m.provider_id
+                      ? <Link to={`/ai/providers/${m.provider_id}`} className="drill-link">{m.provider_name || m.provider_key || m.provider_id}</Link>
+                      : '—'}
+                  </td>
                   <td>
                     <span className={`badge ${m.enabled ? 'badge--success' : 'badge--neutral'}`}>
                       {m.enabled ? 'Yes' : 'No'}

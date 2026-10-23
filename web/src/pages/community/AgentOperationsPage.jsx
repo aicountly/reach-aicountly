@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
+import { DrillLink, drillHref, useUrlFilter } from '../../components/drill';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
 import { formatDateTime } from '../../utils/formatDate';
+
+// Run-history filters with no control of their own; "Used today" sets them.
+const CHIP_LABELS = {
+  identity: (v) => `Identity: ${v}`,
+  action:   (v) => `Action: ${v}`,
+  since:    (v) => (v === 'today' ? 'Today' : `Since ${v}`),
+};
 
 const STATUS_BADGES = {
   success: 'badge badge--success',
@@ -16,13 +25,28 @@ export function AgentOperationsPage() {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [runFilter, setRunFilter] = useState('');
+  // Run filters live in the URL, so a "Used today" count opens its runs and Back returns.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [runFilter, setRunFilter] = useUrlFilter('status');
+  const identityFilter = searchParams.get('identity') ?? '';
+  const actionFilter = searchParams.get('action') ?? '';
+  const since = searchParams.get('since') ?? '';
+  const chips = Object.entries({ identity: identityFilter, action: actionFilter, since }).filter(([, v]) => v);
+
+  const clearChip = (key) => setSearchParams((prev) => {
+    const next = new URLSearchParams(prev);
+    next.delete(key);
+    return next;
+  }, { replace: true });
 
   const load = useCallback(() => {
     setLoading(true);
+    const runParams = Object.fromEntries(
+      Object.entries({ status: runFilter, identity: identityFilter, action: actionFilter, since }).filter(([, v]) => v),
+    );
     Promise.all([
       api.get('v1/community/agents/status'),
-      api.get('v1/community/agents/runs', runFilter ? { status: runFilter } : undefined),
+      api.get('v1/community/agents/runs', Object.keys(runParams).length ? runParams : undefined),
     ])
       .then(([statusRes, runsRes]) => {
         setStatus(statusRes);
@@ -31,7 +55,7 @@ export function AgentOperationsPage() {
       })
       .catch((err) => setError(err?.message || 'Unable to load agent operations.'))
       .finally(() => setLoading(false));
-  }, [runFilter]);
+  }, [runFilter, identityFilter, actionFilter, since]);
 
   useEffect(load, [load]);
 
@@ -66,7 +90,17 @@ export function AgentOperationsPage() {
                       </>
                     )}
                     <td>{action.action}</td>
-                    <td>{action.used_today}</td>
+                    <td>
+                      {/* Same predicate as the count: successful runs since midnight. */}
+                      <DrillLink
+                        to={action.used_today > 0
+                          ? drillHref('/community/agents', { identity: identity.slug, action: action.action, status: 'success', since: 'today' })
+                          : undefined}
+                        label={`${action.used_today} ${action.action} runs by ${identity.slug} today`}
+                      >
+                        {action.used_today}
+                      </DrillLink>
+                    </td>
                     <td>{action.daily_cap ?? '—'}</td>
                     <td>{action.window_gated ? 'yes' : 'no'}</td>
                   </tr>
@@ -90,6 +124,16 @@ export function AgentOperationsPage() {
           </label>
           <button type="button" className="btn btn--secondary" style={{ marginLeft: '0.75rem' }} onClick={load}>Refresh</button>
         </div>
+        {chips.length > 0 && (
+          <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+            {chips.map(([k, v]) => (
+              <button key={k} type="button" className="badge badge-secondary" onClick={() => clearChip(k)}
+                      aria-label={`Clear ${CHIP_LABELS[k](v)} filter`}>
+                {CHIP_LABELS[k](v)} ✕
+              </button>
+            ))}
+          </div>
+        )}
         {runs.length === 0 ? (
           <p className="text-muted">
             No runs yet. The cron trigger (<code>community:agents-run</code>) selects work automatically;
@@ -105,8 +149,16 @@ export function AgentOperationsPage() {
                 {runs.map((run) => (
                   <tr key={run.id}>
                     <td className="text-sm">{formatDateTime(run.created_at)}</td>
-                    <td>{run.identity_name || run.identity_slug || run.identity_id}</td>
-                    <td>{run.action}</td>
+                    <td>
+                      <DrillLink to={run.identity_slug && run.identity_slug !== identityFilter ? drillHref(`/community/agents?${searchParams}`, { identity: run.identity_slug }) : undefined}>
+                        {run.identity_name || run.identity_slug || run.identity_id}
+                      </DrillLink>
+                    </td>
+                    <td>
+                      <DrillLink to={run.action && run.action !== actionFilter ? drillHref(`/community/agents?${searchParams}`, { action: run.action }) : undefined}>
+                        {run.action}
+                      </DrillLink>
+                    </td>
                     <td><span className={STATUS_BADGES[run.outcome] || 'badge'}>{run.outcome}</span></td>
                     <td className="text-sm text-muted">{run.block_reason || ''}</td>
                   </tr>

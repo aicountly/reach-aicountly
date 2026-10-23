@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
 import { normalizeCommunityList, normalizeCommunityMeta } from './communityListUtils';
 import { formatDate, formatDateTime } from '../../utils/formatDate';
 
@@ -76,13 +75,11 @@ function HandledBy({ q }) {
 
 export default function QuestionInboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth() ?? {};
-  // Manual tools (status changes, a hand-made answer) stay available to super
-  // admins; nobody else is expected to act on a row.
-  const isSuperAdmin = user?.role === 'super_admin';
-  // The filters live in the URL so the Overview tiles can link to them.
+  // The filters live in the URL so the Overview tiles and the Settings
+  // spaces list can link to them.
   const status = searchParams.get('status') ?? '';
   const handledBy = searchParams.get('handled_by') ?? '';
+  const spaceId = searchParams.get('space_id') ?? '';
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
@@ -91,7 +88,7 @@ export default function QuestionInboxPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   function changeFilter(key, value) {
-    const next = { status, handled_by: handledBy, [key]: value };
+    const next = { status, handled_by: handledBy, space_id: spaceId, [key]: value };
     setSearchParams(Object.fromEntries(Object.entries(next).filter(([, v]) => v)), { replace: true });
     setPage(1);
   }
@@ -101,6 +98,7 @@ export default function QuestionInboxPage() {
     api.getPage('v1/community/questions', {
       status: status || undefined,
       handled_by: handledBy || undefined,
+      space_id: spaceId || undefined,
       sort,
       page,
     })
@@ -112,7 +110,10 @@ export default function QuestionInboxPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, [status, handledBy, sort, page]); // eslint-disable-line
+  useEffect(() => { load(); }, [status, handledBy, spaceId, sort, page]); // eslint-disable-line
+
+  // space_id has no control of its own; name the space once a row shows it.
+  const spaceLabel = questions.find(q => String(q.space_id) === spaceId)?.space_title ?? `#${spaceId}`;
 
   return (
     <div>
@@ -130,6 +131,8 @@ export default function QuestionInboxPage() {
           Status
           <select value={status} onChange={e => changeFilter('status', e.target.value)} className="form-select form-select--sm">
             {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
+            {/* The Overview counts every status a question can hold; keep a linked one selectable. */}
+            {status && !STATUS_OPTS.some(s => s.value === status) && <option value={status}>{status}</option>}
           </select>
         </label>
         <label className="toolbar__label">
@@ -145,6 +148,15 @@ export default function QuestionInboxPage() {
           </select>
         </label>
       </div>
+
+      {spaceId && (
+        <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+          <button type="button" className="badge badge-secondary" onClick={() => changeFilter('space_id', '')}
+                  aria-label="Clear space filter">
+            Space: {spaceLabel} ✕
+          </button>
+        </div>
+      )}
 
       {loading && <p className="muted">Loading…</p>}
       {error && <p className="text-error">{error}</p>}
@@ -170,12 +182,21 @@ export default function QuestionInboxPage() {
                 {/* Field names are the API row's own (QuestionController::index):
                     uuid is the public id the workspace route resolves, and
                     intake_timestamp is when Reach received the question. */}
+                {/* Everyone who can list the inbox (community.view) can open the
+                    workspace; its manual tools are gated by their own permissions. */}
                 <td className="td--primary">
-                  {isSuperAdmin
-                    ? <Link to={`/community/questions/${q.uuid}`} title="Manual tools (super admin)">{q.title}</Link>
-                    : q.title}
+                  <Link to={`/community/questions/${q.uuid}`}>{q.title}</Link>
                 </td>
-                <td>{q.space_slug ?? '—'}</td>
+                <td>
+                  {q.space_id && String(q.space_id) !== spaceId
+                    ? (
+                      <button type="button" className="drill-link" onClick={() => changeFilter('space_id', String(q.space_id))}
+                              title="Only this space">
+                        {q.space_slug ?? `#${q.space_id}`}
+                      </button>
+                    )
+                    : (q.space_slug ?? '—')}
+                </td>
                 <td>
                   <span className={`badge ${STATUS_CLASS[q.status] ?? 'badge--neutral'}`}>{q.status}</span>
                 </td>

@@ -55,7 +55,7 @@ class CommunityAgentDispatchController extends BaseApiController
 
     /**
      * GET /community/agents/runs — dispatch history (success/blocked/failed),
-     * newest first, filterable by identity/action/status.
+     * newest first, filterable by identity/action/status/since.
      */
     public function runs(): ResponseInterface
     {
@@ -75,6 +75,11 @@ class CommunityAgentDispatchController extends BaseApiController
         $identity = trim((string) $this->request->getGet('identity'));
         if ($identity !== '') {
             $builder->where('i.slug', $identity);
+        }
+        // since=today: the window status() counts "used today" over, so the
+        // Used-today cell opens exactly the runs it counted.
+        if (trim((string) $this->request->getGet('since')) === 'today') {
+            $builder->where('r.created_at >=', date('Y-m-d 00:00:00'));
         }
 
         return $this->response->setJSON(['ok' => true, 'data' => ['runs' => $builder->get()->getResultArray()]]);

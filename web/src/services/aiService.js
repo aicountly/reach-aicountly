@@ -29,8 +29,12 @@ export function requestGeneration(payload) {
   return request('POST', '/generate', payload);
 }
 
-export function listGenerations(page = 1) {
-  return request('GET', `/generations?page=${page}`);
+// filters: status, task_type, content_type, error_category, created_on,
+// completed_on, from, to — empty values are dropped.
+export function listGenerations(page = 1, filters = {}) {
+  const params = new URLSearchParams({ page: String(page) });
+  Object.entries(filters).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') params.set(k, v); });
+  return request('GET', `/generations?${params}`);
 }
 
 export function getGeneration(uuid) {
@@ -89,8 +93,12 @@ export function listAiModels(page = 1) {
   return request('GET', `/models?page=${page}`);
 }
 
+// filters: page, provider, model, task_type, content_type, date, from, to,
+// billing_month — empty values are dropped.
 export function listAiUsage(filters = {}) {
-  const params = new URLSearchParams(filters).toString();
+  const params = new URLSearchParams(
+    Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+  ).toString();
   return request('GET', `/usage?${params}`);
 }
 

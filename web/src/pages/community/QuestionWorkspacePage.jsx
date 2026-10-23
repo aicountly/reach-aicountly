@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
 import { formatDateTime } from '../../utils/formatDate';
 
@@ -22,6 +23,11 @@ const MANUAL_TRANSITIONS = {
 export default function QuestionWorkspacePage() {
   const { uuid } = useParams();
   const navigate  = useNavigate();
+  // Anyone with community.view opens this page from the inbox; the manual
+  // tools show only to those the API would let use them.
+  const { hasPermission } = useAuth() ?? {};
+  const canEditStatus = hasPermission?.('community_question.edit') ?? false;
+  const canCreateAnswer = hasPermission?.('community_answer.generate') ?? false;
   const [question, setQuestion]   = useState(null);
   const [answers, setAnswers]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -107,7 +113,7 @@ export default function QuestionWorkspacePage() {
         </section>
 
         <section>
-          <div className="card mb-3">
+          {canEditStatus && <div className="card mb-3">
             <h2 className="card__title">Change status</h2>
             {transitions.length === 0 ? (
               <p className="muted">No manual status change from {question.status}.</p>
@@ -129,7 +135,7 @@ export default function QuestionWorkspacePage() {
                 </button>
               </form>
             )}
-          </div>
+          </div>}
 
           <div className="card">
             <h2 className="card__title">Official answers ({answers.length})</h2>
@@ -142,7 +148,7 @@ export default function QuestionWorkspacePage() {
               </div>
             ))}
             {/* A question holds one official answer; the API refuses a second. */}
-            {answers.length === 0 && (
+            {answers.length === 0 && canCreateAnswer && (
               <button className="btn btn--sm mt-2" onClick={handleGenerateAnswer} disabled={generating}>
                 {generating ? 'Creating…' : '+ Create official answer'}
               </button>

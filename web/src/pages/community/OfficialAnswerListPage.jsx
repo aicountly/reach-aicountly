@@ -76,6 +76,8 @@ export default function OfficialAnswerListPage() {
           Status
           <select value={status} onChange={e => changeStatus(e.target.value)} className="form-select form-select--sm">
             {STATUS_OPTS.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
+            {/* The Overview links every status an answer can hold; keep a linked one selectable. */}
+            {status && !STATUS_OPTS.some(s => s.value === status) && <option value={status}>{status}</option>}
           </select>
         </label>
       </div>

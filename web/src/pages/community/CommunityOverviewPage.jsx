@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { DrillLink, drillHref } from '../../components/drill';
 import { normalizeCommunityObject } from './communityListUtils';
 
-function StatusTable({ title, rows, emptyLabel }) {
+/** A tile's link, only when there is something behind the number. */
+function TileLink({ count, to, children }) {
+  return Number(count) > 0 ? <Link to={to} className="stat-card__link">{children}</Link> : null;
+}
+
+/** Each row opens its list filtered to that status (`listPath?status=`). */
+function StatusTable({ title, rows, emptyLabel, listPath }) {
   const entries = Object.entries(rows ?? {});
 
   return (
@@ -20,7 +27,11 @@ function StatusTable({ title, rows, emptyLabel }) {
               {entries.map(([status, cnt]) => (
                 <tr key={status}>
                   <td><span className="badge badge--neutral">{status}</span></td>
-                  <td className="text-right">{cnt}</td>
+                  <td className="text-right">
+                    <DrillLink to={Number(cnt) > 0 ? drillHref(listPath, { status }) : undefined} label={`${cnt} ${status}`}>
+                      {cnt}
+                    </DrillLink>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -57,22 +68,22 @@ export default function CommunityOverviewPage() {
               so this tile read 0 and its link filtered to nothing. */}
           <div className="stat-card__value">{q.intake ?? 0}</div>
           <div className="stat-card__label">New questions</div>
-          <Link to="/community/questions?status=intake" className="stat-card__link">View →</Link>
+          <TileLink count={q.intake} to="/community/questions?status=intake">View →</TileLink>
         </div>
         <div className="stat-card">
           <div className="stat-card__value">{stats?.pending_approval ?? 0}</div>
           <div className="stat-card__label">Pending approval</div>
-          <Link to="/community/answers?status=awaiting_approval" className="stat-card__link">Review →</Link>
+          <TileLink count={stats?.pending_approval} to="/community/answers?status=awaiting_approval">Review →</TileLink>
         </div>
         <div className="stat-card">
           <div className="stat-card__value">{stats?.published_answers ?? 0}</div>
           <div className="stat-card__label">Published answers</div>
-          <Link to="/community/answers?status=published" className="stat-card__link">View →</Link>
+          <TileLink count={stats?.published_answers} to="/community/answers?status=published">View →</TileLink>
         </div>
         <div className="stat-card stat-card--warning">
           <div className="stat-card__value">{stats?.open_moderation_flags ?? 0}</div>
           <div className="stat-card__label">Open moderation flags</div>
-          <Link to="/community/moderation" className="stat-card__link">Resolve →</Link>
+          <TileLink count={stats?.open_moderation_flags} to="/community/moderation">Resolve →</TileLink>
         </div>
       </div>
 
@@ -80,11 +91,13 @@ export default function CommunityOverviewPage() {
         <StatusTable
           title="Questions by status"
           rows={q}
+          listPath="/community/questions"
           emptyLabel="No questions yet."
         />
         <StatusTable
           title="Answers by status"
           rows={a}
+          listPath="/community/answers"
           emptyLabel="No answers yet."
         />
       </div>

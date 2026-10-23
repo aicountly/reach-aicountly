@@ -21,6 +21,7 @@ class CitationController extends BaseKnowledgeController
         return $this->listPaged(array_filter([
             'source_id' => $this->request->getGet('source_id'),
             'status'    => $this->request->getGet('status'),
+            'q'         => $this->searchTerm(),
         ]));
     }
 

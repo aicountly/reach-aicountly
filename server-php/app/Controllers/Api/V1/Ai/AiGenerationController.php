@@ -92,8 +92,16 @@ class AiGenerationController extends BaseApiController
         return $this->ok(['request' => $request], 202);
     }
 
+    /** Request statuses a list filter may name (mirrors reach_ai_gen_requests_status_chk). */
+    private const STATUSES = ['pending', 'grounding', 'queued', 'processing', 'validating', 'completed', 'failed', 'cancelled', 'blocked'];
+
     /**
      * GET /api/v1/ai/generations
+     *
+     * Filters: status, task_type, content_type, error_category,
+     * created_on / completed_on (Y-m-d or "today"), from / to (created date).
+     * "today" resolves on the server so the dashboard's "Completed today" and
+     * "Failed today" counts and the list they open use the same day.
      */
     public function index(): \CodeIgniter\HTTP\ResponseInterface
     {
@@ -101,15 +109,59 @@ class AiGenerationController extends BaseApiController
         $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = 20;
 
-        $requests = $db->table('reach_ai_generation_requests')
+        $filtered = function () use ($db) {
+            $builder = $db->table('reach_ai_generation_requests');
+
+            $status = trim((string) ($this->request->getGet('status') ?? ''));
+            if ($status !== '' && in_array($status, self::STATUSES, true)) {
+                $builder->where('status', $status);
+            }
+            foreach (['task_type', 'content_type', 'error_category'] as $column) {
+                $value = trim((string) ($this->request->getGet($column) ?? ''));
+                if ($value !== '') {
+                    $builder->where($column, mb_substr($value, 0, 64));
+                }
+            }
+            // Same DATE(...) predicates as AiDashboardController::dashboard.
+            if (($day = self::day($this->request->getGet('created_on'))) !== null) {
+                $builder->where('DATE(created_at)', $day);
+            }
+            if (($day = self::day($this->request->getGet('completed_on'))) !== null) {
+                $builder->where('DATE(completed_at)', $day);
+            }
+            if (($day = self::day($this->request->getGet('from'))) !== null) {
+                $builder->where('DATE(created_at) >=', $day);
+            }
+            if (($day = self::day($this->request->getGet('to'))) !== null) {
+                $builder->where('DATE(created_at) <=', $day);
+            }
+
+            return $builder;
+        };
+
+        $requests = $filtered()
             ->orderBy('created_at', 'DESC')
             ->limit($perPage, ($page - 1) * $perPage)
             ->get()
             ->getResultArray();
 
-        $total = $db->table('reach_ai_generation_requests')->countAllResults();
+        $total = $filtered()->countAllResults();
 
         return $this->ok(['requests' => $requests, 'total' => $total, 'page' => $page, 'per_page' => $perPage]);
+    }
+
+    /** A Y-m-d day from a query value; "today" is the server's today. Anything else is ignored. */
+    private static function day(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === 'today') {
+            return date('Y-m-d');
+        }
+
+        // Round-trip check rejects 2026-02-31 before Postgres can 500 on it.
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $parsed !== false && $parsed->format('Y-m-d') === $value ? $value : null;
     }
 
     /**
