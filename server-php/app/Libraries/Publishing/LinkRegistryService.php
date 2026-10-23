@@ -52,7 +52,9 @@ class LinkRegistryService
     /**
      * Deterministic suggestions for a content item: same product first, then
      * same category, then evergreen product/guide pages. Never suggests the
-     * item's own URL.
+     * item's own URL. The Aicountly Academy course pages (category
+     * "academy") are never evergreen: they follow only an article about
+     * academy / edge / aspire.
      *
      * @return list<array{url_path:string, title:string, link_type:string}>
      */
@@ -94,6 +96,7 @@ class LinkRegistryService
             $collect($this->db->query(
                 "SELECT url_path, title, link_type FROM reach_link_registry
                  WHERE status = 'active' AND link_type IN ('product', 'guide', 'static')
+                   AND category IS DISTINCT FROM 'academy'
                  ORDER BY updated_at DESC LIMIT 8"
             )->getResultArray());
         }

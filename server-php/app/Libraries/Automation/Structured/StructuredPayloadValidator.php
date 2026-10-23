@@ -231,6 +231,8 @@ final class StructuredPayloadValidator
         $slug = is_string($value) ? strtolower(trim($value)) : '';
         if ($slug === '' || ! ProductCatalog::has($slug)) {
             $errors[] = 'product_slug: required; must be a product slug from the aicountly.com catalogue (GET v1/automation/release-plan lists them).';
+        } elseif (! ProductCatalog::isSoftware($slug)) {
+            $errors[] = "product_slug: {$slug} is an Aicountly Academy course, not an app — release notes and workflow guides are only for Aicountly apps (GET v1/automation/release-plan lists them).";
         }
 
         return $slug;

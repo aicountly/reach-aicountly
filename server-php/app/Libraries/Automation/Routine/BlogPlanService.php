@@ -63,7 +63,7 @@ class BlogPlanService
                 'categories'   => BlogTaxonomy::topics(),
                 'groups'       => BlogTaxonomy::GROUPS,
                 'products'     => BlogTaxonomy::productsForRoutine(),
-                'note'         => 'Send "category" as one slug from categories. Send "product_slug" only for an app-led article (the app is the subject); leave it out for a compliance/finance topic article that merely mentions an app. Beta apps: describe only what their repository shows and always call them Beta, e.g. "HRMS (Beta)".',
+                'note'         => 'Send "category" as one slug from categories. Send "product_slug" only for an app-led article (the app is the subject); leave it out for a compliance/finance topic article that merely mentions an app. Beta apps: describe only what their repository shows and always call them Beta, e.g. "HRMS (Beta)". products.academy are Aicountly Academy courses (training run by Aicountly for college students, not software): never call them Beta; describe them only from their summary and public_url page; no fee amounts, no placement or job promises. File an academy article under the closest category (usually accounting) with product_slug academy, edge or aspire, and only when the owner or the queue asks for one.',
             ],
             'mix'               => $this->mix($now),
             'index_suggestions' => $this->indexSuggestions(),

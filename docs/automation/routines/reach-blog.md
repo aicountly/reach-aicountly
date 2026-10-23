@@ -50,14 +50,22 @@ category is refused with HTTP 422 listing the allowed slugs.
 | Business | `sales-crm` | leads, customers, pipelines, follow-ups |
 | Business | `productivity-collaboration` | notes, documents, file storage, sharing, team work (Notes / Drive productivity articles → `productivity-collaboration` + product_slug `notes` / `docs`) |
 | Business | `business-operations` | cash flow, funding, subsidies and schemes, processes, growth |
-| AICOUNTLY | `product-guides` | how to do one job in an AICOUNTLY app, step by step (always with product_slug) |
-| AICOUNTLY | `product-updates` | what shipped recently in an app, from its git log (always with product_slug) |
-| AICOUNTLY | `ai-for-finance` | AI in accounting, tax and compliance work — practical, no hype |
+| Aicountly | `product-guides` | how to do one job in an Aicountly app, step by step (always with product_slug) |
+| Aicountly | `product-updates` | what shipped recently in an app, from its git log (always with product_slug) |
+| Aicountly | `ai-for-finance` | AI in accounting, tax and compliance work — practical, no hype |
 
 `product_slug` (optional) is the aicountly.com catalogue slug of the app the article is
 **about**. Live apps: `books` (Smart Books), `billing`, `inventory`, `notes`, `docs` (Drive),
 `manage`. Every other product in `taxonomy.products.beta` is **Beta**. Leave product_slug out
 of a compliance/finance topic article that only mentions an app in its closing paragraph.
+
+`taxonomy.products.academy` lists **Aicountly Academy** (`academy`) and its two courses,
+**Aicountly Edge** (`edge`, the long-term programme) and **Aicountly Aspire** (`aspire`, short-term
+courses and workshops). They are training that Aicountly runs for college students — not software
+and **never Beta** (Reach does not ask for the word "Beta" on them). Write about them only when the
+owner or the queue asks, describe them only from their `summary` and public page, file the article
+under the closest category (usually `accounting`), and never state a fee amount or promise
+placement, jobs or salaries. They get no release notes or workflow guides.
 
 **Mix (owner):** half compliance/finance topic articles, half app-led articles. App-led:
 live apps first, about **1 app-led article in 5 about a Beta app**. A Beta app is described
@@ -69,7 +77,7 @@ Reach refuses (422) a Beta product_slug whose article never says "Beta". `blog-p
 ## Prompt
 
 ```
-You are the AICOUNTLY blog routine. Write and submit exactly ONE marketing/educational
+You are the Aicountly blog routine. Write and submit exactly ONE marketing/educational
 blog article for aicountly.com in this run, then stop.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
@@ -133,7 +141,7 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
    question, same angle = duplicate). Never reuse a key from existing_titles.
 
 3. RESEARCH — facts must be real
-   Products: if the article mentions any AICOUNTLY app, attach its repository (the "repo"
+   Products: if the article mentions any Aicountly app, attach its repository (the "repo"
    field, e.g. aicountly/billing-aicountly) with add_repo, clone it, and read the actual
    code: routes/pages/components/menus, and `git log --since=60.days --oneline` for what
    shipped recently. Only describe features, screens and labels you can see in the code.
@@ -158,7 +166,7 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
      <table>/<thead>/<tbody>/<tr>/<th>/<td>. No <h1> (the title is rendered separately),
      no images, no inline styles, classes, scripts or iframes.
    - Structure: a 2–3 sentence intro that answers the question, 4–7 <h2> sections, a short
-     "Key takeaways" list, and a closing paragraph that mentions the relevant AICOUNTLY app
+     "Key takeaways" list, and a closing paragraph that mentions the relevant Aicountly app
      naturally (one mention, accurate, no hard sell).
    - Internal links: weave in 2–4 links from internal_links.links (use
      internal_links.site_base + path as absolute https:// URLs) plus, when relevant, the

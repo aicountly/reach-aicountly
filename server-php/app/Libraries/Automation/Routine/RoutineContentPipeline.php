@@ -275,6 +275,8 @@ class RoutineContentPipeline
 
         return array_filter([
             'content_type'  => $row['content_type'] === 'blog' ? 'Marketing/educational blog for aicountly.com/blogs' : 'Help-centre article for aicountly.com/help',
+            'company'       => \App\Libraries\Settings\BrandFacts::COMPANY,
+            'academy'       => \App\Libraries\Settings\BrandFacts::academy(),
             'launch_apps'   => array_column(LaunchApps::APPS, 'name'),
             'products'      => $products,
             'product_facts' => array_values(array_filter(array_map('strval', (array) ($sub['product_facts'] ?? [])))),
@@ -285,7 +287,8 @@ class RoutineContentPipeline
 
     /**
      * The blog's category and the app it is about, as facts for the vetting
-     * model — a Beta app must be presented as Beta.
+     * model — a Beta app must be presented as Beta; an Aicountly Academy
+     * course is training, never Beta, and carries the course claim rules.
      *
      * @param array<string, mixed> $sub
      * @return array<string, ?string>
@@ -296,9 +299,11 @@ class RoutineContentPipeline
 
         return [
             'blog_category' => \App\Libraries\Blog\BlogTaxonomy::label(isset($sub['category']) ? (string) $sub['category'] : null),
-            'about_app'     => $product === null ? null : ($product['status'] === 'beta'
-                ? $product['name'] . ' — a Beta app: the article must present it as Beta and claim only what its repository shows'
-                : $product['name'] . ' — a live app'),
+            'about_app'     => $product === null ? null : match ($product['status']) {
+                'beta'   => $product['name'] . ' — a Beta app: the article must present it as Beta and claim only what its repository shows',
+                'course' => $product['name'] . ' — an Aicountly Academy course (training run by Aicountly, not software; do not call it Beta): claim only what the context\'s academy facts state. ' . \App\Libraries\Settings\BrandFacts::ACADEMY_RULES,
+                default  => $product['name'] . ' — a live app',
+            },
         ];
     }
 
@@ -542,7 +547,7 @@ class RoutineContentPipeline
         $result = ($this->covers ?? new RoutineCoverService())->provide($itemId, isset($sub['cover_prompt']) ? (string) $sub['cover_prompt'] : null);
 
         if ($result['ok']) {
-            $this->recordCover($itemId, $versionId, true, $result['source'] === 'generated' ? 'Cover image generated (GPT Image, AICOUNTLY-branded)' : 'Cover image assigned from the gallery');
+            $this->recordCover($itemId, $versionId, true, $result['source'] === 'generated' ? 'Cover image generated (GPT Image, Aicountly-branded)' : 'Cover image assigned from the gallery');
             $this->submissions->update($id, [
                 'status'         => RoutineSubmissions::APPROVED,
                 'cover_status'   => $result['source'],
@@ -591,7 +596,7 @@ class RoutineContentPipeline
         (new WorkBlockService())->ensurePublicationProfilesForItem($itemId);
         $profile = $this->db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->get()->getRowArray() ?? [];
 
-        $author = trim((string) ReachConfig::get('automation.blog.author_name', 'AICOUNTLY Editorial Team')) ?: 'AICOUNTLY Editorial Team';
+        $author = trim((string) ReachConfig::get('automation.blog.author_name', 'Aicountly Editorial Team')) ?: 'Aicountly Editorial Team';
         $current = trim((string) ($profile['author_reference'] ?? ''));
         // 'aicountly-editorial' is the pipeline's placeholder reference; the
         // public page prints author_name verbatim, so give it the real name.
