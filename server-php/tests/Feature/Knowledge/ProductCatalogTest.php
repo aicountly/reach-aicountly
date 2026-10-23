@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Knowledge;
 
+use App\Libraries\Automation\Structured\ProductCatalog;
 use App\Libraries\SaasProductTaxonomy;
 use Tests\Support\ApiTestCase;
 
@@ -34,7 +35,7 @@ final class ProductCatalogTest extends ApiTestCase
         $this->assertSame(200, $import->response()->getStatusCode());
         $summary = json_decode($import->response()->getBody(), true)['data'];
 
-        $expected = count(SaasProductTaxonomy::products());
+        $expected = (count(SaasProductTaxonomy::products()) + count(ProductCatalog::ACADEMY));
         $this->assertSame($expected, $summary['created']);
 
         // Alias rows may legitimately report errors if a canonical slug is
@@ -64,7 +65,7 @@ final class ProductCatalogTest extends ApiTestCase
         $this->assertGreaterThan(0, $summary['skipped']);
 
         $listing = $this->listProducts($headers);
-        $this->assertSame(count(SaasProductTaxonomy::products()), $listing['total']);
+        $this->assertSame((count(SaasProductTaxonomy::products()) + count(ProductCatalog::ACADEMY)), $listing['total']);
     }
 
     public function testCreatedProductAppearsInTheListing(): void
@@ -114,7 +115,7 @@ final class ProductCatalogTest extends ApiTestCase
 
         $this->assertSame(1, $this->listProducts($headers, '?status=draft')['total']);
         $this->assertSame(
-            count(SaasProductTaxonomy::products()),
+            (count(SaasProductTaxonomy::products()) + count(ProductCatalog::ACADEMY)),
             $this->listProducts($headers, '?status=needs_review')['total'],
         );
     }

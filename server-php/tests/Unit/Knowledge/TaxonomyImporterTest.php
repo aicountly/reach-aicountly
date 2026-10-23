@@ -187,7 +187,7 @@ final class TaxonomyImporterTest extends TestCase
         $this->assertStringContainsString('ProductCatalog::academy()', $store['edge']['legacy_code_path']);
         $this->assertArrayNotHasKey('edge', SaasProductTaxonomy::products(), 'courses stay out of the SaaS / GA4 list');
         foreach ($store as $row) {
-            $this->assertStringNotContainsString('Aicountly', $row['name'], 'brand is written Aicountly');
+            $this->assertDoesNotMatchRegularExpression('/\bAIC(?:OUNTLY|ountly)\b/', $row['name'], 'brand is written Aicountly');
         }
     }
 
