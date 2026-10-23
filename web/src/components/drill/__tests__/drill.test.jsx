@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { drillHref, useDrillFilters, DrillPath } from '..';
+import { drillHref, useDrillFilters, DrillPath, useUrlFilter } from '..';
 import { DataTable } from '../../common/DataTable';
 import { KPICard } from '../../charts/KPICard';
 import { BarChart } from '../../charts/BarChart';
@@ -95,5 +95,28 @@ describe('KPICard and charts', () => {
     await user.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect).toHaveBeenCalledWith({ label: 'Blog', value: 3 }, 0);
+  });
+});
+
+describe('useUrlFilter', () => {
+  function StatusFilter() {
+    const [status, setStatus] = useUrlFilter('status', 'all');
+    return (
+      <>
+        <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="all">All</option><option value="failed">Failed</option>
+        </select>
+        <Where />
+      </>
+    );
+  }
+
+  it('reads the param, writes it back, and drops it at the fallback', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/x?status=failed&page=2']}><StatusFilter /></MemoryRouter>);
+    expect(screen.getByLabelText('Status')).toHaveValue('failed');
+
+    await user.selectOptions(screen.getByLabelText('Status'), 'all');
+    expect(screen.getByTestId('where').textContent).toBe('?page=2');
   });
 });

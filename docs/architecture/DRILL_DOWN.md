@@ -29,6 +29,7 @@ Console row) and its detail page.
 |---|---|
 | `drillHref(path, params)` | Build a link: `drillHref(ROUTES.LEADS, { status: 'failed' })`. Empty values are dropped. |
 | `useDrillFilters(keys)` | URL-backed filter state for an in-page drill: `filters`, `steps` (in the order chosen), `drill(patch)` (push — Back returns), `set(k, v)` / `set({…})` (replace, for typed inputs), `upTo(i)`, `clear(k)`. |
+| `useUrlFilter(key, fallback?)` | Drop-in for `useState` on a list filter: `const [status, setStatus] = useUrlFilter('status')`. Reads the param, writes it back (replace), drops it at the fallback. |
 | `<DrillPath drill={…} rootLabel labels format />` | The breadcrumb trail of an in-page drill; each step goes back to that level, ✕ drops one step. |
 | `<DrillLink to=… / onClick=…>` | A value that drills: dotted underline, keyboard reachable. Plain text when no target. |
 | `DataTable` `columns[i].drill(row)` | Make a cell drill (`'/path?x=y'`, `{ to }`, `{ onClick }`, or `null`). `onRowClick` rows are now focusable and open on Enter. |
