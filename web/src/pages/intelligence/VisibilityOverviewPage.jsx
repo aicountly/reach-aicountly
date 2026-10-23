@@ -4,6 +4,7 @@ import { getVisibilitySummary, listVisibilityAnswers, runVisibilityBatch } from 
 import { usePermission } from '../../hooks/usePermission';
 import { formatDateTime } from '../../utils/formatDate';
 import ShareOfVoiceChart from './ShareOfVoiceChart.jsx';
+import { DrillLink, useDrillFilters } from '../../components/drill';
 
 const pct = (v) => (v == null ? '—' : `${Math.round(Number(v) * 1000) / 10}%`);
 const PROVIDER_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (OpenAI API)', perplexity: 'Perplexity' };
@@ -23,18 +24,31 @@ export default function VisibilityOverviewPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [running, setRunning] = useState(false);
+  // An assistant row or a gap question narrows "Latest answers" to the
+  // answers behind it (the API filters by provider / prompt_id). In the URL so
+  // the narrowed view is shareable.
+  const answerFilter = useDrillFilters(['provider', 'prompt_id']);
+  const { provider: answerProvider, prompt_id: answerPrompt } = answerFilter.filters;
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    return Promise.allSettled([getVisibilitySummary(days), listVisibilityAnswers({ limit: 30 })])
+    const answerParams = { limit: 30 };
+    if (answerProvider) answerParams.provider = answerProvider;
+    if (answerPrompt) answerParams.prompt_id = answerPrompt;
+    return Promise.allSettled([getVisibilitySummary(days), listVisibilityAnswers(answerParams)])
       .then(([s, a]) => {
         if (s.status === 'fulfilled') setSummary(s.value);
         else setError(s.reason?.message || 'Failed to load AI visibility');
         if (a.status === 'fulfilled') setAnswers(Array.isArray(a.value) ? a.value : []);
       })
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, answerProvider, answerPrompt]);
+
+  const showAnswers = (patch) => {
+    answerFilter.drill(patch);
+    document.getElementById('latest-answers')?.scrollIntoView?.({ behavior: 'smooth' });
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -175,7 +189,12 @@ export default function VisibilityOverviewPage() {
                     return (
                       <tr key={p.provider}>
                         <td>{PROVIDER_LABEL[p.provider] || p.provider}</td>
-                        <td>{p.answers}</td>
+                        <td>
+                          <DrillLink onClick={p.answers > 0 ? () => showAnswers({ provider: p.provider }) : undefined}
+                                     title="Show these answers">
+                            {p.answers}
+                          </DrillLink>
+                        </td>
                         <td>{pct(p.brand_mention_rate)}</td>
                         <td>{p.brand_avg_rank != null ? `#${p.brand_avg_rank}` : '—'}</td>
                         <td>{topName ? `${topName} (${pct(top.mention_rate)})` : '—'}</td>
@@ -223,7 +242,13 @@ export default function VisibilityOverviewPage() {
                   <tr key={g.prompt_id}>
                     <td>{g.question}</td>
                     <td>{g.market || '—'}</td>
-                    <td>{g.answers_without_us} ({g.providers.map((p) => PROVIDER_LABEL[p] || p).join(', ')})</td>
+                    <td>
+                      <DrillLink onClick={g.answers_without_us > 0 ? () => showAnswers({ prompt_id: g.prompt_id, provider: '' }) : undefined}
+                                 title="Show the answers for this question">
+                        {g.answers_without_us}
+                      </DrillLink>
+                      {' '}({g.providers.map((p) => PROVIDER_LABEL[p] || p).join(', ')})
+                    </td>
                     <td>{g.competitors.slice(0, 4).map((c) => `${c.name} ×${c.answers}`).join(', ')}</td>
                   </tr>
                 ))}
@@ -264,10 +289,28 @@ export default function VisibilityOverviewPage() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">Latest answers</div>
+      <div className="card" id="latest-answers">
+        <div className="card-header flex items-center gap-2 flex-wrap">
+          <span>Latest answers</span>
+          {answerProvider && (
+            <button type="button" className="badge badge-secondary" onClick={() => answerFilter.clear('provider')}
+                    aria-label={`Clear assistant ${answerProvider} filter`}>
+              {PROVIDER_LABEL[answerProvider] || answerProvider} ✕
+            </button>
+          )}
+          {answerPrompt && (
+            <button type="button" className="badge badge-secondary" onClick={() => answerFilter.clear('prompt_id')}
+                    aria-label="Clear question filter">
+              {(summary?.gaps ?? []).find((g) => String(g.prompt_id) === answerPrompt)?.question || `Question #${answerPrompt}`} ✕
+            </button>
+          )}
+        </div>
         <div className="card-body">
-          {answers.length === 0 && <p className="text-sm text-muted" style={{ margin: 0 }}>No answers recorded yet.</p>}
+          {answers.length === 0 && (
+            <p className="text-sm text-muted" style={{ margin: 0 }}>
+              {answerProvider || answerPrompt ? 'No answers match this filter.' : 'No answers recorded yet.'}
+            </p>
+          )}
           {answers.map((a) => (
             <details key={a.run_id} style={{ borderBottom: '1px solid var(--color-border)', padding: '0.5rem 0' }}>
               <summary style={{ cursor: 'pointer' }}>

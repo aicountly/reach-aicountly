@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useUrlFilter } from '../../components/drill';
 import { Activity, RefreshCw, CheckCircle, AlertCircle, XCircle, Settings } from 'lucide-react';
 import { listConnectors } from '../../services/intelligenceService.js';
 import { formatDateTime } from '../../utils/formatDate';
@@ -32,8 +34,18 @@ export default function IntelligenceOperationsPage() {
 
   useEffect(() => { load(); }, []);
 
-  const healthy = connectors.filter((c) => ['healthy', 'ok'].includes((c.health_status || c.status || '').toLowerCase())).length;
-  const failed = connectors.filter((c) => ['failed', 'unhealthy'].includes((c.health_status || c.status || '').toLowerCase())).length;
+  const healthOf = (c) => {
+    const st = (c.health_status || c.status || '').toLowerCase();
+    if (['healthy', 'ok'].includes(st)) return 'healthy';
+    if (['failed', 'unhealthy'].includes(st)) return 'unhealthy';
+    return 'other';
+  };
+  const healthy = connectors.filter((c) => healthOf(c) === 'healthy').length;
+  const failed = connectors.filter((c) => healthOf(c) === 'unhealthy').length;
+  // The Healthy / Unhealthy tiles narrow the table below (?health=), using
+  // the same test that counted them.
+  const [health, setHealth] = useUrlFilter('health');
+  const shown = health ? connectors.filter((c) => healthOf(c) === health) : connectors;
 
   return (
     <div>
@@ -56,19 +68,41 @@ export default function IntelligenceOperationsPage() {
 
       <div className="grid grid-3" style={{ marginBottom: '1.25rem' }}>
         {[
-          { label: 'Connectors', value: loading ? '…' : String(connectors.length), icon: Settings },
-          { label: 'Healthy', value: loading ? '…' : String(healthy), icon: CheckCircle },
-          { label: 'Unhealthy', value: loading ? '…' : String(failed), icon: XCircle },
-        ].map((s) => (
-          <div key={s.label} className="stat-tile" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <s.icon size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-            <div>
-              <div className="stat-tile__value">{s.value}</div>
-              <div className="stat-tile__label">{s.label}</div>
-            </div>
-          </div>
-        ))}
+          { label: 'Connectors', value: loading ? '…' : String(connectors.length), icon: Settings, count: connectors.length, filter: '' },
+          { label: 'Healthy', value: loading ? '…' : String(healthy), icon: CheckCircle, count: healthy, filter: 'healthy' },
+          { label: 'Unhealthy', value: loading ? '…' : String(failed), icon: XCircle, count: failed, filter: 'unhealthy' },
+        ].map((s) => {
+          const style = { display: 'flex', alignItems: 'center', gap: '0.75rem' };
+          const body = (
+            <>
+              <s.icon size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+              <div>
+                <div className="stat-tile__value">{s.value}</div>
+                <div className="stat-tile__label">{s.label}</div>
+              </div>
+            </>
+          );
+          const active = health === s.filter;
+          return !loading && s.count > 0 && !active ? (
+            <button key={s.label} type="button" className="stat-tile" style={style} onClick={() => setHealth(s.filter)}
+                    aria-label={`${s.label}: ${s.value} — show in table`}>
+              {body}
+            </button>
+          ) : (
+            <div key={s.label} className="stat-tile" style={style}>{body}</div>
+          );
+        })}
       </div>
+
+      {health && (
+        <div className="flex items-center gap-2 mb-2">
+          <button type="button" className="badge badge-secondary" onClick={() => setHealth('')}
+                  aria-label={`Clear ${health} filter`}>
+            {health} ✕
+          </button>
+          <span className="text-xs text-muted">{shown.length} of {connectors.length} connectors</span>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">Connector Status</div>
@@ -89,11 +123,15 @@ export default function IntelligenceOperationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {connectors.map((c) => {
+                  {shown.map((c) => {
                     const status = (c.health_status || c.status || 'unknown').toLowerCase();
                     return (
                       <tr key={c.id || c.connector_key}>
-                        <td style={{ fontWeight: 600 }}>{c.name || c.connector_key || `Connector #${c.id}`}</td>
+                        <td style={{ fontWeight: 600 }}>
+                          <Link to="/intelligence/connectors" className="drill-link" title="Configure in Connectors">
+                            {c.name || c.connector_key || `Connector #${c.id}`}
+                          </Link>
+                        </td>
                         <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{c.provider || c.type || '—'}</td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>

@@ -1,13 +1,24 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { DrillLink, drillHref, useUrlFilter } from '../../components/drill';
+
+// Bounces and unsubscribes end up on the suppression list, which is kept per
+// channel (not per dispatch) — the link opens that channel's suppressions.
+const suppressionsHref = (count, channel, reason) => (count > 0
+  ? drillHref('/distribution/suppressions', { channel, reason })
+  : undefined);
 
 export default function DistributionAnalyticsPage() {
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  // ?channel= narrows the table; the API applies it (AnalyticsController::index).
+  const [channel, setChannel] = useUrlFilter('channel');
 
   useEffect(() => {
-    api.get('v1/distribution/analytics')
+    setLoading(true);
+    setError(null);
+    api.get('v1/distribution/analytics', channel ? { channel } : undefined)
       .then(r => setMetrics(Array.isArray(r) ? r : (r?.data ?? [])))
       .catch(e => {
         // Soft-fail while migrations/deploy catch up — show empty state, not a hard error.
@@ -19,7 +30,7 @@ export default function DistributionAnalyticsPage() {
         setError(e.message || 'Failed to load analytics');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [channel]);
 
   return (
     <div>
@@ -29,6 +40,15 @@ export default function DistributionAnalyticsPage() {
           Delivery, engagement, and compliance metrics across all channels
         </p>
       </div>
+
+      {channel && (
+        <div className="filter-bar mb-4">
+          <button type="button" className="badge badge--neutral" onClick={() => setChannel('')}
+                  aria-label={`Clear channel ${channel} filter`}>
+            Channel: {channel} ✕
+          </button>
+        </div>
+      )}
 
       {error && <p className="text-error">{error}</p>}
       {loading && <p className="muted">Loading analytics…</p>}
@@ -54,14 +74,33 @@ export default function DistributionAnalyticsPage() {
           <tbody>
             {metrics.map((m) => (
               <tr key={m.id ?? `${m.dispatch_id}-${m.channel}`}>
-                <td>{m.campaign_id ?? '—'}</td>
-                <td><span className="badge badge--neutral">{m.channel}</span></td>
+                <td>
+                  <DrillLink to={m.campaign_id ? `/distribution/campaigns/${m.campaign_id}` : undefined}>
+                    {m.campaign_id ?? '—'}
+                  </DrillLink>
+                </td>
+                <td>
+                  <DrillLink onClick={m.channel && m.channel !== channel ? () => setChannel(m.channel) : undefined}
+                             title="Only this channel">
+                    <span className="badge badge--neutral">{m.channel}</span>
+                  </DrillLink>
+                </td>
                 <td>{m.sent_count ?? 0}</td>
                 <td>{m.delivered_count ?? 0}</td>
                 <td>{m.open_count ?? 0}</td>
                 <td>{m.click_count ?? 0}</td>
-                <td>{m.bounce_count ?? 0}</td>
-                <td>{m.unsubscribe_count ?? 0}</td>
+                <td>
+                  <DrillLink to={suppressionsHref(m.bounce_count, m.channel, 'bounce')}
+                             title="Bounced addresses suppressed on this channel">
+                    {m.bounce_count ?? 0}
+                  </DrillLink>
+                </td>
+                <td>
+                  <DrillLink to={suppressionsHref(m.unsubscribe_count, m.channel, 'unsubscribe')}
+                             title="Unsubscribed addresses on this channel">
+                    {m.unsubscribe_count ?? 0}
+                  </DrillLink>
+                </td>
               </tr>
             ))}
           </tbody>

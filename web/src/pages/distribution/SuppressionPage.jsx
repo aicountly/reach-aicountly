@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { formatDate } from '../../utils/formatDate';
+import { DrillLink, useUrlFilter } from '../../components/drill';
 
 const SUPPRESSION_REASONS = ['unsubscribe', 'bounce', 'complaint', 'manual', 'legal', 'opt_out', 'invalid_address'];
+const CHANNELS = ['email', 'sms', 'whatsapp', 'social'];
 
 function normalizeList(payload) {
   if (Array.isArray(payload)) return payload;
@@ -19,12 +21,22 @@ export default function SuppressionPage() {
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ channel: 'email', address: '', reason: 'manual' });
+  // In the URL so the SMS overview (?channel=sms) and analytics bounce /
+  // unsubscribe counts (?reason=bounce) land on the narrowed list.
+  const [channel, setChannelParam] = useUrlFilter('channel');
+  const [reason, setReasonParam] = useUrlFilter('reason');
   const perPage = 25;
+
+  const setChannel = (v) => { setChannelParam(v); setPage(1); };
+  const setReason = (v) => { setReasonParam(v); setPage(1); };
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    api.get('v1/distribution/suppressions', { page, per_page: perPage })
+    const params = { page, per_page: perPage };
+    if (channel) params.channel = channel;
+    if (reason) params.reason = reason;
+    api.get('v1/distribution/suppressions', params)
       .then((r) => {
         setSuppressions(normalizeList(r));
         setTotal(Number(r?.total ?? 0));
@@ -40,7 +52,7 @@ export default function SuppressionPage() {
         setError(e?.message || 'Failed to load suppressions.');
       })
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, channel, reason]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -118,11 +130,29 @@ export default function SuppressionPage() {
         </div>
       )}
 
+      <div className="filter-bar mb-4">
+        <select value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Channel filter">
+          <option value="">All channels</option>
+          {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason filter">
+          <option value="">All reasons</option>
+          {SUPPRESSION_REASONS.map((r) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+        </select>
+        {(channel || reason) && (
+          <span className="muted text-sm">{total} matching suppression{total === 1 ? '' : 's'}</span>
+        )}
+      </div>
+
       {error && <p className="text-error">{error}</p>}
       {loading && <p className="muted">Loading suppressions…</p>}
 
       {!loading && suppressions.length === 0 && !error && (
-        <p className="muted">No suppressions. Unsubscribes and bounces will appear here automatically.</p>
+        <p className="muted">
+          {channel || reason
+            ? 'No suppressions match this filter.'
+            : 'No suppressions. Unsubscribes and bounces will appear here automatically.'}
+        </p>
       )}
 
       {!loading && suppressions.length > 0 && (
@@ -139,9 +169,17 @@ export default function SuppressionPage() {
           <tbody>
             {suppressions.map((s) => (
               <tr key={s.id}>
-                <td><span className="badge badge--neutral">{s.channel}</span></td>
+                <td>
+                  <DrillLink onClick={s.channel !== channel ? () => setChannel(s.channel) : undefined} title="Only this channel">
+                    <span className="badge badge--neutral">{s.channel}</span>
+                  </DrillLink>
+                </td>
                 <td>{s.address_masked ?? '***'}</td>
-                <td>{s.reason}</td>
+                <td>
+                  <DrillLink onClick={s.reason !== reason ? () => setReason(s.reason) : undefined} title="Only this reason">
+                    {s.reason}
+                  </DrillLink>
+                </td>
                 <td>{s.suppressed_at ? formatDate(s.suppressed_at) : '—'}</td>
                 <td>
                   <button className="btn btn--sm btn--error" onClick={() => handleRemove(s.id)}>

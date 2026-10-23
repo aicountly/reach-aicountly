@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { DrillLink, useUrlFilter } from '../../components/drill';
 import { Youtube, RefreshCw, Settings, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import videoService from '../../services/videoService';
 import { useAuth } from '../../context/AuthContext';
@@ -251,10 +252,17 @@ export default function VideoPipelinePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(null);
+  // ?status= and ?format= narrow the list (the bot plan's "videos published"
+  // links here); the API filters on both.
+  const [statusFilter, setStatusFilter] = useUrlFilter('status');
+  const [formatFilter, setFormatFilter] = useUrlFilter('format');
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.allSettled([videoService.pipeline({ limit: 50 }), videoService.status(), videoService.youtubeStatus()])
+    const params = { limit: 50 };
+    if (statusFilter) params.status = statusFilter;
+    if (formatFilter) params.format = formatFilter;
+    Promise.allSettled([videoService.pipeline(params), videoService.status(), videoService.youtubeStatus()])
       .then(([list, st, yt]) => {
         if (list.status === 'fulfilled') {
           setItems(list.value?.items ?? []);
@@ -267,9 +275,10 @@ export default function VideoPipelinePage() {
         if (yt.status === 'fulfilled') setChannel(yt.value);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [statusFilter, formatFilter]);
 
   useEffect(() => { load(); }, [load]);
+  const filtered = Boolean(statusFilter || formatFilter);
 
   const connectResult = searchParams.get('youtube');
   const connectReason = searchParams.get('reason');
@@ -300,9 +309,23 @@ export default function VideoPipelinePage() {
           </button>
         </div>
         <div className="card__body">
+          <div className="filter-bar mb-4">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
+              <option value="">All statuses</option>
+              {Object.keys(STATUS_BADGE).map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+              {statusFilter && !STATUS_BADGE[statusFilter] && <option value={statusFilter}>{statusLabel(statusFilter)}</option>}
+            </select>
+            <select value={formatFilter} onChange={(e) => setFormatFilter(e.target.value)} aria-label="Format">
+              <option value="">All formats</option>
+              <option value="vlog">Vlog</option>
+              <option value="short">Short</option>
+            </select>
+          </div>
           {error && <p className="text-error">{error}</p>}
           {loading && items.length === 0 && <p className="muted">Loading…</p>}
-          {!loading && !error && items.length === 0 && <p className="muted">No videos yet. Scripts arrive from the reach-video routine every morning.</p>}
+          {!loading && !error && items.length === 0 && (
+            <p className="muted">{filtered ? 'No videos match this filter.' : 'No videos yet. Scripts arrive from the reach-video routine every morning.'}</p>
+          )}
           {items.length > 0 && (
             <table className="data-table">
               <thead>
@@ -318,8 +341,16 @@ export default function VideoPipelinePage() {
                         </button>
                       </td>
                       <td>{item.title}</td>
-                      <td>{item.format === 'short' ? 'Short' : 'Vlog'}</td>
-                      <td><span className={`badge ${STATUS_BADGE[item.status] ?? 'badge--neutral'}`}>{statusLabel(item.status)}</span></td>
+                      <td>
+                        <DrillLink onClick={item.format && item.format !== formatFilter ? () => setFormatFilter(item.format) : undefined} title="Only this format">
+                          {item.format === 'short' ? 'Short' : 'Vlog'}
+                        </DrillLink>
+                      </td>
+                      <td>
+                        <DrillLink onClick={item.status && item.status !== statusFilter ? () => setStatusFilter(item.status) : undefined} title="Only this status">
+                          <span className={`badge ${STATUS_BADGE[item.status] ?? 'badge--neutral'}`}>{statusLabel(item.status)}</span>
+                        </DrillLink>
+                      </td>
                       <td>{STEP_LABEL[item.step] ?? item.step}{item.step_detail ? <div className="muted text-sm">{item.step_detail}</div> : null}</td>
                       <td>{item.created_at ? formatDate(item.created_at) : '—'}</td>
                       <td>{item.youtube_url && /^https:\/\//.test(item.youtube_url) ? <a href={item.youtube_url} target="_blank" rel="noreferrer">Open</a> : '—'}</td>

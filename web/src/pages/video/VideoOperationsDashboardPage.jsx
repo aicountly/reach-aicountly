@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { ROUTES } from '../../constants/routes';
+import { drillHref } from '../../components/drill';
+
+const JOB_QUEUE = { queue: 'video', job_type: 'reach.video_pipeline_step' };
 
 /** Pipeline health exactly as the API reports it — nothing shows "operational" unless it is. */
 export default function VideoOperationsDashboardPage() {
@@ -89,7 +92,9 @@ export default function VideoOperationsDashboardPage() {
               <p className="text-muted" style={{ margin: 0, padding: 0 }}>
                 Pipeline steps run as <code>reach.video_pipeline_step</code> jobs on the <code>video</code> queue.
               </p>
-              <Link to={ROUTES.JOBS} className="stat-card__link">Open Job Monitor →</Link>
+              <Link to={drillHref(ROUTES.JOBS, JOB_QUEUE)} className="stat-card__link">Open these jobs →</Link>
+              {' '}
+              <Link to={drillHref(ROUTES.JOBS, { ...JOB_QUEUE, status: 'dead_letter,failed' })} className="stat-card__link">Failed steps →</Link>
             </div>
           </div>
 

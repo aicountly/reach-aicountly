@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Target, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { getAttributionOverview } from '../../services/intelligenceService.js';
 
@@ -37,7 +38,8 @@ export default function AttributionOverviewPage() {
   const tiles = [
     { label: 'Total Conversions', value: stats.total_conversions, icon: Target, color: 'var(--color-info)' },
     { label: 'Attributed', value: stats.attributed, icon: CheckCircle, color: 'var(--color-success)' },
-    { label: 'Unattributed', value: stats.unattributed, icon: AlertCircle, color: 'var(--color-warning)' },
+    // The only conversion list page is the unattributed one.
+    { label: 'Unattributed', value: stats.unattributed, icon: AlertCircle, color: 'var(--color-warning)', to: '/intelligence/attribution/unattributed' },
     { label: 'Attribution Rate', value: `${stats.attribution_rate ?? 0}%`, icon: Users, color: 'var(--color-primary-hover)' },
   ];
 
@@ -62,13 +64,18 @@ export default function AttributionOverviewPage() {
       ) : (
         <>
           <div className="grid grid-4" style={{ marginBottom: '1.25rem' }}>
-            {tiles.map((s) => (
-              <div key={s.label} className="stat-tile">
-                <s.icon size={18} style={{ color: s.color, marginBottom: '0.35rem' }} />
-                <div className="stat-tile__value" style={{ color: s.color }}>{s.value}</div>
-                <div className="stat-tile__label">{s.label}</div>
-              </div>
-            ))}
+            {tiles.map((s) => {
+              const body = (
+                <>
+                  <s.icon size={18} style={{ color: s.color, marginBottom: '0.35rem' }} />
+                  <div className="stat-tile__value" style={{ color: s.color }}>{s.value}</div>
+                  <div className="stat-tile__label">{s.label}</div>
+                </>
+              );
+              return s.to && Number(s.value) > 0
+                ? <Link key={s.label} to={s.to} className="stat-tile" aria-label={`${s.label}: ${s.value}`}>{body}</Link>
+                : <div key={s.label} className="stat-tile">{body}</div>;
+            })}
           </div>
 
           <div className="card" style={{ marginBottom: 0 }}>

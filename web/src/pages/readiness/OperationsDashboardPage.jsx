@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermission } from '../../hooks/usePermission';
+import { ROUTES } from '../../constants/routes';
+import { DrillLink, drillHref } from '../../components/drill';
 import {
   ensureOperationalCheckDefaults,
   getOperationsSummary,
@@ -8,20 +10,31 @@ import {
   upsertOperationalCheck,
 } from '../../services/readinessService.js';
 
-function StatCard({ label, value, variant }) {
+/** `to` makes a non-zero card open the records it counted. */
+function StatCard({ label, value, variant, to }) {
   const valueStyle = {
     danger:  { color: 'var(--color-danger)' },
     warning: { color: 'var(--color-warning)' },
     success: { color: 'var(--color-success)' },
   }[variant];
-
-  return (
-    <div className={`stat-card${variant === 'warning' ? ' stat-card--warning' : ''}`}>
+  const className = `stat-card${variant === 'warning' ? ' stat-card--warning' : ''}`;
+  const body = (
+    <>
       <div className="stat-card__value" style={valueStyle}>{value}</div>
       <div className="stat-card__label">{label}</div>
-    </div>
+    </>
   );
+
+  if (to && Number(value) > 0) {
+    return <Link to={to} className={`${className} stat-tile`} aria-label={`${label}: ${value} — view records`}>{body}</Link>;
+  }
+  return <div className={className}>{body}</div>;
 }
+
+// Open = the release-blocker scope (ReadinessFindingModel::getOpenBlockers).
+const openFindings = (severity) => drillHref('/readiness/security', { severity, resolution_status: 'open,in_progress' });
+// The reliability table covers the last 7 days (RefreshOperationsService).
+const jobsHref = (jobType, status) => drillHref(ROUTES.JOBS, { job_type: jobType, status, since_hours: 168 });
 
 const STATUS_BADGE = {
   passed: 'badge--success',
@@ -113,17 +126,24 @@ export default function OperationsDashboardPage() {
             label="Failed Publications"
             value={summary?.failed_publications ?? 0}
             variant={(summary?.failed_publications ?? 0) > 0 ? 'danger' : 'success'}
+            to={drillHref('/publishing/deployments', { status: 'failed' })}
           />
-          <StatCard label="Pending Outcomes" value={summary?.pending_outcome_windows ?? 0} />
+          <StatCard
+            label="Pending Outcomes"
+            value={summary?.pending_outcome_windows ?? 0}
+            to={drillHref('/readiness/outcomes', { measurement_status: 'pending' })}
+          />
           <StatCard
             label="Open Critical"
             value={summary?.open_critical_findings ?? 0}
             variant={(summary?.open_critical_findings ?? 0) > 0 ? 'danger' : 'success'}
+            to={openFindings('critical')}
           />
           <StatCard
             label="Open High"
             value={summary?.open_high_findings ?? 0}
             variant={(summary?.open_high_findings ?? 0) > 0 ? 'warning' : 'success'}
+            to={openFindings('high')}
           />
         </div>
       )}
@@ -213,9 +233,9 @@ export default function OperationsDashboardPage() {
                 {jobs.map((j) => (
                   <tr key={j.job_type}>
                     <td>{j.job_type}</td>
-                    <td>{j.total}</td>
-                    <td>{j.completed}</td>
-                    <td>{j.failed}</td>
+                    <td><DrillLink to={Number(j.total) > 0 ? jobsHref(j.job_type) : undefined}>{j.total}</DrillLink></td>
+                    <td><DrillLink to={Number(j.completed) > 0 ? jobsHref(j.job_type, 'completed') : undefined}>{j.completed}</DrillLink></td>
+                    <td><DrillLink to={Number(j.failed) > 0 ? jobsHref(j.job_type, 'failed') : undefined}>{j.failed}</DrillLink></td>
                   </tr>
                 ))}
               </tbody>

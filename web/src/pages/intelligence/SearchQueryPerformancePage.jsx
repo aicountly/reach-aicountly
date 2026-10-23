@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { listSearchMetrics } from '../../services/intelligenceService.js';
+import { DrillLink, drillHref } from '../../components/drill';
 
 export default function SearchQueryPerformancePage() {
   const [rows, setRows] = useState([]);
@@ -71,7 +72,15 @@ export default function SearchQueryPerformancePage() {
                 const position = Number(q.position ?? q.avg_position ?? 0);
                 return (
                   <tr key={q.query || i}>
-                    <td style={{ fontWeight: 500 }}>{q.query || q.dimension_value || '—'}</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {/* The pages that rank for this query, in the Search Console explorer. */}
+                      <DrillLink
+                        to={(q.query || q.dimension_value) ? drillHref('/seo-centre/search', { query: q.query || q.dimension_value, by: 'page' }) : undefined}
+                        title="Pages ranking for this query"
+                      >
+                        {q.query || q.dimension_value || '—'}
+                      </DrillLink>
+                    </td>
                     <td style={{ textAlign: 'right' }}>{Number(q.clicks || 0).toLocaleString()}</td>
                     <td style={{ textAlign: 'right' }}>{Number(q.impressions || 0).toLocaleString()}</td>
                     <td style={{ textAlign: 'right' }}>{(ctr <= 1 ? ctr * 100 : ctr).toFixed(1)}%</td>

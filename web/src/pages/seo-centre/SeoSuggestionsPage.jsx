@@ -3,6 +3,8 @@ import { api } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
+import { ExternalLink } from 'lucide-react';
+import { DrillLink, drillHref } from '../../components/drill';
 
 export function SeoSuggestionsPage() {
   const [suggestions, setSuggestions] = useState([]);
@@ -36,7 +38,14 @@ export function SeoSuggestionsPage() {
                 {suggestions.map((row) => (
                   <tr key={row.page_url}>
                     <td className="text-sm" style={{ maxWidth: '24rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      <a href={row.page_url} target="_blank" rel="noreferrer">{row.page_url}</a>
+                      {/* The queries behind the impressions — what the title should answer. */}
+                      <DrillLink to={drillHref('/seo-centre/search', { page: row.page_url, by: 'query' })} title="Queries for this page">
+                        {row.page_url}
+                      </DrillLink>
+                      {' '}
+                      <a href={row.page_url} target="_blank" rel="noreferrer" aria-label={`Open ${row.page_url}`}>
+                        <ExternalLink size={12} aria-hidden="true" />
+                      </a>
                     </td>
                     <td>{row.impressions}</td>
                     <td>{row.clicks}</td>

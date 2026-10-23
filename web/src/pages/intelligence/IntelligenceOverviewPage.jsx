@@ -19,10 +19,10 @@ const LINKS = [
 
 export default function IntelligenceOverviewPage() {
   const [tiles, setTiles] = useState([
-    { label: 'Attributed Conversions', value: '—', sub: 'Live attribution', icon: Link2 },
-    { label: 'AI Visibility Runs', value: '—', sub: 'Recent runs', icon: Eye },
-    { label: 'Competitors Tracked', value: '—', sub: 'Active monitoring', icon: Users2 },
-    { label: 'Connectors', value: '—', sub: 'Configured integrations', icon: Zap },
+    { label: 'Attributed Conversions', value: '—', sub: 'Live attribution', icon: Link2, to: '/intelligence/attribution' },
+    { label: 'AI Visibility Runs', value: '—', sub: 'Recent runs', icon: Eye, to: '/intelligence/visibility' },
+    { label: 'Competitors Tracked', value: '—', sub: 'Active monitoring', icon: Users2, to: '/intelligence/competitors' },
+    { label: 'Connectors', value: '—', sub: 'Configured integrations', icon: Zap, to: '/intelligence/connectors' },
   ]);
   const [connectors, setConnectors] = useState([]);
   const [error, setError] = useState(null);
@@ -82,16 +82,25 @@ export default function IntelligenceOverviewPage() {
       {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="grid grid-4" style={{ marginBottom: '1.25rem' }}>
-        {tiles.map((c) => (
-          <div key={c.label} className="stat-tile" style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-            <c.icon size={18} style={{ color: 'var(--color-primary)', marginTop: 2, flexShrink: 0 }} />
-            <div>
-              <div className="stat-tile__value">{c.value}</div>
-              <div className="stat-tile__label">{c.label}</div>
-              <div className="stat-tile__hint">{c.sub}</div>
-            </div>
-          </div>
-        ))}
+        {tiles.map((c) => {
+          const style = { display: 'flex', gap: '0.75rem', alignItems: 'flex-start' };
+          const body = (
+            <>
+              <c.icon size={18} style={{ color: 'var(--color-primary)', marginTop: 2, flexShrink: 0 }} />
+              <div>
+                <div className="stat-tile__value">{c.value}</div>
+                <div className="stat-tile__label">{c.label}</div>
+                <div className="stat-tile__hint">{c.sub}</div>
+              </div>
+            </>
+          );
+          // Only a loaded, non-zero count opens the records behind it.
+          return Number(c.value) > 0 ? (
+            <Link key={c.label} to={c.to} className="stat-tile" style={style} aria-label={`${c.label}: ${c.value}`}>{body}</Link>
+          ) : (
+            <div key={c.label} className="stat-tile" style={style}>{body}</div>
+          );
+        })}
       </div>
 
       <div className="grid grid-3" style={{ marginBottom: '1.25rem' }}>
@@ -135,7 +144,7 @@ export default function IntelligenceOverviewPage() {
                       borderBottom: '1px solid var(--color-border)',
                     }}
                   >
-                    <span className="text-sm">{name}</span>
+                    <Link to="/intelligence/connectors" className="text-sm drill-link">{name}</Link>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       {healthy
                         ? <CheckCircle size={14} style={{ color: 'var(--color-success)' }} />

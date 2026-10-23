@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Save } from 'lucide-react';
 import { emailService } from '../../services/emailService';
 import { Card } from '../../components/common/Card';
@@ -21,6 +22,7 @@ export function EmailListPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
 
   const load = () => {
     setLoading(true);
@@ -68,7 +70,9 @@ export function EmailListPage() {
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
         <Card padding={false}>
-          <DataTable columns={columns} rows={rows} emptyMessage="No email campaigns yet." />
+          <DataTable columns={columns} rows={rows}
+            onRowClick={(r) => navigate(`/email/${r.id}`)} rowLabel={(r) => `Open email campaign ${r.subject || r.id}`}
+            emptyMessage="No email campaigns yet." />
         </Card>
       )}
 

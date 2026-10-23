@@ -11,6 +11,9 @@ use App\Libraries\Database\SchemaGuard;
 
 class FindingsController extends BaseApiController
 {
+    private const SEVERITIES          = ['critical', 'high', 'medium', 'low', 'info'];
+    private const RESOLUTION_STATUSES = ['open', 'in_progress', 'resolved', 'accepted_risk', 'deferred'];
+
     public function index(): ResponseInterface
     {
         try {
@@ -19,15 +22,17 @@ class FindingsController extends BaseApiController
                 return $this->ok([]);
             }
 
-            $model  = new ReadinessFindingModel();
-            $status = $this->request->getGet('resolution_status');
-            $severity = $this->request->getGet('severity');
+            $model    = new ReadinessFindingModel();
+            $status   = $this->listParam('resolution_status', self::RESOLUTION_STATUSES);
+            $severity = $this->listParam('severity', self::SEVERITIES);
 
-            if (is_string($status) && $status !== '') {
-                $model->where('resolution_status', $status);
+            // Comma lists so the dashboard's "open critical" count (open +
+            // in_progress, see getOpenBlockers) links to the same rows.
+            if ($status !== []) {
+                $model->whereIn('resolution_status', $status);
             }
-            if (is_string($severity) && $severity !== '') {
-                $model->where('severity', $severity);
+            if ($severity !== []) {
+                $model->whereIn('severity', $severity);
             }
 
             $rows = $model->orderBy('id', 'DESC')->findAll(200);
@@ -36,6 +41,23 @@ class FindingsController extends BaseApiController
             log_message('error', 'FindingsController::index: ' . $e->getMessage());
             return $this->ok([]);
         }
+    }
+
+    /**
+     * A comma-separated query param, keeping only known values.
+     *
+     * @param list<string> $allowed
+     * @return list<string>
+     */
+    private function listParam(string $key, array $allowed): array
+    {
+        $raw = $this->request->getGet($key);
+        if (! is_string($raw) || $raw === '') {
+            return [];
+        }
+        $values = array_map('trim', explode(',', strtolower($raw)));
+
+        return array_values(array_unique(array_intersect($values, $allowed)));
     }
 
     public function blockers(): ResponseInterface
