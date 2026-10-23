@@ -14,7 +14,7 @@ vi.mock('../services/api', () => {
 vi.mock('../components/layout/ReachLayout', () => ({
   ReachLayout: () => {
     const l = useLocation();
-    return <><div data-testid="where">{l.pathname}</div><Outlet /></>;
+    return <><div data-testid="where">{l.pathname}</div><div data-testid="query">{l.search}</div><Outlet /></>;
   },
 }));
 
@@ -43,6 +43,13 @@ describe('App routing after the 2026-10 IA revamp', () => {
     renderAt(from);
     // A redirect into a planned page lands there (placeholder until that stream merges).
     expect(screen.getByTestId('where')).toHaveTextContent(new RegExp(`^${to}`));
+  });
+
+  it('keeps the query string through a redirect, so drill-down filters survive', () => {
+    const r = LEGACY_REDIRECTS.find((x) => !x.to.includes('?'));
+    renderAt(`${r.from}?status=failed&channel=linkedin`);
+    expect(screen.getByTestId('where')).toHaveTextContent(new RegExp(`^${r.to}`));
+    expect(screen.getByTestId('query')).toHaveTextContent('?status=failed&channel=linkedin');
   });
 
   it.each(PLANNED_ROUTES.map((r) => [r.path]))('%s renders the "coming in this release" placeholder', (path) => {

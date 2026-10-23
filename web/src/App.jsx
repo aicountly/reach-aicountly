@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { ReachLayout } from './components/layout/ReachLayout';
@@ -227,6 +227,20 @@ import { isBlogCommandCentreEnabled } from './constants/blogFeatureFlags';
 import { ROUTES } from './constants/routes';
 import { Loader } from './components/common/Loader';
 
+/**
+ * A retired route forwards its query string, so a drill-down link to an old
+ * path (`/social/queue?status=failed`) still lands on the filtered list. A
+ * target's own params win over the incoming ones.
+ */
+function RedirectKeepingQuery({ to }) {
+  const { search, hash } = useLocation();
+  const [path, own = ''] = to.split('?');
+  const params = new URLSearchParams(search);
+  new URLSearchParams(own).forEach((value, key) => params.set(key, value));
+  const qs = params.toString();
+  return <Navigate to={`${path}${qs ? `?${qs}` : ''}${hash}`} replace />;
+}
+
 export default function App() {
   const { user, loading, ssoPending } = useAuth();
 
@@ -269,7 +283,7 @@ export default function App() {
             These sit outside the BCC feature flag on purpose so old bookmarks
             resolve in both flag states. */}
         {LEGACY_REDIRECTS.map((r) => (
-          <Route key={r.from} path={r.from} element={<Navigate to={r.to} replace />} />
+          <Route key={r.from} path={r.from} element={<RedirectKeepingQuery to={r.to} />} />
         ))}
 
         {/* Pages other streams of this release are building; replaced at merge. */}
