@@ -149,3 +149,44 @@ describe('Quality Centre content base', () => {
     await waitFor(() => expect(screen.getByText(/Seeds not imported yet/)).toBeInTheDocument());
   });
 });
+
+describe('Content base drill-down', () => {
+  beforeEach(() => {
+    contentBaseService.overview.mockResolvedValue(overview);
+  });
+
+  it('a status count filters the table to that status', async () => {
+    const user = userEvent.setup();
+    renderWithAuth(<ContentBasePage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Show 1 planned topics' }));
+
+    expect(screen.getByText('GSTR-9 annual return checklist')).toBeInTheDocument();
+    expect(screen.queryByText('GSTR-2B vs purchase register mismatch')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear planned filter/i })).toBeInTheDocument();
+  });
+
+  it('reads the surface and status from the URL', async () => {
+    renderWithAuth(<ContentBasePage />, { route: '/quality/content-base?surface=blog&status=published' });
+
+    expect(await screen.findByText('GSTR-2B vs purchase register mismatch')).toBeInTheDocument();
+    expect(screen.queryByText('GSTR-9 annual return checklist')).not.toBeInTheDocument();
+  });
+
+  it('a written topic opens its content item', async () => {
+    contentBaseService.overview.mockResolvedValue({
+      ...overview,
+      surfaces: {
+        ...overview.surfaces,
+        blog: {
+          ...overview.surfaces.blog,
+          entries: [{ ...overview.surfaces.blog.entries[0], content_item_id: 42 }],
+        },
+      },
+    });
+    renderWithAuth(<ContentBasePage />);
+
+    const link = await screen.findByRole('link', { name: 'GSTR-2B vs purchase register mismatch' });
+    expect(link).toHaveAttribute('href', '/content/42');
+  });
+});

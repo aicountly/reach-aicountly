@@ -63,3 +63,15 @@ describe('PublishingCalendarPage', () => {
     await waitFor(() => expect(screen.getByText(/Calendar error/i)).toBeInTheDocument());
   });
 });
+
+describe('PublishingCalendarPage drill-down', () => {
+  it('each entry opens its content item and its deployment', async () => {
+    api.get.mockResolvedValueOnce([
+      { id: 31, status: 'scheduled', scheduled_at: '2026-10-25T04:30:00Z', content_item_id: 12, content_title: 'GST guide', content_type: 'blog' },
+    ]);
+    renderWithAuth(<PublishingCalendarPage />, ctx);
+
+    expect(await screen.findByRole('link', { name: 'GST guide' })).toHaveAttribute('href', '/content/12');
+    expect(screen.getByRole('link', { name: '(scheduled)' })).toHaveAttribute('href', '/publishing/deployments/31');
+  });
+});

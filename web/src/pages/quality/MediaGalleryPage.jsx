@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Upload, Images } from 'lucide-react';
 import { mediaGalleryService } from '../../services/mediaGalleryService';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
 import { formatDate } from '../../utils/formatDate';
+import { DrillLink } from '../../components/drill';
 
 /** category_tags arrives as a JSONB string from Postgres or an array once edited. */
 function assetTags(asset) {
@@ -41,6 +43,14 @@ function isRotationReady(asset) {
 function isRetiredMissing(asset) {
   return asset?.status === 'retired' && !!asset?.file_missing;
 }
+
+/** Gallery narrowings the page's counts open (?tab=gallery&show=…). */
+const SHOW_FILTERS = {
+  rotation_ready: { label: 'Rotation-ready', test: isRotationReady },
+  active: { label: 'Active', test: (a) => a?.status === 'active' },
+  retired: { label: 'Retired', test: (a) => a?.status === 'retired' },
+  untagged: { label: 'Untagged · never assigned', test: (a) => a?.status === 'active' && isUnmatchable(a) },
+};
 
 /** Alt text describes the asset; the stored prompt is a paragraph, not alt text. */
 function altFor(asset) {
@@ -100,7 +110,22 @@ export function MediaGalleryPage() {
   const [uploading, setUploading] = useState(false);
   const [tags, setTags] = useState('');
   const [stream, setStream] = useState('');
-  const [tab, setTab] = useState('deficit');
+  // Tab and gallery narrowing live in the URL: the counts above link to the
+  // covers they counted, and Back returns to where you were.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') || 'deficit';
+  const show = SHOW_FILTERS[searchParams.get('show')] ? searchParams.get('show') : '';
+  const setView = useCallback((patch, push = false) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      Object.entries(patch).forEach(([k, v]) => { if (v) next.set(k, v); else next.delete(k); });
+      if (next.get('tab') === 'deficit') next.delete('tab');
+      if (next.get('tab') !== 'gallery') next.delete('show');
+      return next;
+    }, { replace: !push });
+  }, [setSearchParams]);
+  const setTab = useCallback((id) => setView({ tab: id }), [setView]);
+  const showGallery = (filter) => () => setView({ tab: 'gallery', show: filter }, true);
   const [showRetiredMissing, setShowRetiredMissing] = useState(false);
   const fileRef = useRef(null);
 
@@ -208,8 +233,12 @@ export function MediaGalleryPage() {
           <h1>Cover Gallery</h1>
           <p className="text-sm text-muted">
             Covers shared across blog, knowledge base and community.
-            {' '}{rotationReady} of {activeAssets.length} active covers are rotation-ready
-            {assets.length > activeAssets.length ? `, ${assets.length - activeAssets.length} retired` : ''}.
+            {' '}<DrillLink onClick={rotationReady > 0 ? showGallery('rotation_ready') : undefined} label="Show rotation-ready covers">{rotationReady}</DrillLink>
+            {' '}of <DrillLink onClick={activeAssets.length > 0 ? showGallery('active') : undefined} label="Show active covers">{activeAssets.length}</DrillLink>
+            {' '}active covers are rotation-ready
+            {assets.length > activeAssets.length && (
+              <>, <DrillLink onClick={showGallery('retired')} label="Show retired covers">{assets.length - activeAssets.length} retired</DrillLink></>
+            )}.
           </p>
         </div>
       </div>
@@ -325,7 +354,7 @@ export function MediaGalleryPage() {
             )}
             {deficit.untagged > 0 && (
               <Alert variant="warning">
-                {deficit.untagged} active cover(s) have no tags or stream. Covers are assigned by topical
+                <DrillLink onClick={showGallery('untagged')} label="Show untagged covers">{deficit.untagged} active cover(s)</DrillLink> have no tags or stream. Covers are assigned by topical
                 relevance, so untagged ones are never picked — tag them on the Gallery tab to bring them
                 into rotation.
               </Alert>
@@ -370,10 +399,21 @@ export function MediaGalleryPage() {
           <Card title={`Gallery (${assets.length})`}>
             {(() => {
               const hiddenCount = assets.filter(isRetiredMissing).length;
-              const visibleAssets = showRetiredMissing ? assets : assets.filter((a) => !isRetiredMissing(a));
+              // The retired count in the header includes covers with no file.
+              const base = showRetiredMissing || show === 'retired' ? assets : assets.filter((a) => !isRetiredMissing(a));
+              const visibleAssets = show ? base.filter(SHOW_FILTERS[show].test) : base;
               return (
                 <>
-                  {hiddenCount > 0 && (
+                  {show && (
+                    <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+                      <button type="button" className="badge badge-secondary" onClick={() => setView({ show: '' })}
+                              aria-label={`Clear ${SHOW_FILTERS[show].label} filter`}>
+                        {SHOW_FILTERS[show].label} ✕
+                      </button>
+                      <span className="text-xs text-muted">{visibleAssets.length} of {assets.length} covers</span>
+                    </div>
+                  )}
+                  {hiddenCount > 0 && show !== 'retired' && (
                     <p className="text-sm text-muted" style={{ marginBottom: '0.75rem' }}>
                       {hiddenCount} retired cover{hiddenCount === 1 ? '' : 's'} with no file on disk{' '}
                       {showRetiredMissing ? 'shown below' : 'hidden'} — settled business, kept as a record only.
@@ -383,7 +423,9 @@ export function MediaGalleryPage() {
                       </button>
                     </p>
                   )}
-                  {visibleAssets.length === 0 ? (
+                  {visibleAssets.length === 0 && show ? (
+                    <p className="text-muted">No covers match this filter.</p>
+                  ) : visibleAssets.length === 0 ? (
                     <p className="text-muted">
                       No covers yet. Reach stocks the gallery hourly and generates a cover for any article no gallery cover fits.
                     </p>

@@ -13,6 +13,7 @@ import { Pagination } from '../../components/common/Pagination';
 import { ROUTES } from '../../constants/routes';
 import { isBlogLegacyCreateDisabled } from '../../constants/blogFeatureFlags';
 import { formatDateTime } from '../../utils/formatDate';
+import { useUrlFilter } from '../../components/drill';
 
 const STATUS_OPTIONS = ['', 'idea','draft','seo_review','internal_review','approved','scheduled','published','rejected','archived'];
 
@@ -21,8 +22,9 @@ export function BlogListPage() {
   const [total, setTotal]   = useState(0);
   const [page, setPage]     = useState(1);
   const [limit]             = useState(25);
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
+  // Filters in the URL so a count elsewhere can open e.g. ?status=draft.
+  const [status, setStatus] = useUrlFilter('status');
+  const [search, setSearch] = useUrlFilter('search');
   const [loading, setLoading]= useState(true);
   const [error, setError]   = useState(null);
   const [deletingId, setDeletingId] = useState(null);

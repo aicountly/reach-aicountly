@@ -5,6 +5,7 @@ import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { Card } from '../../../components/common/Card';
 import { formatDate, formatDateTime } from '../../../utils/formatDate';
+import { ROUTES } from '../../../constants/routes';
 
 const STATUS_LABELS = {
   planned: { label: 'Planned', className: 'badge badge--warning' },
@@ -68,7 +69,12 @@ export function ContentBasePage() {
                 return (
                   <tr key={entry.key}>
                     <td><code>{entry.key}</code></td>
-                    <td>{entry.title}</td>
+                    <td>
+                      {/* Once written, a topic opens the article it produced. */}
+                      {entry.sync?.content_item_id
+                        ? <Link to={ROUTES.CONTENT_DETAIL.replace(':id', entry.sync.content_item_id)}>{entry.title}</Link>
+                        : entry.title}
+                    </td>
                     <td>{entry.portfolio_stream}</td>
                     <td>{formatDate(entry.target_date)}</td>
                     <td><span className={status.className}>{status.label}</span></td>

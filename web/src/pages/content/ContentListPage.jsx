@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { contentService } from '../../services/contentService';
@@ -6,6 +6,7 @@ import { Card } from '../../components/common/Card';
 import { Alert } from '../../components/common/Alert';
 import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
+import { Pagination } from '../../components/common/Pagination';
 import { ContentStatusBadge } from '../../components/content/ContentStatusBadge';
 import { ContentTypeBadge } from '../../components/content/ContentTypeBadge';
 import { ContentRiskBadge } from '../../components/content/ContentRiskBadge';
@@ -26,21 +27,50 @@ const WORKFLOW_STATUSES = [
   'published', 'refresh_due', 'archived', 'rejected',
 ];
 
+const FILTER_KEYS = ['workflow_status', 'content_type', 'search', 'risk_level', 'approval_status', 'product_id', 'market_id'];
+
+// Params drill links can set that have no control on this page; shown as
+// removable chips so the viewer can see why the list is short.
+const CHIP_FILTERS = {
+  risk_level: 'Risk',
+  approval_status: 'Approval',
+  product_id: 'Product #',
+  market_id: 'Market #',
+};
+
 export function ContentListPage() {
   const [items, setItems]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
-  // Seeded from the URL so dashboard tiles can open the rows they counted
-  // (e.g. ?workflow_status=scheduled,ready_for_publication).
-  const [searchParams] = useSearchParams();
-  const [filters, setFilters]       = useState(() => {
-    const init = {};
-    ['workflow_status', 'content_type', 'search'].forEach((k) => {
-      const v = searchParams.get(k);
-      if (v) init[k] = v;
+  // Filters live in the URL so drill links from tiles elsewhere
+  // (e.g. ?workflow_status=scheduled,ready_for_publication) land on the rows
+  // they counted, and a later link to this page re-filters it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qs = searchParams.toString();
+  const filters = useMemo(() => {
+    const out = {};
+    FILTER_KEYS.forEach((k) => {
+      const v = new URLSearchParams(qs).get(k);
+      if (v) out[k] = v;
     });
-    return init;
+    return out;
+  }, [qs]);
+  const setFilter = useCallback((key, value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value); else next.delete(key);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const clearFilters = () => setSearchParams((prev) => {
+    const next = new URLSearchParams(prev);
+    FILTER_KEYS.forEach((k) => next.delete(k));
+    return next;
   });
+  // Paging belongs to one filter set: a new filter starts again at page 1.
+  const [paging, setPaging] = useState({ qs, page: 1 });
+  const page = paging.qs === qs ? paging.page : 1;
+  const [pager, setPager] = useState(null);
   const { has } = usePermission();
   const nav = useNavigate();
 
@@ -48,11 +78,12 @@ export function ContentListPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    contentService.listItems(filters)
-      .then((d) => setItems(d.items ?? d))
+    setError(null);
+    contentService.listItems(page > 1 ? { ...filters, page } : filters)
+      .then((d) => { setItems(d.items ?? d); setPager(d.pager ?? null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -88,7 +119,8 @@ export function ContentListPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <select
           value={filters.content_type || ''}
-          onChange={(e) => setFilters((f) => ({ ...f, content_type: e.target.value || undefined }))}
+          onChange={(e) => setFilter('content_type', e.target.value)}
+          aria-label="Content type"
           style={{ borderRadius: 4, border: '1px solid #e5e7eb', padding: '5px 10px', fontSize: 12 }}
         >
           <option value="">All types</option>
@@ -96,7 +128,8 @@ export function ContentListPage() {
         </select>
         <select
           value={filters.workflow_status || ''}
-          onChange={(e) => setFilters((f) => ({ ...f, workflow_status: e.target.value || undefined }))}
+          onChange={(e) => setFilter('workflow_status', e.target.value)}
+          aria-label="Workflow status"
           style={{ borderRadius: 4, border: '1px solid #e5e7eb', padding: '5px 10px', fontSize: 12 }}
         >
           <option value="">All statuses</option>
@@ -108,13 +141,27 @@ export function ContentListPage() {
         <input
           type="search"
           value={filters.search || ''}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value || undefined }))}
+          onChange={(e) => setFilter('search', e.target.value)}
           placeholder="Search title…"
           style={{ borderRadius: 4, border: '1px solid #e5e7eb', padding: '5px 10px', fontSize: 12 }}
         />
-        <button className="btn btn-ghost btn-sm" onClick={() => setFilters({})}>Clear</button>
+        <button className="btn btn-ghost btn-sm" onClick={clearFilters}>Clear</button>
       </div>
 
+      {Object.keys(CHIP_FILTERS).some((k) => filters[k]) && (
+        <div className="flex items-center gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+          {Object.entries(CHIP_FILTERS).filter(([k]) => filters[k]).map(([k, label]) => (
+            <button key={k} type="button" className="badge badge-secondary" onClick={() => setFilter(k, '')}
+                    aria-label={`Clear ${label.replace(' #', '')} filter`}>
+              {label.endsWith('#') ? `${label}${filters[k]}` : `${label}: ${filters[k].replace(/_/g, ' ')}`} ✕
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pager && !loading && Object.keys(filters).length > 0 && (
+        <p className="text-xs text-muted" style={{ marginBottom: 8 }}>{pager.total} matching item{pager.total === 1 ? '' : 's'}</p>
+      )}
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
         <Card padding={false}>
@@ -125,6 +172,14 @@ export function ContentListPage() {
             emptyMessage="No content items found."
           />
         </Card>
+      )}
+      {pager && (
+        <Pagination
+          page={page}
+          limit={pager.perPage}
+          total={pager.total}
+          onPage={(p) => setPaging({ qs, page: p })}
+        />
       )}
     </div>
   );

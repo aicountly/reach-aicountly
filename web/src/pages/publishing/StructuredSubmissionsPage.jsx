@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDateTime } from '../../utils/formatDate';
+import { useUrlFilter } from '../../components/drill';
 
 const STATUS_LABELS = {
   pending_vetting: 'Pending vetting',
@@ -91,7 +92,8 @@ export default function StructuredSubmissionsPage({ kind }) {
   const cfg = KINDS[kind];
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState('');
+  // In the URL so a failure count elsewhere can open ?status=failed.
+  const [status, setStatus] = useUrlFilter('status');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -143,6 +145,9 @@ export default function StructuredSubmissionsPage({ kind }) {
         <label>
           <span className="text-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>Status</span>
           <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            {status && !STATUS_FILTERS.some((f) => f.key === status) && (
+              <option value={status}>{STATUS_LABELS[status] ?? status}</option>
+            )}
             {STATUS_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </label>

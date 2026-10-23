@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithAuth } from '../../../../test/renderWithAuth';
 
 const mocks = {
@@ -220,5 +220,62 @@ describe('RoadmapOptimizerPage', () => {
       expect(screen.getByText('REQUIRE_HUMAN_REVIEW')).toBeInTheDocument();
     });
     expect(screen.getByText('Human review')).toBeInTheDocument();
+  });
+});
+
+describe('Roadmap drill-down', () => {
+
+  it('candidates read status and stream from the URL and link written topics', async () => {
+    mocks.getRoadmapCandidates.mockResolvedValue({
+      items: [{ id: 3, title: 'Written topic', portfolio_stream: 'product', status: 'roadmap_selected', content_item_id: 55 }],
+      total: 1,
+    });
+    renderWithAuth(<RoadmapCandidatesPage />, { ...ctx, route: '/blog-command-centre/roadmap/candidates?status=roadmap_selected&portfolio_stream=product' });
+
+    await waitFor(() => expect(mocks.getRoadmapCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'roadmap_selected', portfolio_stream: 'product' }),
+    ));
+    expect(await screen.findByRole('link', { name: 'Article #55' })).toHaveAttribute('href', '/content/55');
+  });
+
+  it('scored topics narrow to one run date from the URL', async () => {
+    mocks.getRoadmapScored.mockResolvedValue({ items: [], total: 0 });
+    renderWithAuth(<RoadmapScoredPage />, { ...ctx, route: '/blog-command-centre/roadmap/scored?scored_for_date=2026-10-22' });
+
+    await waitFor(() => expect(mocks.getRoadmapScored).toHaveBeenCalledWith(
+      expect.objectContaining({ scored_for_date: '2026-10-22' }),
+    ));
+    expect(await screen.findByRole('button', { name: /clear scored-for date filter/i })).toBeInTheDocument();
+  });
+
+  it('run counts open the scores and decisions they counted', async () => {
+    mocks.getOptimizerRuns.mockResolvedValue({
+      items: [{ id: 9, run_for_date: '2026-10-22', status: 'completed', candidates_scored: 12, decisions_created: 4, work_blocks_created: 0 }],
+    });
+    mocks.getRoadmapDecisions.mockResolvedValue({ items: [], total: 0 });
+    mocks.getScoringWeights.mockResolvedValue({});
+    renderWithAuth(<RoadmapOptimizerPage />, { ...ctx, route: '/blog-command-centre/roadmap/optimizer' });
+
+    expect(await screen.findByRole('link', { name: /topics scored on/i }))
+      .toHaveAttribute('href', '/blog-command-centre/roadmap/scored?scored_for_date=2026-10-22');
+    // Zero work blocks is not a link.
+    expect(screen.queryByRole('button', { name: /queued a work block/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /decisions from the run/i }));
+    await waitFor(() => expect(mocks.getRoadmapDecisions).toHaveBeenLastCalledWith({ run_id: '9' }));
+    expect(screen.getByRole('navigation', { name: /drill-down path/i })).toHaveTextContent('Run: #9');
+  });
+
+  it('decision rows open the article they produced', async () => {
+    mocks.getOptimizerRuns.mockResolvedValue({ items: [] });
+    mocks.getScoringWeights.mockResolvedValue({});
+    mocks.getRoadmapDecisions.mockResolvedValue({
+      items: [{ id: 1, title: 'GST topic', decision: 'CREATE_NEW', content_item_id: 77, decided_for_date: '2026-10-22' }],
+      total: 1,
+    });
+    renderWithAuth(<RoadmapOptimizerPage />, { ...ctx, route: '/blog-command-centre/roadmap/optimizer?run_id=9' });
+
+    await waitFor(() => expect(mocks.getRoadmapDecisions).toHaveBeenCalledWith({ run_id: '9' }));
+    expect(await screen.findByRole('link', { name: 'GST topic' })).toHaveAttribute('href', '/content/77');
   });
 });

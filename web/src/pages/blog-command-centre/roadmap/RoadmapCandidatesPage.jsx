@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { blogCommandCentreService } from '../../../services/blogCommandCentreService';
 import { Loader } from '../../../components/common/Loader';
 import { Alert } from '../../../components/common/Alert';
 import { RoadmapEmptyState, TrendCell } from './roadmapShared';
 import { formatScore } from './roadmapFormat';
 import { formatDate } from '../../../utils/formatDate';
+import { ROUTES } from '../../../constants/routes';
+import { useUrlFilter } from '../../../components/drill';
+import { Pagination } from '../../../components/common/Pagination';
+
+const PAGE_SIZE = 25;
+const articleHref = (id) => ROUTES.CONTENT_DETAIL.replace(':id', id);
 
 const STATUS_OPTIONS = ['', 'candidate', 'scored', 'roadmap_selected', 'rejected'];
 
@@ -14,7 +21,13 @@ function isTrue(value) {
 }
 
 function writerCell(row) {
-  if (row.content_item_id) return `Article #${row.content_item_id}`;
+  if (row.content_item_id) {
+    return (
+      <Link to={articleHref(row.content_item_id)} onClick={(e) => e.stopPropagation()}>
+        Article #{row.content_item_id}
+      </Link>
+    );
+  }
   if (row.status === 'roadmap_selected') return 'In the blog routine queue';
   return '—';
 }
@@ -23,14 +36,21 @@ const STREAM_OPTIONS = ['', 'marketing', 'product', 'problem_to_product'];
 export function RoadmapCandidatesPage() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState('');
-  const [stream, setStream] = useState('');
+  // In the URL so plan tiles (?status=roadmap_selected) land on their rows.
+  const [status, setStatus] = useUrlFilter('status');
+  const [stream, setStream] = useUrlFilter('portfolio_stream');
+  // Paging belongs to one filter set; a new filter starts again at page 1.
+  const filterKey = `${status}|${stream}`;
+  const [paging, setPaging] = useState({ key: filterKey, page: 1 });
+  const page = paging.key === filterKey ? paging.page : 1;
+  const nav = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = {};
+    const params = { limit: PAGE_SIZE };
+    if (page > 1) params.page = page;
     if (status) params.status = status;
     if (stream) params.portfolio_stream = stream;
 
@@ -46,7 +66,7 @@ export function RoadmapCandidatesPage() {
         setTotal(0);
       })
       .finally(() => setLoading(false));
-  }, [status, stream]);
+  }, [status, stream, page]);
 
   useEffect(load, [load]);
 
@@ -59,6 +79,7 @@ export function RoadmapCandidatesPage() {
             {STATUS_OPTIONS.map((option) => (
               <option key={option || 'all'} value={option}>{option || 'All statuses'}</option>
             ))}
+            {status && !STATUS_OPTIONS.includes(status) && <option value={status}>{status}</option>}
           </select>
         </label>
         <label>
@@ -67,6 +88,7 @@ export function RoadmapCandidatesPage() {
             {STREAM_OPTIONS.map((option) => (
               <option key={option || 'all'} value={option}>{option ? option.replace(/_/g, ' ') : 'All streams'}</option>
             ))}
+            {stream && !STREAM_OPTIONS.includes(stream) && <option value={stream}>{stream.replace(/_/g, ' ')}</option>}
           </select>
         </label>
         <button type="button" className="btn btn--secondary" onClick={load}>Refresh</button>
@@ -75,10 +97,17 @@ export function RoadmapCandidatesPage() {
       {error && <Alert variant="error">{error}</Alert>}
 
       {loading ? <Loader label="Loading candidates…" /> : items.length === 0 ? (
-        <RoadmapEmptyState
-          title="No topic candidates yet"
-          detail="Candidates appear once discovery work blocks run, or when an editor adds them manually."
-        />
+        status || stream ? (
+          <RoadmapEmptyState
+            title="No topic candidates match this filter"
+            detail="Clear the status or stream filter to see every candidate."
+          />
+        ) : (
+          <RoadmapEmptyState
+            title="No topic candidates yet"
+            detail="Candidates appear once discovery work blocks run, or when an editor adds them manually."
+          />
+        )
       ) : (
         <>
           <p className="text-muted">
@@ -101,7 +130,12 @@ export function RoadmapCandidatesPage() {
             </thead>
             <tbody>
               {items.map((row) => (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  // A candidate the routine has written opens its article.
+                  className={row.content_item_id ? 'is-drillable' : undefined}
+                  onClick={row.content_item_id ? () => nav(articleHref(row.content_item_id)) : undefined}
+                >
                   <td>
                     {row.title}
                     {isTrue(row.is_human_pinned) && <span className="badge badge--info" style={{ marginLeft: '0.5rem' }}>Pinned</span>}
@@ -118,6 +152,7 @@ export function RoadmapCandidatesPage() {
               ))}
             </tbody>
           </table>
+          <Pagination page={page} limit={PAGE_SIZE} total={total} onPage={(p) => setPaging({ key: filterKey, page: p })} />
         </>
       )}
     </div>

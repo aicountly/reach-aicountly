@@ -108,3 +108,13 @@ describe('Publishing navigation', () => {
     expect(screen.getByText('Workflow guides').closest('a')).toHaveAttribute('href', '/publishing/workflow-guides');
   });
 });
+
+describe('Structured submissions deep links', () => {
+  it('applies ?status from the URL to the query and the filter control', async () => {
+    api.get.mockResolvedValue({ items: [failed], total: 1 });
+    renderWithAuth(<ReleaseNotesPublishingPage />, { ...publisher, route: '/publishing/release-notes?status=failed' });
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('v1/publishing/release-notes', { status: 'failed' }));
+    expect(screen.getByLabelText('Status')).toHaveValue('failed');
+  });
+});

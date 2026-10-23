@@ -443,9 +443,18 @@ class BlogCommandCentreController extends BaseApiController
         }
 
         $builder = $db->table('reach_topic_scores ts')
-            ->select('ts.*, tc.title, tc.portfolio_stream, tc.status AS candidate_status')
-            ->join('reach_topic_candidates tc', 'tc.id = ts.topic_candidate_id', 'inner')
-            ->where('ts.is_current', true);
+            ->select('ts.*, tc.title, tc.portfolio_stream, tc.status AS candidate_status, tc.content_item_id')
+            ->join('reach_topic_candidates tc', 'tc.id = ts.topic_candidate_id', 'inner');
+
+        // An optimiser run's "Scored" count is the scores it wrote for its
+        // date — later runs may have superseded them, so this view is not
+        // limited to the current score.
+        $scoredFor = trim((string) $this->request->getGet('scored_for_date'));
+        if ($scoredFor !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $scoredFor) === 1) {
+            $builder->where('ts.scored_for_date', $scoredFor);
+        } else {
+            $builder->where('ts.is_current', true);
+        }
 
         $total = $builder->countAllResults(false);
         $rows  = $builder->orderBy('ts.total_score', 'DESC')
@@ -472,6 +481,15 @@ class BlogCommandCentreController extends BaseApiController
 
         if ($decision !== '') {
             $builder->where('rd.decision', $decision);
+        }
+        // One optimiser run's decisions (its "Decisions" count) and the ones
+        // that queued a work block (its "Work blocks" count).
+        $runId = (int) $this->request->getGet('run_id');
+        if ($runId > 0) {
+            $builder->where('rd.optimizer_run_id', $runId);
+        }
+        if ((string) $this->request->getGet('has_work_block') === '1') {
+            $builder->where('rd.work_block_id IS NOT NULL', null, false);
         }
 
         $total = $builder->countAllResults(false);

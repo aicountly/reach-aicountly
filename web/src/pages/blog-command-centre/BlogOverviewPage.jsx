@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { blogCommandCentreService } from '../../services/blogCommandCentreService';
 import { ROUTES } from '../../constants/routes';
+import { DrillLink, drillHref } from '../../components/drill';
 import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { formatDate, toDate, toDateInputValue, todayInputValue } from '../../utils/formatDate';
@@ -18,9 +19,27 @@ function badgeVariant(status) {
   return 'muted';
 }
 
-function metric(label, value) {
-  return { label, value: value === null || value === undefined ? '—' : String(value) };
+/**
+ * `to` is where the number's records are listed. It is dropped for a zero or
+ * a missing value — a drill into an empty set reads as a broken count.
+ */
+function metric(label, value, to) {
+  const shown = value === null || value === undefined ? '—' : String(value);
+  return { label, value: shown, to: Number(value) > 0 ? to : undefined };
 }
+
+// The workflow stages each Production metric adds up; its link lists the same
+// stages so the list length matches the number.
+const BRIEF_STAGES = ['idea', 'roadmap_planned', 'brief_draft', 'brief_ready', 'outline_draft', 'outline_ready'];
+const DRAFT_STAGES = ['draft', 'draft_generating', 'fact_verifying', 'fact_verified'];
+const REVIEW_STAGES = ['seo_review', 'internal_review', 'changes_requested'];
+const IN_FLIGHT_DEPLOYMENTS = 'queued,sending,accepted,scheduled,verification_pending';
+
+const sumOf = (counts, stages) => stages.reduce((n, s) => n + (counts[s] ?? 0), 0);
+const blogStages = (path, stages) => drillHref(path, { workflow_status: stages.join(',') });
+const blogContent = (status) => drillHref(ROUTES.CONTENT, { content_type: 'blog', workflow_status: status });
+// Deployment counts are blog-only (BlogCommandCentreController::publishingSummary).
+const blogDeployments = (status) => drillHref(ROUTES.BCC_PUBLISHING_DEPLOYMENTS, { status, content_type: 'blog' });
 
 function countProviders(map) {
   const entries = Object.entries(map ?? {});
@@ -80,9 +99,7 @@ function publishingDetail(publishing) {
 }
 
 function publishingLink(publishing) {
-  return (publishing.failed ?? 0) > 0
-    ? `${ROUTES.BCC_PUBLISHING_DEPLOYMENTS}?status=failed,blocked`
-    : ROUTES.BCC_PUBLISHING_DEPLOYMENTS;
+  return blogDeployments((publishing.failed ?? 0) > 0 ? 'failed,blocked' : '');
 }
 
 /**
@@ -98,13 +115,9 @@ function buildCards(data) {
   const providers = data.ai_providers ?? {};
   const optimizer = data.optimizer ?? {};
 
-  const briefStage = (workflow.brief_draft ?? 0) + (workflow.brief_ready ?? 0)
-    + (workflow.outline_draft ?? 0) + (workflow.outline_ready ?? 0)
-    + (workflow.idea ?? 0) + (workflow.roadmap_planned ?? 0);
-  const draftStage = (workflow.draft ?? 0) + (workflow.draft_generating ?? 0)
-    + (workflow.fact_verifying ?? 0) + (workflow.fact_verified ?? 0);
-  const reviewStage = (workflow.seo_review ?? 0) + (workflow.internal_review ?? 0)
-    + (workflow.changes_requested ?? 0);
+  const briefStage = sumOf(workflow, BRIEF_STAGES);
+  const draftStage = sumOf(workflow, DRAFT_STAGES);
+  const reviewStage = sumOf(workflow, REVIEW_STAGES);
   const inProduction = briefStage + draftStage + reviewStage;
   const blogTotal = data.content?.blog_total ?? 0;
   const textProviders = countProviders(providers.text);
@@ -131,9 +144,9 @@ function buildCards(data) {
         ? `Nothing in production — all ${blogTotal} blog item${blogTotal === 1 ? '' : 's'} are past this stage.`
         : null,
       metrics: [
-        metric('briefs/outlines', briefStage),
-        metric('drafts', draftStage),
-        metric('awaiting review', reviewStage),
+        metric('briefs/outlines', briefStage, blogStages(ROUTES.BCC_PIPELINE_BRIEFS, BRIEF_STAGES)),
+        metric('drafts', draftStage, blogStages(ROUTES.BCC_PIPELINE_DRAFTS, DRAFT_STAGES)),
+        metric('awaiting review', reviewStage, blogStages(ROUTES.BCC_PIPELINE_EDITORIAL, REVIEW_STAGES)),
       ],
     },
     {
@@ -151,8 +164,10 @@ function buildCards(data) {
         // Passed as an argument rather than rendered in JSX, which is how it
         // escaped the dd-mm-yyyy sweep and kept showing the raw API date.
         metric('last run', formatDate(lastRun?.run_for_date)),
-        metric('scored', lastRun?.candidates_scored),
-        metric('decisions', lastRun?.decisions_created),
+        metric('scored', lastRun?.candidates_scored,
+          drillHref(ROUTES.BCC_ROADMAP_SCORED, { scored_for_date: toDateInputValue(lastRun?.run_for_date) })),
+        metric('decisions', lastRun?.decisions_created,
+          drillHref(ROUTES.BCC_ROADMAP_OPTIMIZER, { run_id: lastRun?.id })),
       ],
     },
     {
@@ -162,8 +177,8 @@ function buildCards(data) {
       link: ROUTES.BCC_VERIFICATION,
       status: providers.verification_enabled ? 'OK' : 'DISABLED',
       metrics: [
-        metric('approved', workflow.approved ?? 0),
-        metric('rejected', workflow.rejected ?? 0),
+        metric('approved', workflow.approved ?? 0, blogContent('approved')),
+        metric('rejected', workflow.rejected ?? 0, blogContent('rejected')),
         metric('verification', providers.verification_enabled ? 'on' : 'off'),
       ],
     },
@@ -178,9 +193,9 @@ function buildCards(data) {
       status: publishingStatus(publishing),
       detail: publishingDetail(publishing),
       metrics: [
-        metric('in flight', publishing.in_flight ?? publishing.queued ?? 0),
-        metric('published', publishing.published ?? 0),
-        metric('failed', publishing.failed ?? 0),
+        metric('in flight', publishing.in_flight ?? publishing.queued ?? 0, blogDeployments(IN_FLIGHT_DEPLOYMENTS)),
+        metric('published', publishing.published ?? 0, blogDeployments('published')),
+        metric('failed', publishing.failed ?? 0, blogDeployments('failed,blocked')),
       ],
     },
     {
@@ -195,7 +210,7 @@ function buildCards(data) {
       // never showed whether data was actually flowing.
       metrics: [
         metric('property', searchConsole.site_property),
-        metric('facts (28d)', searchConsole.facts_28d ?? 0),
+        metric('facts (28d)', searchConsole.facts_28d ?? 0, ROUTES.BLOG_SEO_SEARCH),
         metric('freshest day', searchConsole.latest_metric_date),
       ],
     },
@@ -246,22 +261,24 @@ export function BlogOverviewPage() {
 
       <div className="bcc-cards">
         {cards.map(({ key, title, icon: CardIcon, link, status, detail, metrics }) => (
-          <Link key={key} to={link} className="bcc-card card" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div className="bcc-card__header">
+          // The card is no longer one big link: each count opens its own
+          // records, and links cannot nest. The title opens the section.
+          <div key={key} className="bcc-card card">
+            <Link to={link} className="bcc-card__header" style={{ textDecoration: 'none', color: 'inherit' }}>
               <CardIcon size={18} aria-hidden="true" />
               <h3>{title}</h3>
               <span className={`badge badge--${badgeVariant(status)}`}>{status}</span>
-            </div>
+            </Link>
             <dl className="definition-list">
-              {metrics.map(({ label, value }) => (
+              {metrics.map(({ label, value, to }) => (
                 <div key={label} className="bcc-card__metric">
                   <dt>{label}</dt>
-                  <dd>{value}</dd>
+                  <dd><DrillLink to={to} label={to ? `${title}: ${value} ${label}` : undefined}>{value}</DrillLink></dd>
                 </div>
               ))}
             </dl>
             {detail && <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>{detail}</p>}
-          </Link>
+          </div>
         ))}
       </div>
     </div>
