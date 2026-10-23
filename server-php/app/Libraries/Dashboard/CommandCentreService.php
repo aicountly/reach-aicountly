@@ -209,102 +209,25 @@ final class CommandCentreService
     // ─────────────────────────────────────────────────────────── activity
 
     /**
-     * What the bot did: one normalised feed over every automated output,
-     * newest first, with 24 h / 7 d / 30 d counters per kind.
+     * What the bot did: 24 h / 7 d / 30 d counters per kind, and the newest
+     * items across every kind. Counters and items come from
+     * CommandCentreActivity, which also serves the per-tile drill-down
+     * (`GET v1/dashboard/command-centre/activity`) from the same scope, so a
+     * tile and its list always agree.
      *
      * @return array<string, mixed>
      */
     private function activity(): array
     {
-        $sources = $this->activitySources();
-        $events  = [];
-        $counts  = [];
-
-        foreach ($sources as $kind => $src) {
-            [$table, $atCol, $where, $select, $label] = $src;
-            if (! SchemaGuard::hasTable($this->db, $table)) {
-                continue;
-            }
-            $c = $this->db->query(
-                "SELECT COUNT(*) FILTER (WHERE {$atCol} >= NOW() - INTERVAL '24 hours') AS d1,
-                        COUNT(*) FILTER (WHERE {$atCol} >= NOW() - INTERVAL '7 days') AS d7,
-                        COUNT(*) AS d30
-                   FROM {$table} WHERE {$where} AND {$atCol} >= NOW() - INTERVAL '30 days'"
-            )->getRowArray();
-            $counts[$kind] = ['label' => $label, 'h24' => (int) $c['d1'], 'd7' => (int) $c['d7'], 'd30' => (int) $c['d30']];
-
-            $rows = $this->db->query(
-                "SELECT {$select}, {$atCol} AS at FROM {$table}
-                  WHERE {$where} AND {$atCol} >= NOW() - INTERVAL '30 days'
-                  ORDER BY {$atCol} DESC LIMIT 25"
-            )->getResultArray();
-            foreach ($rows as $r) {
-                $events[] = [
-                    'kind'   => $kind,
-                    'label'  => $label,
-                    'title'  => (string) ($r['title'] ?? '') !== '' ? (string) $r['title'] : '(untitled)',
-                    'detail' => isset($r['detail']) && $r['detail'] !== '' ? mb_substr((string) $r['detail'], 0, 240) : null,
-                    'at'     => $r['at'],
-                    'link'   => $r['link'] ?? null,
-                    'external' => isset($r['link']) && is_string($r['link']) && str_starts_with($r['link'], 'http'),
-                    'tone'   => in_array($kind, ['vetting_rejected', 'job_failed'], true) ? 'negative' : 'positive',
-                ];
-            }
-        }
-
-        usort($events, static fn (array $a, array $b): int => strcmp((string) $b['at'], (string) $a['at']));
-
-        $total30 = array_sum(array_column($counts, 'd30'));
+        $activity = new CommandCentreActivity($this->db);
+        $counts   = $activity->counters();
+        $total30  = array_sum(array_column($counts, 'd30'));
 
         return [
             'status'   => $total30 === 0 ? 'empty' : 'ok',
             'note'     => $total30 === 0 ? 'Nothing automated has been recorded in the last 30 days yet.' : null,
             'counters' => $counts,
-            'events'   => array_slice($events, 0, 80),
-        ];
-    }
-
-    /**
-     * kind => [table, timestamp column, filter, select list (title, detail, link), label]
-     *
-     * @return array<string, array{0:string,1:string,2:string,3:string,4:string}>
-     */
-    private function activitySources(): array
-    {
-        return [
-            'blog_published' => ['reach_content_items', 'published_at',
-                "content_type = 'blog' AND workflow_status IN ('published','live','verification_pending') AND deleted_at IS NULL AND published_at IS NOT NULL",
-                "title, NULL AS detail, '/content/' || id AS link", 'Blog published'],
-            'kb_published' => ['reach_content_items', 'published_at',
-                "content_type = 'knowledge_base' AND workflow_status IN ('published','live','verification_pending') AND deleted_at IS NULL AND published_at IS NOT NULL",
-                "title, NULL AS detail, '/content/' || id AS link", 'Help article published'],
-            'release_note_published' => ['reach_structured_content_submissions', 'published_at',
-                "content_type = 'release_note' AND status = 'published' AND published_at IS NOT NULL",
-                'title, product_slug AS detail, public_url AS link', 'Release note published'],
-            'workflow_guide_published' => ['reach_structured_content_submissions', 'published_at',
-                "content_type = 'workflow_guide' AND status = 'published' AND published_at IS NOT NULL",
-                'title, product_slug AS detail, public_url AS link', 'Workflow guide published'],
-            'community_answer_published' => ['reach_community_automation_submissions', 'published_at',
-                "status = 'published' AND published_at IS NOT NULL",
-                'question_title AS title, category_slug AS detail, public_url AS link', 'Community answer published'],
-            'video_published' => ['reach_video_pipeline_items', 'published_at',
-                'published_at IS NOT NULL',
-                "title, format AS detail, youtube_url AS link", 'Video published'],
-            'social_posted' => ['reach_social_posts', 'published_at',
-                "status = 'posted' AND published_at IS NOT NULL",
-                "COALESCE(NULLIF(title, ''), LEFT(content, 90)) AS title, channel AS detail, remote_url AS link", 'Social post'],
-            'campaign_sent' => ['reach_campaign_dispatches', 'completed_at',
-                "status IN ('completed','partially_completed') AND completed_at IS NOT NULL",
-                "channel || ' dispatch #' || id AS title, sent_count || ' sent, ' || failed_count || ' failed' AS detail, '/campaigns' AS link", 'Campaign sent'],
-            'cover_generated' => ['reach_routine_submissions', 'updated_at',
-                "cover_status = 'generated' AND cover_url IS NOT NULL",
-                "content_type || ' cover' AS title, cover_alt AS detail, cover_url AS link", 'Cover generated'],
-            'vetting_rejected' => ['reach_ai_vetting_runs', 'created_at',
-                "decision = 'reject'",
-                "content_type || ' ' || COALESCE(content_ref, '') AS title, reasons_json::text AS detail, NULL AS link", 'Rejected by vetting'],
-            'job_failed' => ['reach_jobs', 'completed_at',
-                "status = 'dead_letter' AND completed_at IS NOT NULL",
-                "job_type AS title, error_message AS detail, '/admin/jobs?status=dead_letter,failed&job_type=' || job_type AS link", 'Job failed'],
+            'events'   => $total30 === 0 ? [] : $activity->items('', CommandCentreActivity::WINDOWS['30d'], 80),
         ];
     }
 
