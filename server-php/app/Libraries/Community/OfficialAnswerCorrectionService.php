@@ -21,6 +21,9 @@ class OfficialAnswerCorrectionService
 
     /**
      * Start a correction: create new version, invalidate approval.
+     *
+     * $generationRefs records who wrote the corrected text (model_route,
+     * prompt_version), as for any generated version.
      */
     public function startCorrection(
         int    $answerId,
@@ -28,7 +31,8 @@ class OfficialAnswerCorrectionService
         string $correctedExcerpt,
         string $correctionNote,
         array  $sources  = [],
-        ?int   $actorId  = null
+        ?int   $actorId  = null,
+        array  $generationRefs = []
     ): array {
         $answer = $this->answerRepo->findById($answerId);
         if ($answer === null) {
@@ -45,7 +49,7 @@ class OfficialAnswerCorrectionService
             $correctedExcerpt,
             $sources,
             'correction',
-            [],
+            $generationRefs,
             [],
             [],
             $actorId

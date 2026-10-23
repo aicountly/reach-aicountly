@@ -117,9 +117,11 @@ class CommunityInboxAutomationService
     // -------------------------------------------------------------------------
 
     /**
-     * Questions waiting for the routine's answer: members' first, then the
-     * highest triage score, then the oldest. One per normalised title, so the
-     * routine never answers the same question twice in a run.
+     * Questions waiting for the routine's answer: re-answers of live answers
+     * that re-vetting found wrong first (`reanswer: true`, no quota;
+     * CommunityReanswerQueue), then members' questions, then the highest
+     * triage score, then the oldest. One per normalised title, so the routine
+     * never answers the same question twice in a run.
      *
      * @return list<array<string, mixed>>
      */
@@ -129,6 +131,16 @@ class CommunityInboxAutomationService
             $this->sweep(false);
         }
         $limit = max(1, min(100, $limit));
+
+        $out  = [];
+        $seen = [];
+        foreach ((new CommunityReanswerQueue($this->db, $this->answers))->forRoutine($limit) as $item) {
+            $seen[CommunityQaAutomationService::normaliseTitle((string) $item['title'])] = true;
+            $out[] = $item;
+        }
+        if (count($out) >= $limit) {
+            return $out;
+        }
 
         $rows = $this->db->query(
             "SELECT q.id, q.uuid, q.title, q.body, q.category, q.product, q.source_type, q.intake_timestamp,
@@ -164,8 +176,6 @@ class CommunityInboxAutomationService
             [CommunityInboxPolicy::MAX_ROUTINE_ATTEMPTS, $limit * 3]
         )->getResultArray();
 
-        $out  = [];
-        $seen = [];
         foreach ($rows as $row) {
             $key = CommunityQaAutomationService::normaliseTitle((string) $row['title']);
             if (isset($seen[$key])) {
@@ -187,6 +197,7 @@ class CommunityInboxAutomationService
                 'risk'              => $row['risk'],
                 'screened'          => $row['triage_decision'] !== null,
                 'previous_attempts' => (int) $row['previous_attempts'],
+                'reanswer'          => false,
                 'answer_endpoint'   => 'POST /v1/automation/community/pending/' . $row['uuid'] . '/answer',
             ];
             if (count($out) >= $limit) {
@@ -441,7 +452,8 @@ class CommunityInboxAutomationService
                 if ($decision['note'] === CommunityInboxPolicy::QUEUED_NOTE && $row['routine_queued_at'] !== null
                     && ($row['handled_by'] ?? null) === CommunityInboxPolicy::QUEUE
                     && (str_contains((string) $row['handling_note'], 'archived after')
-                        || str_contains((string) $row['handling_note'], 'Edited by the member'))
+                        || str_contains((string) $row['handling_note'], 'Edited by the member')
+                        || str_starts_with((string) $row['handling_note'], 'Re-answer'))
                 ) {
                     break;
                 }

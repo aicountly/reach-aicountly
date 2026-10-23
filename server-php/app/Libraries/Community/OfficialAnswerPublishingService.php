@@ -380,9 +380,17 @@ class OfficialAnswerPublishingService
         $result      = $this->publisher->unpublishAnswer($answer['uuid'], $envelope);
 
         if ($result['success'] ?? false) {
+            // published → unpublishing → unpublished: there is no direct
+            // transition, and the direct one used to throw here AFTER the
+            // public site had already taken the answer down.
             $this->answerRepo->transitionStatus(
                 $answerId,
                 CommunityAnswerStatus::Published,
+                CommunityAnswerStatus::Unpublishing
+            );
+            $this->answerRepo->transitionStatus(
+                $answerId,
+                CommunityAnswerStatus::Unpublishing,
                 CommunityAnswerStatus::Unpublished
             );
             $this->answerRepo->save(['id' => $answerId, 'publication_status' => 'unpublished']);

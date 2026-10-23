@@ -11,6 +11,7 @@ use App\Libraries\AuditLogger;
 use App\Libraries\Automation\Routine\RoutineSubmissions;
 use App\Libraries\Automation\Routine\RoutineVetting;
 use App\Libraries\Blog\BlogContentApprovalService;
+use App\Libraries\Community\Automation\CommunityAnswerRepairService;
 use App\Libraries\Content\ContentQualityHeuristics;
 use App\Libraries\Publishing\Jobs\PublicationRollbackService;
 use CodeIgniter\Database\BaseConnection;
@@ -37,8 +38,37 @@ use Config\Database;
  *                          stays reserved in the receiver's registry and in
  *                          Reach), then blog/KB queued for regeneration and
  *                          republished at the same URL by the routine.
- *   live, revise / pass  → recorded only (a revise is listed for the owner).
+ *   live, revise→approve → the corrected text Gemini approved is applied by
+ *                          LiveRevisionApplier: a new current version,
+ *                          approved under the SystemApprover, republished
+ *                          through the publisher at the SAME slug and public
+ *                          record (`revision_applied+republish_queued`). A
+ *                          title that drifts from the topic is not taken; the
+ *                          slug never changes; nothing is taken down. An error
+ *                          rolls back and reads `revision_failed` (reason in
+ *                          the reasons and the log).
+ *   live, other revise   → listed for the owner (`flagged_for_owner`): an
+ *                          unresolved revise, no changed text, a HIGH_RISK
+ *                          verdict, a release note / workflow guide.
+ *   live, pass           → recorded only.
  *   vetting unavailable  → nothing changes; listed as unavailable.
+ *
+ * Live community answers (--community, and the daily sweep), through
+ * CommunityAnswerRepairService and the community automation chain:
+ *
+ *   Gemini REJECT        → unpublished on aicountly.com and marked withdrawn in
+ *                          Reach (reversible), then queued for the
+ *                          reach-community-qa routine as a priority re-answer
+ *                          (no quota); the new answer is a correction of the
+ *                          same answer, republished at the same URL.
+ *   revise with text     → the revised answer is published as a correction
+ *                          version (vet → SystemApprover → publish → verify);
+ *                          the current text stays live until then.
+ *   revise without text  → left live and queued for a re-answer.
+ *   already being fixed  → not vetted again (`none`, with the reason).
+ *
+ * A revise never takes an answer down; risk tier 4 is never re-published.
+ * Every row of a dry run carries `would` — the step a real run takes.
  *
  * Heuristic flags alone never retire or unpublish anything.
  */
@@ -52,19 +82,29 @@ class ContentRevetService
     /** @var (callable(int $deploymentId, string $reason): bool)|null */
     private $unpublisher;
 
+    private ?LiveRevisionApplier $revisions;
+    /** What the live-revision branch did, for the report row and the check log. */
+    private ?string $revisionNote = null;
+    private ?CommunityAnswerRepairService $communityRepair;
+
     public function __construct(
         private readonly ?ContentVettingService $vetting = null,
         ?BaseConnection $db = null,
         ?callable $unpublisher = null,
+        ?LiveRevisionApplier $revisions = null,
+        ?CommunityAnswerRepairService $communityRepair = null,
     ) {
-        $this->db          = $db ?? Database::connect();
-        $this->log         = new QualityCheckLog($this->db);
-        $this->unpublisher = $unpublisher;
+        $this->db              = $db ?? Database::connect();
+        $this->log             = new QualityCheckLog($this->db);
+        $this->unpublisher     = $unpublisher;
+        $this->revisions       = $revisions;
+        $this->communityRepair = $communityRepair;
     }
 
     /**
      * @param array{types?: list<string>, scope?: string, dry_run?: bool, heuristics_only?: bool,
-     *              since?: ?string, ids?: list<int>, limit?: int, trigger?: string, community?: bool} $options
+     *              since?: ?string, ids?: list<int>, limit?: int, trigger?: string, community?: bool,
+     *              answer_ids?: list<int>} $options
      * @return array{items: list<array<string, mixed>>, totals: array<string, int>}
      */
     public function run(array $options = []): array
@@ -80,7 +120,7 @@ class ContentRevetService
             $rows[] = $this->checkItem($candidate, $dryRun, (bool) ($options['heuristics_only'] ?? false), $trigger);
         }
         if (! empty($options['community'])) {
-            foreach ($this->communityAnswers($limit, $options['since'] ?? null) as $answer) {
+            foreach ($this->communityAnswers($limit, $options['since'] ?? null, $options['answer_ids'] ?? []) as $answer) {
                 $rows[] = $this->checkCommunityAnswer($answer, $dryRun, (bool) ($options['heuristics_only'] ?? false), $trigger);
             }
         }
@@ -90,6 +130,9 @@ class ContentRevetService
             $totals[$r['decision']] = ($totals[$r['decision']] ?? 0) + 1;
             if ($r['action'] !== 'none') {
                 $totals['action:' . $r['action']] = ($totals['action:' . $r['action']] ?? 0) + 1;
+            }
+            if ($dryRun && ($r['would'] ?? 'none') !== 'none') {
+                $totals['would:' . $r['would']] = ($totals['would:' . $r['would']] ?? 0) + 1;
             }
         }
 
@@ -209,15 +252,19 @@ class ContentRevetService
         }
 
         $checkId = null;
+        $this->revisionNote = null;
         if (! $dryRun) {
-            $row['action'] = $this->act($c, $row['decision'], $rejected, $verdict['reasons']);
+            $row['action'] = $this->act($c, $row['decision'], $rejected, $verdict['reasons'], $verdict, $content);
         } else {
             $row['action'] = 'none';
-            $row['would']  = $this->wouldDo($c, $row['decision'], $rejected);
+            $row['would']  = $this->wouldDo($c, $row['decision'], $rejected, $verdict, $content);
+        }
+        if ($this->revisionNote !== null) {
+            $row['reasons'][] = $this->revisionNote;
         }
         $checkId = $this->log->record($base + [
             'decision' => $row['decision'], 'vetting_decision' => $verdict['decision'], 'vetting_run_id' => $verdict['run_id'],
-            'reasons' => $verdict['reasons'], 'action' => $row['action'],
+            'reasons' => $this->revisionNote !== null ? [...$verdict['reasons'], $this->revisionNote] : $verdict['reasons'], 'action' => $row['action'],
         ]);
         if ($checkId !== null && str_contains($row['action'], 'regeneration')) {
             $this->db->table('reach_content_regenerations')->where('content_item_id', $c['id'])
@@ -228,8 +275,12 @@ class ContentRevetService
         return $row;
     }
 
-    /** @param list<string> $reasons */
-    private function act(array $c, string $decision, bool $rejected, array $reasons): string
+    /**
+     * @param list<string>         $reasons
+     * @param array<string, mixed> $verdict RoutineVetting::run()
+     * @param array<string, mixed> $content VettableContent::forItem()
+     */
+    private function act(array $c, string $decision, bool $rejected, array $reasons, array $verdict = [], array $content = []): string
     {
         $regenerable = in_array($c['type'], ['blog', 'knowledge_base'], true);
 
@@ -247,9 +298,16 @@ class ContentRevetService
             return 'none';
         }
 
-        // Live: only a vetting-model REJECT takes a page down.
+        // Live: only a vetting-model REJECT takes a page down; an approved
+        // correction is applied and republished at the same URL.
         if (! $rejected) {
-            return $decision === 'pass' ? 'none' : 'flagged_for_owner';
+            if ($decision === 'pass') {
+                return 'none';
+            }
+            $result = $this->revisions()->apply($c, $content, $verdict);
+            $this->revisionNote = $result['note'];
+
+            return $result['action'];
         }
         if ($c['deployment_id'] === null) {
             return 'flagged_for_owner'; // live by workflow only; nothing the publisher can withdraw
@@ -264,14 +322,26 @@ class ContentRevetService
             ? 'unpublished+queued_regeneration' : 'unpublished';
     }
 
-    private function wouldDo(array $c, string $decision, bool $rejected): string
+    private function wouldDo(array $c, string $decision, bool $rejected, array $verdict = [], array $content = []): string
     {
         $regenerable = in_array($c['type'], ['blog', 'knowledge_base'], true);
         if ($c['scope'] === 'unpublished') {
             return $decision === 'fail' ? ($regenerable ? 'retire+queue_regeneration' : 'retire') : ($regenerable ? 'adopt_into_pipeline' : 'none');
         }
 
-        return $rejected ? ($regenerable ? 'unpublish+queue_regeneration' : 'unpublish') : ($decision === 'pass' ? 'none' : 'flag_for_owner');
+        if (! $rejected && $decision !== 'pass') {
+            $plan = $this->revisions()->plan($c, $content, $verdict);
+            $this->revisionNote = $plan['note'];
+
+            return $plan['applicable'] ? 'apply_revision+republish' : 'flag_for_owner';
+        }
+
+        return $rejected ? ($regenerable ? 'unpublish+queue_regeneration' : 'unpublish') : 'none';
+    }
+
+    private function revisions(): LiveRevisionApplier
+    {
+        return $this->revisions ??= new LiveRevisionApplier($this->db);
     }
 
     private function unpublish(int $deploymentId, string $reason): bool
@@ -359,20 +429,26 @@ class ContentRevetService
         return 'adopted_into_pipeline';
     }
 
-    // ── community answers: detection and report only ───────────────────────
+    // ── community answers ───────────────────────────────────────────────────
 
-    /** @return list<array<string, mixed>> */
-    private function communityAnswers(int $limit, ?string $since): array
+    /**
+     * @param list<int> $ids
+     * @return list<array<string, mixed>>
+     */
+    private function communityAnswers(int $limit, ?string $since, array $ids = []): array
     {
         try {
             $b = $this->db->table('reach_community_official_answers a')
-                ->select('a.id, a.uuid, a.current_version, a.public_url, a.updated_at, q.title AS question_title, q.body AS question_body, v.content, v.excerpt')
+                ->select('a.id, a.uuid, a.status, a.current_version, a.public_url, a.updated_at, q.title AS question_title, q.body AS question_body, v.content, v.excerpt')
                 ->join('reach_community_questions q', 'q.id = a.question_id')
                 ->join('reach_community_answer_versions v', 'v.answer_id = a.id AND v.version_number = a.current_version', 'left')
                 ->where('a.publication_status', 'published')
                 ->orderBy('a.id', 'ASC')->limit($limit);
             if ($since !== null) {
                 $b->where('a.updated_at >=', $since);
+            }
+            if ($ids !== []) {
+                $b->whereIn('a.id', array_map('intval', $ids));
             }
 
             return $b->get()->getResultArray();
@@ -381,12 +457,20 @@ class ContentRevetService
         }
     }
 
+    private function repair(): CommunityAnswerRepairService
+    {
+        return $this->communityRepair ??= new CommunityAnswerRepairService($this->db, $this->vetting);
+    }
+
     /** @param array<string, mixed> $a */
     private function checkCommunityAnswer(array $a, bool $dryRun, bool $heuristicsOnly, string $trigger): array
     {
         $title = (string) $a['question_title'];
         $row   = ['id' => (int) $a['id'], 'type' => 'community_answer', 'title' => $title, 'slug' => (string) ($a['public_url'] ?? ''),
                   'scope' => 'live', 'flags' => [], 'decision' => 'skipped', 'vetting' => null, 'reasons' => [], 'action' => 'none'];
+        if ($dryRun) {
+            $row['would'] = 'none';
+        }
         $versionNo = (int) ($a['current_version'] ?? 0);
         if ($trigger === 'daily_sweep' && $this->log->alreadyChecked('community_answer', (int) $a['id'], $versionNo, $trigger)) {
             $row['reasons'] = ['This version was already checked by the daily sweep.'];
@@ -397,6 +481,14 @@ class ContentRevetService
         // Short answers are normal on the community desk.
         $row['flags'] = array_values(array_filter($h['flags'], static fn (string $f) => ! str_starts_with($f, 'short_body') && $f !== 'title_not_reflected_in_body'));
         if ($heuristicsOnly) {
+            return $row;
+        }
+        // Already being fixed (a re-answer queued, a correction in flight):
+        // the current_version may not even be the live text. Not vetted again.
+        $busy = $this->repair()->inProgress((int) $a['id']);
+        if ($busy !== null) {
+            $row['reasons'] = [$busy];
+
             return $row;
         }
         try {
@@ -413,14 +505,28 @@ class ContentRevetService
         $row['vetting']  = $result->decision;
         $row['reasons']  = array_slice($result->reasons, 0, 6);
         $row['decision'] = $result->decision === VettingResult::APPROVE ? 'pass' : ($result->decision === VettingResult::REJECT ? 'fail' : 'revise');
-        // Reported for the owner / community stream; no automatic action here.
-        $row['action'] = $row['decision'] === 'pass' ? 'none' : 'flagged_for_owner';
-        $this->log->record([
+
+        $revised = CommunityAnswerRepairService::revisedText($result, (string) ($a['content'] ?? ''), (string) ($a['excerpt'] ?? ''));
+        $outcome = ['action' => 'none', 'reanswer_id' => null, 'error' => null];
+        if ($dryRun) {
+            $row['would'] = $this->repair()->plan((int) $a['id'], $result->decision, $revised);
+        } elseif ($row['decision'] !== 'pass') {
+            $outcome       = $this->repair()->apply((int) $a['id'], $result->decision, $revised, $result->reasons);
+            $row['action'] = $outcome['action'];
+            if ($outcome['error'] !== null) {
+                $row['reasons'][] = $outcome['error'];
+            }
+        }
+        $checkId = $this->log->record([
             'subject_type' => 'community_answer', 'subject_id' => (int) $a['id'], 'content_version_id' => $versionNo ?: null,
             'scope' => 'live', 'trigger_source' => $trigger,
             'heuristic_flags' => $row['flags'], 'decision' => $row['decision'], 'vetting_decision' => $result->decision,
-            'vetting_run_id' => $result->runId, 'reasons' => $result->reasons, 'action' => $row['action'], 'dry_run' => $dryRun,
+            'vetting_run_id' => $result->runId, 'reasons' => array_merge($result->reasons, $outcome['error'] !== null ? [$outcome['error']] : []),
+            'action' => mb_substr($row['action'], 0, 48), 'dry_run' => $dryRun,
         ]);
+        if ($outcome['reanswer_id'] !== null) {
+            $this->repair()->queue()->setQualityCheck((int) $outcome['reanswer_id'], $checkId);
+        }
 
         return $row;
     }
