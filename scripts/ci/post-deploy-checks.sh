@@ -61,7 +61,7 @@ check_with_hint() {
 if [ -n "$entry" ]; then
   check page "Reach web (${target})" "${base}/" "$entry"
 else
-  check page "Reach web (${target})" "${base}/" '<title>Reach — AICOUNTLY Marketing Portal</title>'
+  check page "Reach web (${target})" "${base}/" '<title>Reach — Aicountly Marketing Portal</title>'
 fi
 
 # It is Reach's API (fatal, as before). "misconfigured" (ok: false) depends on the server's api/.env

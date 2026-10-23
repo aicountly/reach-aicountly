@@ -79,7 +79,7 @@ final class UnsubscribeLinks
 
         return '<hr style="border:none;border-top:1px solid #ddd;margin:24px 0 12px">'
             . '<p style="font-size:12px;color:#666;line-height:1.5">'
-            . 'You are receiving this because you shared your contact details with AICOUNTLY. '
+            . 'You are receiving this because you shared your contact details with Aicountly. '
             . '<a href="' . $url . '">Unsubscribe</a> at any time.<br>' . $addr . '</p>';
     }
 

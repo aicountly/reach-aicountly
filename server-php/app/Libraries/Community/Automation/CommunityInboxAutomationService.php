@@ -640,7 +640,7 @@ class CommunityInboxAutomationService
                 ], [
                     'category' => $q['category'],
                     'product'  => $q['product'],
-                    'task'     => 'Screen this member question before an AICOUNTLY desk answers it. There is no answer yet.',
+                    'task'     => 'Screen this member question before an Aicountly desk answers it. There is no answer yet.',
                 ], 'community_question:' . $q['id']);
             } catch (VettingUnavailableException $e) {
                 $this->db->table('reach_community_questions')->where('id', (int) $q['id'])

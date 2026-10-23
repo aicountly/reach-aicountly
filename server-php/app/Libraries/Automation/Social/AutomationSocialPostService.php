@@ -390,9 +390,10 @@ class AutomationSocialPostService
     private function vettingContext(array $row, array $media): array
     {
         $context = [
-            'company'   => 'AICOUNTLY — Indian cloud accounting, compliance and business software suite (aicountly.com)',
+            'company'   => \App\Libraries\Settings\BrandFacts::COMPANY,
             'products'  => array_values(array_slice(SaasProductTaxonomy::products(), 0, 12)),
-            'published_on' => 'the official AICOUNTLY accounts on: ' . implode(', ', self::json($row['channels_json'])),
+            'academy'   => \App\Libraries\Settings\BrandFacts::academy(),
+            'published_on' => 'the official Aicountly accounts on: ' . implode(', ', self::json($row['channels_json'])),
             'media'     => array_map(static fn ($m) => ($m['type'] ?? 'file') . ': ' . $m['url'], $media),
         ];
         if (($offer = \App\Libraries\Settings\BrandOffer::text()) !== '') {

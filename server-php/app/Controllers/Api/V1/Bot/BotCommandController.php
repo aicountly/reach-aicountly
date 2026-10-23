@@ -21,7 +21,7 @@ class BotCommandController extends BaseApiController
     use BotActionResponses;
 
     public const EXAMPLES = [
-        'Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social platforms today.',
+        'Post a 30-second soft-launch reel announcing Aicountly on all connected social platforms today.',
         'Write a LinkedIn and Facebook post about this month\'s GST return due dates, linking to our GST blog.',
         'Run today\'s blog routine again now and tell me what it published.',
         'Answer the open community questions about TDS now.',

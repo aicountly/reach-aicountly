@@ -172,7 +172,7 @@ final class EmailDispatcher
         $fromName  = trim((string) ($opts['from_name'] ?? ''))
             ?: self::env('SENDER_NAME')
             ?: trim((string) ($cfg['from_name'] ?? ''))
-            ?: 'AICOUNTLY Reach';
+            ?: 'Aicountly Reach';
         $replyTo   = trim((string) ($opts['reply_to'] ?? ''))
             ?: self::env('REPLY_TO_EMAIL')
             ?: trim((string) ($cfg['reply_to'] ?? ''))

@@ -186,7 +186,7 @@ class ReachSchedule extends BaseCommand
         }
 
         // Every hour: stock the Cover Gallery with the covers the upcoming blog
-        // index is missing (GPT Image, AICOUNTLY-branded; capped by
+        // index is missing (GPT Image, Aicountly-branded; capped by
         // covers.auto.daily_limit, idempotent per index entry). No human
         // uploads covers any more.
         $add('reach.cover_gallery_autofill', ['limit' => 5], "cover-gallery-autofill-{$hourKey}", ['queue' => 'blog']);

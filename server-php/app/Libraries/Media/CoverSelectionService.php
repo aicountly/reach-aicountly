@@ -18,7 +18,7 @@ use Config\Database;
  *      (content-base entry key, category, tags, title; topical score must reach
  *      CoverRelevanceScorer::minScore(), a stream match alone never counts),
  *      prefers a never-used cover, honours the reuse cooldown, and brands a
- *      legacy upload with the AICOUNTLY mark on the way out.
+ *      legacy upload with the Aicountly mark on the way out.
  *   2. Otherwise a fresh cover is generated with GPT Image from the article's
  *      own title, summary and section headings (CoverPromptBuilder), branded,
  *      and added to the gallery (kind ai_gallery, tagged with the article's

@@ -93,7 +93,7 @@ class PublicationConnectionService
             ->getRowArray();
 
         $payload = [
-            'display_name'              => 'AICOUNTLY.com public site',
+            'display_name'              => 'aicountly.com public site',
             'base_url'                  => $baseUrl,
             'api_version'               => (int) ($_ENV['AICOUNTLY_PUBLIC_SITE_API_VERSION'] ?? 1),
             'authentication_type'       => 'hmac_bearer',

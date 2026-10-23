@@ -41,7 +41,7 @@ export const SECTION_META = {
   },
   'AI visibility & insights': {
     id: 'ai-visibility', icon: Eye,
-    description: 'Daily checks of how AI assistants mention AICOUNTLY, and the weekly AI Insights report.',
+    description: 'Daily checks of how AI assistants mention Aicountly, and the weekly AI Insights report.',
   },
   Images: {
     id: 'images', icon: Image,

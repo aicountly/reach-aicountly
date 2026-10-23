@@ -102,7 +102,7 @@ States used below and on the readiness page: **ready**, **test_mode**
   `CONSOLE_API_TOKEN` (capability `email.credentials`; `Email\EmailProviderResolver`,
   cached for the answer's TTL in an encrypted 0600 file, used up to 15 minutes stale
   while Console is down). A send tries the primary, then each fallback (HTTP API =
-  Itwalk, SMTP = AICOUNTLY's mail server); a recipient counts as sent only when a
+  Itwalk, SMTP = Aicountly's mail server); a recipient counts as sent only when a
   provider accepted it. The readiness page lists the providers by name in send
   order (never a key). `php spark reach:email-providers [--send=you@x] [--resend]`
   shows the same and sends a test.
@@ -125,7 +125,7 @@ States used below and on the readiness page: **ready**, **test_mode**
   Yahoo require one-click header unsubscribe for bulk senders (≈5,000+/day to
   their users): above that volume make the SMTP provider the primary for reach.
 - **Prerequisites outside Reach:** SPF including every provider (Itwalk and the
-  AICOUNTLY mail server), DKIM signing for each provider's from domain, DMARC
+  Aicountly mail server), DKIM signing for each provider's from domain, DMARC
   record (at least `p=none` with reporting, aligned From); a working reply-to
   inbox; Itwalk account out of sandbox with enough daily quota.
 
@@ -180,7 +180,7 @@ States used below and on the readiness page: **ready**, **test_mode**
   Delivery-report webhooks are not wired; status stops at `accepted`.
 - **Prerequisites:** Meta Business verification; WhatsApp sender + display
   name approved in Infobip; each template approved in category MARKETING;
-  WhatsApp Business Policy opt-in (explicit, naming AICOUNTLY, recorded) and a
+  WhatsApp Business Policy opt-in (explicit, naming Aicountly, recorded) and a
   working opt-out ("STOP" → add a WhatsApp suppression); messaging-limit tier
   and per-message marketing pricing (check current Meta rates).
 - **Audience:** only leads with a `granted` WhatsApp marketing consent (same

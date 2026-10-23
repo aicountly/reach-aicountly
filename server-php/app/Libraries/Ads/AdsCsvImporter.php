@@ -39,7 +39,7 @@ final class AdsCsvImporter
         'google_ads'        => ['label' => 'Google Ads — campaign report by day (Day, Campaign, Cost, Impr., Clicks, Conversions)', 'platforms' => ['google_search', 'youtube']],
         'meta'              => ['label' => 'Meta Ads Manager — export with Breakdown → By time → Day (Day, Campaign name, Amount spent (INR), Impressions, Link clicks, Results)', 'platforms' => ['meta']],
         'linkedin'          => ['label' => 'LinkedIn Campaign Manager — campaign performance, daily (Start Date (in UTC), Campaign Name, Total Spent, Impressions, Clicks, Conversions)', 'platforms' => ['linkedin']],
-        'aicountly_signups' => ['label' => 'AICOUNTLY sign-ups report from my.aicountly.com (date, utm_source, utm_medium, utm_campaign, utm_content, signups)', 'platforms' => ['google_search', 'youtube', 'meta', 'linkedin']],
+        'aicountly_signups' => ['label' => 'Aicountly sign-ups report from my.aicountly.com (date, utm_source, utm_medium, utm_campaign, utm_content, signups)', 'platforms' => ['google_search', 'youtube', 'meta', 'linkedin']],
     ];
 
     public const MAX_BYTES = 2_000_000;

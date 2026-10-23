@@ -17,7 +17,7 @@ use Config\Database;
  *
  * Calls the configured OpenAI GPT Image model (ai.image.model, ai.image.size,
  * ai.image.quality — OpenAiImageProvider), checks what came back (decodes as
- * an image, sensible dimensions, not empty), composites the AICOUNTLY corner
+ * an image, sensible dimensions, not empty), composites the Aicountly corner
  * mark (CoverBranding; the unbranded original is kept), stores it in the Cover
  * Gallery as an active `ai_gallery` asset with the topic's tags and records the
  * attempt in reach_cover_generation_attempts — success or failure — which is

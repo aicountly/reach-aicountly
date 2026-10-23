@@ -71,7 +71,7 @@ final class BotAutomationApiTest extends ApiTestCase
         VideoProviders::override('screenshots', new MockVisualSource());
         AutomationSocialPostService::useVetting($gemini);
         SocialChannelReadiness::override(static fn (): array => array_map(
-            static fn ($c) => ['channel' => $c, 'platform' => $c, 'label' => $c, 'ready' => true, 'account' => 'AICOUNTLY', 'reason' => null],
+            static fn ($c) => ['channel' => $c, 'platform' => $c, 'label' => $c, 'ready' => true, 'account' => 'Aicountly', 'reason' => null],
             ['youtube', 'instagram', 'facebook', 'linkedin', 'twitter'],
         ));
     }
@@ -107,7 +107,7 @@ final class BotAutomationApiTest extends ApiTestCase
     {
         $db = Database::connect();
         $db->table('reach_bot_commands')->insert([
-            'instruction'      => 'Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social platforms today',
+            'instruction'      => 'Post a 30-second soft-launch reel announcing Aicountly on all connected social platforms today',
             'channels_json'    => json_encode(['youtube', 'instagram', 'facebook', 'linkedin', 'twitter']),
             'idempotency_key'  => 'cmd-' . bin2hex(random_bytes(6)),
             'status'           => $status,
@@ -250,9 +250,9 @@ final class BotAutomationApiTest extends ApiTestCase
             'external_key' => 'cmd-2026-10-18-soft-launch-post',
             'command_id'   => $cmd['uuid'],
             'channels'     => ['linkedin', 'facebook', 'instagram'],
-            'text'         => 'AICOUNTLY is now open: accounting, GST and compliance software for Indian businesses.',
+            'text'         => 'Aicountly is now open: accounting, GST and compliance software for Indian businesses.',
             'link'         => 'https://aicountly.com',
-            'hashtags'     => ['AICOUNTLY', '#GST'],
+            'hashtags'     => ['Aicountly', '#GST'],
             'media_urls'   => ['https://aicountly.com/assests/images/launch.png'],
         ];
         $res = $this->auto('POST', 'v1/automation/social-posts', $payload);
@@ -266,7 +266,7 @@ final class BotAutomationApiTest extends ApiTestCase
         $this->assertSame(['linkedin', 'facebook', 'instagram'], array_column($posts, 'channel'));
         foreach ($posts as $p) {
             $this->assertStringContainsString('https://aicountly.com', $p['content']);
-            $this->assertSame(['#AICOUNTLY', '#GST'], json_decode((string) $p['hashtags'], true));
+            $this->assertSame(['#Aicountly', '#GST'], json_decode((string) $p['hashtags'], true));
             $this->assertSame([['url' => 'https://aicountly.com/assests/images/launch.png', 'type' => 'image']], json_decode((string) $p['media_refs'], true));
             $this->assertSame('approved', $p['approval_status']);
             $this->assertTrue(in_array($p['status'], ['approved', 'manual_queue'], true));
@@ -305,7 +305,7 @@ final class BotAutomationApiTest extends ApiTestCase
     public function testSocialPostWaitsWhenVettingIsUnavailableAndRetriesOnResend(): void
     {
         AutomationSocialPostService::useVetting(new ContentVettingService(static fn (string $u, array $b): array => ['status' => 503, 'body' => '{"error":{"message":"overloaded"}}']));
-        $body = ['external_key' => 'social-pending-1', 'channels' => ['linkedin'], 'text' => 'AICOUNTLY is live.'];
+        $body = ['external_key' => 'social-pending-1', 'channels' => ['linkedin'], 'text' => 'Aicountly is live.'];
         $res  = $this->auto('POST', 'v1/automation/social-posts', $body);
         $res->assertStatus(202);
         $this->assertSame('pending_vetting', self::data($res)['status']);

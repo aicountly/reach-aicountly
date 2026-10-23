@@ -12,7 +12,7 @@ namespace App\Enums;
  */
 enum CommunityRiskTier: int
 {
-    /** AICOUNTLY product usage and low-risk navigation. */
+    /** Aicountly product usage and low-risk navigation. */
     case ProductUsage = 0;
 
     /** General accounting and business education. */

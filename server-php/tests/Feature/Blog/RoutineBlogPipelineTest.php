@@ -222,7 +222,7 @@ final class RoutineBlogPipelineTest extends DatabaseTestCase
         $this->assertTrue((new BlogContentApprovalService())->verifyForPublication($itemId, (int) $item['current_version_id']));
 
         $profile = $db->table('reach_blog_publication_profiles')->where('content_item_id', $itemId)->get()->getRowArray();
-        $this->assertSame('AICOUNTLY Editorial Team', $profile['author_reference']);
+        $this->assertSame('Aicountly Editorial Team', $profile['author_reference']);
         $this->assertStringContainsString('/api/v1/public/media/', (string) $profile['featured_image_reference']);
         $this->assertNotSame('', trim((string) $profile['featured_image_alt']));
 

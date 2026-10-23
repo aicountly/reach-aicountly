@@ -558,7 +558,7 @@ class OutputSchemaRegistry
                             'confidence' => ['type' => 'string', 'enum' => ['high', 'medium', 'low']],
                         ],
                     ],
-                    'description' => 'Approved AICOUNTLY claims this answer relies on.',
+                    'description' => 'Approved Aicountly claims this answer relies on.',
                 ],
                 'citations_used' => [
                     'type'  => 'array',

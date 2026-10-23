@@ -388,9 +388,9 @@ final class LiveRevisionApplyTest extends DatabaseTestCase
         }
         $ingest = (new KnowledgeBaseDraftIngestService())->ingestKbDraft([
             'title' => 'How to create your first invoice in Billing', 'product_slug' => 'billing', 'article_type' => 'how_to',
-            'content_base_key' => 'kb-billing-first-invoice', 'summary' => 'Create, check and share a sales invoice in AICOUNTLY Billing.',
+            'content_base_key' => 'kb-billing-first-invoice', 'summary' => 'Create, check and share a sales invoice in Aicountly Billing.',
             'body_html' => $body,
-            'seo' => ['slug' => 'billing-create-first-invoice', 'meta_title' => 'Create your first invoice in Billing', 'meta_description' => 'Step-by-step: create, check and share your first sales invoice in AICOUNTLY Billing.'],
+            'seo' => ['slug' => 'billing-create-first-invoice', 'meta_title' => 'Create your first invoice in Billing', 'meta_description' => 'Step-by-step: create, check and share your first sales invoice in Aicountly Billing.'],
             'prerequisites' => ['A Billing account with at least one customer'],
             'steps' => [['title' => 'Open Billing', 'text' => 'Open Billing from the app launcher.'], ['text' => 'Choose New invoice on the Invoices screen.'], 'Save the invoice.'],
             'troubleshooting' => ['If the tax line is missing, check the item tax settings.'],

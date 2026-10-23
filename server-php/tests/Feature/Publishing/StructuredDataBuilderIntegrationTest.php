@@ -32,8 +32,8 @@ class StructuredDataBuilderIntegrationTest extends CIUnitTestCase
             ['title' => 'Run Reconciliation', 'description' => 'Click Reconcile to match transactions'],
         ];
 
-        $schema = $this->builder->buildHowTo('How to Reconcile Bank Statements in AICOUNTLY', $steps,
-            'Step by step guide for bank reconciliation in AICOUNTLY accounting software.'
+        $schema = $this->builder->buildHowTo('How to Reconcile Bank Statements in Aicountly', $steps,
+            'Step by step guide for bank reconciliation in Aicountly accounting software.'
         );
 
         $result = $this->validator->validate($schema);
@@ -44,9 +44,9 @@ class StructuredDataBuilderIntegrationTest extends CIUnitTestCase
     public function testFaqForGstFilingPassesValidation(): void
     {
         $items = [
-            ['question' => 'How does AICOUNTLY handle GST filing?', 'answer' => 'AICOUNTLY automates GSTR-1 and GSTR-3B generation.'],
-            ['question' => 'Can AICOUNTLY file GST directly?', 'answer' => 'Yes, AICOUNTLY integrates with the GST portal for direct filing.'],
-            ['question' => 'What happens if my GST filing fails?', 'answer' => 'AICOUNTLY shows detailed error messages and retry options.'],
+            ['question' => 'How does Aicountly handle GST filing?', 'answer' => 'Aicountly automates GSTR-1 and GSTR-3B generation.'],
+            ['question' => 'Can Aicountly file GST directly?', 'answer' => 'Yes, Aicountly integrates with the GST portal for direct filing.'],
+            ['question' => 'What happens if my GST filing fails?', 'answer' => 'Aicountly shows detailed error messages and retry options.'],
         ];
 
         $schema = $this->builder->buildFAQPage($items);
@@ -85,7 +85,7 @@ class StructuredDataBuilderIntegrationTest extends CIUnitTestCase
     public function testWebPageForLandingPagePassesValidation(): void
     {
         $schema = $this->builder->buildWebPage(
-            'AICOUNTLY — AI-Powered Accounting Software for India',
+            'Aicountly — AI-Powered Accounting Software for India',
             'https://aicountly.com',
             'Cloud-based AI accounting platform for Indian businesses. Automate GST, TDS, and bank reconciliation.'
         );

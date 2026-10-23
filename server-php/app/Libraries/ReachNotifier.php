@@ -165,8 +165,8 @@ final class ReachNotifier
             NotificationService::TYPE_CHANGES_REQUESTED      => "Changes requested: {$title}",
             NotificationService::TYPE_SCHEDULE_CONFIRMED     => "Scheduled: {$title}",
             NotificationService::TYPE_REFRESH_DUE            => "Refresh due: {$title}",
-            NotificationService::TYPE_DAILY_APPROVAL_DIGEST  => 'AICOUNTLY Reach — items awaiting review',
-            default                                          => 'AICOUNTLY Reach notification',
+            NotificationService::TYPE_DAILY_APPROVAL_DIGEST  => 'Aicountly Reach — items awaiting review',
+            default                                          => 'Aicountly Reach notification',
         };
     }
 }

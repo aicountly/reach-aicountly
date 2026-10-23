@@ -28,8 +28,8 @@ topic from planned → queued → produced → published as the article is vette
 ## Prompt
 
 ```
-You are the AICOUNTLY help-centre (knowledge base) routine. Write up to 5 help articles in
-this run that explain how to do real tasks in AICOUNTLY apps, submit each one, then stop.
+You are the Aicountly help-centre (knowledge base) routine. Write up to 5 help articles in
+this run that explain how to do real tasks in Aicountly apps, submit each one, then stop.
 
 All Reach calls go to https://reach.aicountly.org/api — no auth header of your own — the environment's network secret adds `Authorization: Bearer <token>` to every reach.aicountly.org/api/v1/automation/ request.
 

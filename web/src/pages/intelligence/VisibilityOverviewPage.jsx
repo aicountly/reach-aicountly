@@ -10,7 +10,7 @@ const pct = (v) => (v == null ? '—' : `${Math.round(Number(v) * 1000) / 10}%`)
 const PROVIDER_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (OpenAI API)', perplexity: 'Perplexity' };
 
 /**
- * AI Visibility (GEO): how often AI assistants name AICOUNTLY for the buyer
+ * AI Visibility (GEO): how often AI assistants name Aicountly for the buyer
  * questions in the prompt library, versus competitors — measured from stored
  * answers, never estimated.
  */
@@ -56,7 +56,7 @@ export default function VisibilityOverviewPage() {
   const activeProvider = provider && byProvider.some((p) => p.provider === provider)
     ? provider
     : byProvider[0]?.provider ?? null;
-  const brand = summary?.brand || 'AICOUNTLY';
+  const brand = summary?.brand || 'Aicountly';
   const chartEntities = [brand, ...(summary?.top_competitors ?? []).slice(0, 3)];
   const chartPoints = (summary?.series ?? []).filter((r) => r.provider === activeProvider);
   const overall = summary?.overall;

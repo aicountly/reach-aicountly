@@ -103,11 +103,11 @@ counting covers that do not exist.
 Nobody makes, uploads or approves covers. Reach generates them with the
 configured OpenAI GPT Image model (`ai.image.model`, default
 `gpt-image-2.5-flare`; `ai.image.size` 1536x1024; `ai.image.quality`), puts the
-official AICOUNTLY logo on them, keeps the Cover Gallery stocked, and decides
+official Aicountly logo on them, keeps the Cover Gallery stocked, and decides
 per article whether to reuse a gallery cover or draw a fresh one.
 
 **Brand style.** Every prompt (`CoverPromptBuilder`) is a flat editorial vector
-illustration in the green/white brand palette (AICOUNTLY greens `#8cc854`,
+illustration in the green/white brand palette (Aicountly greens `#8cc854`,
 `#1b7f00`, navy `#071a33` accents), one focal concept, and *strictly no text, no
 letters, no logos*. The model never draws the brand: `CoverBranding`
 composites the real logo (aicountly.com `assests/images/ai-logo.png`, bundled at
@@ -371,7 +371,7 @@ php spark reach:work --queue=publishing --once --limit=20   # (the worker cron d
 
 product_slug is only filled when derivable with evidence: the title names a live app, or the
 topic candidate's `[product]` note / content-base entry names one AND the post is app-led
-(stream product / problem_to_product, or an AICOUNTLY category). A marketing-stream post with
+(stream product / problem_to_product, or an Aicountly category). A marketing-stream post with
 only a product affinity stays a topic article (product_slug NULL). Posts whose category maps to
 nothing are listed and left as they are.
 

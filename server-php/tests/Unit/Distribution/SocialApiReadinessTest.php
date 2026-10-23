@@ -43,7 +43,7 @@ final class SocialApiReadinessTest extends CIUnitTestCase
         $this->setVideoEnv($env);
         SocialApiAccounts::forget();
         $this->http = (new FakeHttpTransport())->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, ['accounts' => [
-            ['id' => 'acc_yt', 'name' => 'AICOUNTLY', 'platform' => 'youtube', 'status' => 'active'],
+            ['id' => 'acc_yt', 'name' => 'Aicountly', 'platform' => 'youtube', 'status' => 'active'],
             ['id' => 'acc_fb_1', 'platform' => 'facebook', 'status' => 'active'],
             ['id' => 'acc_fb_2', 'platform' => 'facebook', 'status' => 'active'],
             ['id' => 'acc_x', 'platform' => 'twitter', 'status' => 'reauth_required'],

@@ -47,7 +47,7 @@ Spend only ever comes from entered or imported results.
     Re-importing a file replaces that day's figures from the same source, so it changes nothing.
 - **Sign-ups:** on the my.aicountly.com host run
   `php spark accounts:acquisition-report --since=2026-10-18 --out=signups.csv` (counts only, no
-  personal data) and import it as *AICOUNTLY sign-ups report*. Rows are matched by
+  personal data) and import it as *Aicountly sign-ups report*. Rows are matched by
   `utm_source` + `utm_campaign`; sign-ups without a campaign are reported as direct/organic.
 
 ## Leads

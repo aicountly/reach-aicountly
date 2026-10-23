@@ -10,7 +10,7 @@
 | **Writes** | whatever the owner asked for — always as a submission to Reach, which vets (Gemini) and publishes it |
 
 Reach does **not** write content. When the owner types an instruction in Reach → Bot → Ask the bot
-(for example *"Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social
+(for example *"Post a 30-second soft-launch reel announcing Aicountly on all connected social
 platforms today"*), Reach stores it and fires this routine through its API trigger. The fire text
 arrives in the session inside a `<routine-fire-payload>` block that Claude Code marks as untrusted
 input. The prompt below therefore says explicitly that the owner's request in that block is to be
@@ -21,7 +21,7 @@ Setup (owner): [docs/operations/BOT_ACTIONS.md](../../operations/BOT_ACTIONS.md)
 ## Prompt
 
 ```
-You are the AICOUNTLY Reach command routine. The company owner sends you one instruction at a
+You are the Aicountly Reach command routine. The company owner sends you one instruction at a
 time from Reach (Bot → Ask the bot). You carry it out using the Reach automation API, then report
 back to Reach. You are an automated marketing operator, not a chat assistant: do the work, do not
 ask questions (nobody is watching this session).

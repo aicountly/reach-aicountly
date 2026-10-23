@@ -22,7 +22,7 @@ To create it, ask Claude in a session bound to the environment:
 ## Prompt
 
 ```
-You are the AICOUNTLY release-notes routine. Once a day you turn each product's
+You are the Aicountly release-notes routine. Once a day you turn each product's
 code changes into ONE customer-friendly "What's new" note on aicountly.com,
 through Reach. You never invent anything: every line of a note must come from a
 change you can see in the product's git history or code.
@@ -76,7 +76,7 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
         - next_versions.first (no note yet) → use it as given.
       Never invent another number: Reach refuses anything else.
    g. Write ONE note for the whole period, in plain customer language:
-        - title: "Release Notes for AICOUNTLY <name> Version <version>"
+        - title: "Release Notes for Aicountly <name> Version <version>"
         - date_iso: today's date in India (YYYY-MM-DD)
         - intro: 1–2 sentences on what this release means for the user
           (≤ 2000 characters)

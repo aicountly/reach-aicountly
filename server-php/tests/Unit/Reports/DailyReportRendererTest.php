@@ -37,7 +37,7 @@ final class DailyReportRendererTest extends CIUnitTestCase
         $this->assertStringContainsString('Not tracked yet', $html, 'A content type with no source is not reported as 0.');
         $this->assertStringContainsString('Release notes: not tracked yet', $text);
         $this->assertStringNotContainsString('<style', $html, 'Mail clients strip <style>; everything is inline.');
-        $this->assertSame('AICOUNTLY daily report — Sat 17 Oct 2026', DailyReportRenderer::subject($s));
+        $this->assertSame('Aicountly daily report — Sat 17 Oct 2026', DailyReportRenderer::subject($s));
     }
 
     public function testGeneratedTimeIsShownInIstWithItsLabel(): void

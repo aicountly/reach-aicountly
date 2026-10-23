@@ -205,7 +205,8 @@ class VideoAutomationService
             'format'          => $script['format'],
             'published_on'    => 'YouTube (public) — Shorts are also offered to Instagram Reels, Facebook and LinkedIn',
             'voice'           => 'synthetic voice-over (OpenAI text-to-speech); captions burned in from the script',
-            'company'         => 'AICOUNTLY — Indian cloud accounting and business software suite (aicountly.com)',
+            'company'         => \App\Libraries\Settings\BrandFacts::COMPANY,
+            'academy'         => \App\Libraries\Settings\BrandFacts::academy(),
             'product_screens' => VideoTopicPlanner::screens(),
         ];
         if (($offer = \App\Libraries\Settings\BrandOffer::text()) !== '') {

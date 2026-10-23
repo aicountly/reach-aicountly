@@ -11,7 +11,7 @@ use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
 /**
- * Connecting Reach to the AICOUNTLY YouTube channel (one channel per
+ * Connecting Reach to the Aicountly YouTube channel (one channel per
  * deployment). An admin starts the OAuth flow from Reach → Video; Google
  * sends them back to the public callback, which checks the single-use state,
  * swaps the code for tokens, stores the refresh token encrypted

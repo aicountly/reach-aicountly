@@ -15,7 +15,7 @@ use Config\Services;
 
 /**
  * The owner's "AI bot command centre": what the bot did, what it achieved,
- * where AICOUNTLY ranks, where the numbers are heading, what to do next, and
+ * where Aicountly ranks, where the numbers are heading, what to do next, and
  * whether the machinery is healthy — one aggregated payload for
  * `GET v1/dashboard/command-centre`.
  *
@@ -467,7 +467,7 @@ final class CommandCentreService
                     'available'     => true,
                     'period'        => $sum['period'],
                     'answers'       => $answers,
-                    // Answers to questions that name AICOUNTLY are not counted for the brand.
+                    // Answers to questions that name Aicountly are not counted for the brand.
                     'brand_answers_counted' => $counted,
                     'brand_mentions' => (int) ($sum['overall']['brand_mentions'] ?? 0),
                     'measured'      => $counted > 0,

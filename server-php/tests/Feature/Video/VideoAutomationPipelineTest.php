@@ -407,7 +407,7 @@ final class VideoAutomationPipelineTest extends ApiTestCase
                 'access_token' => 'ya29.a', 'refresh_token' => '1//stored-refresh', 'expires_in' => 3599,
                 'scope' => 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl',
             ]))
-            ->on('GET', '#youtube/v3/channels#', FakeHttpTransport::json(200, ['items' => [['id' => 'UCaicountly', 'snippet' => ['title' => 'AICOUNTLY']]]]));
+            ->on('GET', '#youtube/v3/channels#', FakeHttpTransport::json(200, ['items' => [['id' => 'UCaicountly', 'snippet' => ['title' => 'Aicountly']]]]));
         VideoProviders::override('http', $http);
         VideoProviders::reset();
         VideoProviders::override('http', $http);
@@ -429,7 +429,7 @@ final class VideoAutomationPipelineTest extends ApiTestCase
 
         $status = self::data($this->withHeaders($h)->call('GET', 'v1/video/youtube/status'));
         $this->assertTrue($status['connected']);
-        $this->assertSame('AICOUNTLY', $status['channel_title']);
+        $this->assertSame('Aicountly', $status['channel_title']);
         $this->assertStringNotContainsString('stored-refresh', json_encode($status));
 
         $this->assertSame('in_progress', $this->item($data['item_uuid'])['status'], 'blocked uploads are released');

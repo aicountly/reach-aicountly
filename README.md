@@ -1,8 +1,8 @@
 # reach-aicountly
 
-Internal AICOUNTLY marketing operations portal for **reach.aicountly.org**.
+Internal Aicountly marketing operations portal for **reach.aicountly.org**.
 
-Scope: marketing only — blog approval/publishing for AICOUNTLY.com, campaigns
+Scope: marketing only — blog approval/publishing for aicountly.com, campaigns
 (email/WhatsApp/social/landing/paid/webinar/referral), social media planning
 and queue, SEO planner, keyword ideas, creative briefs, analytics, lead
 capture with push to Engage, and the Reach Marketing Bot with Auto/Confirm
@@ -53,7 +53,7 @@ modes and superadmin approval gates.
   - **Flow** — complaints from social media become Flow tickets via
     `POST {FLOW_API_BASE_URL}/internal/reach/social-tickets` (`Authorization: Bearer {FLOW_REACH_INBOUND_KEY}`,
     the same key in Flow's `.env`; flow-react-app `docs/REACH_SOCIAL_TICKETS.md`).
-  - **AICOUNTLY.com blog publish** — HTTP placeholder against
+  - **aicountly.com blog publish** — HTTP placeholder against
     `{AICOUNTLY_SITE_API_BASE_URL}/blog/posts`. If either env is empty the
     post stays `approved` with `publishing_status = pending_publishing`.
 
@@ -119,7 +119,7 @@ npm run dev
    `https://reach.aicountly.org/api/v1` and `REACH_BOT_SERVICE_KEY` to the
    same value as Reach's `CONSOLE_INBOUND_TOKEN`.
 9. Scheduled jobs: the **Deploy Production via SSH** workflow runs `api/bin/ops/post-deploy-jobs.sh` on the
-   server (the AICOUNTLY ops kit, identical to console-react-app `ops/estate/kit/bin/ops/`). It writes
+   server (the Aicountly ops kit, identical to console-react-app `ops/estate/kit/bin/ops/`). It writes
    `CONSOLE_CRON_MONITOR_KEY` (repository secret, sent over SSH on STDIN) into `api/.env` — the only line of `.env`
    a deploy writes; Console's production refuses the shared `CONSOLE_SERVICE_KEY` for heartbeats — and installs
    `server-php/bin/ops/jobs.txt` into the deploy user's crontab (block `aicountly-reach jobs`, `flock -n`, log

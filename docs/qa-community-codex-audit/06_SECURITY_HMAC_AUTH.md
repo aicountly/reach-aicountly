@@ -3,7 +3,7 @@
 ## Header contract (preserved, not renamed)
 
 Per the locked decision, the existing `X-Reach-*` convention was kept as-is
-— no `X-AICOUNTLY-*` rename. `CommunityReceiverAuth` (public repo) extends
+— no `X-Aicountly-*` rename. `CommunityReceiverAuth` (public repo) extends
 `PublisherAuth` verbatim rather than reimplementing verification, so there is
 exactly one HMAC implementation on the public site shared by the blog
 publisher and the Community receiver. Reach's `HmacSigner`

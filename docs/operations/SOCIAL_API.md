@@ -1,7 +1,7 @@
 # social-api.ai — social posts and YouTube videos
 
 Reach publishes its social posts **and** its YouTube vlogs/Shorts through
-[social-api.ai](https://docs.social-api.ai). AICOUNTLY's YouTube connection inside social-api.ai
+[social-api.ai](https://docs.social-api.ai). Aicountly's YouTube connection inside social-api.ai
 is already verified by Google, so Reach needs no Google OAuth app, no YouTube API audit and no
 "private-only" lock. Reach's own direct YouTube uploader stays as an optional fallback
 (`video.youtube.publisher = direct`, see [VIDEO_AUTOMATION_SETUP.md](VIDEO_AUTOMATION_SETUP.md)).
@@ -13,7 +13,7 @@ Code: `server-php/app/Libraries/Distribution/Providers/SocialApiAiPublisher.php`
 
 ## Set it up (operator)
 
-1. In social-api.ai: connect the AICOUNTLY accounts (YouTube channel, Instagram, Facebook page,
+1. In social-api.ai: connect the Aicountly accounts (YouTube channel, Instagram, Facebook page,
    LinkedIn page, X). Create an API key (it starts with `sapi_key_`).
 2. Reach → **Settings → AI & Automation → Social**:
    - *social-api.ai API base URL* — leave the default `https://api.social-api.ai/v1`.
@@ -211,7 +211,7 @@ methods of `SocialApiAiClient`, job `reach.social_inbox_poll`, table `reach_soci
    not answered · one reply per conversation (same network + thread + author; without a thread id,
    the same author and kind within 24 h) · `social.inbox.daily_reply_cap` (40 per IST day) → the
    message waits (`deferred`) for a later run while it is young enough · `SocialReplyPolicy`: at most
-   280 characters on X (600 elsewhere), signed "— AICOUNTLY team", no PAN / Aadhaar / card / phone /
+   280 characters on X (600 elsewhere), signed "— Aicountly team", no PAN / Aadhaar / card / phone /
    foreign e-mail, links to aicountly.com only.
 5. **Failures are honest.** Gemini or Flow unavailable → `retry`, up to 5 attempts, then `failed`
    with the reason. Flow not set up (no key, Flow 401 / 503 "not configured" / 404) → `deferred`: the

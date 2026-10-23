@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Libraries\Intelligence\Visibility;
 
 /**
- * Reads an assistant's answer for: is AICOUNTLY mentioned, where does it sit
+ * Reads an assistant's answer for: is Aicountly mentioned, where does it sit
  * in any list of recommendations, which tracked competitors are mentioned,
  * and which URLs were cited. Pure — no I/O — so every rule is unit-tested.
  *
@@ -64,7 +64,7 @@ final class MentionParser
         array $brandDomains = ['aicountly.com'],
     ): array {
         $brandAliases = $this->cleanAliases($brandAliases);
-        $brandName    = $brandAliases[0] ?? 'AICOUNTLY';
+        $brandName    = $brandAliases[0] ?? 'Aicountly';
         $items        = $this->listItems($text);
 
         $entities = [['key' => 'brand', 'id' => null, 'name' => $brandName, 'aliases' => $brandAliases, 'is_brand' => true]];

@@ -26,7 +26,7 @@ final class TimelineBuilderTest extends CIUnitTestCase
 
     private static function script(string $format): array
     {
-        return ['format' => $format, 'title' => 'GST returns in 3 minutes', 'cta_text' => 'Try AICOUNTLY Smart Books at aicountly.com', 'chapters' => []];
+        return ['format' => $format, 'title' => 'GST returns in 3 minutes', 'cta_text' => 'Try Aicountly Smart Books at aicountly.com', 'chapters' => []];
     }
 
     /** @return list<array<string, mixed>> */
@@ -82,7 +82,7 @@ final class TimelineBuilderTest extends CIUnitTestCase
         $this->assertContains('GST returns in 3 minutes', $texts, 'intro title');
         $this->assertContains('Two returns every month', $texts, 'lower third');
         $this->assertContains('GSTR-1 vs GSTR-3B', $texts, 'title card');
-        $this->assertContains('Try AICOUNTLY Smart Books at aicountly.com', $texts, 'CTA end card');
+        $this->assertContains('Try Aicountly Smart Books at aicountly.com', $texts, 'CTA end card');
         $this->assertContains('aicountly.com', $texts);
 
         // Captions are the same cues sent to YouTube, inside each voice-over.
@@ -150,7 +150,7 @@ final class TimelineBuilderTest extends CIUnitTestCase
         $out   = TimelineBuilder::build(self::script('short'), [self::scene(1, 'title_card', 5.0, 'TDS due on the 7th')], ['logo_url' => TimelineBuilder::DEFAULT_LOGO_URL]);
         $texts = self::clips($out['edit'], 'text');
         $this->assertContains('aicountly.com', array_column(array_column($texts, 'asset'), 'text'));
-        $this->assertContains('Try AICOUNTLY Smart Books at aicountly.com', array_column(array_column($texts, 'asset'), 'text'));
+        $this->assertContains('Try Aicountly Smart Books at aicountly.com', array_column(array_column($texts, 'asset'), 'text'));
         $card = array_values(array_filter($texts, static fn ($c) => $c['asset']['text'] === 'TDS due on the 7th'))[0];
         $this->assertSame(TimelineBuilder::GREEN_SOFT, $card['asset']['background']['color'], 'title cards use the brand panel');
         $this->assertSame(TimelineBuilder::NAVY, $card['asset']['font']['color']);

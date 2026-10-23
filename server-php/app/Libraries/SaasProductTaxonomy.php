@@ -11,35 +11,35 @@ final class SaasProductTaxonomy
     public static function products(): array
     {
         return [
-            'smart_books'         => 'AICountly Smart Books',
-            'contacts'            => 'AICountly Contacts',
-            'calendar'            => 'AICountly Calendar',
-            'financial_reporting' => 'AICountly Financial Reporting',
-            'secretarial'         => 'AICountly Secretarial',
-            'auditor'             => 'AICountly Auditor',
-            'vault'               => 'AICountly Vault',
-            'hrms'                => 'AICountly HRMS',
-            'docs'                => 'AICountly Docs',
-            'chat'                => 'AICountly Chat',
-            'flow'                => 'AICountly Flow',
+            'smart_books'         => 'Aicountly Smart Books',
+            'contacts'            => 'Aicountly Contacts',
+            'calendar'            => 'Aicountly Calendar',
+            'financial_reporting' => 'Aicountly Financial Reporting',
+            'secretarial'         => 'Aicountly Secretarial',
+            'auditor'             => 'Aicountly Auditor',
+            'vault'               => 'Aicountly Vault',
+            'hrms'                => 'Aicountly HRMS',
+            'docs'                => 'Aicountly Docs',
+            'chat'                => 'Aicountly Chat',
+            'flow'                => 'Aicountly Flow',
             'my_account'          => 'My Account',
-            'our_people'          => 'AICountly Our People',
-            'manage_account'      => 'AICountly Manage',
-            'buddy'               => 'AICountly AI Pulse',
-            'drive'               => 'AICountly Drive',
-            'connect'             => 'AICountly Connect',
-            'notes'               => 'AICountly Notes',
-            'pos'                 => 'AICountly POS',
-            'billing'             => 'AICountly Billing',
-            'inventory'           => 'AICountly Inventory',
-            'sales'               => 'AICountly Sales',
-            'purchase'            => 'AICountly Purchase',
-            'insights'            => 'AICountly Insights',
-            'remote'              => 'AICountly Remote',
-            'advisor'             => 'AICountly Advisor',
-            'appointments'        => 'AICountly Appointments',
-            'contracts'           => 'AICountly Contracts',
-            'pay'                 => 'AICountly Pay',
+            'our_people'          => 'Aicountly Our People',
+            'manage_account'      => 'Aicountly Manage',
+            'buddy'               => 'Aicountly AI Pulse',
+            'drive'               => 'Aicountly Drive',
+            'connect'             => 'Aicountly Connect',
+            'notes'               => 'Aicountly Notes',
+            'pos'                 => 'Aicountly POS',
+            'billing'             => 'Aicountly Billing',
+            'inventory'           => 'Aicountly Inventory',
+            'sales'               => 'Aicountly Sales',
+            'purchase'            => 'Aicountly Purchase',
+            'insights'            => 'Aicountly Insights',
+            'remote'              => 'Aicountly Remote',
+            'advisor'             => 'Aicountly Advisor',
+            'appointments'        => 'Aicountly Appointments',
+            'contracts'           => 'Aicountly Contracts',
+            'pay'                 => 'Aicountly Pay',
         ];
     }
 
@@ -177,6 +177,6 @@ final class SaasProductTaxonomy
             return '';
         }
 
-        return 'AICountly ' . ucwords(str_replace(['_', '-'], ' ', $slug));
+        return 'Aicountly ' . ucwords(str_replace(['_', '-'], ' ', $slug));
     }
 }

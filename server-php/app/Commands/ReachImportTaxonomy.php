@@ -10,7 +10,8 @@ use App\Libraries\KnowledgeTaxonomyImporter;
  * `php spark reach:import-taxonomy`
  *
  * Idempotent importer that seeds reach_products and reach_product_aliases
- * from SaasProductTaxonomy::products(). Safe to run multiple times.
+ * from SaasProductTaxonomy::products() and the Aicountly Academy courses
+ * (ProductCatalog::academy()). Safe to run multiple times.
  *
  * Options:
  *   --dry-run    Print what would be imported without writing to the database.
@@ -75,6 +76,10 @@ class ReachImportTaxonomy extends BaseCommand
         CLI::write('Products that would be imported:', 'cyan');
         foreach ($products as $slug => $label) {
             CLI::write("  {$slug} => {$label}", 'white');
+        }
+        CLI::write('Aicountly Academy products that would be imported:', 'cyan');
+        foreach (\App\Libraries\Automation\Structured\ProductCatalog::academy() as $course) {
+            CLI::write("  {$course['slug']} => {$course['name']} ({$course['public_url']})", 'white');
         }
         CLI::write('Aliases that would be processed:', 'cyan');
         foreach ($aliases as $alias => $canonical) {

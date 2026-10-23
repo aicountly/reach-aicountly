@@ -14,7 +14,7 @@ use Config\Database;
 
 /**
  * reach:covers-refresh — replace the covers of live posts that cannot be
- * shown to be AICOUNTLY's own, topic-drawn, branded image.
+ * shown to be Aicountly's own, topic-drawn, branded image.
  *
  * A live post needs a new cover when its featured image is
  *   - missing (aicountly.com then shows a random picsum.photos stock photo —
@@ -23,7 +23,7 @@ use Config\Database;
  *   - a Reach media URL whose asset is gone, retired or has no file,
  *   - an operator upload or a legacy generation (provenance is not
  *     aicountly_generated), or
- *   - not branded with the AICOUNTLY mark.
+ *   - not branded with the Aicountly mark.
  *
  * Each one gets a fresh GPT Image cover from its own title, summary and
  * headings (never a gallery reuse — the point is a cover drawn for that post),
@@ -83,7 +83,7 @@ class CoverRefreshService
         return $out;
     }
 
-    /** Why this cover cannot stay, or null when it is a branded AICOUNTLY-generated cover. */
+    /** Why this cover cannot stay, or null when it is a branded Aicountly-generated cover. */
     public function reason(string $url): ?string
     {
         $url = trim($url);
@@ -219,7 +219,7 @@ class CoverRefreshService
         try {
             (new ContentValidationService())->storeResult($contentItemId, 'cover_image', 'passed', [
                 'version_id' => $versionId > 0 ? $versionId : null,
-                'message'    => 'Cover replaced by reach:covers-refresh (GPT Image, AICOUNTLY-branded)',
+                'message'    => 'Cover replaced by reach:covers-refresh (GPT Image, Aicountly-branded)',
             ]);
         } catch (\Throwable) {
         }

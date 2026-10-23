@@ -161,7 +161,7 @@ final class CommunityQaPayload
         $slug = SaasProductTaxonomy::normalizeProductSlug(str_replace('-', '_', $slug));
         if (! SaasProductTaxonomy::validateProduct($slug)) {
             throw new InvalidArgumentException(
-                'product_slug is not an AICOUNTLY product. Use one of: ' . implode(', ', array_keys(SaasProductTaxonomy::products())) . '.'
+                'product_slug is not an Aicountly product. Use one of: ' . implode(', ', array_keys(SaasProductTaxonomy::products())) . '.'
             );
         }
         return $slug;

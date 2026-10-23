@@ -256,14 +256,14 @@ final class VideoPipelineRunner
                 try {
                     $img   = ImageNormalizer::toJpeg(VideoProviders::stills()->generate(StillPromptBuilder::forThumbnail($script), 'landscape'), 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
                     // The thumbnail is shown outside the video, so it carries
-                    // the AICOUNTLY mark itself (bottom-right corner plate).
+                    // the Aicountly mark itself (bottom-right corner plate).
                     $branded = (new CoverBranding())->apply($img['bytes']);
                     if ($branded['branded']) {
                         $img = ImageNormalizer::toJpeg($branded['bytes'], 1280, 720, ImageNormalizer::THUMBNAIL_MAX_BYTES);
                     }
                     $media = $this->media->store($img['bytes'], $img['mime'], ['item_id' => $id, 'width' => 1280, 'height' => 720]);
                     $this->repo->updateAsset((int) $thumb['id'], ['status' => 'ready', 'media_id' => (int) $media['id'], 'attempts' => (int) $thumb['attempts'] + 1,
-                        'detail' => 'GPT Image thumbnail' . ($branded['branded'] ? ', AICOUNTLY logo' : ' (logo not applied: ' . $branded['reason'] . ')')]);
+                        'detail' => 'GPT Image thumbnail' . ($branded['branded'] ? ', Aicountly logo' : ' (logo not applied: ' . $branded['reason'] . ')')]);
                 } catch (VideoProviderException|\RuntimeException $e) {
                     $attempts = (int) $thumb['attempts'] + 1;
                     if ($e instanceof VideoProviderException && $e->kind === VideoProviderException::TRANSIENT && $attempts < 3) {
@@ -724,7 +724,7 @@ final class VideoPipelineRunner
     }
 
     /**
-     * Signed URL of the AICOUNTLY corner mark (official logo on a white
+     * Signed URL of the Aicountly corner mark (official logo on a white
      * rounded plate, CoverBranding::badgePng) the template lays over every
      * scene, so the logo stays legible on dark stills as well as light
      * screenshots. Stored once (no item, never purged) and re-signed per

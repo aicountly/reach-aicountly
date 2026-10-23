@@ -50,7 +50,7 @@ final class BotActivityRegistry
             ],
             'cover_gallery_autofill' => [
                 'name' => 'Cover gallery autofill', 'group' => 'Content & publishing', 'kind' => 'job',
-                'description' => 'Generates AICOUNTLY-branded GPT Image covers for upcoming articles no gallery cover fits, then releases articles parked for a cover.',
+                'description' => 'Generates Aicountly-branded GPT Image covers for upcoming articles no gallery cover fits, then releases articles parked for a cover.',
                 'cron' => '0 * * * *', 'schedule' => 'Hourly (at :00 UTC, :30 IST)',
                 'job_type' => 'reach.cover_gallery_autofill', 'queue' => 'blog',
                 'payload' => static fn (): array => ['limit' => 5],
@@ -250,7 +250,7 @@ final class BotActivityRegistry
             ],
             'ai_visibility_daily' => [
                 'name' => 'AI visibility pass', 'group' => 'Search, SEO & reports', 'kind' => 'job',
-                'description' => 'Asks each active visibility prompt to every configured assistant and records whether AICOUNTLY is mentioned.',
+                'description' => 'Asks each active visibility prompt to every configured assistant and records whether Aicountly is mentioned.',
                 'cron' => '30 23 * * *', 'schedule' => 'Daily 05:00 IST (23:30 UTC, previous day)',
                 'job_type' => 'reach.ai_visibility_daily', 'queue' => 'default', 'max_attempts' => 1,
                 'payload' => static fn (\DateTimeImmutable $n, ?int $userId = null): array => ['trigger' => 'manual', 'date' => $istDay($n), 'user_id' => $userId],

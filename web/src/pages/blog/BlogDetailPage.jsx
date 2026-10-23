@@ -95,7 +95,7 @@ export function BlogDetailPage() {
                 <button className="btn btn-danger btn-sm" disabled={busy} onClick={reject}><X size={13}/> Reject</button>
               )}
               {post.status === 'approved' || post.status === 'scheduled' ? (
-                <button className="btn btn-primary btn-sm" disabled={busy} onClick={publish}><Send size={13}/> Publish to AICOUNTLY.com</button>
+                <button className="btn btn-primary btn-sm" disabled={busy} onClick={publish}><Send size={13}/> Publish to aicountly.com</button>
               ) : null}
             </div>
           </Card>

@@ -23,7 +23,7 @@ class KbStructureValidationIntegrationTest extends CIUnitTestCase
     public function testCompleteHowToArticleStepsPass(): void
     {
         $steps = [
-            ['step_number' => 1, 'title' => 'Log in', 'description' => 'Open the AICOUNTLY portal and log in with your credentials.'],
+            ['step_number' => 1, 'title' => 'Log in', 'description' => 'Open the Aicountly portal and log in with your credentials.'],
             ['step_number' => 2, 'title' => 'Navigate to Banking', 'description' => 'Click Banking module in the sidebar.'],
             ['step_number' => 3, 'title' => 'Upload Statement', 'description' => 'Click Upload Statement and select your bank file.'],
             ['step_number' => 4, 'title' => 'Run Reconciliation', 'description' => 'Click Reconcile to start the automatic matching.'],

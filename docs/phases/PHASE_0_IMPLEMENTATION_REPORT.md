@@ -168,7 +168,7 @@ lists status + primary evidence.
   particular deploy, `HtmlSanitizer` falls back to in-memory definitions
   automatically (slower first request, no failure).
 - **AicountlySitePublisher.** Endpoint is still a placeholder; when the
-  real AICOUNTLY.com write API lands, add its hostname to
+  real aicountly.com write API lands, add its hostname to
   `URL_POLICY_ALLOWED_HOSTS`.
 - **Job worker under cPanel.** Long-running `spark reach:work` is
   discouraged by most shared hosts. The documented pattern is

@@ -47,10 +47,10 @@ class BlogMetadataServiceTest extends CIUnitTestCase
 
     public function testDeriveExcerptReturnsPlainText(): void
     {
-        $html    = '<h2>Introduction</h2><p>AICOUNTLY is an AI-powered accounting platform.</p>';
+        $html    = '<h2>Introduction</h2><p>Aicountly is an AI-powered accounting platform.</p>';
         $excerpt = $this->service->deriveExcerpt($html);
         $this->assertStringNotContainsString('<', $excerpt);
-        $this->assertStringContainsString('AICOUNTLY', $excerpt);
+        $this->assertStringContainsString('Aicountly', $excerpt);
     }
 
     public function testDeriveExcerptRespectMaxLength(): void

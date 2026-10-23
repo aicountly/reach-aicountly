@@ -81,10 +81,10 @@ class InitialReachSeeder extends Seeder
         // ---- Default settings row so Settings UI has data to render ----
         $settings = $this->db->table('reach_settings');
         $defaults = [
-            'brand.name'        => 'AICOUNTLY',
+            'brand.name'        => 'Aicountly',
             'brand.tagline'     => 'AI for accountants',
-            'blog.default_author' => $name ?: 'AICOUNTLY',
-            'social.default_hashtags' => ['#AICOUNTLY', '#accountingAI'],
+            'blog.default_author' => $name ?: 'Aicountly',
+            'social.default_hashtags' => ['#Aicountly', '#accountingAI'],
         ];
         foreach ($defaults as $key => $value) {
             $exists = $settings->where('key', $key)->countAllResults() > 0;

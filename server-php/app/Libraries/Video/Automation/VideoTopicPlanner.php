@@ -54,7 +54,7 @@ final class VideoTopicPlanner
         // Live: Smart Books, Inventory, Billing, Notes, Drive + Manage (aicountly.com/pricing and the
         // launch page); every other app is Beta on the site. Drive has no product page of its own.
         $pages = [
-            '/'                         => 'AICOUNTLY home page — the product suite overview',
+            '/'                         => 'Aicountly home page — the product suite overview',
             '/free-accounting-software' => 'Launch page — Smart Books, Inventory, Billing, Notes and Drive are live with Manage; free to get started',
             '/platform'                 => 'Platform overview',
             '/pricing'                  => 'Pricing plans — the Free plan with the live apps; other apps marked Beta',
@@ -97,7 +97,7 @@ final class VideoTopicPlanner
             $month = (int) $d->format('n');
             $label = self::MONTHLY[$day] ?? null;
             if ($label !== null) {
-                $out[] = ['topic' => $label, 'angle' => 'Due ' . $d->format('j M Y') . ' — explain what is due, who files it and how AICOUNTLY helps prepare it. Confirm the current due date on the official portal first; extensions are common.', 'kind' => 'compliance'];
+                $out[] = ['topic' => $label, 'angle' => 'Due ' . $d->format('j M Y') . ' — explain what is due, who files it and how Aicountly helps prepare it. Confirm the current due date on the official portal first; extensions are common.', 'kind' => 'compliance'];
             }
             foreach (self::ANNUAL as [$m, $dd, $text]) {
                 if ($m === $month && $dd === $day) {

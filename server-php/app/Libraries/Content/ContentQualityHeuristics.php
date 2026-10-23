@@ -28,7 +28,7 @@ final class ContentQualityHeuristics
         'prompt_echo'        => '/\b(?:system\s+prompt|prompt\s+template|the\s+provided\s+context|based\s+on\s+the\s+(?:grounding|provided)\s+(?:context|data))\b/i',
     ];
 
-    /** Generic marketing filler that never belongs in an AICOUNTLY tax/accounting article. */
+    /** Generic marketing filler that never belongs in an Aicountly tax/accounting article. */
     private const FILLER_PATTERNS = [
         '/\bdigital\s+content\s+creation\b/i',
         '/\bcontent\s+creation\s+(?:process|strategy|landscape)\b/i',

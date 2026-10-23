@@ -30,7 +30,7 @@ class StructuredDataIntegrationTest extends CIUnitTestCase
             ['title' => 'Configure', 'description' => 'Enter configuration values'],
             ['title' => 'Save', 'description' => 'Click save to persist'],
         ];
-        $schema = $this->builder->buildHowTo('How to Configure AICOUNTLY', $steps, 'Step by step guide.');
+        $schema = $this->builder->buildHowTo('How to Configure Aicountly', $steps, 'Step by step guide.');
         $result = $this->validator->validate($schema);
         $this->assertTrue($result['valid'], json_encode($result['errors']));
     }
@@ -38,7 +38,7 @@ class StructuredDataIntegrationTest extends CIUnitTestCase
     public function testFaqPageAlwaysValid(): void
     {
         $items  = [
-            ['question' => 'What is AICOUNTLY?', 'answer' => 'AI-powered accounting platform.'],
+            ['question' => 'What is Aicountly?', 'answer' => 'AI-powered accounting platform.'],
             ['question' => 'Is there a free trial?', 'answer' => 'Yes, 14 days free.'],
             ['question' => 'Does it support GST?', 'answer' => 'Yes, full GST support.'],
         ];
@@ -52,7 +52,7 @@ class StructuredDataIntegrationTest extends CIUnitTestCase
         $crumbs = [
             ['name' => 'Home', 'url' => 'https://aicountly.com'],
             ['name' => 'Blog', 'url' => 'https://aicountly.com/blog'],
-            ['name' => 'How AICOUNTLY Works'],
+            ['name' => 'How Aicountly Works'],
         ];
         $schema = $this->builder->buildBreadcrumbs($crumbs);
         $result = $this->validator->validate($schema);
@@ -62,7 +62,7 @@ class StructuredDataIntegrationTest extends CIUnitTestCase
     public function testWebPageAlwaysValid(): void
     {
         $schema = $this->builder->buildWebPage(
-            'AICOUNTLY — AI Accounting Platform',
+            'Aicountly — AI Accounting Platform',
             'https://aicountly.com',
             'Cloud-based AI accounting for Indian SMBs.'
         );

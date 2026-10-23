@@ -189,7 +189,7 @@ export const ADS_PLATFORMS = [
     needs: [
       'A Google Ads manager (MCC) account and an approved Google Ads API developer token (Basic or Standard access).',
       'A Google Cloud OAuth 2.0 client (client id + secret) and a refresh token for a user with access to the ads account.',
-      'The customer id of the AICOUNTLY ads account (and the manager login-customer-id).',
+      'The customer id of the Aicountly ads account (and the manager login-customer-id).',
       'Reach-side code for campaigns, spend and conversion reporting — not built.',
     ],
   },

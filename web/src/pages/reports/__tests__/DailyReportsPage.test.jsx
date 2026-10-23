@@ -17,7 +17,7 @@ vi.mock('../../../services/reportService', () => ({
 import { DailyReportsPage } from '../DailyReportsPage';
 
 const rows = {
-  reports: [{ id: 1, report_date: '2026-10-17', status: 'failed', subject: 'AICOUNTLY daily report', error: 'EMAIL_API_KEY is not configured — the report was generated but not sent.', sent_to: null }],
+  reports: [{ id: 1, report_date: '2026-10-17', status: 'failed', subject: 'Aicountly daily report', error: 'EMAIL_API_KEY is not configured — the report was generated but not sent.', sent_to: null }],
   recipients: ['pno@aicountly.com'],
   today: '2026-10-17',
 };

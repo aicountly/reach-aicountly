@@ -119,7 +119,7 @@ final class ContentBaseLivingTest extends ApiTestCase
             'summary'          => 'Set up your company details in Smart Books.',
             'body_html'        => $this->kbBody(),
             'steps'            => [['title' => 'Open Settings', 'text' => 'Choose Company in Settings.']],
-            'seo'              => ['slug' => 'smart-books-company-setup', 'meta_title' => 'Set up your company in Smart Books', 'meta_description' => 'Step by step: set up your company details in AICOUNTLY Smart Books before you record your first invoice.'],
+            'seo'              => ['slug' => 'smart-books-company-setup', 'meta_title' => 'Set up your company in Smart Books', 'meta_description' => 'Step by step: set up your company details in Aicountly Smart Books before you record your first invoice.'],
             'provenance'       => ['generated_by_model' => 'claude-sonnet', 'routine_run_id' => 'session_test'],
         ];
     }

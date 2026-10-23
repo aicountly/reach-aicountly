@@ -16,9 +16,9 @@ vi.mock('../../../services/botActionsService', () => ({
 
 import { BotAskPage } from '../BotAskPage';
 
-const EXAMPLE = 'Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social platforms today.';
+const EXAMPLE = 'Post a 30-second soft-launch reel announcing Aicountly on all connected social platforms today.';
 const channels = [
-  { channel: 'youtube', label: 'YouTube', ready: true, account: 'AICOUNTLY', reason: null },
+  { channel: 'youtube', label: 'YouTube', ready: true, account: 'Aicountly', reason: null },
   { channel: 'instagram', label: 'Instagram', ready: true, account: 'aicountly', reason: null },
   { channel: 'linkedin', label: 'LinkedIn', ready: false, account: null, reason: 'No active LinkedIn account is connected in social-api.ai.' },
 ];
@@ -73,7 +73,7 @@ describe('BotAskPage', () => {
           uuid: 'c2', kind: 'command', instruction: EXAMPLE, channels: ['youtube', 'instagram'], status: 'completed', created_at: '2026-10-18T10:00:00Z', created_by: 'Owner',
           session_url: 'https://claude.ai/code/session_A', report_summary: 'Submitted the soft-launch Short; Reach approved it.', report_links: [{ label: 'Video status', url: 'https://reach.aicountly.org/api/v1/automation/videos/v1' }],
           artifacts: [
-            { type: 'video', ref: 'v1', title: 'AICOUNTLY is here', format: 'short', status: 'in_progress', step: 'render_poll', link: '/video' },
+            { type: 'video', ref: 'v1', title: 'Aicountly is here', format: 'short', status: 'in_progress', step: 'render_poll', link: '/video' },
             { type: 'social_post', ref: '9', channel: 'instagram', status: 'manual_queue', error: null, link: '/social/queue' },
           ],
         },

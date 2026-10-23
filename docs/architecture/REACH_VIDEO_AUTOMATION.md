@@ -13,7 +13,7 @@
 
 ## 1. Overview
 
-The Reach Video Automation system delivers a fully governed video content lifecycle within the AICOUNTLY Reach platform. Starting from AI-grounded idea discovery, through editorial script review and approval, asynchronous render orchestration, and YouTube publication — every transition is:
+The Reach Video Automation system delivers a fully governed video content lifecycle within the Aicountly Reach platform. Starting from AI-grounded idea discovery, through editorial script review and approval, asynchronous render orchestration, and YouTube publication — every transition is:
 
 - **Permission-gated** — enforced at the route filter level
 - **Audit-trailed** — every state change written to the audit log

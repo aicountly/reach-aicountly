@@ -120,7 +120,7 @@ final class WhatsappSender
      *   {"messages":[{"from","to","messageId","content":{"templateName","templateData":{"body":{"placeholders":[...]}},"language"}}]}
      *
      * Built from Infobip's public API reference; not yet exercised against the
-     * live AICOUNTLY account. Returns the provider message id on acceptance,
+     * live Aicountly account. Returns the provider message id on acceptance,
      * null otherwise (including when WHATSAPP_SKIP_SEND is on — callers must
      * check isSendDisabled() first and record an honest "skipped").
      *

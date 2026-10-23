@@ -91,7 +91,7 @@ final class StructuredContentPipelineTest extends ApiTestCase
             'external_key' => $key !== '' ? $key : "{$product}:{$version}:" . bin2hex(random_bytes(3)),
             'product_slug' => $product,
             'version'      => $version,
-            'title'        => "Release Notes for AICOUNTLY Billing Version {$version}",
+            'title'        => "Release Notes for Aicountly Billing Version {$version}",
             'date_iso'     => '2026-10-16',
             'intro'        => 'This release adds a day-close dashboard and fixes rounding on split payments.',
             'sections'     => [
@@ -173,7 +173,7 @@ final class StructuredContentPipelineTest extends ApiTestCase
     public function testARevisionIsReVettedOnceAndOnlyTheTextChanges(): void
     {
         $revised = [
-            'title'    => 'Release Notes for AICOUNTLY Billing Version 1.0',
+            'title'    => 'Release Notes for Aicountly Billing Version 1.0',
             'intro'    => 'Billing 1.0 adds a day-close dashboard and fixes rounding on split payments.',
             'sections' => [['heading' => 'New', 'bullets' => ['See your cash, card and UPI totals at the end of the day.']]],
             'slug'     => 'something-else', // not a vetted field — must be ignored

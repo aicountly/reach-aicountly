@@ -1,4 +1,4 @@
-# AICOUNTLY Reach — Marketing Automation Gap Matrix
+# Aicountly Reach — Marketing Automation Gap Matrix
 
 **Audit date:** 2026-07-12  
 **Repository:** reach-aicountly  
@@ -32,7 +32,7 @@ Status classifications used: Implemented, Substantially Implemented, Partially I
 | 20 | Daily approval queue | Today's pending items with preview and priority | Partially Implemented | `reach_approvals`, `ApprovalsPage.jsx` — list only | Preview, priority, filters, calendar view | Critical | High | High | All content modules | Phase 2 |
 | 21 | Multi-stage approval | Role-based, multi-reviewer, compliance stage | Missing | Single approve/reject; superadmin only | Role model, stage config, routing | Critical | High | Critical — SoD | Role permissions | Phase 2 |
 | 22 | Publishing scheduler | Schedule approved content to channels | Partially Implemented | `scheduled_at` on blog/social; no job runner | Scheduler, job queue, retry | High | High | Medium | Job queues | Phase 2–4 |
-| 23 | Website publishing | Publish blogs/pages to aicountly.com | Stub/Placeholder | `AicountlySitePublisher.php` — HTTP placeholder | Real CMS/API integration | Critical | High | High | AICOUNTLY.com write API | Phase 4 |
+| 23 | Website publishing | Publish blogs/pages to aicountly.com | Stub/Placeholder | `AicountlySitePublisher.php` — HTTP placeholder | Real CMS/API integration | Critical | High | High | aicountly.com write API | Phase 4 |
 | 24 | Community publishing | Publish Q&A to aicountly.com/community | Missing | No community integration | Community API connector | High | High | Critical | Community platform | Phase 5 |
 | 25 | Social publishing | Auto-post to LinkedIn, X, FB, IG | Stub/Placeholder | `SocialPostController::approve` → manual_queue | Social SDK integration | High | High | Medium | Channel credentials | Phase 7 |
 | 26 | Email publishing | Send email campaigns via provider | Stub/Placeholder | `EmailCampaignController::markSent` manual | Email provider SDK | High | High | Medium | Email provider | Phase 7 |

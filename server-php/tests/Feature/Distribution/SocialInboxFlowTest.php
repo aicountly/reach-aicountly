@@ -58,7 +58,7 @@ final class SocialInboxFlowTest extends DatabaseTestCase
         $this->now      = time();
         $this->alerts   = [];
         $this->verdicts = [
-            'how do i'   => ['category' => 'question', 'confidence' => 92, 'severity' => 'low', 'personal_data' => false, 'summary' => 'Asks how to file GSTR-1.', 'reply' => 'You can file GSTR-1 from Returns in AICOUNTLY. For your own case, check with your CA.'],
+            'how do i'   => ['category' => 'question', 'confidence' => 92, 'severity' => 'low', 'personal_data' => false, 'summary' => 'Asks how to file GSTR-1.', 'reply' => 'You can file GSTR-1 from Returns in Aicountly. For your own case, check with your CA.'],
             'love it'    => ['category' => 'praise', 'confidence' => 95, 'severity' => 'low', 'personal_data' => false, 'summary' => 'Praise.', 'reply' => 'Thank you so much!'],
             'broken'     => ['category' => 'complaint', 'confidence' => 90, 'severity' => 'medium', 'personal_data' => false, 'summary' => 'Export broken.', 'reply' => ''],
             'lawyer'     => ['category' => 'complaint', 'confidence' => 88, 'severity' => 'high', 'severity_reason' => 'legal threat', 'personal_data' => false, 'summary' => 'Threatens legal action over billing.', 'reply' => ''],
@@ -71,7 +71,7 @@ final class SocialInboxFlowTest extends DatabaseTestCase
         $this->vetRevision    = null;
         $this->classifierDown = false;
         $this->http = (new FakeHttpTransport())->on('GET', '#/v1/accounts$#', FakeHttpTransport::json(200, [
-            ['id' => 'acc_li', 'name' => 'AICOUNTLY', 'platform' => 'linkedin', 'status' => 'active'],
+            ['id' => 'acc_li', 'name' => 'Aicountly', 'platform' => 'linkedin', 'status' => 'active'],
         ]));
     }
 
@@ -199,16 +199,16 @@ final class SocialInboxFlowTest extends DatabaseTestCase
 
     public function testAQuestionIsAnsweredOnlyAfterVettingAndSocialApiAcceptingIt(): void
     {
-        $this->inbox([$this->item('c1', 'How do I file GSTR-1 in AICOUNTLY?')]);
+        $this->inbox([$this->item('c1', 'How do I file GSTR-1 in Aicountly?')]);
         $this->acceptReplies();
         $this->vetDecision = 'revise';
-        $this->vetRevision = ['reply' => 'You can file GSTR-1 from Returns in AICOUNTLY — check the specifics with your CA.'];
+        $this->vetRevision = ['reply' => 'You can file GSTR-1 from Returns in Aicountly — check the specifics with your CA.'];
         $out = $this->service()->run();
 
         $this->assertSame(1, $out['process']['replied']);
         $r = $this->row('c1');
         $this->assertSame(['replied', 'sent', 'question', 'revise'], [$r['status'], $r['reply_status'], $r['classification'], $r['vetting_decision']]);
-        $this->assertSame('You can file GSTR-1 from Returns in AICOUNTLY — check the specifics with your CA. — AICOUNTLY team', $r['reply_text'], 'the vetted text, signed');
+        $this->assertSame('You can file GSTR-1 from Returns in Aicountly — check the specifics with your CA. — Aicountly team', $r['reply_text'], 'the vetted text, signed');
         $this->assertSame('rep_c1', $r['reply_external_id']);
         $posted = json_decode((string) $this->http->to('#/reply$#', 'POST')[0]['body'], true);
         $this->assertSame($r['reply_text'], $posted['text']);

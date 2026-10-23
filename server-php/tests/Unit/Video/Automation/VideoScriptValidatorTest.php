@@ -29,11 +29,11 @@ final class VideoScriptValidatorTest extends CIUnitTestCase
             'external_key' => 'vlog-2026-10-17-gst',
             'format' => 'vlog',
             'title' => 'GST returns explained <in 4 minutes>',
-            'description' => "GSTR-1 and GSTR-3B for small businesses.\nWith AICOUNTLY Smart Books.",
+            'description' => "GSTR-1 and GSTR-3B for small businesses.\nWith Aicountly Smart Books.",
             'tags' => ['GST', 'gst', 'GSTR-1', 'Smart Books', ''],
             'chapters' => [['title' => 'Intro', 'scene_order' => 1], ['title' => 'GSTR-1', 'scene_order' => 2], ['title' => 'GSTR-3B', 'scene_order' => 4]],
             'scenes' => $scenes,
-            'cta_text' => 'Start with AICOUNTLY Smart Books at aicountly.com',
+            'cta_text' => 'Start with Aicountly Smart Books at aicountly.com',
             'thumbnail_prompt' => 'A clean illustration of a GST return form with a green tick',
             'product_slug' => 'smart_books',
         ], $over);
@@ -49,7 +49,7 @@ final class VideoScriptValidatorTest extends CIUnitTestCase
             'tags' => ['TDS'],
             'scenes' => [
                 ['order' => 1, 'voice_over_text' => 'TDS you deducted last month is usually due by the seventh.', 'on_screen_text' => 'TDS: usually the 7th', 'visual' => ['type' => 'image', 'url_or_prompt' => 'A calendar with the 7th circled in green'], 'duration_hint_secs' => 5],
-                ['order' => 2, 'voice_over_text' => 'AICOUNTLY Smart Books lists what is due so you can plan the payment.', 'on_screen_text' => '', 'visual' => ['type' => 'screenshot', 'url_or_prompt' => 'https://aicountly.com/smart-books'], 'duration_hint_secs' => 6],
+                ['order' => 2, 'voice_over_text' => 'Aicountly Smart Books lists what is due so you can plan the payment.', 'on_screen_text' => '', 'visual' => ['type' => 'screenshot', 'url_or_prompt' => 'https://aicountly.com/smart-books'], 'duration_hint_secs' => 6],
             ],
             'cta_text' => 'See aicountly.com',
             'thumbnail_prompt' => '',
