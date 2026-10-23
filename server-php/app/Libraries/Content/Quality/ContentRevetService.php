@@ -37,7 +37,19 @@ use Config\Database;
  *                          stays reserved in the receiver's registry and in
  *                          Reach), then blog/KB queued for regeneration and
  *                          republished at the same URL by the routine.
- *   live, revise / pass  → recorded only (a revise is listed for the owner).
+ *   live, revise→approve → the corrected text Gemini approved is applied by
+ *                          LiveRevisionApplier: a new current version,
+ *                          approved under the SystemApprover, republished
+ *                          through the publisher at the SAME slug and public
+ *                          record (`revision_applied+republish_queued`). A
+ *                          title that drifts from the topic is not taken; the
+ *                          slug never changes; nothing is taken down. An error
+ *                          rolls back and reads `revision_failed` (reason in
+ *                          the reasons and the log).
+ *   live, other revise   → listed for the owner (`flagged_for_owner`): an
+ *                          unresolved revise, no changed text, a HIGH_RISK
+ *                          verdict, a release note / workflow guide.
+ *   live, pass           → recorded only.
  *   vetting unavailable  → nothing changes; listed as unavailable.
  *
  * Heuristic flags alone never retire or unpublish anything.
@@ -52,14 +64,20 @@ class ContentRevetService
     /** @var (callable(int $deploymentId, string $reason): bool)|null */
     private $unpublisher;
 
+    private ?LiveRevisionApplier $revisions;
+    /** What the live-revision branch did, for the report row and the check log. */
+    private ?string $revisionNote = null;
+
     public function __construct(
         private readonly ?ContentVettingService $vetting = null,
         ?BaseConnection $db = null,
         ?callable $unpublisher = null,
+        ?LiveRevisionApplier $revisions = null,
     ) {
         $this->db          = $db ?? Database::connect();
         $this->log         = new QualityCheckLog($this->db);
         $this->unpublisher = $unpublisher;
+        $this->revisions   = $revisions;
     }
 
     /**
@@ -209,15 +227,19 @@ class ContentRevetService
         }
 
         $checkId = null;
+        $this->revisionNote = null;
         if (! $dryRun) {
-            $row['action'] = $this->act($c, $row['decision'], $rejected, $verdict['reasons']);
+            $row['action'] = $this->act($c, $row['decision'], $rejected, $verdict['reasons'], $verdict, $content);
         } else {
             $row['action'] = 'none';
-            $row['would']  = $this->wouldDo($c, $row['decision'], $rejected);
+            $row['would']  = $this->wouldDo($c, $row['decision'], $rejected, $verdict, $content);
+        }
+        if ($this->revisionNote !== null) {
+            $row['reasons'][] = $this->revisionNote;
         }
         $checkId = $this->log->record($base + [
             'decision' => $row['decision'], 'vetting_decision' => $verdict['decision'], 'vetting_run_id' => $verdict['run_id'],
-            'reasons' => $verdict['reasons'], 'action' => $row['action'],
+            'reasons' => $this->revisionNote !== null ? [...$verdict['reasons'], $this->revisionNote] : $verdict['reasons'], 'action' => $row['action'],
         ]);
         if ($checkId !== null && str_contains($row['action'], 'regeneration')) {
             $this->db->table('reach_content_regenerations')->where('content_item_id', $c['id'])
@@ -228,8 +250,12 @@ class ContentRevetService
         return $row;
     }
 
-    /** @param list<string> $reasons */
-    private function act(array $c, string $decision, bool $rejected, array $reasons): string
+    /**
+     * @param list<string>         $reasons
+     * @param array<string, mixed> $verdict RoutineVetting::run()
+     * @param array<string, mixed> $content VettableContent::forItem()
+     */
+    private function act(array $c, string $decision, bool $rejected, array $reasons, array $verdict = [], array $content = []): string
     {
         $regenerable = in_array($c['type'], ['blog', 'knowledge_base'], true);
 
@@ -247,9 +273,16 @@ class ContentRevetService
             return 'none';
         }
 
-        // Live: only a vetting-model REJECT takes a page down.
+        // Live: only a vetting-model REJECT takes a page down; an approved
+        // correction is applied and republished at the same URL.
         if (! $rejected) {
-            return $decision === 'pass' ? 'none' : 'flagged_for_owner';
+            if ($decision === 'pass') {
+                return 'none';
+            }
+            $result = $this->revisions()->apply($c, $content, $verdict);
+            $this->revisionNote = $result['note'];
+
+            return $result['action'];
         }
         if ($c['deployment_id'] === null) {
             return 'flagged_for_owner'; // live by workflow only; nothing the publisher can withdraw
@@ -264,14 +297,26 @@ class ContentRevetService
             ? 'unpublished+queued_regeneration' : 'unpublished';
     }
 
-    private function wouldDo(array $c, string $decision, bool $rejected): string
+    private function wouldDo(array $c, string $decision, bool $rejected, array $verdict = [], array $content = []): string
     {
         $regenerable = in_array($c['type'], ['blog', 'knowledge_base'], true);
         if ($c['scope'] === 'unpublished') {
             return $decision === 'fail' ? ($regenerable ? 'retire+queue_regeneration' : 'retire') : ($regenerable ? 'adopt_into_pipeline' : 'none');
         }
 
-        return $rejected ? ($regenerable ? 'unpublish+queue_regeneration' : 'unpublish') : ($decision === 'pass' ? 'none' : 'flag_for_owner');
+        if (! $rejected && $decision !== 'pass') {
+            $plan = $this->revisions()->plan($c, $content, $verdict);
+            $this->revisionNote = $plan['note'];
+
+            return $plan['applicable'] ? 'apply_revision+republish' : 'flag_for_owner';
+        }
+
+        return $rejected ? ($regenerable ? 'unpublish+queue_regeneration' : 'unpublish') : 'none';
+    }
+
+    private function revisions(): LiveRevisionApplier
+    {
+        return $this->revisions ??= new LiveRevisionApplier($this->db);
     }
 
     private function unpublish(int $deploymentId, string $reason): bool

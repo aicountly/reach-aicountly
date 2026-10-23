@@ -392,7 +392,9 @@ php spark reach:content-revet --ids=1,5                  # just these items
 | approved, not live | approve / revise→approve | adopted into the routine pipeline (origin `revet`, no quota): cover, publish, verify |
 | approved, not live | reject / unresolved revise | approval revoked, item `rejected`, queued for a same-slug rewrite |
 | live | reject | withdrawn on aicountly.com (`unpublish`: the receiver answers 410 and keeps the slug), item `unpublished`, queued for a same-slug rewrite |
-| live | revise / approve | recorded only (`flagged_for_owner` for a revise) |
+| live (blog/KB) | revise→approve with changed text | Gemini's corrected text becomes a new current version (approved under the SystemApprover, vetting run bound) and is republished at the same slug and public record: `revision_applied+republish_queued` (`revision_failed` + reason on an error; nothing changes). Slug never changes; Gemini's title only when it is still the topic; never taken down |
+| live | unresolved revise, no changed text, HIGH_RISK, release note / guide | `flagged_for_owner` (reason in the report) |
+| live | approve | recorded only |
 | any | vetting unavailable | nothing changes |
 
 The blog and KB routines take queued rewrites first (`GET v1/automation/regenerate/next`) and

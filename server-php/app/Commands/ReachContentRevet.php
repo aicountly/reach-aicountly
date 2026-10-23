@@ -15,6 +15,16 @@ use CodeIgniter\CLI\CLI;
  * model, then clean up: see ContentRevetService for exactly what each verdict
  * does. --dry-run changes nothing and prints what would happen.
  *
+ * Live items: a Gemini reject withdraws the page and queues a same-slug
+ * rewrite; a revise that Gemini approved after correcting it is applied
+ * (LiveRevisionApplier): new current version, approved under the
+ * SystemApprover, republished at the same URL (`revision_applied+republish_queued`,
+ * or `revision_failed` with the reason; dry run: `apply_revision+republish`).
+ * The slug never changes and a revise never takes a page down. A revise with
+ * no usable corrected text stays `flagged_for_owner`. To fix given posts:
+ *   php spark reach:content-revet --scope=live --type=blog --ids=2,32 --dry-run
+ *   php spark reach:content-revet --scope=live --type=blog --ids=2,32
+ *
  * Options:
  *   --dry-run            report only
  *   --scope=all|unpublished|live

@@ -11,7 +11,9 @@ use App\Libraries\JobHandlerInterface;
 /**
  * Daily safety net (reach:schedule, 01:00 UTC): re-vets content that went
  * live in the last 48 hours. A vetting-model REJECT takes the page down and
- * queues a same-slug rewrite; anything else is recorded only. The daily
+ * queues a same-slug rewrite; a correction Gemini approved is applied and
+ * republished at the same URL (LiveRevisionApplier); anything else is
+ * recorded only. The daily
  * report shows the counts (informational — nobody has to act).
  */
 class ContentQualitySweepJob implements JobHandlerInterface
