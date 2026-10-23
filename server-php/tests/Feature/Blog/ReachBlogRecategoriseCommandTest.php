@@ -136,4 +136,25 @@ final class ReachBlogRecategoriseCommandTest extends DatabaseTestCase
         command('reach:blog-recategorise --republish');
         $this->assertSame('GST', $this->profile($id)['category']);
     }
+
+    public function testTheOwnerCanFileOnePostByHand(): void
+    {
+        $stock = $this->seedBlog('Physical stock verification: a practical year-end routine', 'Accounting');
+        $hr    = $this->seedBlog('The complete payroll compliance checklist for Indian startups', null, 'publish_queued', 'problem_to_product');
+        $other = $this->seedBlog('GSTR-1 amendments made simple', 'GST');
+
+        command("reach:blog-recategorise --id {$stock} --category inventory-stock --product inventory --apply");
+        $this->assertSame('inventory-stock', $this->profile($stock)['category']);
+        $this->assertSame('inventory', $this->profile($stock)['product_slug']);
+        $this->assertSame('GST', $this->profile($other)['category'], 'only the --id post is touched');
+
+        command("reach:blog-recategorise --id {$hr} --category Payroll --product none --apply");
+        $this->assertSame('payroll-hr', $this->profile($hr)['category'], 'a known label is accepted');
+        $this->assertNull($this->profile($hr)['product_slug'], '--product=none makes it a topic article');
+
+        command("reach:blog-recategorise --id {$stock} --category astrology --apply");
+        $this->assertSame('inventory-stock', $this->profile($stock)['category'], 'an unknown category is refused');
+        command("reach:blog-recategorise --category gst --apply");
+        $this->assertSame('GST', $this->profile($other)['category'], '--category without --id is refused');
+    }
 }

@@ -82,6 +82,39 @@ class BlogRecategoriseService
     }
 
     /**
+     * The owner's own choice for the post(s) in a plan built for one --id:
+     * category and/or product_slug replace what was inferred. $category and
+     * $product must already be canonical (or null for "no app"); $setProduct
+     * says whether the product was given at all.
+     *
+     * @param array<string, mixed> $plan from plan()
+     * @return array<string, mixed>
+     */
+    public function withOverride(array $plan, ?string $category, bool $setProduct, ?string $product): array
+    {
+        $after = [];
+        foreach ($plan['rows'] as $i => $row) {
+            if ($category !== null) {
+                $row['category_after'] = $category;
+                $row['evidence'][]     = 'category ' . $category . ' set by the owner (--category)';
+            }
+            if ($setProduct) {
+                $row['product_after'] = $product;
+                $row['evidence'][]    = 'product_slug ' . ($product ?? '(none)') . ' set by the owner (--product)';
+            }
+            $row['changed'] = ($row['category_after'] !== null && $row['category_after'] !== $row['category_before'])
+                || $row['product_after'] !== $row['product_before'];
+            $plan['rows'][$i] = $row;
+            $after[] = ['category' => $row['category_after'] ?? $row['category_before'], 'product_slug' => $row['product_after']];
+        }
+        $plan['after']    = self::counts($after, true);
+        $plan['changed']  = count(array_filter($plan['rows'], static fn ($r) => $r['changed']));
+        $plan['unmapped'] = array_values(array_filter($plan['rows'], static fn ($r) => $r['category_after'] === null));
+
+        return $plan;
+    }
+
+    /**
      * Write the planned profile changes. Text and versions are not touched.
      *
      * @param array<string, mixed> $plan from plan()

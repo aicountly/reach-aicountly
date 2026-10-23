@@ -6,6 +6,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\ParsesSparkOptions;
 use App\Libraries\Blog\BlogRecategoriseService;
+use App\Libraries\Blog\BlogTaxonomy;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Throwable;
@@ -32,12 +33,14 @@ class ReachBlogRecategorise extends BaseCommand
     protected $group       = 'Reach';
     protected $name        = 'reach:blog-recategorise';
     protected $description = 'File existing blogs under the aicountly.com taxonomy (canonical category + product_slug). Dry run by default.';
-    protected $usage       = 'reach:blog-recategorise [--dry-run] [--apply] [--republish] [--id=N] [--json]';
+    protected $usage       = 'reach:blog-recategorise [--dry-run] [--apply] [--republish] [--id=N [--category=<slug>] [--product=<slug>|none]] [--json]';
     protected $options     = [
         '--dry-run'   => 'Show the plan only (the default).',
         '--apply'     => 'Write the new category / product_slug to the publication profiles.',
         '--republish' => 'With --apply: queue a republish of every changed live post.',
         '--id'        => 'Only this content item.',
+        '--category'  => 'With --id: file the post under this category (one of the 15 slugs or a known label) instead of the inferred one.',
+        '--product'   => 'With --id: tag the post with this app (an aicountly.com product slug), or "none" to make it a topic article.',
         '--json'      => 'Print the full plan as JSON.',
     ];
 
@@ -53,9 +56,43 @@ class ReachBlogRecategorise extends BaseCommand
             return EXIT_ERROR;
         }
 
+        $categoryOpt = $this->sparkOption('category', $params);
+        $productOpt  = $this->sparkOption('product', $params);
+        $category    = null;
+        $product     = null;
+        if (($categoryOpt !== null || $productOpt !== null) && $id <= 0) {
+            CLI::error('--category / --product need --id=N (one post at a time).');
+
+            return EXIT_ERROR;
+        }
+        if ($categoryOpt !== null) {
+            $category = BlogTaxonomy::canonical((string) $categoryOpt);
+            if ($category === null) {
+                CLI::error('Unknown category "' . $categoryOpt . '". Use one of: ' . implode(', ', BlogTaxonomy::slugs()));
+
+                return EXIT_ERROR;
+            }
+        }
+        if ($productOpt !== null && strtolower(trim((string) $productOpt)) !== 'none') {
+            $product = BlogTaxonomy::canonicalProduct((string) $productOpt);
+            if ($product === null) {
+                CLI::error('Unknown product "' . $productOpt . '". Use an aicountly.com product slug (' . implode(', ', BlogTaxonomy::productSlugs()) . ') or "none".');
+
+                return EXIT_ERROR;
+            }
+        }
+
         try {
             $service = new BlogRecategoriseService();
             $plan    = $service->plan($id > 0 ? $id : null);
+            if ($id > 0 && $plan['rows'] === []) {
+                CLI::error("No blog with content item id {$id}.");
+
+                return EXIT_ERROR;
+            }
+            if ($categoryOpt !== null || $productOpt !== null) {
+                $plan = $service->withOverride($plan, $category, $productOpt !== null, $product);
+            }
 
             if ($this->sparkFlag('json', $params)) {
                 CLI::write(json_encode($plan, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));

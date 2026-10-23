@@ -363,6 +363,9 @@ Existing posts are refiled once with:
 php spark reach:blog-recategorise                        # dry run: each change + evidence, before/after counts
 php spark reach:blog-recategorise --apply                # write category / product_slug on the profiles (text untouched)
 php spark reach:blog-recategorise --apply --republish    # …and queue a republish of every changed live post
+php spark reach:blog-recategorise --id=N --category=inventory-stock --product=inventory --apply --republish
+                                                        # the owner's own choice for one post (category slug or label;
+                                                        # --product=<aicountly.com slug> or none) instead of the inferred one
 php spark reach:work --queue=publishing --once --limit=20   # (the worker cron does this on its own)
 ```
 
