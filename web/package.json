@@ -14,8 +14,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@tiptap/react": "^3.27.3",
-    "@tiptap/starter-kit": "^3.27.3",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
