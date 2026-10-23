@@ -19,6 +19,11 @@ class CampaignController extends BaseApiController
                 $q->where($filter, $val);
             }
         }
+        // "Created in the last N days" — the same predicate as analytics/summary's campaigns_created.
+        $days = trim((string) $this->request->getGet('days'));
+        if ($days !== '' && ctype_digit($days) && (int) $days >= 1 && (int) $days <= 365) {
+            $q->where('created_at >=', date('Y-m-d H:i:s', strtotime('-' . (int) $days . ' days')));
+        }
         $search = trim((string) $this->request->getGet('search'));
         if ($search !== '') {
             $q->like('name', $search);
@@ -34,6 +39,11 @@ class CampaignController extends BaseApiController
         if (! $row) {
             return $this->fail('Campaign not found.', 404);
         }
+        // Real counts behind the campaign page's drill links (leads_generated is a
+        // hand-entered figure): v1/leads?campaign_id= and v1/leads/outcomes?campaign_id=.
+        $db = \Config\Database::connect();
+        $row['leads_captured'] = (int) ($db->query('SELECT COUNT(*) AS n FROM reach_leads WHERE campaign_id = ?', [$id])->getRowArray()['n'] ?? 0);
+        $row['outcome_events'] = (int) ($db->query('SELECT COUNT(*) AS n FROM reach_lead_outcomes WHERE campaign_id = ?', [$id])->getRowArray()['n'] ?? 0);
         return $this->ok($row);
     }
 

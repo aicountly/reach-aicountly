@@ -19,6 +19,18 @@ class LeadController extends BaseApiController
                 $q->where($f, $v);
             }
         }
+        // Drill links: a campaign's / landing page's leads, one lead (lead_id), and
+        // "captured in the last N days" — the same predicate as analytics/summary.
+        foreach (['lead_id' => 'id', 'campaign_id' => 'campaign_id', 'landing_page_id' => 'landing_page_id'] as $key => $col) {
+            $v = trim((string) $this->request->getGet($key));
+            if ($v !== '' && ctype_digit($v)) {
+                $q->where($col, (int) $v);
+            }
+        }
+        $days = trim((string) $this->request->getGet('days'));
+        if ($days !== '' && ctype_digit($days) && (int) $days >= 1 && (int) $days <= 365) {
+            $q->where('created_at >=', date('Y-m-d H:i:s', strtotime('-' . (int) $days . ' days')));
+        }
         $search = trim((string) $this->request->getGet('search'));
         if ($search !== '') {
             $q->groupStart()
@@ -26,6 +38,8 @@ class LeadController extends BaseApiController
                 ->orLike('email', $search)
                 ->orLike('mobile', $search)
                 ->orLike('organization', $search)
+                ->orLike('engage_lead_code', $search)
+                ->orLike('ref_code', $search)
               ->groupEnd();
         }
         $total = $q->countAllResults(false);

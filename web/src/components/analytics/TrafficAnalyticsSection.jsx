@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { analyticsService } from '../../services/analyticsService';
 import { KPICard } from '../charts/KPICard';
 import { LineChart } from '../charts/LineChart';
@@ -6,6 +7,8 @@ import { PieChart } from '../charts/PieChart';
 import { BarChart } from '../charts/BarChart';
 import { Card } from '../common/Card';
 import { Loader } from '../common/Loader';
+import { drillHref } from '../drill';
+import { ROUTES } from '../../constants/routes';
 import {
   Activity, Users, Eye, MousePointerClick, AlertCircle, CheckCircle2,
 } from 'lucide-react';
@@ -43,6 +46,11 @@ const SAAS_PRODUCTS_FALLBACK = {
   contracts: 'Aicountly Contracts',
   pay: 'Aicountly Pay',
 };
+
+// GA4 events that submit a lead form. Under the chart they link to the leads
+// Reach captured in the same window (GA4 counts submits, Reach counts stored
+// leads, so the two can differ); clicks and page views have no Reach records.
+const LEAD_SUBMIT_EVENTS = new Set(['lead_form_submit', 'blog_lead_submit']);
 
 function buildSaasStreamOptions(products) {
   return Object.entries(products)
@@ -219,6 +227,7 @@ export function TrafficAnalyticsSection() {
     ? Object.entries(leads)
         .filter(([key]) => !key.startsWith('_'))
         .map(([key, count]) => ({
+          key,
           name: EVENT_LABELS[key] || key,
           open_count: count,
         }))
@@ -497,7 +506,14 @@ export function TrafficAnalyticsSection() {
           </Card>
           <Card title="Lead events (GA4)">
             {leadEvents.length > 0 ? (
-              <BarChart data={leadEvents} labelKey="name" valueKey="open_count" color="var(--color-primary)" />
+              <>
+                <BarChart data={leadEvents} labelKey="name" valueKey="open_count" color="var(--color-primary)" />
+                {leadEvents.some((e) => LEAD_SUBMIT_EVENTS.has(e.key) && e.open_count > 0) && (
+                  <p className="text-sm" style={{ marginTop: '0.5rem' }}>
+                    <Link to={drillHref(ROUTES.LEADS, { days })}>Leads Reach captured in the last {days} days ›</Link>
+                  </p>
+                )}
+              </>
             ) : (
               <p className="text-sm text-muted">
                 {dataLoading

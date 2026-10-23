@@ -20,3 +20,9 @@ export function contentLabel(r) {
 export function sellerLabel(r) {
   return r.seller_code;
 }
+
+// Drill targets on Leads → Outcomes for each breakdown row (null = nothing to filter on).
+export const campaignFilter = (r) => (r.campaign_id == null ? null : { campaign_id: r.campaign_id });
+export const sourceFilter = (r) => ({ source: r.source });
+export const contentFilter = (r) => ({ content_identity_id: r.content_identity_id });
+export const sellerFilter = (r) => ({ seller_code: r.seller_code });

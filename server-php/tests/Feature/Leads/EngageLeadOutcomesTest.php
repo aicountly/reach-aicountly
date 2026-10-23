@@ -227,6 +227,55 @@ final class EngageLeadOutcomesTest extends ApiTestCase
         $this->assertSame(403, $this->withHeaders($analyst)->call('GET', 'v1/leads/outcomes')->response()->getStatusCode());
     }
 
+    public function testOutcomeListDrillFilters(): void
+    {
+        $this->send([
+            self::event('d-1', ['reach_lead_id' => $this->landingLead, 'stage' => 'converted', 'value_inr' => '100.00', 'occurred_at' => gmdate('c', time() - 3600)]),
+            self::event('d-2', ['lead_code' => 'LD-SELL-2', 'seller_code' => 'SLR-000999', 'stage' => 'qualified', 'occurred_at' => gmdate('c', time() - 7200)]),
+            self::event('d-3', ['reach_lead_id' => $this->touchLead, 'stage' => 'demo', 'occurred_at' => gmdate('c', time() - 5400)]),
+            self::event('d-4', ['reach_lead_id' => $this->landingLead, 'stage' => 'converted', 'sales_status' => 'paid', 'value_inr' => '50.00', 'occurred_at' => gmdate('c', time() - 1800)]),
+        ]);
+        $h     = $this->authAs('super_admin');
+        $total = fn (string $qs) => self::data($this->withHeaders($h)->call('GET', 'v1/leads/outcomes?' . $qs))['data']['total'];
+        $sum   = self::data($this->withHeaders($h)->call('GET', 'v1/leads/outcomes/summary'))['data'];
+
+        // Each breakdown row of the summary opens exactly the events it counted.
+        $byCampaign = array_column($sum['by_campaign'], 'events', 'campaign_id');
+        $this->assertSame($byCampaign[$this->campaignId], $total('campaign_id=' . $this->campaignId));
+        foreach ($sum['by_source'] as $r) {
+            $this->assertSame($r['events'], $total('source=' . urlencode($r['source'])), $r['source']);
+        }
+        $this->assertSame(1, $total('source=seller'));
+        $this->assertSame(0, $total('source=unattributed'));
+        $this->assertSame(1, $total('seller_code=SLR-000999'));
+        $this->assertSame($sum['by_content'][0]['events'], $total('content_identity_id=' . $this->contentId));
+        $this->assertSame([$sum['matched'], $sum['unmatched']], [$total('match=matched'), $total('match=unmatched')]);
+        $this->assertSame(1, $total('match=reach_lead_id&stage=demo'));
+        $this->assertSame(1, $total('paid=1'), 'paid sales_status counts as revenue, as in the summary');
+    }
+
+    public function testLeadListDrillFilters(): void
+    {
+        $db = Database::connect();
+        $db->table('reach_leads')->insert(['name' => 'Old Lead', 'email' => 'old@example.test', 'priority' => 'normal', 'created_at' => date('Y-m-d H:i:s', strtotime('-60 days'))]);
+        $h     = $this->authAs('super_admin');
+        $items = fn (string $qs) => self::data($this->withHeaders($h)->call('GET', 'v1/leads?' . $qs))['data'];
+
+        $this->assertSame([$this->landingLead], array_map('intval', array_column($items('campaign_id=' . $this->campaignId)['items'], 'id')));
+        $this->assertSame([$this->codeLead], array_map('intval', array_column($items('lead_id=' . $this->codeLead)['items'], 'id')));
+        $this->assertSame(4, $items('days=30')['total'], 'the 60-day-old lead is outside "last 30 days"');
+        $this->assertSame(5, $items('days=bogus')['total'], 'a malformed window is ignored');
+        $this->assertSame(1, $items('search=LD-000200')['total'], 'search covers the Engage lead code');
+        $this->assertSame(1, $items('search=SLR-000123')['total'], 'and the seller referral code');
+
+        // The campaign page's "Leads captured" count is the list it links to.
+        $campaign = self::data($this->withHeaders($h)->call('GET', 'v1/campaigns/' . $this->campaignId))['data'];
+        $this->assertSame($items('campaign_id=' . $this->campaignId)['total'], $campaign['leads_captured']);
+        $this->assertSame(0, $campaign['outcome_events']);
+        $campaigns = fn (string $qs) => self::data($this->withHeaders($h)->call('GET', 'v1/campaigns?' . $qs))['data']['total'];
+        $this->assertSame([2, 1], [$campaigns('days=30'), $campaigns('campaign_type=landing')]);
+    }
+
     public function testPublicCaptureStoresRefAndUtm(): void
     {
         $res = $this->withEnv('ENGAGE_API_BASE_URL', null, fn () => $this->withHeaders(['X-Public-Capture-Token' => 'test-public-capture-token'])

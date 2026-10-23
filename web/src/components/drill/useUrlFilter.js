@@ -9,8 +9,8 @@ import { useSearchParams } from 'react-router-dom';
  *   const [status, setStatus] = useUrlFilter('status');
  *
  * Changes replace the history entry (typing into a filter must not flood
- * Back); an empty value removes the param. Pass `{ onChange }` to reset
- * paging alongside.
+ * Back); an empty value (or the fallback) removes the param. Reset paging
+ * in an effect on the value when the list pages.
  *
  * @param {string} key
  * @param {string} [fallback] value when the param is absent

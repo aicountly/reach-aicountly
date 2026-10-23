@@ -18,17 +18,20 @@ export function CampaignListPage() {
   // In the URL so dashboard tiles can link to a filtered list (?status=running).
   const [type, setType] = useUrlFilter('type');
   const [status, setStatus] = useUrlFilter('status');
+  // "Created in the last N days" — Analytics' "Campaigns created (30d)" tile links here.
+  const [days, setDays] = useUrlFilter('days');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const load = () => {
     setLoading(true);
-    campaignService.list({ type, status })
+    // The API filters on campaign_type; `type` is the shorter URL param.
+    campaignService.list({ campaign_type: type, status, days })
       .then((d) => setRows(d.items || d))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [type, status]);
+  useEffect(load, [type, status, days]);
 
   return (
     <div>
@@ -49,10 +52,19 @@ export function CampaignListPage() {
         </select>
       </FilterBar>
 
+      {days && (
+        <div className="flex items-center gap-2 mb-2">
+          <button type="button" className="badge badge-secondary" onClick={() => setDays('')}
+                  aria-label={`Clear created in the last ${days} days filter`}>
+            Created in the last {days} days ✕
+          </button>
+        </div>
+      )}
+
       {error && <Alert variant="danger">{error}</Alert>}
       {loading ? <Loader /> : (
         rows.length === 0
-          ? <EmptyState message={type || status ? 'No campaigns match this filter.' : 'No campaigns yet.'} />
+          ? <EmptyState message={type || status || days ? 'No campaigns match this filter.' : 'No campaigns yet.'} />
           : (
             <div className="grid grid-3">
               {rows.map((c) => <CampaignCard key={c.id} campaign={c} />)}
