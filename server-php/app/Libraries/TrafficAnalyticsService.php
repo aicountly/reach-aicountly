@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries;
 
+use App\Libraries\Intelligence\ContentIdentitySyncService;
 
 /**
  * GA4 traffic reports for Reach Marketing Analytics (ported from Flow).
@@ -20,11 +21,55 @@ final class TrafficAnalyticsService
         'signup_click',
     ];
 
+    /**
+     * Explorer dimensions → GA4 Data API dimension names. The channel name is
+     * the one the Traffic sources pie groups by, so a slice and its drill use
+     * the same values.
+     */
+    public const EXPLORE_DIMENSIONS = [
+        'date'    => 'date',
+        'channel' => self::CHANNEL_DIMENSION,
+        'source'  => 'sessionSourceMedium',
+        'page'    => 'pagePath',
+        'device'  => 'deviceCategory',
+        'country' => 'country',
+        'event'   => 'eventName',
+    ];
+
+    public const EXPLORE_SORTS = ['key', 'sessions', 'users', 'pageviews', 'bounce_rate', 'events'];
+
+    /** Same metric names as the overview KPIs (users = activeUsers), so a card and its drill agree. */
+    private const EXPLORE_METRICS = ['sessions', 'activeUsers', 'screenPageViews', 'bounceRate', 'eventCount'];
+
+    private const EXPLORE_SORT_METRICS = [
+        'sessions'    => 'sessions',
+        'users'       => 'activeUsers',
+        'pageviews'   => 'screenPageViews',
+        'bounce_rate' => 'bounceRate',
+        'events'      => 'eventCount',
+    ];
+
+    /** Rows each property may return for a combined (all sites) explore, which merges and pages in PHP. */
+    private const COMBINED_FETCH_CAP = 1000;
+
+    private const CHANNEL_DIMENSION = 'sessionDefaultChannelGrouping';
+
     private AnalyticsCache $cache;
 
-    public function __construct()
+    /** @var (\Closure(string, array<string, mixed>): ?array)|null */
+    private ?\Closure $reportRunner;
+
+    /** @var array<string, ?string> */
+    private array $tokens = [];
+
+    /**
+     * $reportRunner(stream, body) replaces the live GA4 call for explore()
+     * (tests); production resolves the stream's property and token.
+     */
+    public function __construct(?AnalyticsCache $cache = null, ?\Closure $reportRunner = null)
     {
-        $this->cache = new AnalyticsCache();
+        $this->cache        = $cache ?? new AnalyticsCache();
+        $this->reportRunner = $reportRunner;
     }
 
     public function overview(int $days, string $stream): array
@@ -193,6 +238,510 @@ final class TrafficAnalyticsService
         $this->cache->set($cacheKey, $paramsHash, $result, self::CACHE_TTL_SECONDS);
 
         return ['data' => $result, 'demo' => false, 'unconfigured' => false, 'cached' => false];
+    }
+
+    /**
+     * GA4 traffic grouped by one dimension within the filters chosen so far
+     * — the traffic counterpart of SearchSiteAnalyticsService::explore().
+     * Each filter is an exact match on an EXPLORE_DIMENSIONS key, so every
+     * drill step narrows the same report until a single GA4 row is left (one
+     * day × channel × source × page × device × country × event).
+     *
+     * $opts: sort (EXPLORE_SORTS), dir (asc|desc), search (contains on the
+     * grouped dimension), limit (1–250), offset. Unconfigured streams return
+     * an empty, flagged payload exactly like overview() — never numbers.
+     *
+     * @param array<string, mixed> $filters
+     * @param array<string, mixed> $opts
+     * @return array{data: array<string, mixed>, demo: bool, unconfigured: bool, cached: bool}
+     */
+    public function explore(string $groupBy, int $days, string $stream, array $filters = [], array $opts = []): array
+    {
+        if (! isset(self::EXPLORE_DIMENSIONS[$groupBy])) {
+            throw new \InvalidArgumentException("Unknown dimension `{$groupBy}`.");
+        }
+        $filters = self::normalizeExploreFilters($filters);
+        $opts = self::normalizeExploreOpts($groupBy, $opts);
+        [$startDate, $endDate] = self::exploreWindow($days, $filters['date'] ?? null);
+        $period = ['from' => $startDate, 'to' => $endDate === 'today' ? date('Y-m-d') : $endDate];
+
+        $cacheKey   = 'traffic_explore_v1';
+        $paramsHash = md5((string) json_encode([$groupBy, $days, $stream, $filters, $opts]));
+        $cached     = $this->cache->get($cacheKey, $paramsHash);
+        if ($cached !== null && empty($cached['_unconfigured'])) {
+            return ['data' => $this->withContentIdentities($cached, $groupBy, $filters), 'demo' => false, 'unconfigured' => false, 'cached' => true];
+        }
+
+        if ($this->isCombinedStream($stream)) {
+            $result = $this->fetchCombinedExplore($groupBy, $startDate, $endDate, $filters, $opts);
+        } else {
+            $setupReason = $this->saasStreamSetupReason($stream);
+            if ($setupReason !== null) {
+                return ['data' => $this->emptyExplore($groupBy, $stream, $filters, $period, $setupReason), 'demo' => false, 'unconfigured' => true, 'cached' => false];
+            }
+            $result = $this->fetchExploreForStream($stream, $groupBy, $startDate, $endDate, $filters, $opts);
+            if ($result !== null) {
+                $result['sites'] = [$result['site']];
+            }
+        }
+        if ($result === null) {
+            $empty = $this->emptyExplore($groupBy, $stream, $filters, $period, $this->streamFailureReason($stream));
+
+            return ['data' => $empty, 'demo' => false, 'unconfigured' => true, 'cached' => false];
+        }
+
+        $result += ['group_by' => $groupBy, 'filters' => $filters, 'period' => $period, 'stream' => $stream, 'days' => $days];
+        $this->cache->set($cacheKey, $paramsHash, $result, self::CACHE_TTL_SECONDS);
+
+        return ['data' => $this->withContentIdentities($result, $groupBy, $filters), 'demo' => false, 'unconfigured' => false, 'cached' => false];
+    }
+
+    /**
+     * Known keys with non-empty values; `date` becomes GA4's YYYYMMDD.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<string, string>
+     */
+    public static function normalizeExploreFilters(array $filters): array
+    {
+        $out = [];
+        foreach (array_keys(self::EXPLORE_DIMENSIONS) as $key) {
+            $value = $filters[$key] ?? '';
+            if (! is_string($value) || trim($value) === '') {
+                continue;
+            }
+            $value = trim($value);
+            if ($key === 'date') {
+                $ymd = str_replace('-', '', $value);
+                if (! preg_match('/^\d{8}$/', $ymd)
+                    || ! checkdate((int) substr($ymd, 4, 2), (int) substr($ymd, 6, 2), (int) substr($ymd, 0, 4))) {
+                    throw new \InvalidArgumentException('`date` must be YYYY-MM-DD or YYYYMMDD.');
+                }
+                $value = $ymd;
+            }
+            $out[$key] = $value;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $opts
+     * @return array{sort: string, dir: string, search: string, limit: int, offset: int}
+     */
+    private static function normalizeExploreOpts(string $groupBy, array $opts): array
+    {
+        $sort = in_array($opts['sort'] ?? '', self::EXPLORE_SORTS, true)
+            ? (string) $opts['sort']
+            : match ($groupBy) {
+                'date'  => 'key',
+                'event' => 'events',
+                default => 'sessions',
+            };
+        $dir = strtolower((string) ($opts['dir'] ?? ''));
+        if ($dir !== 'asc' && $dir !== 'desc') {
+            // Metrics high → low, days newest first, other names A → Z.
+            $dir = $sort === 'key' && $groupBy !== 'date' ? 'asc' : 'desc';
+        }
+
+        return [
+            'sort'   => $sort,
+            'dir'    => $dir,
+            'search' => $groupBy === 'date' ? '' : trim((string) ($opts['search'] ?? '')),
+            'limit'  => max(1, min(250, (int) ($opts['limit'] ?? 50))),
+            'offset' => max(0, (int) ($opts['offset'] ?? 0)),
+        ];
+    }
+
+    /**
+     * The overview's "last $days days" window, or the one day a date filter names.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function exploreWindow(int $days, ?string $ymd = null): array
+    {
+        if ($ymd !== null && $ymd !== '') {
+            $day = substr($ymd, 0, 4) . '-' . substr($ymd, 4, 2) . '-' . substr($ymd, 6, 2);
+
+            return [$day, $day];
+        }
+
+        return [date('Y-m-d', strtotime("-{$days} days")), 'today'];
+    }
+
+    /**
+     * The runReport body for one explore step: one dimension, the shared
+     * metrics, an andGroup of EXACT matches for every filter (plus the SaaS
+     * path filter and a CONTAINS on the grouped dimension), sorted and paged
+     * by GA4. Pure, so the request shape is unit-testable.
+     *
+     * @param array<string, string>     $filters normalised (see normalizeExploreFilters)
+     * @param array<string, mixed>      $opts    normalised
+     * @param array<string, mixed>|null $pathFilter
+     * @return array<string, mixed>
+     */
+    public static function exploreRequestBody(
+        string $groupBy,
+        string $startDate,
+        string $endDate,
+        array $filters,
+        array $opts,
+        ?array $pathFilter = null,
+    ): array {
+        $dimension   = self::EXPLORE_DIMENSIONS[$groupBy];
+        $expressions = self::exactFilterExpressions($filters, $pathFilter);
+        $search      = (string) ($opts['search'] ?? '');
+        if ($search !== '') {
+            $expressions[] = ['filter' => [
+                'fieldName'    => $dimension,
+                'stringFilter' => ['matchType' => 'CONTAINS', 'value' => $search, 'caseSensitive' => false],
+            ]];
+        }
+
+        $sort = (string) ($opts['sort'] ?? 'sessions');
+        $desc = ($opts['dir'] ?? 'desc') === 'desc';
+        $orderBys = [$sort === 'key'
+            ? ['dimension' => ['dimensionName' => $dimension], 'desc' => $desc]
+            : ['metric' => ['metricName' => self::EXPLORE_SORT_METRICS[$sort] ?? 'sessions'], 'desc' => $desc]];
+        if ($sort !== 'sessions') {
+            $orderBys[] = ['metric' => ['metricName' => 'sessions'], 'desc' => true];
+        }
+        if ($sort !== 'key') {
+            $orderBys[] = ['dimension' => ['dimensionName' => $dimension], 'desc' => false];
+        }
+
+        $body = [
+            'dateRanges'         => [['startDate' => $startDate, 'endDate' => $endDate]],
+            'dimensions'         => [['name' => $dimension]],
+            'metrics'            => array_map(static fn (string $m): array => ['name' => $m], self::EXPLORE_METRICS),
+            'orderBys'           => $orderBys,
+            'limit'              => (int) ($opts['limit'] ?? 50),
+            'offset'             => (int) ($opts['offset'] ?? 0),
+            'metricAggregations' => ['TOTAL'],
+        ];
+        $filter = self::andExpressions($expressions);
+        if ($filter !== null) {
+            $body['dimensionFilter'] = $filter;
+        }
+
+        return $body;
+    }
+
+    /**
+     * Totals of the slice without the contains-filter (a search narrows the
+     * rows, not the slice the tiles describe).
+     *
+     * @param array<string, string>     $filters
+     * @param array<string, mixed>|null $pathFilter
+     * @return array<string, mixed>
+     */
+    public static function exploreTotalsBody(string $startDate, string $endDate, array $filters, ?array $pathFilter = null): array
+    {
+        $body = [
+            'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
+            'metrics'    => array_map(static fn (string $m): array => ['name' => $m], self::EXPLORE_METRICS),
+        ];
+        $filter = self::andExpressions(self::exactFilterExpressions($filters, $pathFilter));
+        if ($filter !== null) {
+            $body['dimensionFilter'] = $filter;
+        }
+
+        return $body;
+    }
+
+    /**
+     * @param array<string, mixed> $report a runReport response
+     * @return array{rows: list<array<string, mixed>>, total_rows: int, totals: array<string, int|float>}
+     */
+    public static function parseExploreReport(array $report): array
+    {
+        $rows = is_array($report['rows'] ?? null) ? $report['rows'] : [];
+        $out  = [];
+        foreach ($rows as $row) {
+            $out[] = ['dimension_value' => (string) ($row['dimensionValues'][0]['value'] ?? '')]
+                + self::exploreMetrics($row['metricValues'] ?? []);
+        }
+
+        return [
+            'rows'       => $out,
+            'total_rows' => (int) ($report['rowCount'] ?? count($out)),
+            'totals'     => self::exploreMetrics($report['totals'][0]['metricValues'] ?? $report['rows'][0]['metricValues'] ?? []),
+        ];
+    }
+
+    /**
+     * Rows of several properties keyed by dimension value: counts add up,
+     * bounce rate is session-weighted (as mergeTotals does for the KPIs).
+     *
+     * @param list<array{rows: list<array<string, mixed>>, site?: string}> $parts
+     * @return list<array<string, mixed>>
+     */
+    public static function mergeExploreRows(array $parts): array
+    {
+        $byKey = [];
+        foreach ($parts as $part) {
+            foreach ($part['rows'] as $row) {
+                $key = (string) $row['dimension_value'];
+                if (! isset($byKey[$key])) {
+                    $byKey[$key] = ['dimension_value' => $key] + self::exploreMetrics([]) + ['sites' => []];
+                }
+                $byKey[$key] = ['dimension_value' => $key]
+                    + self::addExploreMetrics($byKey[$key], $row)
+                    + ['sites' => $byKey[$key]['sites']];
+                if (($part['site'] ?? '') !== '' && ! in_array($part['site'], $byKey[$key]['sites'], true)) {
+                    $byKey[$key]['sites'][] = $part['site'];
+                }
+            }
+        }
+
+        return array_values($byKey);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array{sort: string, dir: string} $opts
+     * @return list<array<string, mixed>>
+     */
+    public static function sortExploreRows(array $rows, array $opts): array
+    {
+        $field = $opts['sort'] === 'key' ? 'dimension_value' : $opts['sort'];
+        $sign  = $opts['dir'] === 'asc' ? 1 : -1;
+        usort($rows, static function (array $a, array $b) use ($field, $sign): int {
+            $cmp = $field === 'dimension_value'
+                ? strcmp((string) $a[$field], (string) $b[$field])
+                : ($a[$field] <=> $b[$field]);
+
+            return $cmp * $sign
+                ?: (($b['sessions'] <=> $a['sessions']) ?: strcmp((string) $a['dimension_value'], (string) $b['dimension_value']));
+        });
+
+        return $rows;
+    }
+
+    /** @param list<array{value?: string}> $values */
+    private static function exploreMetrics(array $values): array
+    {
+        return [
+            'sessions'    => (int) ($values[0]['value'] ?? 0),
+            'users'       => (int) ($values[1]['value'] ?? 0),
+            'pageviews'   => (int) ($values[2]['value'] ?? 0),
+            'bounce_rate' => round((float) ($values[3]['value'] ?? 0) * 100, 1),
+            'events'      => (int) ($values[4]['value'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $a
+     * @param array<string, mixed> $b
+     * @return array<string, int|float>
+     */
+    private static function addExploreMetrics(array $a, array $b): array
+    {
+        $sessions = (int) $a['sessions'] + (int) $b['sessions'];
+
+        return [
+            'sessions'    => $sessions,
+            'users'       => (int) $a['users'] + (int) $b['users'],
+            'pageviews'   => (int) $a['pageviews'] + (int) $b['pageviews'],
+            'bounce_rate' => $sessions > 0
+                ? round(((float) $a['bounce_rate'] * (int) $a['sessions'] + (float) $b['bounce_rate'] * (int) $b['sessions']) / $sessions, 1)
+                : 0.0,
+            'events'      => (int) $a['events'] + (int) $b['events'],
+        ];
+    }
+
+    /**
+     * @param array<string, string>     $filters
+     * @param array<string, mixed>|null $pathFilter
+     * @return list<array<string, mixed>>
+     */
+    private static function exactFilterExpressions(array $filters, ?array $pathFilter): array
+    {
+        $expressions = $pathFilter !== null ? [$pathFilter] : [];
+        foreach ($filters as $key => $value) {
+            $expressions[] = ['filter' => [
+                'fieldName'    => self::EXPLORE_DIMENSIONS[$key],
+                'stringFilter' => ['matchType' => 'EXACT', 'value' => $value, 'caseSensitive' => true],
+            ]];
+        }
+
+        return $expressions;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $expressions
+     * @return array<string, mixed>|null
+     */
+    private static function andExpressions(array $expressions): ?array
+    {
+        return match (count($expressions)) {
+            0       => null,
+            1       => $expressions[0],
+            default => ['andGroup' => ['expressions' => $expressions]],
+        };
+    }
+
+    /**
+     * @param array<string, string> $filters
+     * @param array<string, mixed>  $opts
+     * @return array<string, mixed>|null
+     */
+    private function fetchExploreForStream(string $stream, string $groupBy, string $startDate, string $endDate, array $filters, array $opts): ?array
+    {
+        $pathFilter = $this->ga4PagePathFilterForStream($stream);
+        $report     = $this->runStreamReport($stream, self::exploreRequestBody($groupBy, $startDate, $endDate, $filters, $opts, $pathFilter));
+        if ($report === null) {
+            return null;
+        }
+
+        $parsed = self::parseExploreReport($report);
+        if ($opts['search'] !== '') {
+            $totals = $this->runStreamReport($stream, self::exploreTotalsBody($startDate, $endDate, $filters, $pathFilter));
+            $parsed['totals'] = self::parseExploreReport($totals ?? [])['totals'];
+        }
+
+        return $parsed + ['site' => $this->siteUrlForStream($stream)];
+    }
+
+    /**
+     * Every configured property, merged per dimension value and paged here
+     * (GA4 can only page one property). When a property had more rows than
+     * were fetched the total is a lower bound, flagged `total_rows_approx`.
+     *
+     * @param array<string, string> $filters
+     * @param array<string, mixed>  $opts
+     * @return array<string, mixed>|null
+     */
+    private function fetchCombinedExplore(string $groupBy, string $startDate, string $endDate, array $filters, array $opts): ?array
+    {
+        $fetchOpts = ['offset' => 0, 'limit' => min(self::COMBINED_FETCH_CAP, $opts['offset'] + $opts['limit'])] + $opts;
+        $parts     = [];
+        foreach ($this->dataStreams() as $dataStream) {
+            $part = $this->fetchExploreForStream($dataStream, $groupBy, $startDate, $endDate, $filters, $fetchOpts);
+            if ($part !== null) {
+                $parts[] = $part;
+            }
+        }
+        if ($parts === []) {
+            return null;
+        }
+
+        $rows   = self::sortExploreRows(self::mergeExploreRows($parts), $opts);
+        $approx = false;
+        $total  = count($rows);
+        $totals = self::exploreMetrics([]);
+        $sites  = [];
+        foreach ($parts as $part) {
+            if ($part['total_rows'] > count($part['rows'])) {
+                $approx = true;
+                $total  = max($total, $part['total_rows']);
+            }
+            $totals = self::addExploreMetrics($totals, $part['totals']);
+            if (! in_array($part['site'], $sites, true)) {
+                $sites[] = $part['site'];
+            }
+        }
+
+        return [
+            'rows'              => array_slice($rows, $opts['offset'], $opts['limit']),
+            'total_rows'        => $total,
+            'total_rows_approx' => $approx,
+            'totals'            => $totals,
+            'sites'             => $sites,
+        ];
+    }
+
+    /** @param array<string, mixed> $body */
+    private function runStreamReport(string $stream, array $body): ?array
+    {
+        if ($this->reportRunner !== null) {
+            return ($this->reportRunner)($stream, $body);
+        }
+
+        $propertyId = $this->resolvePropertyId($stream);
+        if ($propertyId === '') {
+            return null;
+        }
+        // One OAuth exchange per stream per request, not per report.
+        if (! array_key_exists($stream, $this->tokens)) {
+            $this->tokens[$stream] = $this->accessTokenForStream($stream);
+        }
+        $token = $this->tokens[$stream];
+
+        return $token === null ? null : Ga4AnalyticsClient::runReport($token, $propertyId, $body);
+    }
+
+    /**
+     * @param array<string, string> $filters
+     * @param array{from: string, to: string} $period
+     * @return array<string, mixed>
+     */
+    private function emptyExplore(string $groupBy, string $stream, array $filters, array $period, string $reason): array
+    {
+        return [
+            'group_by'      => $groupBy,
+            'rows'          => [],
+            'total_rows'    => 0,
+            'totals'        => self::exploreMetrics([]),
+            'filters'       => $filters,
+            'period'        => $period,
+            'stream'        => $stream,
+            'sites'         => [],
+            '_unconfigured' => true,
+            '_reason'       => $reason,
+            '_stream'       => $stream,
+        ];
+    }
+
+    /**
+     * Page rows (and a page leaf) carry the Reach content identity whose
+     * published URL is exactly that page on the stream's site — the same
+     * index Search Console ingestion maps pages with. Ambiguous or unknown
+     * pages get none. Not cached: identities change as posts go live.
+     *
+     * @param array<string, mixed>  $data
+     * @param array<string, string> $filters
+     * @return array<string, mixed>
+     */
+    private function withContentIdentities(array $data, string $groupBy, array $filters): array
+    {
+        if ($groupBy !== 'page' && ! isset($filters['page'])) {
+            return $data;
+        }
+        try {
+            // Reach runs a single tenant; ingestion maps pages against tenant 1 too.
+            $index = (new ContentIdentitySyncService())->urlIndex(1);
+        } catch (\Throwable) {
+            return $data;
+        }
+        if ($index === []) {
+            return $data;
+        }
+
+        $lookup = static function (string $path, array $sites) use ($index): ?int {
+            $ids = [];
+            foreach ($sites as $site) {
+                $id = $index[ContentIdentitySyncService::normaliseUrl(rtrim((string) $site, '/') . $path)] ?? null;
+                if ($id !== null) {
+                    $ids[$id] = true;
+                }
+            }
+
+            return count($ids) === 1 ? (int) array_key_first($ids) : null;
+        };
+
+        $sites = is_array($data['sites'] ?? null) ? $data['sites'] : [];
+        if ($groupBy === 'page') {
+            foreach ($data['rows'] as &$row) {
+                $row['content_identity_id'] = $lookup((string) $row['dimension_value'], $row['sites'] ?? $sites);
+            }
+            unset($row);
+        }
+        if (isset($filters['page'])) {
+            $data['page_content_identity_id'] = $lookup($filters['page'], $sites);
+        }
+
+        return $data;
     }
 
     public function configStatus(): array
@@ -735,7 +1284,12 @@ final class TrafficAnalyticsService
             'trend'           => $this->parseTrendRows($trendReport ?? []),
             'totals'          => $this->parseTotalsRow($totalsReport ?? []),
             'previous_totals' => $this->parseTotalsRow($previousTotalsReport ?? []),
-            'top_pages'       => $this->parsePageRows($pagesReport ?? [], $site),
+            // `stream` lets a top page drill into the property it came from
+            // when the overview combines all sites.
+            'top_pages'       => array_map(
+                static fn (array $page): array => $page + ['stream' => $stream],
+                $this->parsePageRows($pagesReport ?? [], $site),
+            ),
             'days'            => $days,
         ];
     }
@@ -755,7 +1309,7 @@ final class TrafficAnalyticsService
         $startDate = date('Y-m-d', strtotime("-{$days} days"));
         $sourcesBody = [
             'dateRanges' => [['startDate' => $startDate, 'endDate' => 'today']],
-            'dimensions' => [['name' => 'sessionDefaultChannelGrouping']],
+            'dimensions' => [['name' => self::CHANNEL_DIMENSION]],
             'metrics'    => [['name' => 'sessions'], ['name' => 'activeUsers']],
             'orderBys'   => [['metric' => ['metricName' => 'sessions'], 'desc' => true]],
         ];

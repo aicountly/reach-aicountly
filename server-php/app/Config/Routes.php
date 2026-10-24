@@ -339,6 +339,9 @@ $routes->group('v1', static function ($routes) {
         $routes->get('analytics/traffic/leads',         'Api\\V1\\AnalyticsController::trafficLeads',       ['filter' => 'permission:analytics.view']);
         $routes->get('analytics/traffic/config-status', 'Api\\V1\\AnalyticsController::trafficConfigStatus',['filter' => 'permission:analytics.view']);
         $routes->get('analytics/providers',             'Api\\V1\\AnalyticsController::providers',          ['filter' => 'permission:analytics.view']);
+        $routes->get('analytics/traffic/explore',       'Api\\V1\\AnalyticsController::trafficExplore',     ['filter' => 'permission:analytics.view']);
+        $routes->get('analytics/snapshots',             'Api\\V1\\AnalyticsController::snapshots',          ['filter' => 'permission:analytics.view']);
+        $routes->get('analytics/legacy-blog-posts',     'Api\\V1\\AnalyticsController::legacyBlogPosts',    ['filter' => 'permission:analytics.view']);
 
         // Leads
         $routes->get('leads/outcomes',         'Api\\V1\\LeadOutcomeController::index',   ['filter' => 'permission:lead.view']);

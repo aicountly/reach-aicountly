@@ -29,6 +29,9 @@ import { ComingSoonPage } from './pages/ComingSoonPage.jsx';
 import { LeadsLayout } from './pages/leads/LeadsLayout.jsx';
 import { LeadDetailPage } from './pages/leads/LeadDetailPage';
 import { AnalyticsLayout } from './pages/reports/AnalyticsLayout.jsx';
+import { TrafficExplorerPage } from './pages/analytics/TrafficExplorerPage';
+import { AnalyticsSnapshotsPage } from './pages/analytics/AnalyticsSnapshotsPage';
+import { LegacyBlogPostsPage } from './pages/analytics/LegacyBlogPostsPage';
 import { LEGACY_REDIRECTS, PLANNED_ROUTES } from './constants/navManifest';
 import { SocialInboxPage } from './pages/social/SocialInboxPage';
 
@@ -392,6 +395,9 @@ export default function App() {
 
         <Route element={<AnalyticsLayout />}>
           <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
+          <Route path={ROUTES.ANALYTICS_TRAFFIC} element={<TrafficExplorerPage />} />
+          <Route path={ROUTES.ANALYTICS_SNAPSHOTS} element={<AnalyticsSnapshotsPage />} />
+          <Route path={ROUTES.ANALYTICS_BLOG_POSTS} element={<LegacyBlogPostsPage />} />
           <Route path={ROUTES.REPORTS} element={<DailyReportsPage />} />
         </Route>
 

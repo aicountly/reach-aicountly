@@ -13,6 +13,9 @@ export const analyticsService = {
   trafficSources: (params) => api.get(withQuery('v1/analytics/traffic/sources', params)),
   trafficLeads: (params) => api.get(withQuery('v1/analytics/traffic/leads', params)),
   trafficConfigStatus: () => api.get('v1/analytics/traffic/config-status'),
+  trafficExplore: (params) => api.get(withQuery('v1/analytics/traffic/explore', params)),
+  snapshots: (params) => api.get(withQuery('v1/analytics/snapshots', params)),
+  legacyBlogPosts: (params) => api.get(withQuery('v1/analytics/legacy-blog-posts', params)),
   providers: () => api.get('v1/analytics/providers'),
   outcomes: (params) => api.get(withQuery('v1/analytics/outcomes', params)),
 };

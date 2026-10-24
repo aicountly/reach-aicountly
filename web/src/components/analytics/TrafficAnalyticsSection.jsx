@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { analyticsService } from '../../services/analyticsService';
 import { KPICard } from '../charts/KPICard';
 import { LineChart } from '../charts/LineChart';
@@ -10,61 +10,11 @@ import { Loader } from '../common/Loader';
 import { drillHref } from '../drill';
 import { ROUTES } from '../../constants/routes';
 import {
+  DAYS_OPTIONS, EVENT_LABELS, LEAD_SUBMIT_EVENTS, STREAM_OPTIONS, streamLabel as baseStreamLabel, trafficExplorerHref,
+} from './trafficDrill';
+import {
   Activity, Users, Eye, MousePointerClick, AlertCircle, CheckCircle2,
 } from 'lucide-react';
-
-const BASE_STREAM_OPTIONS = [
-  { value: 'all', label: 'All sites' },
-];
-
-/** Fallback when desk taxonomy has not loaded yet (mirrors DeskTaxonomy::trafficAnalyticsSaasProducts). */
-const SAAS_PRODUCTS_FALLBACK = {
-  smart_books: 'Aicountly Smart Books',
-  contacts: 'Aicountly Contacts',
-  calendar: 'Aicountly Calendar',
-  financial_reporting: 'Aicountly Financial Reporting',
-  secretarial: 'Aicountly Secretarial',
-  auditor: 'Aicountly Auditor',
-  vault: 'Aicountly Vault',
-  hrms: 'Aicountly HRMS',
-  my_account: 'My Account',
-  our_people: 'Aicountly Our People',
-  manage_account: 'Aicountly Manage',
-  buddy: 'Aicountly AI Pulse',
-  drive: 'Aicountly Drive',
-  connect: 'Aicountly Connect',
-  notes: 'Aicountly Notes',
-  pos: 'Aicountly POS',
-  billing: 'Aicountly Billing',
-  inventory: 'Aicountly Inventory',
-  sales: 'Aicountly Sales',
-  purchase: 'Aicountly Purchase',
-  insights: 'Aicountly Insights',
-  remote: 'Aicountly Remote',
-  advisor: 'Aicountly Advisor',
-  appointments: 'Aicountly Appointments',
-  contracts: 'Aicountly Contracts',
-  pay: 'Aicountly Pay',
-};
-
-// GA4 events that submit a lead form. Under the chart they link to the leads
-// Reach captured in the same window (GA4 counts submits, Reach counts stored
-// leads, so the two can differ); clicks and page views have no Reach records.
-const LEAD_SUBMIT_EVENTS = new Set(['lead_form_submit', 'blog_lead_submit']);
-
-function buildSaasStreamOptions(products) {
-  return Object.entries(products)
-    .filter(([slug]) => slug !== 'flow')
-    .sort(([, a], [, b]) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-    .map(([slug, label]) => ({ value: `saas:${slug}`, label }));
-}
-
-function streamLabel(streamOptions, streamId) {
-  const opt = streamOptions.find((o) => o.value === streamId);
-  return opt?.label ?? streamId;
-}
-
-const DAYS_OPTIONS = [7, 30, 90];
 
 function formatGaDate(ymd) {
   if (!ymd || String(ymd).length !== 8) return ymd;
@@ -72,15 +22,13 @@ function formatGaDate(ymd) {
   return `${s.slice(6, 8)}/${s.slice(4, 6)}`;
 }
 
-const EVENT_LABELS = {
-  lead_form_submit: 'Contact form submits',
-  blog_lead_submit: 'Blog lead submits',
-  blog_cta_click: 'Blog CTA clicks',
-  pricing_view: 'Pricing page views',
-  signup_click: 'Sign-up clicks',
-};
-
+/**
+ * GA4 traffic overview. Every figure drills into TrafficExplorerPage for the
+ * same window and stream: KPI cards (by channel / page), a trend day, a
+ * source slice, a top page and a lead-event bar, each narrowed to its value.
+ */
 export function TrafficAnalyticsSection() {
+  const navigate = useNavigate();
   const [days, setDays] = useState(30);
   const [stream, setStream] = useState('all');
   const [streamInitialized, setStreamInitialized] = useState(false);
@@ -92,15 +40,7 @@ export function TrafficAnalyticsSection() {
   const [dataLoading, setDataLoading] = useState(true);
   const [unconfigured, setUnconfigured] = useState(false);
   const [unconfiguredReason, setUnconfiguredReason] = useState('');
-  const streamOptions = useMemo(
-    () => [...BASE_STREAM_OPTIONS, ...buildSaasStreamOptions(SAAS_PRODUCTS_FALLBACK)],
-    [],
-  );
-
-  const selectedStreamLabel = useMemo(
-    () => streamLabel(streamOptions, stream),
-    [streamOptions, stream],
-  );
+  const selectedStreamLabel = useMemo(() => baseStreamLabel(stream), [stream]);
 
   const currentStreamLive = useMemo(() => {
     if (!config) return false;
@@ -135,11 +75,11 @@ export function TrafficAnalyticsSection() {
     // The backend may default to a stream (e.g. marketing_site/portal) that
     // isn't offered in this dropdown — stay on "All sites" rather than
     // switching to a value with no matching <option>.
-    if (streamOptions.some((opt) => opt.value === config.default_stream)) {
+    if (STREAM_OPTIONS.some((opt) => opt.value === config.default_stream)) {
       setStream(config.default_stream);
     }
     setStreamInitialized(true);
-  }, [config, stream, streamInitialized, streamOptions]);
+  }, [config, stream, streamInitialized]);
 
   useEffect(() => {
     if (configLoading && stream === 'all') {
@@ -216,6 +156,7 @@ export function TrafficAnalyticsSection() {
     return 'GA4 API is connected but no sessions were returned for this date range.';
   })();
   const trend = (overview?.trend || []).map((row) => ({
+    date: row.date,
     label: formatGaDate(row.date),
     value: row.sessions,
   }));
@@ -223,6 +164,11 @@ export function TrafficAnalyticsSection() {
     label: ch.channel,
     value: ch.sessions,
   }));
+  // Drill into the explorer for this window and stream; nothing to open when GA4 is not answering.
+  const live = !unconfigured && !dataLoading;
+  const explore = (params) => trafficExplorerHref({ days, stream, ...params });
+  const kpiTo = (value, params) => (live && Number(value) > 0 ? explore(params) : undefined);
+
   const leadEvents = leads && !leads._unconfigured
     ? Object.entries(leads)
         .filter(([key]) => !key.startsWith('_'))
@@ -254,7 +200,7 @@ export function TrafficAnalyticsSection() {
             style={{ width: 'auto', maxWidth: '100%' }}
             aria-busy={dataLoading}
           >
-            {streamOptions.map((opt) => (
+            {STREAM_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
@@ -389,7 +335,7 @@ export function TrafficAnalyticsSection() {
                 <tbody>
                   {(config.streams || []).map((s) => (
                     <tr key={s.id}>
-                      <td>{s.label || streamLabel(streamOptions, s.id)}</td>
+                      <td>{s.label || baseStreamLabel(s.id)}</td>
                       <td className="text-muted">{s.property_id || '—'}</td>
                       <td>
                         {s.api_ok ? (
@@ -425,6 +371,7 @@ export function TrafficAnalyticsSection() {
             color="var(--color-primary)"
             comparison={comparison.sessions}
             periodLabel={periodLabel}
+            to={kpiTo(totals.sessions, { by: 'channel', sort: 'sessions' })}
           />
           <KPICard
             title="Users"
@@ -433,6 +380,7 @@ export function TrafficAnalyticsSection() {
             color="var(--color-success)"
             comparison={comparison.users}
             periodLabel={periodLabel}
+            to={kpiTo(totals.users, { by: 'channel', sort: 'users' })}
           />
           <KPICard
             title="Pageviews"
@@ -441,6 +389,7 @@ export function TrafficAnalyticsSection() {
             color="var(--color-warning)"
             comparison={comparison.pageviews}
             periodLabel={periodLabel}
+            to={kpiTo(totals.pageviews, { by: 'page', sort: 'pageviews' })}
           />
           <KPICard
             title="Bounce rate"
@@ -450,13 +399,19 @@ export function TrafficAnalyticsSection() {
             comparison={comparison.bounce_rate}
             invert
             periodLabel={periodLabel}
+            to={kpiTo(totals.sessions, { by: 'page', sort: 'bounce_rate' })}
           />
         </div>
 
         <div className="grid grid-2" style={{ marginBottom: '1.5rem', gap: '1.5rem' }}>
           <Card title="Sessions trend">
             {trend.length >= 2 ? (
-              <LineChart data={trend} labelKey="label" valueKey="value" />
+              <LineChart
+                data={trend}
+                labelKey="label"
+                valueKey="value"
+                onSelect={live ? (row) => navigate(explore({ date: row.date, by: 'channel' })) : undefined}
+              />
             ) : (
               <p className="text-sm text-muted">
                 {dataLoading ? 'Loading…' : 'Not enough trend data'}
@@ -465,7 +420,12 @@ export function TrafficAnalyticsSection() {
           </Card>
           <Card title="Traffic sources">
             {channels.length > 0 ? (
-              <PieChart data={channels} labelKey="label" valueKey="value" />
+              <PieChart
+                data={channels}
+                labelKey="label"
+                valueKey="value"
+                onSelect={live ? (row) => navigate(explore({ channel: row.label, by: 'source' })) : undefined}
+              />
             ) : (
               <p className="text-sm text-muted">
                 {dataLoading ? 'Loading…' : 'No source data'}
@@ -486,15 +446,37 @@ export function TrafficAnalyticsSection() {
                     </tr>
                   </thead>
                   <tbody>
-                    {overview.top_pages.map((page) => (
-                      <tr key={`${page.site || ''}-${page.path}`}>
-                        <td>
-                          <div style={{ fontWeight: 500 }}>{page.title || page.path}</div>
-                          <div className="text-sm text-muted">{page.path}</div>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>{page.pageviews}</td>
-                      </tr>
-                    ))}
+                    {overview.top_pages.map((page) => {
+                      // A combined overview lists each site's pages: drill into that page's own property.
+                      const href = live && page.path
+                        ? trafficExplorerHref({ days, stream: page.stream || stream, page: page.path, by: 'date' })
+                        : null;
+                      return (
+                        <tr
+                          key={`${page.site || ''}-${page.path}`}
+                          className={href ? 'is-drillable' : undefined}
+                          onClick={href ? () => navigate(href) : undefined}
+                        >
+                          <td>
+                            {href ? (
+                              <Link
+                                to={href}
+                                className="drill-link"
+                                style={{ fontWeight: 500 }}
+                                onClick={(e) => e.stopPropagation()}
+                                title={`Traffic for ${page.path}`}
+                              >
+                                {page.title || page.path}
+                              </Link>
+                            ) : (
+                              <div style={{ fontWeight: 500 }}>{page.title || page.path}</div>
+                            )}
+                            <div className="text-sm text-muted">{page.path}</div>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{page.pageviews}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -507,7 +489,13 @@ export function TrafficAnalyticsSection() {
           <Card title="Lead events (GA4)">
             {leadEvents.length > 0 ? (
               <>
-                <BarChart data={leadEvents} labelKey="name" valueKey="open_count" color="var(--color-primary)" />
+                <BarChart
+                  data={leadEvents}
+                  labelKey="name"
+                  valueKey="open_count"
+                  color="var(--color-primary)"
+                  onSelect={live ? (row) => { if (row.open_count > 0) navigate(explore({ event: row.key, by: 'date' })); } : undefined}
+                />
                 {leadEvents.some((e) => LEAD_SUBMIT_EVENTS.has(e.key) && e.open_count > 0) && (
                   <p className="text-sm" style={{ marginTop: '0.5rem' }}>
                     <Link to={drillHref(ROUTES.LEADS, { days })}>Leads Reach captured in the last {days} days ›</Link>

@@ -43,6 +43,9 @@ export const ROUTES = {
   CREATIVE_BRIEFS: '/creative-briefs',
 
   ANALYTICS: '/analytics',
+  ANALYTICS_TRAFFIC: '/analytics/traffic',
+  ANALYTICS_SNAPSHOTS: '/analytics/snapshots',
+  ANALYTICS_BLOG_POSTS: '/analytics/blog-posts',
   REPORTS: '/reports',
 
   LEADS:        '/leads',
