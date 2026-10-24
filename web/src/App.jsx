@@ -21,13 +21,18 @@ import { LandingListPage } from './pages/landing/LandingListPage';
 import { LandingDetailPage } from './pages/landing/LandingDetailPage';
 
 import SocialAdsLayout from './pages/social/SocialAdsLayout.jsx';
+import AdCampaignDetailPage from './pages/social/ads/AdCampaignDetailPage.jsx';
 import SocialAccountsTab, { SocialHubIndex } from './pages/social/SocialAccountsTab.jsx';
 import SocialCalendarTab from './pages/social/SocialCalendarTab.jsx';
 import SocialPerformanceTab from './pages/social/SocialPerformanceTab.jsx';
 import SocialAdsPage from './pages/social/ads/SocialAdsPage.jsx';
 import { ComingSoonPage } from './pages/ComingSoonPage.jsx';
 import { LeadsLayout } from './pages/leads/LeadsLayout.jsx';
+import { LeadDetailPage } from './pages/leads/LeadDetailPage';
 import { AnalyticsLayout } from './pages/reports/AnalyticsLayout.jsx';
+import { TrafficExplorerPage } from './pages/analytics/TrafficExplorerPage';
+import { AnalyticsSnapshotsPage } from './pages/analytics/AnalyticsSnapshotsPage';
+import { LegacyBlogPostsPage } from './pages/analytics/LegacyBlogPostsPage';
 import { LEGACY_REDIRECTS, PLANNED_ROUTES } from './constants/navManifest';
 import { SocialInboxPage } from './pages/social/SocialInboxPage';
 
@@ -169,7 +174,15 @@ import SitemapOverviewPage              from './pages/intelligence/SitemapOvervi
 import IndexNowOperationsPage           from './pages/intelligence/IndexNowOperationsPage.jsx';
 import AttributionOverviewPage          from './pages/intelligence/AttributionOverviewPage.jsx';
 import UtmTemplatesPage                 from './pages/intelligence/UtmTemplatesPage.jsx';
+import { BacklinkSnapshotPage } from './pages/seo-centre/BacklinkSnapshotPage.jsx';
+import { BlogIndexingPage } from './pages/seo-centre/BlogIndexingPage.jsx';
+import { IndexNowSubmissionsPage } from './pages/seo-centre/IndexNowSubmissionsPage.jsx';
+import { IndexNowSubmissionDetailPage } from './pages/seo-centre/IndexNowSubmissionDetailPage.jsx';
+import { SitemapEntriesPage } from './pages/seo-centre/SitemapEntriesPage.jsx';
+import VisibilityRunDetailPage from './pages/intelligence/VisibilityRunDetailPage.jsx';
+import CompetitorDetailPage from './pages/intelligence/CompetitorDetailPage.jsx';
 import UnattributedLeadsPage            from './pages/intelligence/UnattributedLeadsPage.jsx';
+import AttributionConversionsPage       from './pages/intelligence/AttributionConversionsPage.jsx';
 import VisibilityOverviewPage           from './pages/intelligence/VisibilityOverviewPage.jsx';
 import VisibilityPromptLibraryPage      from './pages/intelligence/VisibilityPromptLibraryPage.jsx';
 import VisibilityRunHistoryPage         from './pages/intelligence/VisibilityRunHistoryPage.jsx';
@@ -181,6 +194,13 @@ import IntelligenceOperationsPage       from './pages/intelligence/IntelligenceO
 
 // Phase 9: Readiness
 import ReadinessLayout                  from './pages/readiness/ReadinessLayout.jsx';
+import RefreshRecommendationsPage      from './pages/readiness/RefreshRecommendationsPage.jsx';
+import RefreshRecommendationDetailPage from './pages/readiness/RefreshRecommendationDetailPage.jsx';
+import RefreshWorkflowsPage            from './pages/readiness/RefreshWorkflowsPage.jsx';
+import MigrationStatusPage             from './pages/readiness/MigrationStatusPage.jsx';
+import VideoPipelineItemPage           from './pages/video/VideoPipelineItemPage.jsx';
+import { JobDetailPage }               from './pages/admin/JobDetailPage';
+import { BlogWorkBlocksPage }          from './pages/blog-command-centre/BlogWorkBlocksPage';
 import ReadinessOverviewPage            from './pages/readiness/ReadinessOverviewPage.jsx';
 import RefreshOutcomePage               from './pages/readiness/RefreshOutcomePage.jsx';
 import AttributionMaturityPage          from './pages/readiness/AttributionMaturityPage.jsx';
@@ -347,6 +367,7 @@ export default function App() {
           <Route path="operations/provider-health" element={<BlogSharedEmbed embed="provider-health" />} />
           <Route path="operations/provider-routing" element={<BlogSharedEmbed embed="provider-routing" />} />
           <Route path="operations/audit" element={<BlogSharedEmbed embed="audit" />} />
+          <Route path="operations/work-blocks" element={<BlogWorkBlocksPage />} />
 
           <Route path="settings" element={<Navigate to="portfolio" replace />} />
           <Route path="settings/portfolio" element={<BlogPortfolioSettingsPage />} />
@@ -377,6 +398,7 @@ export default function App() {
           <Route path="inbox" element={<SocialInboxPage />} />
           <Route path="performance" element={<SocialPerformanceTab />} />
           <Route path="ads" element={<SocialAdsPage />} />
+          <Route path="ads/:id" element={<AdCampaignDetailPage />} />
         </Route>
 
         <Route path={ROUTES.EMAIL_LIST}      element={<EmailListPage />} />
@@ -390,11 +412,15 @@ export default function App() {
 
         <Route element={<AnalyticsLayout />}>
           <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
+          <Route path={ROUTES.ANALYTICS_TRAFFIC} element={<TrafficExplorerPage />} />
+          <Route path={ROUTES.ANALYTICS_SNAPSHOTS} element={<AnalyticsSnapshotsPage />} />
+          <Route path={ROUTES.ANALYTICS_BLOG_POSTS} element={<LegacyBlogPostsPage />} />
           <Route path={ROUTES.REPORTS} element={<DailyReportsPage />} />
         </Route>
 
         <Route element={<LeadsLayout />}>
           <Route path={ROUTES.LEADS}       element={<LeadsPage />} />
+          <Route path={ROUTES.LEAD_DETAIL} element={<LeadDetailPage />} />
           <Route path={ROUTES.ENGAGE_PUSH} element={<EngagePushPage />} />
           <Route path={ROUTES.LEAD_OUTCOMES} element={<LeadOutcomesPage />} />
         </Route>
@@ -521,12 +547,15 @@ export default function App() {
           <Route path="attribution" element={<AttributionOverviewPage />} />
           <Route path="attribution/utm" element={<UtmTemplatesPage />} />
           <Route path="attribution/unattributed" element={<UnattributedLeadsPage />} />
+          <Route path="attribution/conversions" element={<AttributionConversionsPage />} />
           <Route path="visibility" element={<VisibilityOverviewPage />} />
           <Route path="visibility/prompts" element={<VisibilityPromptLibraryPage />} />
           <Route path="visibility/runs" element={<VisibilityRunHistoryPage />} />
+          <Route path="visibility/runs/:id" element={<VisibilityRunDetailPage />} />
           <Route path="visibility/observations" element={<VisibilityObservationsPage />} />
           <Route path="insights" element={<AiInsightsPage />} />
           <Route path="competitors" element={<CompetitorListPage />} />
+          <Route path="competitors/:id" element={<CompetitorDetailPage />} />
           <Route path="connectors" element={<ConnectorConfigPage />} />
           <Route path="operations" element={<IntelligenceOperationsPage />} />
         </Route>
@@ -535,6 +564,10 @@ export default function App() {
         <Route path="/readiness" element={<ReadinessLayout />}>
           <Route index element={<ReadinessOverviewPage />} />
           <Route path="outcomes" element={<RefreshOutcomePage />} />
+          <Route path="recommendations" element={<RefreshRecommendationsPage />} />
+          <Route path="recommendations/:id" element={<RefreshRecommendationDetailPage />} />
+          <Route path="workflows" element={<RefreshWorkflowsPage />} />
+          <Route path="migrations" element={<MigrationStatusPage />} />
           <Route path="attribution" element={<AttributionMaturityPage />} />
           <Route path="security" element={<SecurityStatusPage />} />
           <Route path="operations" element={<OperationsDashboardPage />} />
@@ -546,6 +579,7 @@ export default function App() {
         {/* Phase 6 — Video Content Automation */}
         <Route path="/video" element={<VideoLayout />}>
           <Route index element={<VideoPipelinePage />} />
+          <Route path="pipeline/:uuid" element={<VideoPipelineItemPage />} />
           <Route path="ideas" element={<VideoIdeaBacklogPage />} />
           <Route path="projects" element={<VideoProjectListPage />} />
           <Route path="projects/:id" element={<VideoProjectWorkspacePage />} />
@@ -567,10 +601,15 @@ export default function App() {
           <Route path="tracker" element={<SeoTrackerPage />} />
           <Route path="keywords" element={<TrackedKeywordsPage />} />
           <Route path="backlinks" element={<BacklinksPage />} />
+          <Route path="backlinks/:id" element={<BacklinkSnapshotPage />} />
+          <Route path="indexing" element={<BlogIndexingPage />} />
           <Route path="suggestions" element={<SeoSuggestionsPage />} />
           <Route path="search" element={<SearchIntelligencePage />} />
           <Route path="indexnow" element={<IndexNowOperationsPage />} />
+          <Route path="indexnow/submissions" element={<IndexNowSubmissionsPage />} />
+          <Route path="indexnow/submissions/:id" element={<IndexNowSubmissionDetailPage />} />
           <Route path="sitemap" element={<SitemapOverviewPage />} />
+          <Route path="sitemap/:snapshotId/entries" element={<SitemapEntriesPage />} />
           <Route path="connections" element={<ConnectorConfigPage />} />
         </Route>
 
@@ -582,6 +621,7 @@ export default function App() {
         <Route path={ROUTES.CONSOLE_SYNC}      element={<ConsoleSyncPage />} />
         <Route path={ROUTES.WORKER_STATUS}     element={<WorkerStatusPage />} />
         <Route path={ROUTES.JOBS}              element={<JobMonitorPage />} />
+        <Route path={ROUTES.JOB_DETAIL}        element={<JobDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />

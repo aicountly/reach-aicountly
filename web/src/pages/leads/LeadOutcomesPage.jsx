@@ -11,6 +11,7 @@ import { formatInr } from '../../utils/formatInr';
 import { OutcomesNotice } from '../../components/outcomes/OutcomesNotice';
 import { localDay } from '../../utils/localDay';
 import { ROUTES } from '../../constants/routes';
+import { leadHref } from './leadLinks';
 import { DrillLink, drillHref, useUrlFilter } from '../../components/drill';
 
 const STAGES = ['', 'qualified', 'demo', 'proposal_sent', 'converted', 'lost', 'payment_confirmed'];
@@ -94,13 +95,12 @@ export function LeadOutcomesPage() {
 
   const columns = [
     { key: 'occurred_at', label: 'When', render: (r) => formatDateTime(r.occurred_at) },
-    // There is no lead detail page: a matched lead opens the lead list narrowed to it,
-    // an unmatched one narrows this list to its Engage lead code.
+    // A matched lead opens its detail page; an unmatched one narrows this list to its Engage lead code.
     { key: 'lead', label: 'Lead', render: (r) => (
       <div>
         <div className="font-semibold">
           {r.lead_id
-            ? <DrillLink to={drillHref(ROUTES.LEADS, { lead_id: r.lead_id })} title="Open this lead">#{r.lead_id} · {r.lead_name || '—'}</DrillLink>
+            ? <DrillLink to={leadHref(r.lead_id)} title="Open this lead">#{r.lead_id} · {r.lead_name || '—'}</DrillLink>
             : 'Not matched'}
         </div>
         <div className="text-xs text-muted">

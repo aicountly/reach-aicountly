@@ -6,7 +6,7 @@ namespace App\Controllers\Api\V1\Intelligence;
 
 use App\Controllers\BaseApiController;
 use App\Models\Intelligence\AnalyticsConnectionModel;
-use App\Models\Intelligence\ContentMetricFactModel;
+use App\Libraries\Intelligence\ContentSearchPerformanceService;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Libraries\Database\SchemaGuard;
 
@@ -80,19 +80,60 @@ class ContentAnalyticsController extends BaseApiController
         return $this->response->setJSON(['message' => 'Content analytics ingestion queued', 'connection_id' => $id]);
     }
 
+    /**
+     * Content Performance list: Search Console clicks / impressions per content
+     * identity (ContentSearchPerformanceService). GA4 is not wired in — the
+     * ingest above is a stub — so nothing here claims sessions.
+     */
     public function metrics(): ResponseInterface
     {
-        $from = $this->request->getGet('from') ?? date('Y-m-d', strtotime('-30 days'));
-        $to   = $this->request->getGet('to') ?? date('Y-m-d');
-        return $this->response->setJSON(['data' => [], 'period' => ['from' => $from, 'to' => $to]]);
+        try {
+            $service = $this->searchPerformance();
+            $window  = $service->window($this->request->getGet('from'), $this->request->getGet('to'));
+            if ($window['from'] > $window['to']) {
+                return $this->fail('`from` must not be after `to`.', 422);
+            }
+
+            return $this->ok([
+                'available'   => $window['latest'] !== null,
+                'source'      => 'search_console',
+                'period'      => ['from' => $window['from'], 'to' => $window['to']],
+                'latest_date' => $window['latest'],
+            ] + $service->list($window['from'], $window['to']));
+        } catch (\Throwable $e) {
+            log_message('error', 'ContentAnalyticsController::metrics: ' . $e->getMessage());
+            return $this->fail('Unable to load content performance', 500);
+        }
     }
 
+    /** One identity's search rows per day × page URL, same window as metrics(). */
     public function contentMetrics(int $identityId): ResponseInterface
     {
-        $from  = $this->request->getGet('from') ?? date('Y-m-d', strtotime('-30 days'));
-        $to    = $this->request->getGet('to') ?? date('Y-m-d');
-        $model = new ContentMetricFactModel();
-        $facts = $model->getForContent($identityId, $from, $to);
-        return $this->response->setJSON(['data' => $facts, 'identity_id' => $identityId]);
+        try {
+            $service = $this->searchPerformance();
+            $window  = $service->window($this->request->getGet('from'), $this->request->getGet('to'));
+            if ($window['from'] > $window['to']) {
+                return $this->fail('`from` must not be after `to`.', 422);
+            }
+            $detail = $service->detail($identityId, $window['from'], $window['to']);
+            if ($detail === null) {
+                return $this->fail('Content identity not found', 404);
+            }
+
+            return $this->ok([
+                'identity_id' => $identityId,
+                'source'      => 'search_console',
+                'period'      => ['from' => $window['from'], 'to' => $window['to']],
+                'latest_date' => $window['latest'],
+            ] + $detail);
+        } catch (\Throwable $e) {
+            log_message('error', 'ContentAnalyticsController::contentMetrics: ' . $e->getMessage());
+            return $this->fail('Unable to load content analytics', 500);
+        }
+    }
+
+    private function searchPerformance(): ContentSearchPerformanceService
+    {
+        return new ContentSearchPerformanceService(null, max(1, (int) ($this->request->getGet('tenant_id') ?? 1)));
     }
 }

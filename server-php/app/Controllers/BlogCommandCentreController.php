@@ -502,6 +502,83 @@ class BlogCommandCentreController extends BaseApiController
         return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }
 
+    /**
+     * reach_work_blocks for the AI Ops card's "work blocks queued" and an
+     * optimiser run's "Work blocks" count.
+     *
+     *   ?status=queued[,eligible…]  eligibility_status (the card counts one each)
+     *   ?run_id=                    blocks a run's decisions queued (rd.work_block_id)
+     *   ?block_type= ?content_item_id=
+     *
+     * Each row carries its content item and the roadmap decision that queued
+     * it (if any), so it can open /content/:id or the run's decisions.
+     */
+    public function workBlocks()
+    {
+        [$page, $limit, $offset] = $this->pagination();
+        $db = Database::connect();
+
+        if (! SchemaGuard::hasTable($db, 'reach_work_blocks')) {
+            return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
+        }
+        $hasDecisions = SchemaGuard::hasTable($db, 'reach_roadmap_decisions');
+
+        $where = ['1=1'];
+        $binds = [];
+        $statuses = array_values(array_filter(array_map('trim', explode(',', (string) $this->request->getGet('status')))));
+        if ($statuses !== []) {
+            $where[] = 'wb.eligibility_status IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')';
+            array_push($binds, ...$statuses);
+        }
+        $blockType = trim((string) $this->request->getGet('block_type'));
+        if ($blockType !== '') {
+            $where[] = 'wb.block_type = ?';
+            $binds[] = $blockType;
+        }
+        $contentId = (int) $this->request->getGet('content_item_id');
+        if ($contentId > 0) {
+            $where[] = 'wb.content_item_id = ?';
+            $binds[] = $contentId;
+        }
+        $runId = (int) $this->request->getGet('run_id');
+        if ($runId > 0) {
+            if (! $hasDecisions) {
+                return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
+            }
+            $where[] = 'wb.id IN (SELECT work_block_id FROM reach_roadmap_decisions WHERE optimizer_run_id = ? AND work_block_id IS NOT NULL)';
+            $binds[] = $runId;
+        }
+        $whereSql = implode(' AND ', $where);
+
+        // A block is queued by at most one decision; LATERAL … LIMIT 1 keeps a
+        // stray duplicate from doubling the row.
+        $decisionJoin = $hasDecisions
+            ? 'LEFT JOIN LATERAL (SELECT id, decision, optimizer_run_id, decided_for_date FROM reach_roadmap_decisions d
+                                  WHERE d.work_block_id = wb.id ORDER BY d.id DESC LIMIT 1) rd ON TRUE'
+            : '';
+        $decisionCols = $hasDecisions
+            ? 'rd.id AS decision_id, rd.decision, rd.optimizer_run_id, rd.decided_for_date'
+            : 'NULL AS decision_id, NULL AS decision, NULL AS optimizer_run_id, NULL AS decided_for_date';
+
+        $total = (int) ($db->query("SELECT COUNT(*) AS c FROM reach_work_blocks wb WHERE {$whereSql}", $binds)->getRowArray()['c'] ?? 0);
+        $rows  = $db->query(
+            "SELECT wb.id, wb.work_block_uuid, wb.block_type, wb.scope, wb.content_item_id, wb.content_version_id,
+                    wb.eligibility_status, wb.priority, wb.scheduled_at, wb.attempt_count, wb.max_attempts,
+                    wb.provider_route, wb.failure_classification, wb.job_id, wb.created_at, wb.started_at,
+                    wb.completed_at, wb.updated_at,
+                    ci.title AS content_title, ci.workflow_status AS content_status, {$decisionCols}
+             FROM reach_work_blocks wb
+             LEFT JOIN reach_content_items ci ON ci.id = wb.content_item_id
+             {$decisionJoin}
+             WHERE {$whereSql}
+             ORDER BY wb.priority DESC, wb.created_at DESC, wb.id DESC
+             LIMIT {$limit} OFFSET {$offset}",
+            $binds
+        )->getResultArray();
+
+        return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
+    }
+
     public function optimizerRuns()
     {
         [$page, $limit, $offset] = $this->pagination();

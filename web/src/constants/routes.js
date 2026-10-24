@@ -28,6 +28,7 @@ export const ROUTES = {
   SOCIAL_ACCOUNTS:    '/social/accounts',
   SOCIAL_CALENDAR:    '/social/calendar',
   SOCIAL_PERFORMANCE: '/social/performance',
+  SOCIAL_AD_CAMPAIGN: '/social/ads/:id',
   SOCIAL_ADS:         '/social/ads',   // paid-ads register (ads stream); placeholder until merged
   SOCIAL_INBOX:       '/social/inbox', // social inbox bot (comments/DMs → replies, Flow tickets)
 
@@ -43,11 +44,16 @@ export const ROUTES = {
   CREATIVE_BRIEFS: '/creative-briefs',
 
   ANALYTICS: '/analytics',
+  ANALYTICS_TRAFFIC: '/analytics/traffic',
+  ANALYTICS_SNAPSHOTS: '/analytics/snapshots',
+  ANALYTICS_BLOG_POSTS: '/analytics/blog-posts',
   REPORTS: '/reports',
 
   LEADS:        '/leads',
   ENGAGE_PUSH:  '/leads/engage-push',
   LEAD_OUTCOMES: '/leads/outcomes',
+  LEAD_DETAIL:  '/leads/:id',
+  ATTRIBUTION_CONVERSIONS: '/intelligence/attribution/conversions',
 
   // Overview → Bot plan (page owned by the bot-plan stream).
   BOT_PLAN:     '/bot/plan',

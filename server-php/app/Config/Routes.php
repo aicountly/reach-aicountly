@@ -223,6 +223,7 @@ $routes->group('v1', static function ($routes) {
 
         // Blog Command Centre
         $routes->get('blog-command-centre/overview',                 'BlogCommandCentreController::overview',        ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/work-blocks',              'BlogCommandCentreController::workBlocks',      ['filter' => 'permission:blog.view']);
         $routes->get('blog-command-centre/settings/portfolio',     'BlogCommandCentreController::getPortfolio',    ['filter' => 'permission:blog.view']);
         $routes->put('blog-command-centre/settings/portfolio',     'BlogCommandCentreController::updatePortfolio', ['filter' => 'permission:blog.edit']);
         $routes->get('blog-command-centre/settings',               'BlogCommandCentreController::getSettings',   ['filter' => 'permission:blog.view']);
@@ -339,6 +340,9 @@ $routes->group('v1', static function ($routes) {
         $routes->get('analytics/traffic/leads',         'Api\\V1\\AnalyticsController::trafficLeads',       ['filter' => 'permission:analytics.view']);
         $routes->get('analytics/traffic/config-status', 'Api\\V1\\AnalyticsController::trafficConfigStatus',['filter' => 'permission:analytics.view']);
         $routes->get('analytics/providers',             'Api\\V1\\AnalyticsController::providers',          ['filter' => 'permission:analytics.view']);
+        $routes->get('analytics/traffic/explore',       'Api\\V1\\AnalyticsController::trafficExplore',     ['filter' => 'permission:analytics.view']);
+        $routes->get('analytics/snapshots',             'Api\\V1\\AnalyticsController::snapshots',          ['filter' => 'permission:analytics.view']);
+        $routes->get('analytics/legacy-blog-posts',     'Api\\V1\\AnalyticsController::legacyBlogPosts',    ['filter' => 'permission:analytics.view']);
 
         // Leads
         $routes->get('leads/outcomes',         'Api\\V1\\LeadOutcomeController::index',   ['filter' => 'permission:lead.view']);
@@ -791,6 +795,8 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community/analytics/engagement',                       'Api\\V1\\Community\\CommunityAnalyticsController::engagement',            ['filter' => 'permission:community_analytics.view']);
         $routes->get('community/analytics/coverage',                         'Api\\V1\\Community\\CommunityAnalyticsController::sourceCoverage',        ['filter' => 'permission:community_analytics.view']);
         $routes->get('community/analytics/cache',                            'Api\\V1\\Community\\CommunityAnalyticsController::cache',                 ['filter' => 'permission:community_analytics.view']);
+        $routes->get('community/analytics/engagement/events',                'Api\\V1\\Community\\CommunityAnalyticsController::engagementEvents',      ['filter' => 'permission:community_analytics.view']);
+        $routes->get('community/analytics/coverage/answers',                 'Api\\V1\\Community\\CommunityAnalyticsController::coverageAnswers',       ['filter' => 'permission:community_analytics.view']);
 
         // ─────────────────────────────────────────────────────────────────────
         // Phase 6 — Video Content Automation
@@ -966,6 +972,9 @@ $routes->group('v1', static function ($routes) {
         $routes->get('seo/tracked-keywords/(:num)/history', 'Api\\V1\\Intelligence\\SeoCommandCentreController::keywordHistory/$1', ['filter' => 'permission:seo.view']);
         $routes->get('seo/backlinks',             'Api\\V1\\Intelligence\\SeoCommandCentreController::backlinks',          ['filter' => 'permission:seo.view']);
         $routes->get('seo/indexnow/submissions',  'Api\\V1\\Intelligence\\SeoCommandCentreController::indexnowSubmissions', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/indexnow/submissions/(:num)', 'Api\\V1\\Intelligence\\SeoCommandCentreController::indexnowSubmission/$1', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/backlinks/(:num)',      'Api\\V1\\Intelligence\\SeoCommandCentreController::backlinkSnapshot/$1', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/indexing',              'Api\\V1\\Intelligence\\SeoCommandCentreController::indexing',           ['filter' => 'permission:seo.view']);
         $routes->get('seo/suggestions',           'Api\\V1\\Intelligence\\SeoCommandCentreController::suggestions',        ['filter' => 'permission:seo.view']);
 
         // Phase 8: Search Console
@@ -1023,6 +1032,7 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/visibility/prompts/(:num)/versions/(:num)/approve', 'Api\\V1\\Intelligence\\VisibilityController::approveVersion/$1/$2', ['filter' => 'permission:visibility.review']);
         $routes->post('intelligence/visibility/runs',                        'Api\\V1\\Intelligence\\VisibilityController::queueRun',              ['filter' => 'permission:visibility.execute']);
         $routes->get('intelligence/visibility/runs',                         'Api\\V1\\Intelligence\\VisibilityController::runs',                  ['filter' => 'permission:visibility.read']);
+        $routes->get('intelligence/visibility/runs/(:num)',                  'Api\\V1\\Intelligence\\VisibilityController::run/$1',                ['filter' => 'permission:visibility.read']);
         $routes->get('intelligence/visibility/observations',                 'Api\\V1\\Intelligence\\VisibilityController::observations',          ['filter' => 'permission:visibility.read']);
         // Stream H: real AI-visibility execution + share of voice, and AI Insights
         $routes->put('intelligence/visibility/prompts/(:num)',               'Api\\V1\\Intelligence\\VisibilityController::updatePrompt/$1',       ['filter' => 'permission:visibility.manage']);
@@ -1063,6 +1073,10 @@ $routes->group('v1', static function ($routes) {
         $routes->post('readiness/attribution/models/(:num)/activate',        'Api\\V1\\Refresh\\AttributionModelController::activate/$1',         ['filter' => 'permission:attribution_model.approve']);
 
         // Phase 9: Refresh outcomes (observational post-refresh changes)
+        $routes->get('readiness/recommendations',                            'Api\\V1\\Refresh\\RefreshRecommendationController::index',         ['filter' => 'permission:refresh.read']);
+        $routes->get('readiness/recommendations/(:num)',                     'Api\\V1\\Refresh\\RefreshRecommendationController::show/$1',       ['filter' => 'permission:refresh.read']);
+        $routes->get('readiness/workflows',                                  'Api\\V1\\Refresh\\RefreshRecommendationController::workflows',     ['filter' => 'permission:refresh.read']);
+        $routes->get('readiness/migrations',                                 'Api\\V1\\Readiness\\MigrationStatusController::index',             ['filter' => 'permission:readiness.read']);
         $routes->get('readiness/outcomes',                                   'Api\\V1\\Refresh\\RefreshOutcomeController::index',                 ['filter' => 'permission:refresh_outcome.read']);
         $routes->get('readiness/outcomes/(:num)',                            'Api\\V1\\Refresh\\RefreshOutcomeController::show/$1',               ['filter' => 'permission:refresh_outcome.read']);
         $routes->post('readiness/outcomes/(:num)/measure',                   'Api\\V1\\Refresh\\RefreshOutcomeController::measure/$1',            ['filter' => 'permission:refresh_outcome.trigger']);

@@ -77,8 +77,37 @@ class SitemapController extends BaseApiController
         }
     }
 
+    /**
+     * GET intelligence/sitemap/{id}/entries — with state, reason, q (or
+     * page/per_page) it is the filtered entry list behind the snapshot
+     * counts; without them it keeps the legacy included_only behaviour.
+     */
     public function entries(int $snapshotId): ResponseInterface
     {
+        $get = $this->request->getGet() ?? [];
+        if (array_intersect_key($get, array_flip(['state', 'reason', 'q', 'page', 'per_page'])) !== []) {
+            try {
+                $result = $this->service()->listEntries(
+                    $snapshotId,
+                    $get,
+                    (int) ($get['page'] ?? 1),
+                    (int) ($get['per_page'] ?? 100),
+                );
+                if ($result['snapshot'] === null) {
+                    return $this->response->setStatusCode(404)->setJSON(['error' => 'Snapshot not found']);
+                }
+
+                return $this->response->setJSON([
+                    'data'  => $result['rows'],
+                    'count' => count($result['rows']),
+                    'meta'  => array_diff_key($result, ['rows' => true]),
+                ]);
+            } catch (\Throwable $e) {
+                log_message('error', 'SitemapController::entries: ' . $e->getMessage());
+                return $this->response->setJSON(['data' => [], 'count' => 0]);
+            }
+        }
+
         try {
             $includedOnly = $this->request->getGet('included_only') !== 'false';
             $entries      = $this->service()->getSnapshotEntries($snapshotId, $includedOnly);

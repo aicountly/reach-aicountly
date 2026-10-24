@@ -25,6 +25,21 @@ describe('AnalyticsPage tiles', () => {
     expect(await tile('Leads generated (30d)')).toHaveAttribute('href', '/leads?days=30');
     expect(await tile('Posts planned (30d)')).toHaveAttribute('href', '/social/calendar');
     expect((await tile('Posts published (30d)')).tagName).toBe('DIV');
-    expect((await tile('Engagement imported')).tagName).toBe('DIV');
+    // Legacy blog tiles open the legacy-table list with the same predicate the count used.
+    expect(await tile('Blog drafts')).toHaveAttribute('href', '/analytics/blog-posts?bucket=drafts');
+    expect(await tile('Blog published (30d)')).toHaveAttribute('href', '/analytics/blog-posts?bucket=published&days=30');
+    expect(await tile('Approvals pending')).toHaveAttribute('href', '/analytics/blog-posts?bucket=approval_pending');
+    expect(await tile('Engagement imported')).toHaveAttribute('href', '/analytics/snapshots?source=external&days=30');
+  });
+
+  it('keeps zero legacy and engagement tiles plain', async () => {
+    analyticsService.summary.mockResolvedValue({
+      window: '30d', blog_drafts: 0, blog_published: 0, approval_pending: 0, engagement_imported: 0,
+    });
+    renderWithAuth(<AnalyticsPage />, { route: '/analytics' });
+
+    for (const label of ['Blog drafts', 'Blog published (30d)', 'Approvals pending', 'Engagement imported']) {
+      expect((await screen.findByText(label)).closest('.stat-tile').tagName).toBe('DIV');
+    }
   });
 });

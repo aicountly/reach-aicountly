@@ -9,8 +9,8 @@ use App\Libraries\AuditLogger;
 use App\Models\Intelligence\AiVisibilityPromptModel;
 use App\Models\Intelligence\AiVisibilityPromptVersionModel;
 use App\Models\Intelligence\AiVisibilityRunModel;
-use App\Models\Intelligence\AiVisibilityObservationModel;
 use App\Libraries\Intelligence\Visibility\AiVisibilityService;
+use App\Libraries\Intelligence\Visibility\VisibilityRecordsService;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Libraries\Database\SchemaGuard;
 
@@ -233,6 +233,13 @@ class VisibilityController extends BaseApiController
         return $this->response->setStatusCode(201)->setJSON(['data' => $runModel->whereIn('id', $ids)->findAll()]);
     }
 
+    /**
+     * GET intelligence/visibility/runs — the answers behind every overview
+     * number. Filters: days, status, provider, prompt_id, market, batch_id,
+     * q, and the facets entity, competitor_id, brand (named|not_named|cited),
+     * gap=1, cited_domain; page, per_page. `data` stays the row list so older
+     * callers keep working; `meta` carries the total and the applied filters.
+     */
     public function runs(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
@@ -240,39 +247,61 @@ class VisibilityController extends BaseApiController
         try {
             $db = \Config\Database::connect();
             if (! SchemaGuard::hasTable($db, 'reach_ai_visibility_runs')) {
-                return $this->response->setJSON(['data' => []]);
+                return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'per_page' => 50, 'filters' => []]]);
             }
 
-            $model = new AiVisibilityRunModel();
-            $runs  = $model->where('tenant_id', $tenantId)->orderBy('queued_at', 'DESC')->findAll(50);
-            return $this->response->setJSON(['data' => is_array($runs) ? $runs : []]);
+            $result = (new VisibilityRecordsService($db, $tenantId))->runs(
+                $this->request->getGet() ?? [],
+                (int) ($this->request->getGet('page') ?? 1),
+                (int) ($this->request->getGet('per_page') ?? 50),
+            );
+
+            return $this->response->setJSON(['data' => $result['rows'], 'meta' => array_diff_key($result, ['rows' => true])]);
         } catch (\Throwable $e) {
             log_message('error', 'VisibilityController::runs: ' . $e->getMessage());
-            return $this->response->setJSON(['data' => []]);
+            return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'per_page' => 50, 'filters' => []]]);
         }
     }
 
+    /** GET intelligence/visibility/runs/{id} — one answer: question, raw text, observations, citations. */
+    public function run(int $id): ResponseInterface
+    {
+        if (! $this->installed()) {
+            return $this->fail('Not found', 404);
+        }
+        $run = (new VisibilityRecordsService(null, (int) ($this->request->getGet('tenant_id') ?? 1)))->run($id);
+
+        return $run === null ? $this->fail('Not found', 404) : $this->ok($run);
+    }
+
+    /**
+     * GET intelligence/visibility/observations — one row per name per answer.
+     * Filters: run_id, coverage_state, mention_type, entity, competitor_id,
+     * provider, prompt_id, days, counted=1; page, per_page.
+     */
     public function observations(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
+        $empty    = ['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'per_page' => 50, 'filters' => []]];
         try {
             $db = \Config\Database::connect();
             if (
                 ! SchemaGuard::hasTable($db, 'reach_ai_visibility_observations')
                 || ! SchemaGuard::hasTable($db, 'reach_ai_visibility_runs')
             ) {
-                return $this->response->setJSON(['data' => []]);
+                return $this->response->setJSON($empty);
             }
 
-            $model = new AiVisibilityObservationModel();
-            $obs   = $model->getByCoverage(
-                $tenantId,
-                $this->request->getGet('coverage_state') ?? 'mentioned'
+            $result = (new VisibilityRecordsService($db, $tenantId))->observations(
+                $this->request->getGet() ?? [],
+                (int) ($this->request->getGet('page') ?? 1),
+                (int) ($this->request->getGet('per_page') ?? 50),
             );
-            return $this->response->setJSON(['data' => is_array($obs) ? $obs : []]);
+
+            return $this->response->setJSON(['data' => $result['rows'], 'meta' => array_diff_key($result, ['rows' => true])]);
         } catch (\Throwable $e) {
             log_message('error', 'VisibilityController::observations: ' . $e->getMessage());
-            return $this->response->setJSON(['data' => []]);
+            return $this->response->setJSON($empty);
         }
     }
 }

@@ -166,20 +166,55 @@ final class AdsSummary
         ];
     }
 
+    /**
+     * Leads per day for one campaign, counted as build() counts them (its UTM
+     * set, within its dates and [from, to]), for the campaign's daily view.
+     *
+     * @return array<string, int> YYYY-MM-DD => leads, days with none omitted
+     */
+    public function leadsByDay(array $c, string $from, string $to): array
+    {
+        $from = max($from, (string) $c['start_date']);
+        $to = min($to, (string) ($c['end_date'] ?? $to));
+        if ($from > $to) {
+            return [];
+        }
+        [$where, $binds] = self::leadsWhere($c, $from, $to);
+        $out = [];
+        foreach ($this->db->query(
+            "SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, COUNT(*) AS n FROM reach_leads WHERE {$where} GROUP BY 1 ORDER BY 1",
+            $binds,
+        )->getResultArray() as $r) {
+            $out[$r['day']] = (int) $r['n'];
+        }
+
+        return $out;
+    }
+
+    /** @return array{0: string, 1: list<string>} the lead-attribution predicate */
+    private static function leadsWhere(array $c, string $from, string $to): array
+    {
+        return [
+            "LOWER(TRIM(utm_source)) = ? AND LOWER(TRIM(utm_campaign)) = ?
+                AND (utm_medium IS NULL OR TRIM(utm_medium) = '' OR LOWER(TRIM(utm_medium)) = ?)
+                AND created_at >= ?::date AND created_at < (?::date + INTERVAL '1 day')",
+            [strtolower((string) $c['utm_source']), strtolower((string) $c['utm_campaign']), strtolower((string) $c['utm_medium']), $from, $to],
+        ];
+    }
+
     /** @return array{0:int, 1:list<array{utm_content:?string, leads:int}>} */
     private function leads(array $c, string $from, string $to): array
     {
         if ($from > $to) {
             return [0, []];
         }
+        [$where, $binds] = self::leadsWhere($c, $from, $to);
         $rows = $this->db->query(
             "SELECT NULLIF(TRIM(utm_content), '') AS utm_content, COUNT(*) AS n
                FROM reach_leads
-              WHERE LOWER(TRIM(utm_source)) = ? AND LOWER(TRIM(utm_campaign)) = ?
-                AND (utm_medium IS NULL OR TRIM(utm_medium) = '' OR LOWER(TRIM(utm_medium)) = ?)
-                AND created_at >= ?::date AND created_at < (?::date + INTERVAL '1 day')
+              WHERE {$where}
               GROUP BY 1 ORDER BY 2 DESC",
-            [strtolower((string) $c['utm_source']), strtolower((string) $c['utm_campaign']), strtolower((string) $c['utm_medium']), $from, $to],
+            $binds,
         )->getResultArray();
         $total = 0;
         $by = [];

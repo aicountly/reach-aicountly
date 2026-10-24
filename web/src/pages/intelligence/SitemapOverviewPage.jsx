@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Map, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { getLatestSitemap, generateSitemapSnapshot } from '../../services/intelligenceService.js';
 import { formatDateTime } from '../../utils/formatDate';
+import { drillHref } from '../../components/drill';
 
 function StatusIcon({ status }) {
   if (status === 'validated' || status === 'generated') {
@@ -61,11 +63,16 @@ export default function SitemapOverviewPage() {
     }
   };
 
+  // Each count opens the snapshot's entries with the same predicate.
+  const entries = (filter) => (snapshot?.id ? drillHref(`/seo-centre/sitemap/${snapshot.id}/entries`, filter) : null);
   const stats = [
-    { label: 'Total Entries', value: snapshot?.total_entries ?? 0 },
-    { label: 'Included', value: snapshot?.included_entries ?? 0 },
-    { label: 'Excluded (noindex)', value: snapshot?.excluded_noindex ?? 0 },
-    { label: 'Excluded (withdrawn)', value: snapshot?.excluded_withdrawn ?? 0 },
+    { label: 'Total Entries', value: snapshot?.total_entries ?? 0, to: entries({}) },
+    { label: 'Included', value: snapshot?.included_entries ?? 0, to: entries({ state: 'included' }) },
+    { label: 'Excluded (noindex)', value: snapshot?.excluded_noindex ?? 0, to: entries({ reason: 'noindex' }) },
+    { label: 'Excluded (withdrawn)', value: snapshot?.excluded_withdrawn ?? 0, to: entries({ reason: 'withdrawn' }) },
+    ...(Number(snapshot?.excluded_other) > 0
+      ? [{ label: 'Excluded (other)', value: snapshot.excluded_other, to: entries({ reason: 'other' }) }]
+      : []),
   ];
 
   return (
@@ -119,12 +126,18 @@ export default function SitemapOverviewPage() {
           </div>
           <div className="card__body">
             <div className="stat-grid">
-              {stats.map((s) => (
+              {stats.map((s) => (Number(s.value) > 0 && s.to ? (
+                <Link key={s.label} to={s.to} className="stat-card stat-tile" style={{ textDecoration: 'none', color: 'inherit' }}
+                      aria-label={`${s.label}: ${s.value}`}>
+                  <div className="stat-card__value">{s.value}</div>
+                  <div className="stat-card__label">{s.label}</div>
+                </Link>
+              ) : (
                 <div key={s.label} className="stat-card">
                   <div className="stat-card__value">{s.value}</div>
                   <div className="stat-card__label">{s.label}</div>
                 </div>
-              ))}
+              )))}
             </div>
             <p className="text-sm text-muted" style={{ margin: '1rem 0 0' }}>
               {snapshot.generated_at

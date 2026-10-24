@@ -20,6 +20,12 @@ use App\Models\Refresh\RefreshWorkflowModel;
  */
 class RefreshOperationsService
 {
+    /** The "Recommendation Backlog" scope — RefreshBacklogReadService lists the same rows. */
+    public const BACKLOG_STATUSES = ['recommended', 'triaged'];
+
+    /** Workflows past these are no longer "active". */
+    public const CLOSED_WORKFLOW_STATUSES = ['outcome_recorded', 'rejected', 'cancelled', 'withdrawn', 'superseded', 'failed'];
+
     public function __construct(
         private RefreshRecommendationModel  $recommendationModel,
         private RefreshWorkflowModel        $workflowModel,
@@ -36,12 +42,12 @@ class RefreshOperationsService
 
         $backlogCount = $this->recommendationModel
             ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['recommended', 'triaged'])
+            ->whereIn('status', self::BACKLOG_STATUSES)
             ->countAllResults();
 
         $activeWorkflows = $this->workflowModel
             ->where('tenant_id', $tenantId)
-            ->whereNotIn('status', ['outcome_recorded', 'rejected', 'cancelled', 'withdrawn', 'superseded', 'failed'])
+            ->whereNotIn('status', self::CLOSED_WORKFLOW_STATUSES)
             ->countAllResults();
 
         $failedPublications = $this->publicationLinkModel

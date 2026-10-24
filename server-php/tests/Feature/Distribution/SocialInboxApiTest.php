@@ -81,6 +81,37 @@ final class SocialInboxApiTest extends ApiTestCase
         $this->assertSame(5, $total('has=everything&since_hours=abc'));
     }
 
+    /** Reply failures (updated_at window) and complaints waiting for Flow (no ticket, still queued). */
+    public function testReplyFailureAndWaitingForFlowFiltersMatchTheSummary(): void
+    {
+        $now = gmdate('Y-m-d H:i:s') . '+00';
+        $old = gmdate('Y-m-d H:i:s', time() - 3 * 86400) . '+00';
+        $this->item(['external_id' => 'f1', 'status' => 'failed', 'reply_status' => 'failed', 'updated_at' => $now]);
+        // Read days ago, the reply attempt failed just now: counted today.
+        $this->item(['external_id' => 'f2', 'status' => 'replied', 'reply_status' => 'failed', 'updated_at' => $now, 'fetched_at' => $old]);
+        $this->item(['external_id' => 'f3', 'status' => 'failed', 'reply_status' => 'failed', 'updated_at' => $old, 'fetched_at' => $old]);
+        $this->item(['external_id' => 'w1', 'classification' => 'complaint', 'status' => 'deferred']);
+        $this->item(['external_id' => 'w2', 'classification' => 'complaint', 'status' => 'retry', 'fetched_at' => $old]);
+        $this->item(['external_id' => 'w3', 'classification' => 'complaint', 'status' => 'retry', 'ticket_number' => 'TCK-9']);
+        $this->item(['external_id' => 'w4', 'classification' => 'complaint', 'status' => 'failed']);
+        $this->item(['external_id' => 'w5', 'classification' => 'question', 'status' => 'deferred']);
+        $h = $this->authAs('super_admin');
+
+        $day = json_decode((string) $this->withHeaders($h)->call('GET', 'v1/social/inbox/summary')->getJSON(), true)['data']['last_24h'];
+        $list = fn (string $qs): array => json_decode((string) $this->withHeaders($h)->call('GET', 'v1/social/inbox?' . $qs)->getJSON(), true)['data'];
+
+        $failures = $list('reply_status=failed&updated_since_hours=24');
+        $this->assertSame(2, $day['reply_failures']);
+        $this->assertSame($day['reply_failures'], $failures['total']);
+        $this->assertEqualsCanonicalizing(['f1', 'f2'], array_column($failures['items'], 'external_id'));
+
+        $waiting = $list('waiting=flow');
+        $this->assertSame(2, $day['waiting_for_flow']);
+        $this->assertSame($day['waiting_for_flow'], $waiting['total']);
+        $this->assertEqualsCanonicalizing(['w1', 'w2'], array_column($waiting['items'], 'external_id'));
+        $this->assertSame(8, $list('waiting=nothing&updated_since_hours=0')['total']);
+    }
+
     public function testRetryIsOnlyForFailedItemsAndNeedsDispatch(): void
     {
         $ok = $this->item(['external_id' => 'c3', 'status' => 'replied', 'reply_status' => 'sent']);

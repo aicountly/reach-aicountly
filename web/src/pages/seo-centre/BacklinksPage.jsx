@@ -4,6 +4,7 @@ import { Loader } from '../../components/common/Loader';
 import { Alert } from '../../components/common/Alert';
 import { Card } from '../../components/common/Card';
 import { formatDate } from '../../utils/formatDate';
+import { DrillLink, drillHref } from '../../components/drill';
 
 export function BacklinksPage() {
   const [data, setData] = useState(null);
@@ -40,16 +41,32 @@ export function BacklinksPage() {
             <table className="data-table">
               <thead><tr><th>Date</th><th>Provider</th><th>Internal links</th><th>Published URLs</th><th>External backlinks</th><th>Referring domains</th></tr></thead>
               <tbody>
-                {snapshots.map((snap) => (
-                  <tr key={snap.id}>
-                    <td>{formatDate(snap.snapshot_date)}</td>
-                    <td>{snap.provider}</td>
-                    <td>{snap.internal_links}</td>
-                    <td>{snap.published_urls}</td>
-                    <td>{snap.total_backlinks ?? '—'}</td>
-                    <td>{snap.referring_domains ?? '—'}</td>
-                  </tr>
-                ))}
+                {snapshots.map((snap) => {
+                  // Each figure opens the snapshot with the records it counted.
+                  const at = (kind, n) => (Number(n) > 0 ? drillHref(`/seo-centre/backlinks/${snap.id}`, { kind }) : undefined);
+                  return (
+                    <tr key={snap.id}>
+                      <td>
+                        <DrillLink to={`/seo-centre/backlinks/${snap.id}`} title="Open this snapshot">
+                          {formatDate(snap.snapshot_date)}
+                        </DrillLink>
+                      </td>
+                      <td>{snap.provider}</td>
+                      <td><DrillLink to={at('internal_links', snap.internal_links)} title="Internal links counted">{snap.internal_links}</DrillLink></td>
+                      <td><DrillLink to={at('published_urls', snap.published_urls)} title="Published URLs counted">{snap.published_urls}</DrillLink></td>
+                      <td>
+                        <DrillLink to={Number(snap.total_backlinks) > 0 ? `/seo-centre/backlinks/${snap.id}` : undefined} title="Backlink rows in this snapshot">
+                          {snap.total_backlinks ?? '—'}
+                        </DrillLink>
+                      </td>
+                      <td>
+                        <DrillLink to={Number(snap.referring_domains) > 0 ? `/seo-centre/backlinks/${snap.id}` : undefined} title="Referring domains in this snapshot">
+                          {snap.referring_domains ?? '—'}
+                        </DrillLink>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

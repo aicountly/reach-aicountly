@@ -1,25 +1,34 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Zap, Send, RefreshCw, CheckCircle, Clock, Shield, XCircle, AlertTriangle } from 'lucide-react';
 import { submitIndexNowUrl, retryIndexNowPending } from '../../services/intelligenceService.js';
+import { seoService } from '../../services/seoService';
 import { formatDateTime } from '../../utils/formatDate';
+import { drillHref } from '../../components/drill';
+
+const SUBMISSIONS = '/seo-centre/indexnow/submissions';
 
 export default function IndexNowOperationsPage() {
+  const navigate = useNavigate();
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [counts, setCounts] = useState(null);
 
-  const counts = useMemo(() => {
-    const tally = { total: submissions.length, submitted: 0, retrying: 0, failed: 0, pending: 0 };
-    for (const row of submissions) {
-      const key = (row.status || 'submitted').toLowerCase();
-      if (key in tally) tally[key] += 1;
-      else tally.submitted += 1;
-    }
-    return tally;
-  }, [submissions]);
+  // Tiles and the recent list come from the stored submissions, so every
+  // number opens the same records on the submissions page.
+  const load = useCallback(() => seoService.listIndexNowSubmissions({ per_page: 10 })
+    .then((res) => {
+      setSubmissions(res?.submissions || []);
+      setCounts(res?.counts || null);
+    })
+    // Without seo.view the tiles stay '—' rather than raising an error.
+    .catch((err) => { if (err?.status !== 403) setError(err?.message || 'Unable to load IndexNow submissions'); }), []);
+
+  useEffect(() => { load(); }, [load]);
 
   const statusBadge = (status) => {
     const map = {
@@ -39,10 +48,9 @@ export default function IndexNowOperationsPage() {
     setResult(null);
     try {
       const res = await submitIndexNowUrl({ url: url.trim(), tenant_id: 1 });
-      const row = res?.data || { url: url.trim(), status: 'submitted', attempt_count: 1, submitted_at: new Date().toISOString() };
-      setResult(row);
-      setSubmissions((prev) => [{ id: row.id || Date.now(), ...row, url: row.url || url.trim() }, ...prev]);
+      setResult(res?.data || res || { url: url.trim() });
       setUrl('');
+      load();
     } catch (err) {
       setError(err.message || 'Submission failed');
     } finally {
@@ -56,6 +64,7 @@ export default function IndexNowOperationsPage() {
     try {
       await retryIndexNowPending();
       setResult({ status: 'retrying', url: 'pending submissions' });
+      load();
     } catch (err) {
       setError(err.message || 'Retry failed');
     } finally {
@@ -87,19 +96,30 @@ export default function IndexNowOperationsPage() {
 
       <div className="stat-grid mb-4">
         {[
-          { label: 'Session total', value: counts.total, icon: Zap, color: 'var(--color-primary)' },
-          { label: 'Submitted', value: counts.submitted, icon: CheckCircle, color: 'var(--color-success)' },
-          { label: 'Retrying', value: counts.retrying + counts.pending, icon: AlertTriangle, color: 'var(--color-warning)' },
-          { label: 'Failed', value: counts.failed, icon: XCircle, color: 'var(--color-danger)' },
-        ].map((stat) => (
-          <div key={stat.label} className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <stat.icon size={20} style={{ color: stat.color, flexShrink: 0 }} aria-hidden="true" />
-            <div>
-              <div className="stat-card__value">{stat.value}</div>
-              <div className="stat-card__label">{stat.label}</div>
-            </div>
-          </div>
-        ))}
+          { label: 'All submissions', value: counts?.total, status: '', icon: Zap, color: 'var(--color-primary)' },
+          { label: 'Submitted', value: counts?.submitted, status: 'submitted', icon: CheckCircle, color: 'var(--color-success)' },
+          { label: 'Pending / retrying', value: counts ? (counts.retrying ?? 0) + (counts.pending ?? 0) : undefined, status: 'retrying,pending', icon: AlertTriangle, color: 'var(--color-warning)' },
+          { label: 'Failed', value: counts?.failed, status: 'failed', icon: XCircle, color: 'var(--color-danger)' },
+        ].map((stat) => {
+          const body = (
+            <>
+              <stat.icon size={20} style={{ color: stat.color, flexShrink: 0 }} aria-hidden="true" />
+              <div>
+                <div className="stat-card__value">{stat.value ?? '—'}</div>
+                <div className="stat-card__label">{stat.label}</div>
+              </div>
+            </>
+          );
+          const style = { display: 'flex', alignItems: 'center', gap: '0.75rem' };
+          return Number(stat.value) > 0 ? (
+            <Link key={stat.label} to={drillHref(SUBMISSIONS, { status: stat.status })} className="stat-card stat-tile"
+                  style={{ ...style, textDecoration: 'none', color: 'inherit' }} aria-label={`${stat.label}: ${stat.value}`}>
+              {body}
+            </Link>
+          ) : (
+            <div key={stat.label} className="stat-card" style={style}>{body}</div>
+          );
+        })}
       </div>
 
       <div
@@ -175,12 +195,12 @@ export default function IndexNowOperationsPage() {
       <div className="card">
         <div className="card__header">
           <h2 className="card__title" style={{ margin: 0 }}>Recent Submissions</h2>
-          <span className="text-sm text-muted">{counts.total} in this session</span>
+          {Number(counts?.total) > 0 && <Link to={SUBMISSIONS} className="text-sm">All {counts.total} ›</Link>}
         </div>
         {submissions.length === 0 ? (
           <div className="card__body">
             <p className="muted" style={{ margin: 0 }}>
-              No submissions in this session yet. Submit a URL above to see results here.
+              No IndexNow submissions recorded yet. Submit a URL above to see results here.
             </p>
           </div>
         ) : (
@@ -196,12 +216,14 @@ export default function IndexNowOperationsPage() {
               </thead>
               <tbody>
                 {submissions.map((s) => (
-                  <tr key={s.id}>
+                  <tr key={s.id} className="is-drillable" tabIndex={0} aria-label={`Open submission ${s.url}`}
+                      onClick={() => navigate(`${SUBMISSIONS}/${s.id}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`${SUBMISSIONS}/${s.id}`); }}>
                     <td className="text-sm" style={{ fontFamily: 'var(--font-mono, monospace)', wordBreak: 'break-all' }}>
                       {s.url}
                     </td>
-                    <td>{statusBadge(s.status || 'submitted')}</td>
-                    <td>{s.attempt_count ?? 1}</td>
+                    <td>{statusBadge(s.status || 'pending')}</td>
+                    <td>{s.attempt_count ?? 0}</td>
                     <td className="text-sm text-muted">
                       {s.submitted_at
                         ? formatDateTime(s.submitted_at)

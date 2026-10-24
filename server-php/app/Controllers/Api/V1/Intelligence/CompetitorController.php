@@ -6,6 +6,7 @@ namespace App\Controllers\Api\V1\Intelligence;
 
 use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
+use App\Libraries\Intelligence\Visibility\VisibilityRecordsService;
 use App\Models\Intelligence\CompetitorModel;
 use App\Models\Intelligence\CompetitorAliasModel;
 use App\Models\Intelligence\CompetitorObservationAggregateModel;
@@ -26,7 +27,9 @@ class CompetitorController extends BaseApiController
 
             $model = new CompetitorModel();
             $rows  = $model->getActiveForTenant($tenantId);
-            return $this->response->setJSON(['data' => is_array($rows) ? $rows : []]);
+            $rows  = is_array($rows) ? $rows : [];
+
+            return $this->response->setJSON(['data' => $this->withRates($db, $tenantId, $rows, $this->days())]);
         } catch (\Throwable $e) {
             log_message('error', 'CompetitorController::index: ' . $e->getMessage());
             return $this->response->setJSON(['data' => []]);
@@ -102,8 +105,10 @@ class CompetitorController extends BaseApiController
 
         $aliasModel = new CompetitorAliasModel();
         $aliases    = $aliasModel->where('competitor_id', $id)->findAll();
+        $db         = \Config\Database::connect();
+        $row        = $this->withRates($db, (int) $competitor['tenant_id'], [$competitor], $this->days())[0];
 
-        return $this->response->setJSON(['data' => array_merge($competitor, ['aliases' => $aliases])]);
+        return $this->response->setJSON(['data' => array_merge($row, ['aliases' => $aliases])]);
     }
 
     public function update(int $id): ResponseInterface
@@ -137,13 +142,79 @@ class CompetitorController extends BaseApiController
         return $this->response->setStatusCode(201)->setJSON(['data' => $model->find($aliasId)]);
     }
 
+    /**
+     * GET intelligence/competitors/{id}/observations?days=28 — the answers
+     * that named this competitor (not in the question): the numerator of its
+     * sample mention rate. Stored per-prompt aggregates ride along.
+     */
     public function observations(int $id): ResponseInterface
     {
-        $model = new CompetitorObservationAggregateModel();
-        $data  = $model->where('competitor_id', $id)->orderBy('period_start', 'DESC')->findAll();
-        foreach ($data as &$row) {
-            $row['_disclosure'] = $row['sample_scope_note'];
+        $competitor = (new CompetitorModel())->find($id);
+        if (! $competitor) {
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
         }
-        return $this->response->setJSON(['data' => $data]);
+
+        $db         = \Config\Database::connect();
+        $aggregates = [];
+        if (SchemaGuard::hasTable($db, 'reach_competitor_observation_aggregates')) {
+            $aggregates = (new CompetitorObservationAggregateModel())->where('competitor_id', $id)->orderBy('period_start', 'DESC')->findAll();
+            foreach ($aggregates as &$row) {
+                $row['_disclosure'] = $row['sample_scope_note'];
+            }
+            unset($row);
+        }
+
+        if (! SchemaGuard::hasTable($db, 'reach_ai_visibility_observations')) {
+            return $this->response->setJSON(['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'per_page' => 50, 'filters' => []], 'aggregates' => $aggregates]);
+        }
+
+        $result = (new VisibilityRecordsService($db, (int) $competitor['tenant_id']))->observations(
+            ['competitor_id' => $id, 'coverage_state' => 'mentioned', 'counted' => 1, 'days' => $this->days()]
+                + array_intersect_key($this->request->getGet() ?? [], array_flip(['provider', 'prompt_id'])),
+            (int) ($this->request->getGet('page') ?? 1),
+            (int) ($this->request->getGet('per_page') ?? 50),
+        );
+
+        return $this->response->setJSON([
+            'data'       => $result['rows'],
+            'meta'       => array_diff_key($result, ['rows' => true]),
+            'aggregates' => $aggregates,
+        ]);
+    }
+
+    private function days(): int
+    {
+        $days = (int) ($this->request->getGet('days') ?? 28);
+
+        return $days > 0 ? min(180, $days) : 28;
+    }
+
+    /**
+     * Live sample mention rate from stored AI answers (the aggregates table
+     * is not populated by any job, so it cannot back the number).
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function withRates(\CodeIgniter\Database\BaseConnection $db, int $tenantId, array $rows, int $days): array
+    {
+        if ($rows === [] || ! SchemaGuard::hasTable($db, 'reach_ai_visibility_observations')) {
+            return $rows;
+        }
+        try {
+            $rates = (new VisibilityRecordsService($db, $tenantId))->competitorRates($days, array_map('intval', array_column($rows, 'id')));
+        } catch (\Throwable $e) {
+            log_message('error', 'CompetitorController::withRates: ' . $e->getMessage());
+            return $rows;
+        }
+
+        return array_map(static function (array $r) use ($rates): array {
+            $rate = $rates[(int) $r['id']] ?? null;
+            if ($rate === null || $rate['answers'] === 0) {
+                return $r + ['mention_rate' => null, 'mentions' => 0, 'answers' => $rate['answers'] ?? 0, 'rate_days' => $rate['days'] ?? null];
+            }
+
+            return $r + ['mention_rate' => $rate['mention_rate'], 'mentions' => $rate['mentions'], 'answers' => $rate['answers'], 'rate_days' => $rate['days']];
+        }, $rows);
     }
 }

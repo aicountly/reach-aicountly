@@ -12,6 +12,8 @@ const PER_PAGE = 50;
 const CHIP_FILTERS = {
   date:          (v) => (v === 'today' ? 'Today' : `On ${v}`),
   billing_month: (v) => (v === 'current' ? 'This month' : `Month ${v}`),
+  product:       (v) => `Product ${v}`,
+  user:          (v) => `User ${v}`,
 };
 
 export default function AiUsagePage() {
@@ -34,9 +36,12 @@ export default function AiUsagePage() {
     .filter(([, v]) => v);
   const date = searchParams.get('date') || '';
   const billingMonth = searchParams.get('billing_month') || '';
+  // Product (slug or id) and user (id or email), as product / user budgets name them.
+  const product = searchParams.get('product') || '';
+  const user = searchParams.get('user') || '';
 
   // A new filter is a new list: start it from page 1.
-  const filterKey = [provider, model, taskType, contentType, from, to, date, billingMonth].join('|');
+  const filterKey = [provider, model, taskType, contentType, from, to, date, billingMonth, product, user].join('|');
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey);
@@ -48,12 +53,12 @@ export default function AiUsagePage() {
     setError(null);
     listAiUsage({
       page, provider, model, task_type: taskType, content_type: contentType,
-      from, to, date, billing_month: billingMonth,
+      from, to, date, billing_month: billingMonth, product, user,
     })
       .then(d => { setUsage(d.usage || d.ledger || []); setTotal(d.total ?? 0); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [page, provider, model, taskType, contentType, from, to, date, billingMonth]);
+  }, [page, provider, model, taskType, contentType, from, to, date, billingMonth, product, user]);
 
   const clearChip = (key) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
@@ -109,7 +114,7 @@ export default function AiUsagePage() {
           <table className="data-table">
             <thead>
               <tr>
-                {['Date', 'Provider', 'Model', 'Task', 'Content Type', 'Input Tokens', 'Output Tokens', 'Cost', 'Currency'].map(h => (
+                {['Date', 'Provider', 'Model', 'Task', 'Content Type', 'Product', 'User', 'Input Tokens', 'Output Tokens', 'Cost', 'Currency'].map(h => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -149,6 +154,16 @@ export default function AiUsagePage() {
                         : '—'}
                     </td>
                     <td className="text-muted">{u.content_type}</td>
+                    <td>
+                      {u.product_id
+                        ? <Link to={narrow({ product: u.product_slug || u.product_id })} className="drill-link" onClick={stop}>{u.product_slug || `#${u.product_id}`}</Link>
+                        : '—'}
+                    </td>
+                    <td>
+                      {u.user_id
+                        ? <Link to={narrow({ user: u.user_id })} className="drill-link" onClick={stop}>#{u.user_id}</Link>
+                        : '—'}
+                    </td>
                     <td className="text-muted">{u.input_tokens?.toLocaleString()}</td>
                     <td className="text-muted">{u.output_tokens?.toLocaleString()}</td>
                     <td className="font-semibold">{parseFloat(u.estimated_cost || 0).toFixed(6)}</td>

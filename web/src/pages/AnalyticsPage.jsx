@@ -8,6 +8,7 @@ import { Loader } from '../components/common/Loader';
 import { Alert } from '../components/common/Alert';
 import { ROUTES } from '../constants/routes';
 import { drillHref } from '../components/drill';
+import { LEGACY_BLOG_POSTS_PATH, SNAPSHOTS_PATH } from '../components/analytics/trafficDrill';
 
 /** `to` opens the records the tile counted; a zero (or a count with no list to open) stays plain. */
 function Tile({ label, value, hint, to }) {
@@ -58,11 +59,12 @@ export function AnalyticsPage() {
           <Tile label="Posts planned (30d)"    value={summary.posts_planned} to={ROUTES.SOCIAL_CALENDAR} />
           <Tile label="Posts published (30d)"  value={summary.posts_published} to={drillHref(ROUTES.SOCIAL_CALENDAR, { status: 'posted' })} />
           <Tile label="Leads generated (30d)"  value={summary.leads_generated} to={drillHref(ROUTES.LEADS, { days })} />
-          {/* Blog tiles count the legacy blog table, whose list now redirects to Blog Command Centre — no list to open. */}
-          <Tile label="Blog drafts"            value={summary.blog_drafts} />
-          <Tile label="Blog published (30d)"   value={summary.blog_published} />
-          <Tile label="Approvals pending"      value={summary.approval_pending} />
-          <Tile label="Engagement imported"    value={summary.engagement_imported} />
+          {/* Blog tiles count the legacy blog table (still written by the bot's blog drafts); its old
+              list redirects to Blog Command Centre, so they open the legacy list on this page's area. */}
+          <Tile label="Blog drafts"            value={summary.blog_drafts} hint="Legacy blog table" to={drillHref(LEGACY_BLOG_POSTS_PATH, { bucket: 'drafts' })} />
+          <Tile label="Blog published (30d)"   value={summary.blog_published} hint="Legacy blog table" to={drillHref(LEGACY_BLOG_POSTS_PATH, { bucket: 'published', days })} />
+          <Tile label="Approvals pending"      value={summary.approval_pending} hint="Legacy blog table" to={drillHref(LEGACY_BLOG_POSTS_PATH, { bucket: 'approval_pending' })} />
+          <Tile label="Engagement imported"    value={summary.engagement_imported} to={drillHref(SNAPSHOTS_PATH, { source: 'external', days })} />
         </div>
       </Card>
 

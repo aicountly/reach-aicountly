@@ -4,6 +4,7 @@ namespace App\Controllers\Api\V1\Community;
 
 use App\Controllers\BaseApiController;
 use App\Enums\CommunityAnswerStatus;
+use App\Libraries\Community\CommunityAnalyticsDrill;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Libraries\Database\SchemaGuard;
 
@@ -78,7 +79,7 @@ class CommunityAnalyticsController extends BaseApiController
     /** GET /community/analytics/engagement */
     public function engagement(): ResponseInterface
     {
-        $days = min((int) ($this->request->getGet('days') ?? 30), 90);
+        $days = CommunityAnalyticsDrill::days($this->request->getGet('days'));
 
         try {
             $db = db_connect();
@@ -86,14 +87,15 @@ class CommunityAnalyticsController extends BaseApiController
                 return $this->response->setJSON(['data' => [], 'days' => $days]);
             }
 
+            // The same window engagementEvents() lists, so a count opens its events.
+            [$window, $binds] = CommunityAnalyticsDrill::engagementWindow($days, '');
             $rows = $db->query("
                 SELECT DATE(event_timestamp) AS day, event_type, COUNT(*) AS cnt
                 FROM reach_community_engagement_events
-                WHERE validated = TRUE
-                  AND event_timestamp >= NOW() - INTERVAL '{$days} days'
+                WHERE {$window}
                 GROUP BY DATE(event_timestamp), event_type
                 ORDER BY day ASC
-            ")->getResultArray();
+            ", $binds)->getResultArray();
 
             return $this->response->setJSON(['data' => $rows ?: [], 'days' => $days]);
         } catch (\Throwable $e) {
@@ -113,7 +115,7 @@ class CommunityAnalyticsController extends BaseApiController
 
             // Avoid table aliases in Query Builder / raw SQL that CI4 may re-escape.
             $rows = $db->query("
-                SELECT source_type, source_id, COUNT(DISTINCT answer_version_id) AS usage_count
+                SELECT source_type, source_id, MAX(source_title) AS source_title, COUNT(DISTINCT answer_version_id) AS usage_count
                 FROM reach_community_source_coverage
                 GROUP BY source_type, source_id
                 ORDER BY usage_count DESC
@@ -125,6 +127,48 @@ class CommunityAnalyticsController extends BaseApiController
             log_message('error', 'CommunityAnalyticsController::sourceCoverage: ' . $e->getMessage());
             return $this->response->setJSON(['data' => []]);
         }
+    }
+
+    /**
+     * GET /community/analytics/engagement/events?event_type=&day=YYYY-MM-DD&days=&page=&limit=
+     * The validated events an engagement count summed, newest first, each with
+     * the question / answer it was recorded on.
+     */
+    public function engagementEvents(): ResponseInterface
+    {
+        [$page, $limit, $offset] = $this->pagination(25, 100);
+        $db = db_connect();
+        if (! SchemaGuard::hasTable($db, 'reach_community_engagement_events')) {
+            return $this->ok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit, 'days' => CommunityAnalyticsDrill::days(null)]);
+        }
+        $out = (new CommunityAnalyticsDrill($db))->events([
+            'event_type' => (string) $this->request->getGet('event_type'),
+            'day'        => (string) $this->request->getGet('day'),
+            'days'       => $this->request->getGet('days'),
+        ], $limit, $offset);
+
+        return $this->ok($out + ['page' => $page, 'limit' => $limit]);
+    }
+
+    /**
+     * GET /community/analytics/coverage/answers?source_type=&source_id=<id|none>&page=&limit=
+     * The answer versions grounded on one "Top grounding sources" row.
+     */
+    public function coverageAnswers(): ResponseInterface
+    {
+        [$page, $limit, $offset] = $this->pagination(25, 100);
+        $type = (string) $this->request->getGet('source_type');
+        $rawId = trim((string) $this->request->getGet('source_id'));
+        if (! in_array($type, CommunityAnalyticsDrill::SOURCE_TYPES, true) || ($rawId !== 'none' && ! ctype_digit($rawId))) {
+            return $this->fail('source_type and source_id (a number, or none) are required.', 422);
+        }
+        $db = db_connect();
+        if (! SchemaGuard::hasTable($db, 'reach_community_source_coverage')) {
+            return $this->ok(['items' => [], 'total' => 0, 'source' => null, 'page' => $page, 'limit' => $limit]);
+        }
+        $out = (new CommunityAnalyticsDrill($db))->groundedAnswers($type, $rawId === 'none' ? null : (int) $rawId, $limit, $offset);
+
+        return $this->ok($out + ['page' => $page, 'limit' => $limit]);
     }
 
     /** GET /community/analytics/cache */

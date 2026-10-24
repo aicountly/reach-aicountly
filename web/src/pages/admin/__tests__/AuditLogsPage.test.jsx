@@ -32,7 +32,7 @@ describe('AuditLogsPage drill-down', () => {
     renderWithAuth(<AuditLogsPage />, { route: '/admin/audit-logs' });
 
     expect(await screen.findByRole('link', { name: '12' })).toHaveAttribute('href', '/campaigns/12');
-    expect(screen.getByRole('link', { name: '88' })).toHaveAttribute('href', '/leads?lead_id=88');
+    expect(screen.getByRole('link', { name: '88' })).toHaveAttribute('href', '/leads/88');
     // settings has no detail page.
     expect(screen.queryByRole('link', { name: '1' })).not.toBeInTheDocument();
   });

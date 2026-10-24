@@ -2,16 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { listAiBudgets } from '../../services/aiService.js';
 import { DrillLink, drillHref } from '../../components/drill';
 
-// Budget scope → the usage-ledger filter AiBudgetService counts it with.
-// Product and user budgets have no ledger filter yet, so they don't drill.
-const SCOPE_PARAM = { provider: 'provider', model: 'model', content_type: 'content_type', task_type: 'task_type' };
+// Budget scope → the usage-ledger filter. Both sides use
+// AiBudgetService::ledgerScope (product = slug or id, user = id or email), so
+// the used amount (summed from the ledger by GET v1/ai/budgets) and the rows
+// it opens agree.
+const SCOPE_PARAM = {
+  provider: 'provider', model: 'model', content_type: 'content_type', task_type: 'task_type', product: 'product', user: 'user',
+};
 const PERIOD_PARAMS = { daily: { date: 'today' }, monthly: { billing_month: 'current' } };
 
 function budgetUsageHref(b) {
   if (!(parseFloat(b.used_amount) > 0)) return null;
+  // Weekly / custom budgets show the stored figure; the ledger has no key for their period.
+  const period = PERIOD_PARAMS[b.period_type];
+  if (!period || b.used_source === 'stored') return null;
   const scope = b.scope_type === 'global' ? {} : (SCOPE_PARAM[b.scope_type] ? { [SCOPE_PARAM[b.scope_type]]: b.scope_reference } : null);
   if (!scope) return null;
-  return drillHref('/ai/usage', { ...scope, ...(PERIOD_PARAMS[b.period_type] || {}) });
+  return drillHref('/ai/usage', { ...scope, ...period });
 }
 
 function BudgetBar({ used, hard, to }) {

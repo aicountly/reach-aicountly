@@ -6,7 +6,7 @@ import { Loader } from '../../components/common/Loader';
 import { DataTable } from '../../components/common/DataTable';
 import { FilterBar } from '../../components/common/FilterBar';
 import { Pagination } from '../../components/common/Pagination';
-import { drillHref, useUrlFilter } from '../../components/drill';
+import { useUrlFilter } from '../../components/drill';
 import { ROUTES } from '../../constants/routes';
 import { formatDateTime } from '../../utils/formatDate';
 
@@ -22,7 +22,7 @@ const ENTITY_ROUTES = {
   email_campaign:    (id) => ROUTES.EMAIL_DETAIL.replace(':id', id),
   whatsapp_campaign: (id) => ROUTES.WHATSAPP_DETAIL.replace(':id', id),
   bot_report:        (id) => ROUTES.BOT_REPORT_DETAIL.replace(':id', id),
-  lead:              (id) => drillHref(ROUTES.LEADS, { lead_id: id }),
+  lead:              (id) => ROUTES.LEAD_DETAIL.replace(':id', id),
 };
 
 function entityHref(row) {

@@ -57,7 +57,8 @@ class SitemapSnapshotService
                     $include         = false;
                     $exclusionReason = 'not_published';
                     $excludedOther++;
-                } elseif (!$identity['analytics_eligible']) {
+                } elseif (in_array($identity['analytics_eligible'], [false, 'f', 'false', 0, '0', null], true)) {
+                    // Postgres hands booleans back as 't'/'f'; !'f' is false, so a plain negation never excluded anything.
                     $include         = false;
                     $exclusionReason = 'analytics_ineligible';
                     $excludedOther++;
@@ -132,5 +133,97 @@ class SitemapSnapshotService
              ORDER BY se.priority DESC, se.url",
             [$snapshotId]
         )->getResultArray();
+    }
+
+    /** Exclusion reasons generateSnapshot() writes. */
+    public const EXCLUSION_REASONS = ['noindex', 'withdrawn', 'not_published', 'analytics_ineligible'];
+
+    /**
+     * Entries of one snapshot, filtered the way its counts were taken:
+     * state=included|excluded, reason=<exclusion reason>, q=url contains.
+     * Each entry carries its content identity so the UI can open the post.
+     *
+     * Snapshot counts include identities without a canonical URL, which get
+     * no entry row — `unlisted` says how many, so the gap is explained.
+     *
+     * @param array<string, mixed> $filters
+     * @return array{snapshot: ?array, rows: list<array<string, mixed>>, total: int, page: int, per_page: int, filters: array<string, mixed>, facets: array<string, int>, unlisted: int}
+     */
+    public function listEntries(int $snapshotId, array $filters = [], int $page = 1, int $perPage = 100): array
+    {
+        $db       = $this->snapshotModel->db;
+        $page     = max(1, $page);
+        $perPage  = max(1, min(500, $perPage));
+        $snapshot = $db->table('reach_sitemap_snapshots')->where('id', $snapshotId)->get()->getRowArray() ?: null;
+
+        $where = ['se.snapshot_id = ?'];
+        $binds = [$snapshotId];
+        $clean = [];
+        $state = (string) ($filters['state'] ?? '');
+        if ($state === 'included' || $state === 'excluded') {
+            $where[] = $state === 'included' ? 'se.included = TRUE' : 'se.included = FALSE';
+            $clean['state'] = $state;
+        }
+        $reason = (string) ($filters['reason'] ?? '');
+        if (in_array($reason, self::EXCLUSION_REASONS, true)) {
+            $where[] = 'se.exclusion_reason = ?';
+            $binds[] = $clean['reason'] = $reason;
+        } elseif ($reason === 'other') {
+            // excluded_other = not_published + analytics_ineligible
+            $where[] = "se.exclusion_reason IN ('not_published', 'analytics_ineligible')";
+            $clean['reason'] = 'other';
+        }
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q !== '') {
+            $where[] = 'se.url ILIKE ?';
+            $binds[] = '%' . addcslashes(mb_substr($q, 0, 200), '%_\\') . '%';
+            $clean['q'] = $q;
+        }
+        $whereSql = implode(' AND ', $where);
+
+        $total = (int) ($db->query("SELECT COUNT(*) AS n FROM reach_sitemap_entries se WHERE {$whereSql}", $binds)->getRowArray()['n'] ?? 0);
+        $rows  = $db->query(
+            "SELECT se.id, se.snapshot_id, se.content_identity_id, se.url, se.last_modified_at, se.change_frequency, se.priority,
+                    se.included, se.exclusion_reason, se.created_at,
+                    ci.content_type, ci.source_id, ci.publication_status, ci.analytics_eligible, ci.canonical_url AS identity_canonical
+               FROM reach_sitemap_entries se
+               LEFT JOIN reach_content_identities ci ON ci.id = se.content_identity_id
+              WHERE {$whereSql}
+              ORDER BY se.included DESC, se.priority DESC NULLS LAST, se.url
+              LIMIT ? OFFSET ?",
+            array_merge($binds, [$perPage, ($page - 1) * $perPage])
+        )->getResultArray();
+
+        foreach ($rows as &$row) {
+            $row['included'] = in_array($row['included'], [true, 't', 'true', 1, '1'], true);
+            // A blog identity's source is the content item, so the post opens in Reach.
+            $row['content_item_id'] = ($row['content_type'] ?? null) === 'blog' && $row['source_id'] !== null ? (int) $row['source_id'] : null;
+        }
+        unset($row);
+
+        $facets = ['all' => 0, 'included' => 0, 'excluded' => 0];
+        foreach ($db->query(
+            'SELECT included, exclusion_reason, COUNT(*) AS n FROM reach_sitemap_entries WHERE snapshot_id = ? GROUP BY included, exclusion_reason',
+            [$snapshotId]
+        )->getResultArray() as $f) {
+            $n = (int) $f['n'];
+            $facets['all'] += $n;
+            $inc = in_array($f['included'], [true, 't', 'true', 1, '1'], true);
+            $facets[$inc ? 'included' : 'excluded'] += $n;
+            if (! $inc && $f['exclusion_reason'] !== null) {
+                $facets[(string) $f['exclusion_reason']] = ($facets[(string) $f['exclusion_reason']] ?? 0) + $n;
+            }
+        }
+
+        return [
+            'snapshot' => $snapshot,
+            'rows'     => $rows,
+            'total'    => $total,
+            'page'     => $page,
+            'per_page' => $perPage,
+            'filters'  => $clean,
+            'facets'   => $facets,
+            'unlisted' => $snapshot ? max(0, (int) $snapshot['total_entries'] - $facets['all']) : 0,
+        ];
     }
 }

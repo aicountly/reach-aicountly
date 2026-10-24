@@ -6,28 +6,7 @@ import videoService from '../../services/videoService';
 import { useAuth } from '../../context/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { formatDate } from '../../utils/formatDate';
-
-const STATUS_BADGE = {
-  pending_vetting: 'badge--warning',
-  rejected: 'badge--muted',
-  in_progress: 'badge--info',
-  blocked: 'badge--warning',
-  failed: 'badge--error',
-  published: 'badge--success',
-  cancelled: 'badge--muted',
-};
-
-const STEP_LABEL = {
-  vet: 'Vetting',
-  tts: 'Voice-over',
-  visuals: 'Visuals',
-  render_submit: 'Render submit',
-  render_poll: 'Rendering',
-  youtube_upload: 'YouTube upload',
-  youtube_extras: 'Thumbnail & captions',
-  social: 'Social offer',
-  done: 'Done',
-};
+import { STATUS_BADGE, STEP_LABEL, pipelineItemHref, statusLabel } from './videoPipelineShared';
 
 const CHECK_LABEL = {
   automation_enabled: 'Automation switched on',
@@ -48,10 +27,6 @@ const CONNECT_ERRORS = {
   missing_code: 'Google did not return an authorisation code.',
   connect_failed: 'Google refused the connection — see the error below.',
 };
-
-function statusLabel(status) {
-  return String(status ?? '').replace(/_/g, ' ');
-}
 
 function ChannelCard({ status, path, canManage, onChanged }) {
   const [busy, setBusy] = useState(false);
@@ -340,7 +315,7 @@ export default function VideoPipelinePage() {
                           {open === item.uuid ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
                       </td>
-                      <td>{item.title}</td>
+                      <td><DrillLink to={pipelineItemHref(item.uuid)} title="Open this video's pipeline">{item.title}</DrillLink></td>
                       <td>
                         <DrillLink onClick={item.format && item.format !== formatFilter ? () => setFormatFilter(item.format) : undefined} title="Only this format">
                           {item.format === 'short' ? 'Short' : 'Vlog'}

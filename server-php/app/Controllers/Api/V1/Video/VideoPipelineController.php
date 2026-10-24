@@ -66,7 +66,68 @@ class VideoPipelineController extends BaseApiController
             ];
         }
 
-        return $this->ok($this->present($item, true) + ['assets' => $assets]);
+        return $this->ok($this->present($item, true) + [
+            'assets'  => $assets,
+            'jobs'    => $this->stepJobs($repo, (int) $item['id']),
+            'history' => $this->history($repo, (int) $item['id']),
+        ]);
+    }
+
+    /**
+     * Every queue job that ran (or will run) a step of this item, oldest first:
+     * the pipeline's step-by-step trail, each one openable in the Job Monitor.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function stepJobs(VideoPipelineRepository $repo, int $itemId): array
+    {
+        try {
+            $rows = $repo->db()->query(
+                "SELECT id, status, attempts, max_attempts, payload_json->>'step' AS step, error_message,
+                        available_at, started_at, completed_at, created_at
+                 FROM reach_jobs
+                 WHERE job_type = ? AND payload_json->>'item_id' = ?
+                 ORDER BY id ASC LIMIT 200",
+                [VideoPipelineRunner::JOB_TYPE, (string) $itemId],
+            )->getResultArray();
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoPipelineController::stepJobs: ' . $e->getMessage());
+            return [];
+        }
+
+        return array_map(static fn (array $r): array => [
+            'id'           => (int) $r['id'],
+            'attempts'     => (int) $r['attempts'],
+            'max_attempts' => (int) $r['max_attempts'],
+        ] + $r, $rows);
+    }
+
+    /**
+     * Staff actions on the item (retry, re-vet) from the audit log, newest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function history(VideoPipelineRepository $repo, int $itemId): array
+    {
+        try {
+            $rows = $repo->db()->table('reach_audit_logs')
+                ->select('id, action, user_id, old_value, new_value, created_at')
+                ->where('entity_type', 'video_pipeline')->where('entity_id', $itemId)
+                ->orderBy('id', 'DESC')->limit(100)->get()->getResultArray();
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoPipelineController::history: ' . $e->getMessage());
+            return [];
+        }
+
+        return array_map(static function (array $r): array {
+            foreach (['old_value', 'new_value'] as $k) {
+                if (isset($r[$k]) && is_string($r[$k])) {
+                    $r[$k] = json_decode($r[$k], true);
+                }
+            }
+
+            return ['id' => (int) $r['id']] + $r;
+        }, $rows);
     }
 
     public function retry(string $uuid)

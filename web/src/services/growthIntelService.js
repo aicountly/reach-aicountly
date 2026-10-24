@@ -49,6 +49,28 @@ export function queueVisibilityPromptRun(versionId) {
   return api.post('v1/intelligence/visibility/runs', { prompt_version_id: versionId });
 }
 
+// Records behind the overview numbers. Lists answer { data, meta }; keep
+// the envelope so the page knows the total.
+export function listVisibilityRunRecords(params = {}) {
+  return api.getPage('v1/intelligence/visibility/runs', params);
+}
+
+export function getVisibilityRun(id) {
+  return api.get(`v1/intelligence/visibility/runs/${id}`);
+}
+
+export function listVisibilityObservationRecords(params = {}) {
+  return api.getPage('v1/intelligence/visibility/observations', params);
+}
+
+export function getCompetitor(id, params = {}) {
+  return api.get(`v1/intelligence/competitors/${id}`, params);
+}
+
+export function listCompetitorObservations(id, params = {}) {
+  return api.getPage(`v1/intelligence/competitors/${id}/observations`, params);
+}
+
 // ── AI Insights ───────────────────────────────────────────────────────────
 export function getLatestInsights() {
   return api.get('v1/intelligence/insights/latest');

@@ -74,3 +74,21 @@ export function getRefreshOutcome(id) {
 export function measureRefreshOutcome(id) {
   return api.post(`v1/readiness/outcomes/${id}/measure`);
 }
+
+/** Refresh recommendations / workflows (Operations "Recommendation Backlog" / "Active Workflows"). */
+export function listRefreshRecommendations(params = {}) {
+  return api.get('v1/readiness/recommendations', params);
+}
+
+export function getRefreshRecommendation(id) {
+  return api.get(`v1/readiness/recommendations/${id}`);
+}
+
+export function listRefreshWorkflows(params = {}) {
+  return api.get('v1/readiness/workflows', params);
+}
+
+/** Migration files vs the applied history. */
+export function getMigrationStatus(params = {}) {
+  return api.get('v1/readiness/migrations', params);
+}

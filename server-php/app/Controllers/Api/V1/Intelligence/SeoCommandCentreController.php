@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers\Api\V1\Intelligence;
 
 use App\Controllers\Api\V1\BaseApiController;
+use App\Libraries\Intelligence\Seo\SeoRecordsService;
+use App\Libraries\Intelligence\Visibility\VisibilityRecordsService;
 
 /**
  * SEO Command Centre aggregation endpoints. Every number here comes from a
@@ -61,9 +63,11 @@ class SeoCommandCentreController extends BaseApiController
         $latestSitemap = $safe(static fn () => $db->table('reach_sitemap_snapshots')
             ->orderBy('id', 'DESC')->limit(1)->get()->getRowArray());
 
+        // Runs have no created_at; count on the window the run list's
+        // ?days=28 filter uses so the tile and its list agree.
         $visibility = $safe(static fn () => $db->query(
-            "SELECT COUNT(*) AS runs FROM reach_ai_visibility_runs WHERE created_at >= ?",
-            [date('Y-m-d H:i:s', strtotime('-28 days'))]
+            "SELECT COUNT(*) AS runs FROM reach_ai_visibility_runs WHERE tenant_id = 1 AND COALESCE(completed_at, queued_at) >= ?",
+            [VisibilityRecordsService::since(28)]
         )->getRowArray(), ['runs' => 0]);
 
         $backlinks = $safe(static fn () => $db->table('reach_backlink_snapshots')
@@ -143,18 +147,63 @@ class SeoCommandCentreController extends BaseApiController
         ]);
     }
 
+    /**
+     * GET seo/backlinks/{id} — one snapshot, its details_json as rows and the
+     * records behind its counts (?kind=internal_links|published_urls, status,
+     * target_type, q, page, per_page).
+     */
+    public function backlinkSnapshot(int $id)
+    {
+        $get    = $this->request->getGet() ?? [];
+        $result = (new SeoRecordsService())->backlinkSnapshot($id, $get, (int) ($get['page'] ?? 1), (int) ($get['per_page'] ?? 50));
+
+        return $result === null ? $this->notFound('Backlink snapshot not found.') : $this->ok($result);
+    }
+
+    /**
+     * GET seo/indexnow/submissions — status (one or a comma list), url
+     * (contains), content_identity_id, page / per_page (limit is the legacy
+     * page size). `counts` are per status over the same url/content filter.
+     */
     public function indexnowSubmissions()
     {
-        $builder = db_connect()->table('reach_indexnow_submissions')
-            ->orderBy('id', 'DESC')
-            ->limit(min(200, max(1, (int) ($this->request->getGet('limit') ?: 100))));
+        $get     = $this->request->getGet() ?? [];
+        $perPage = (int) ($get['per_page'] ?? $get['limit'] ?? 100);
+        $result  = (new SeoRecordsService())->indexnowSubmissions($get, (int) ($get['page'] ?? 1), $perPage);
 
-        $status = trim((string) $this->request->getGet('status'));
-        if ($status !== '') {
-            $builder->where('status', $status);
-        }
+        return $this->ok([
+            'submissions' => $result['rows'],
+            'counts'      => $result['counts'],
+            'meta'        => array_diff_key($result, ['rows' => true, 'counts' => true]),
+        ]);
+    }
 
-        return $this->ok(['submissions' => $builder->get()->getResultArray()]);
+    /** GET seo/indexnow/submissions/{id} — the submission and every attempt. */
+    public function indexnowSubmission(int $id)
+    {
+        $row = (new SeoRecordsService())->indexnowSubmission($id);
+
+        return $row === null ? $this->notFound('Submission not found.') : $this->ok($row);
+    }
+
+    /**
+     * GET seo/indexing?status= — blog posts by indexing status, the rows the
+     * overview's "Blog indexing status" counts group. q, page, per_page.
+     */
+    public function indexing()
+    {
+        $get    = $this->request->getGet() ?? [];
+        $result = (new SeoRecordsService())->blogPosts(
+            ['indexing_status' => $get['status'] ?? null, 'q' => $get['q'] ?? null],
+            (int) ($get['page'] ?? 1),
+            (int) ($get['per_page'] ?? 50),
+        );
+
+        return $this->ok([
+            'posts'  => $result['rows'],
+            'counts' => $result['counts'],
+            'meta'   => array_diff_key($result, ['rows' => true, 'counts' => true]),
+        ]);
     }
 
     /**

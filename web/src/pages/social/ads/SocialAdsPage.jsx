@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Info } from 'lucide-react';
 import { adsService } from '../../../services/adsService';
 import { Card } from '../../../components/common/Card';
@@ -6,11 +7,10 @@ import { Alert } from '../../../components/common/Alert';
 import { Loader } from '../../../components/common/Loader';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { usePermission } from '../../../hooks/usePermission';
-import { DrillLink, drillHref } from '../../../components/drill';
-import { ROUTES } from '../../../constants/routes';
-import { formatInr } from '../../../utils/formatInr';
+import { DrillLink, DrillPath, useDrillFilters } from '../../../components/drill';
 import { formatDate, todayInputValue } from '../../../utils/formatDate';
 import { ADS_PLATFORM_LIST, ADS_PLATFORMS, DEFAULT_CAMPAIGN, DEFAULT_LANDING, buildAdsLink } from './adsUtm';
+import { ADS_METRICS, campaignHref, campaignLeadsHref, campaignsForMetric, inr, num, pct } from './adsDrill';
 
 /**
  * Social & Ads → Ads (/social/ads).
@@ -33,10 +33,6 @@ const CSV_FORMATS = [
 const STATUSES = ['planned', 'live', 'paused', 'ended'];
 const OBJECTIVES = ['signups', 'leads', 'traffic', 'video_views', 'awareness'];
 
-const num = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('en-IN'));
-const inr = (v) => (v === null || v === undefined ? '—' : formatInr(Number(v).toFixed(2)));
-const pct = (v) => (v === null || v === undefined ? '—' : `${(Number(v) * 100).toFixed(2)}%`);
-
 function emptyForm(platform = 'google_search') {
   const p = ADS_PLATFORMS[platform];
   return {
@@ -47,25 +43,8 @@ function emptyForm(platform = 'google_search') {
   };
 }
 
-/**
- * The leads AdsSummary counted for one campaign: its UTM set, captured within
- * the campaign's dates inside the summary period. Zero is not a link.
- */
-function campaignLeadsHref(figure, period) {
-  if (!figure?.leads || !figure.utm) return undefined;
-  const later = (a, b) => (a && b ? (a > b ? a : b) : a || b);
-  const earlier = (a, b) => (a && b ? (a < b ? a : b) : a || b);
-  return drillHref(ROUTES.LEADS, {
-    utm_source: figure.utm.source,
-    utm_medium: figure.utm.medium,
-    utm_campaign: figure.utm.campaign,
-    created_from: later(period?.from, figure.start_date),
-    created_to: earlier(period?.to, figure.end_date),
-  });
-}
-
-/** Totals have no single list behind them; `href` points at the per-campaign split. */
-function Tile({ label, value, hint, testId, href }) {
+/** A total opens the campaigns it summed (`onDrill`), unless nothing was. */
+function Tile({ label, value, hint, testId, onDrill, active }) {
   const body = (
     <>
       <div className="stat-tile__label">{label}</div>
@@ -73,12 +52,56 @@ function Tile({ label, value, hint, testId, href }) {
       {hint && <div className="stat-tile__hint">{hint}</div>}
     </>
   );
-  return href
-    ? <a className="stat-tile" data-testid={testId} href={href} title="See it per campaign">{body}</a>
+  return onDrill
+    ? (
+      <button type="button" className={`stat-tile${active ? ' is-active' : ''}`} data-testid={testId} onClick={onDrill}
+              aria-pressed={!!active} title="The campaigns behind this figure">{body}</button>
+    )
     : <div className="stat-tile" data-testid={testId}>{body}</div>;
 }
 
-const REGISTER = '#ads-campaign-register';
+/**
+ * The campaigns a tile summed, largest first, each opening its days. The
+ * total row is the tile's own figure (leads de-duplicate shared UTM sets).
+ */
+function MetricCampaigns({ metric, summary, drill }) {
+  const m = ADS_METRICS[metric];
+  const rows = campaignsForMetric(summary?.campaigns, metric);
+  const period = summary?.period;
+  const tileValue = metric === 'budget' ? summary?.budget?.live_daily_inr : summary?.totals?.[m.key];
+  return (
+    <Card title={`${m.label} by campaign${metric === 'budget' ? ' (live campaigns)' : period ? ` · ${formatDate(period.from)} – ${formatDate(period.to)}` : ''}`}>
+      <div data-testid="ads-metric-campaigns">
+        <DrillPath drill={drill} rootLabel="All figures" labels={{ metric: 'Figure' }} format={(k, v) => ADS_METRICS[v]?.label || v} />
+        {rows.length === 0 ? <EmptyState message={`No campaign has ${m.label.toLowerCase()} in this period.`} /> : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead><tr><th>Campaign</th><th>Platform</th><th>Status</th><th>{m.label}</th><th>Spend</th><th>Clicks</th><th>Leads</th><th>Sign-ups</th></tr></thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr key={c.id}>
+                    <td><Link className="drill-link" to={campaignHref(c.id, { period, metric })}>{c.name}</Link></td>
+                    <td>{ADS_PLATFORMS[c.platform]?.label || c.platform}</td>
+                    <td>{c.status}</td>
+                    <td className="font-semibold">{m.fmt(c[m.key])}</td>
+                    <td>{inr(c.spend_inr)}</td>
+                    <td>{num(c.clicks)}</td>
+                    <td><DrillLink to={campaignLeadsHref(c, period)} label={`${c.leads} leads for ${c.name}`}>{num(c.leads)}</DrillLink></td>
+                    <td>{num(c.signups)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><th>Total ({rows.length})</th><th /><th /><th>{m.fmt(tileValue)}</th><th colSpan={4} /></tr></tfoot>
+            </table>
+          </div>
+        )}
+        {metric === 'leads' && rows.some((c) => c.attribution_warning) && (
+          <p className="text-xs text-muted">Campaigns sharing a UTM set share their leads; the total counts them once.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 export function SocialAdsPage() {
   const { hasAny } = usePermission();
@@ -178,8 +201,13 @@ export function SocialAdsPage() {
   };
 
   const t = summary?.totals;
-  const perCampaign = campaigns.length > 0 ? REGISTER : undefined;
   const live = campaigns.filter((c) => c.status === 'live').length;
+  // Tile → campaigns behind it, in the URL (?metric=) so Back returns.
+  const metricDrill = useDrillFilters(['metric']);
+  const metric = ADS_METRICS[metricDrill.filters.metric] ? metricDrill.filters.metric : '';
+  const tileDrill = (key) => (campaignsForMetric(summary?.campaigns, key).length > 0
+    ? () => metricDrill.drill({ metric: key })
+    : undefined);
 
   return (
     <section aria-labelledby="ads-title" data-testid="ads-register">
@@ -207,14 +235,16 @@ export function SocialAdsPage() {
 
       {loading && !summary ? <Loader /> : (
         <div className="stat-grid" data-testid="ads-summary">
-          <Tile testId="tile-spend" label="Spend (30 days)" href={perCampaign} value={inr(t?.spend_inr)} hint={summary?.has_results ? 'from entered / imported results' : 'no results entered yet'} />
-          <Tile testId="tile-clicks" label="Clicks" href={perCampaign} value={num(t?.clicks)} hint={`CTR ${pct(t?.ctr)} · CPC ${inr(t?.cpc_inr)}`} />
-          <Tile testId="tile-leads" label="Leads (Reach capture)" href={t?.leads ? perCampaign : undefined} value={num(t?.leads)} hint={`Cost per lead ${inr(t?.cost_per_lead_inr)}`} />
-          <Tile testId="tile-signups" label="Sign-ups (my.aicountly)" href={perCampaign} value={num(t?.signups)} hint={`Cost per sign-up ${inr(t?.cost_per_signup_inr)}`} />
-          <Tile testId="tile-budget" label="Live daily budget" value={inr(summary?.budget?.live_daily_inr)}
+          <Tile testId="tile-spend" label="Spend (30 days)" onDrill={tileDrill('spend')} active={metric === 'spend'} value={inr(t?.spend_inr)} hint={summary?.has_results ? 'from entered / imported results' : 'no results entered yet'} />
+          <Tile testId="tile-clicks" label="Clicks" onDrill={tileDrill('clicks')} active={metric === 'clicks'} value={num(t?.clicks)} hint={`CTR ${pct(t?.ctr)} · CPC ${inr(t?.cpc_inr)}`} />
+          <Tile testId="tile-leads" label="Leads (Reach capture)" onDrill={t?.leads ? tileDrill('leads') : undefined} active={metric === 'leads'} value={num(t?.leads)} hint={`Cost per lead ${inr(t?.cost_per_lead_inr)}`} />
+          <Tile testId="tile-signups" label="Sign-ups (my.aicountly)" onDrill={tileDrill('signups')} active={metric === 'signups'} value={num(t?.signups)} hint={`Cost per sign-up ${inr(t?.cost_per_signup_inr)}`} />
+          <Tile testId="tile-budget" label="Live daily budget" onDrill={summary?.budget?.live_daily_inr ? tileDrill('budget') : undefined} active={metric === 'budget'} value={inr(summary?.budget?.live_daily_inr)}
             hint={`${live} live · plan ${inr(summary?.budget?.launch_plan?.daily_total_inr)}/day (a plan, not spend)`} />
         </div>
       )}
+
+      {metric && summary && <MetricCampaigns metric={metric} summary={summary} drill={metricDrill} />}
 
       {form && (
         <Card title={form.id ? 'Edit campaign' : 'Register a campaign placed in an ads manager'}>
@@ -253,7 +283,6 @@ export function SocialAdsPage() {
         </Card>
       )}
 
-      <div id="ads-campaign-register" />
       <Card title="Campaign register">
         {campaigns.length === 0 ? (
           <EmptyState message="No paid campaigns registered. Register each campaign after placing it in its ads manager, or add the launch plan." />
@@ -268,7 +297,8 @@ export function SocialAdsPage() {
                   const f = figures[c.id] || {};
                   return (
                     <tr key={c.id}>
-                      <td>{c.name}{f.attribution_warning && <div className="text-xs text-danger">{f.attribution_warning}</div>}</td>
+                      <td><Link className="drill-link" to={campaignHref(c.id, { period: summary?.period })} title="Its daily results">{c.name}</Link>
+                        {f.attribution_warning && <div className="text-xs text-danger">{f.attribution_warning}</div>}</td>
                       <td>{ADS_PLATFORMS[c.platform]?.label || c.platform}</td>
                       <td><span className={`badge badge-${c.status === 'live' ? 'success' : c.status === 'paused' ? 'warning' : 'secondary'}`}>{c.status}</span>
                         {f.days_missing_results > 0 && <div className="text-xs text-muted">{f.days_missing_results} day(s) without results</div>}</td>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Target, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { getAttributionOverview } from '../../services/intelligenceService.js';
+import { DrillLink } from '../../components/drill';
+import { conversionsHref } from '../leads/leadLinks';
 
 const EMPTY_STATS = {
   total_conversions: 0,
@@ -35,12 +37,15 @@ export default function AttributionOverviewPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Each tile opens the conversions it counted; the API lists them with the
+  // overview's own predicates, so the list total equals the tile.
   const tiles = [
-    { label: 'Total Conversions', value: stats.total_conversions, icon: Target, color: 'var(--color-info)' },
-    { label: 'Attributed', value: stats.attributed, icon: CheckCircle, color: 'var(--color-success)' },
-    // The only conversion list page is the unattributed one.
-    { label: 'Unattributed', value: stats.unattributed, icon: AlertCircle, color: 'var(--color-warning)', to: '/intelligence/attribution/unattributed' },
-    { label: 'Attribution Rate', value: `${stats.attribution_rate ?? 0}%`, icon: Users, color: 'var(--color-primary-hover)' },
+    { label: 'Total Conversions', value: stats.total_conversions, count: stats.total_conversions, icon: Target, color: 'var(--color-info)', to: conversionsHref() },
+    { label: 'Attributed', value: stats.attributed, count: stats.attributed, icon: CheckCircle, color: 'var(--color-success)', to: conversionsHref({ attributed: '1' }) },
+    // The unattributed list (conversions?attributed=0).
+    { label: 'Unattributed', value: stats.unattributed, count: stats.unattributed, icon: AlertCircle, color: 'var(--color-warning)', to: '/intelligence/attribution/unattributed' },
+    // A rate is attributed ÷ total: it opens its numerator.
+    { label: 'Attribution Rate', value: `${stats.attribution_rate ?? 0}%`, count: stats.attributed, icon: Users, color: 'var(--color-primary-hover)', to: conversionsHref({ attributed: '1' }), title: 'The attributed conversions behind the rate' },
   ];
 
   return (
@@ -72,8 +77,8 @@ export default function AttributionOverviewPage() {
                   <div className="stat-tile__label">{s.label}</div>
                 </>
               );
-              return s.to && Number(s.value) > 0
-                ? <Link key={s.label} to={s.to} className="stat-tile" aria-label={`${s.label}: ${s.value}`}>{body}</Link>
+              return s.to && Number(s.count) > 0
+                ? <Link key={s.label} to={s.to} className="stat-tile" aria-label={`${s.label}: ${s.value}`} title={s.title}>{body}</Link>
                 : <div key={s.label} className="stat-tile">{body}</div>;
             })}
           </div>
@@ -91,7 +96,13 @@ export default function AttributionOverviewPage() {
                   {breakdown.map((b) => (
                     <div key={b.channel}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-                        <span>{b.channel}</span>
+                        <DrillLink
+                          to={b.conversions > 0 ? conversionsHref({ attributed: '1', channel: b.channel }) : null}
+                          label={`${b.channel}: ${b.conversions} conversions`}
+                          title="Attributed conversions whose first touch was this channel"
+                        >
+                          {b.channel}
+                        </DrillLink>
                         <span style={{ fontWeight: 600 }}>{b.conversions} ({b.pct}%)</span>
                       </div>
                       <div style={{ width: '100%', background: 'var(--color-border)', borderRadius: 999, height: 8 }}>

@@ -44,7 +44,7 @@ describe('LeadsPage drill-down', () => {
     expect(screen.getByRole('link', { name: /clear captured in the last filter/i })).toHaveTextContent('Captured in the last 30 days');
   });
 
-  it('opens a single lead by id (there is no lead detail page)', async () => {
+  it('narrows the list to a single lead by id (old ?lead_id= links)', async () => {
     renderWithAuth(<LeadsPage />, { route: '/leads?lead_id=41' });
     await waitFor(() => expect(leadsService.list).toHaveBeenCalledWith(expect.objectContaining({ lead_id: '41' })));
     expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
@@ -57,6 +57,7 @@ describe('LeadsPage drill-down', () => {
     expect(await screen.findByRole('link', { name: 'Campaign #7' })).toHaveAttribute('href', '/campaigns/7');
     expect(screen.getByRole('link', { name: 'landing' })).toHaveAttribute('href', '/leads?source_kind=landing');
     expect(screen.getByRole('link', { name: /stage: converted/ })).toHaveAttribute('href', '/leads/outcomes?lead_id=41&days=all');
+    expect(screen.getByRole('link', { name: 'Asha Rao' })).toHaveAttribute('href', '/leads/41');
   });
 
   it('keeps a changed filter in the query', async () => {

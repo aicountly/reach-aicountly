@@ -80,10 +80,21 @@ Every area follows the rules above; the notable chains:
 | Community & knowledge | status rows → questions/answers lists → workspace; product → claims / brand rules; source → citations |
 | Distribution, video, SEO, readiness | counts → dispatches, suppressions (`channel`, `reason`), pipeline (`status`, `format`), SEO tracker `?show=`, findings (`severity`, `resolution_status`), failing jobs |
 
-Known gaps (no records behind the number, or no list page yet): GA4 traffic
-aggregates, legacy blog-table analytics tiles, engagement snapshots,
-backlink/sitemap/IndexNow snapshot counts, attribution channel splits,
-product/user AI budgets, ad spend/clicks, and the two sample-data
-visibility pages (run history, observations). Where a count and its list
-cannot share a predicate the link says so in its title (dispatch bounces →
-per-channel suppressions; command-centre revenue → all outcomes).
+| Leads (detail) | every lead reference → `/leads/:id`: contact, source, push attempts, outcomes, attribution touchpoints, inbox origin, audit trail |
+| Attribution | total / attributed / unattributed / channel bars → `/intelligence/attribution/conversions?…` → lead |
+| GA4 traffic | KPI cards, trend points, channel slices, top pages, lead events → `/analytics/traffic` (day → channel → source → page → device → country → event) → single GA4 report row |
+| Analytics records | legacy blog tiles → `/analytics/blog-posts?bucket=`; engagement → `/analytics/snapshots` |
+| SEO records | backlinks → `/seo-centre/backlinks/:id`; sitemap → `/seo-centre/sitemap/:id/entries`; IndexNow → `/seo-centre/indexnow/submissions` → attempts; indexing → `/seo-centre/indexing` |
+| AI visibility | every overview figure → runs → `/intelligence/visibility/runs/:id` (answer, observations, citations); competitors → `/intelligence/competitors/:id` |
+| Ads | tile → campaigns by figure → `/social/ads/:id` → day results row → leads |
+| Readiness & ops | backlog → `/readiness/recommendations/:id`; workflows; migrations; jobs → `/admin/jobs/:id`; video → `/video/pipeline/:uuid`; work blocks → `/blog-command-centre/operations/work-blocks` |
+| Content performance | rows → `/intelligence/content/:id` → day × page → Search Console explorer |
+
+Remaining limits are about missing source data, not missing links: external
+backlinks / referring domains (no provider stores them), GA4 per-content
+metrics (the GA4 ingest is a stub; content performance uses Search Console),
+AI cost (the orchestrator records 0, so budgets show nothing to drill), job
+attempt history before the latest error, and per-step video timestamps.
+Where a count and its list cannot share a predicate the link says so in its
+title (dispatch bounces → per-channel suppressions; command-centre revenue →
+all outcomes).

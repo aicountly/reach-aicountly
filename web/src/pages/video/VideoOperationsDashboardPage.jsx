@@ -2,9 +2,44 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { ROUTES } from '../../constants/routes';
-import { drillHref } from '../../components/drill';
+import { DrillLink, drillHref } from '../../components/drill';
+import { statusLabel } from './videoPipelineShared';
 
 const JOB_QUEUE = { queue: 'video', job_type: 'reach.video_pipeline_step' };
+
+/**
+ * Videos per status × format. Each count opens the pipeline list with the
+ * same ?status=&format= the API counted by (VideoOperationsController).
+ */
+function PipelineCounts({ counts }) {
+  const rows = Object.entries(counts?.by_status ?? {});
+  const cell = (n, params) => <DrillLink to={n > 0 ? drillHref('/video', params) : undefined}>{n}</DrillLink>;
+  return (
+    <div className="card">
+      <h3 className="card__title">Videos by status</h3>
+      <div className="card__body">
+        {rows.length === 0 ? (
+          <p className="text-muted" style={{ margin: 0 }}>No videos in the pipeline yet.</p>
+        ) : (
+          <table className="data-table data-table--compact">
+            <thead><tr><th>Status</th><th>Vlog</th><th>Short</th><th>Total</th></tr></thead>
+            <tbody>
+              {rows.map(([status, c]) => (
+                <tr key={status}>
+                  <td>{statusLabel(status)}</td>
+                  <td>{cell(c.vlog, { status, format: 'vlog' })}</td>
+                  <td>{cell(c.short, { status, format: 'short' })}</td>
+                  <td>{cell(c.total, { status })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {counts?.total > 0 && <Link to="/video" className="stat-card__link">All {counts.total} videos →</Link>}
+      </div>
+    </div>
+  );
+}
 
 /** Pipeline health exactly as the API reports it — nothing shows "operational" unless it is. */
 export default function VideoOperationsDashboardPage() {
@@ -97,6 +132,8 @@ export default function VideoOperationsDashboardPage() {
               <Link to={drillHref(ROUTES.JOBS, { ...JOB_QUEUE, status: 'dead_letter,failed' })} className="stat-card__link">Failed steps →</Link>
             </div>
           </div>
+
+          <PipelineCounts counts={ops.pipeline_counts} />
 
           {(ops.notes || []).map((n) => <p key={n} className="muted">{n}</p>)}
         </div>

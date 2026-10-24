@@ -18,6 +18,15 @@ const BLOCKERS = { severity: 'critical,high', resolution_status: OPEN };
 
 const label = (v) => v.replace(/,/g, ' + ').replace(/_/g, ' ');
 
+// reach_readiness_audit_runs.audit_type. The readiness overview's Privacy and
+// AI Governance cards open this page narrowed to their audit type.
+const AUDIT_TYPES = ['security', 'privacy', 'ai_governance', 'migration', 'performance', 'operational', 'dr'];
+const AUDIT_TITLES = {
+  privacy: ['Privacy Status', 'Findings from privacy audits (personal data controls).'],
+  ai_governance: ['AI Governance', 'Findings from AI governance audits (model use, prompts, controls).'],
+  migration: ['Migration Findings', 'Findings from database migration audits.'],
+};
+
 export default function SecurityStatusPage() {
   const [findings, setFindings] = useState([]);
   const [blockers, setBlockers] = useState([]);
@@ -26,12 +35,14 @@ export default function SecurityStatusPage() {
   // In the URL: the operations dashboard links ?severity=critical&resolution_status=open,in_progress.
   const [severity, setSeverity] = useUrlFilter('severity');
   const [resolution, setResolution] = useUrlFilter('resolution_status');
+  const [auditType, setAuditType] = useUrlFilter('audit_type');
 
   useEffect(() => {
     setLoading(true);
     const params = {};
     if (severity) params.severity = severity;
     if (resolution) params.resolution_status = resolution;
+    if (auditType) params.audit_type = auditType;
     Promise.all([listFindings(params), listFindingBlockers()])
       .then(([all, open]) => {
         setFindings(Array.isArray(all) ? all : []);
@@ -39,17 +50,18 @@ export default function SecurityStatusPage() {
       })
       .catch((e) => setError(e.message || 'Failed to load findings'))
       .finally(() => setLoading(false));
-  }, [severity, resolution]);
+  }, [severity, resolution, auditType]);
 
-  const filtered = Boolean(severity || resolution);
+  const filtered = Boolean(severity || resolution || auditType);
+  const [title, subtitle] = AUDIT_TITLES[auditType] || ['Security Status', null];
   const blockersHref = drillHref('/readiness/security', BLOCKERS);
 
   return (
     <div>
       <div className="page-header page-header--stack">
-        <h1>Security Status</h1>
+        <h1>{title}</h1>
         <p className="page-header__subtitle">
-          Open security findings from readiness audit runs. Critical and high findings
+          {subtitle || 'Open security findings from readiness audit runs.'} Critical and high findings
           must be resolved or risk-accepted before release.
         </p>
       </div>
@@ -73,6 +85,11 @@ export default function SecurityStatusPage() {
       </div>
 
       <div className="filter-bar mb-4">
+        <select value={auditType} onChange={(e) => setAuditType(e.target.value)} aria-label="Audit type">
+          <option value="">All audit types</option>
+          {AUDIT_TYPES.map((v) => <option key={v} value={v}>{label(v)}</option>)}
+          {auditType && !AUDIT_TYPES.includes(auditType) && <option value={auditType}>{label(auditType)}</option>}
+        </select>
         <select value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Severity">
           <option value="">All severities</option>
           {SEVERITIES.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -95,6 +112,7 @@ export default function SecurityStatusPage() {
               {filtered
                 ? 'No findings match this filter.'
                 : 'No audit findings recorded yet. Empty blockers means this gate can pass for release acceptance.'}
+              {auditType && ` No ${label(auditType)} audit has recorded findings.`}
             </p>
           </div>
         ) : (

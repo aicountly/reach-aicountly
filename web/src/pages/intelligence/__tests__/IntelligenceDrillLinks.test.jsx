@@ -40,7 +40,7 @@ beforeEach(() => {
   intel.listConnectors.mockResolvedValue(connectors);
   intel.listSearchMetrics.mockResolvedValue({ rows: [] });
   intel.listContentMetrics.mockResolvedValue([]);
-  growth.getVisibilitySummary.mockResolvedValue({ brand: 'AICOUNTLY', by_provider: [{ provider: 'gemini', answers: 3, entities: {} }], gaps: [] });
+  growth.getVisibilitySummary.mockResolvedValue({ brand: 'Aicountly', by_provider: [{ provider: 'gemini', answers: 3, entities: {} }], gaps: [] });
   growth.listVisibilityAnswers.mockResolvedValue([]);
 });
 
@@ -98,7 +98,7 @@ describe('intelligence rows', () => {
   it('visibility narrows latest answers from the URL and from an assistant row', async () => {
     renderWithAuth(<VisibilityOverviewPage />, { route: '/intelligence/visibility?prompt_id=4' });
     await waitFor(() => expect(growth.listVisibilityAnswers).toHaveBeenCalledWith({ limit: 30, prompt_id: '4' }));
-    fireEvent.click(await screen.findByRole('button', { name: '3' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Gemini' }));
     await waitFor(() => expect(growth.listVisibilityAnswers).toHaveBeenCalledWith({ limit: 30, prompt_id: '4', provider: 'gemini' }));
   });
 });

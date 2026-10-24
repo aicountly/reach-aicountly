@@ -24,8 +24,26 @@ export function SeoOverviewPage() {
 
   const search = data?.search_28d || {};
   const connections = data?.connections || {};
-  const statusList = (rows, keyName) =>
-    (rows || []).map((row) => `${row[keyName] || 'unknown'}: ${row.c}`).join(' · ') || '—';
+  // Each status count opens the records in that status; zero stays text.
+  const statusLinks = (rows, keyName, path, what) => {
+    const list = (rows || []).filter((row) => row[keyName] != null);
+    if (list.length === 0) return '—';
+    return list.map((row, i) => {
+      const label = String(row[keyName]).replace(/_/g, ' ');
+      return (
+        <span key={row[keyName]}>
+          {i > 0 && ' · '}
+          {label}:{' '}
+          <DrillLink to={Number(row.c) > 0 ? drillHref(path, { status: row[keyName] }) : undefined}
+                     label={`${label}: ${row.c} ${what}`} title={`${what} — ${label}`}>
+            {row.c}
+          </DrillLink>
+        </span>
+      );
+    });
+  };
+  const bl = data?.backlinks;
+  const blHref = (kind, n) => (bl?.id && Number(n) > 0 ? drillHref(`/seo-centre/backlinks/${bl.id}`, { kind }) : undefined);
 
   return (
     <div>
@@ -42,7 +60,7 @@ export function SeoOverviewPage() {
           { title: 'Clicks (28d)', value: search.clicks ?? 0, to: drillHref('/seo-centre/search', { by: 'query', sort: 'clicks' }), count: Number(search.clicks ?? 0) },
           { title: 'Impressions (28d)', value: search.impressions ?? 0, to: drillHref('/seo-centre/search', { by: 'query', sort: 'impressions' }), count: Number(search.impressions ?? 0) },
           { title: 'Avg position (28d)', value: search.avg_position ? Number(search.avg_position).toFixed(1) : '—', to: drillHref('/seo-centre/search', { by: 'query', sort: 'position' }), count: search.avg_position ? 1 : 0 },
-          { title: 'AI visibility runs (28d)', value: data?.visibility_28d?.runs ?? 0, to: '/intelligence/visibility', count: Number(data?.visibility_28d?.runs ?? 0) },
+          { title: 'AI visibility runs (28d)', value: data?.visibility_28d?.runs ?? 0, to: drillHref('/intelligence/visibility/runs', { days: 28 }), count: Number(data?.visibility_28d?.runs ?? 0) },
         ].map((t) => {
           const card = <Card title={t.title}><strong style={{ fontSize: '1.5rem' }}>{t.value}</strong></Card>;
           return t.count > 0
@@ -51,22 +69,24 @@ export function SeoOverviewPage() {
         })}
       </div>
 
-      <Card title="Blog indexing status">
-        <p>{statusList(data?.indexing_status, 'indexing_status')}</p>
+      <Card title="Blog indexing status" actions={<Link to="/seo-centre/indexing" className="text-sm">All posts ›</Link>}>
+        <p>{statusLinks(data?.indexing_status, 'indexing_status', '/seo-centre/indexing', 'blog posts')}</p>
       </Card>
 
-      <Card title="IndexNow submissions" actions={<Link to="/seo-centre/indexnow" className="text-sm">IndexNow ›</Link>}>
-        <p>{statusList(data?.indexnow_status, 'status')}</p>
+      <Card title="IndexNow submissions" actions={<Link to="/seo-centre/indexnow/submissions" className="text-sm">All submissions ›</Link>}>
+        <p>{statusLinks(data?.indexnow_status, 'status', '/seo-centre/indexnow/submissions', 'IndexNow submissions')}</p>
         {!connections.indexnow && <p className="text-muted text-sm">Auto-submission is off (INDEXNOW_ENABLED=false).</p>}
       </Card>
 
       <Card title="Backlink health (latest snapshot)" actions={<Link to="/seo-centre/backlinks" className="text-sm">All snapshots ›</Link>}>
-        {data?.backlinks ? (
+        {bl ? (
           <p>
-            Provider: {data.backlinks.provider} · Internal links: {data.backlinks.internal_links} ·
-            Published URLs: {data.backlinks.published_urls}
-            {data.backlinks.total_backlinks != null && <> · External backlinks: {data.backlinks.total_backlinks}</>}
-            {data.backlinks.referring_domains != null && <> · Referring domains: {data.backlinks.referring_domains}</>}
+            Provider: {bl.provider} · Internal links:{' '}
+            <DrillLink to={blHref('internal_links', bl.internal_links)} label={`Internal links: ${bl.internal_links}`}>{bl.internal_links}</DrillLink> ·
+            Published URLs:{' '}
+            <DrillLink to={blHref('published_urls', bl.published_urls)} label={`Published URLs: ${bl.published_urls}`}>{bl.published_urls}</DrillLink>
+            {bl.total_backlinks != null && <> · External backlinks: <DrillLink to={blHref('', bl.total_backlinks)}>{bl.total_backlinks}</DrillLink></>}
+            {bl.referring_domains != null && <> · Referring domains: <DrillLink to={blHref('', bl.referring_domains)}>{bl.referring_domains}</DrillLink></>}
           </p>
         ) : (
           <p className="text-muted">No snapshot yet — the daily 05:00 job writes the first one.</p>

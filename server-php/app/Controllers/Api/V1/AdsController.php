@@ -165,14 +165,38 @@ class AdsController extends BaseApiController
         return $this->ok(['created' => $created, 'already_registered' => $kept], $created === [] ? 200 : 201);
     }
 
+    /**
+     * GET v1/ads/campaigns/{id}/results?from=&to= — the campaign's day rows,
+     * newest first. With from/to (the summary period) the rows are the ones
+     * the summary summed for this campaign, and leads_by_day holds its UTM
+     * leads per day under the summary's attribution rule (days without a
+     * results row included).
+     */
     public function results(int $id)
     {
-        if (! (new AdCampaignModel())->find($id)) {
+        $campaign = (new AdCampaignModel())->find($id);
+        if (! $campaign) {
             return $this->fail('Ad campaign not found.', 404);
         }
-        $rows = (new AdResultModel())->where('ad_campaign_id', $id)->orderBy('result_date', 'DESC')->findAll(400);
+        $from = AdsConventions::date((string) $this->request->getGet('from'));
+        $to = AdsConventions::date((string) $this->request->getGet('to'));
+        if ($from !== null && $to !== null && $from > $to) {
+            return $this->fail('from must not be after to.', 422);
+        }
+        $q = (new AdResultModel())->where('ad_campaign_id', $id);
+        if ($from !== null) {
+            $q->where('result_date >=', $from);
+        }
+        if ($to !== null) {
+            $q->where('result_date <=', $to);
+        }
+        $rows = $q->orderBy('result_date', 'DESC')->findAll(400);
+        $leads = (new AdsSummary(Database::connect()))->leadsByDay($campaign, $from ?? (string) $campaign['start_date'], $to ?? date('Y-m-d'));
 
-        return $this->ok(['items' => $rows, 'total' => count($rows), 'source' => AdsSummary::SOURCE_NOTE]);
+        return $this->ok([
+            'items' => $rows, 'total' => count($rows), 'period' => ['from' => $from, 'to' => $to],
+            'leads_by_day' => (object) $leads, 'source' => AdsSummary::SOURCE_NOTE,
+        ]);
     }
 
     /** PUT v1/ads/campaigns/{id}/results — one day typed in by hand. */

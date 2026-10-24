@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Leads\LeadDetail;
 use App\Models\CampaignModel;
 use App\Models\LeadModel;
 use Config\Services;
@@ -75,12 +76,19 @@ class LeadController extends BaseApiController
         return $this->ok(['items' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }
 
+    /**
+     * One lead plus `related` (LeadDetail): campaign, landing page, Engage push
+     * attempts, outcomes, attribution, social inbox origin and audit trail —
+     * the lead detail page's single call.
+     */
     public function show(int $id)
     {
-        $row = (new LeadModel())->find($id);
+        $m   = new LeadModel();
+        $row = $m->find($id);
         if (! $row) {
             return $this->fail('Lead not found.', 404);
         }
+        $row['related'] = LeadDetail::related($m->db, $row);
         return $this->ok($row);
     }
 

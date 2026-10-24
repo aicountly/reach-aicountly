@@ -78,6 +78,9 @@ export default function RefreshOutcomePage() {
   // card links here with ?measurement_status=pending.
   const [filter, setFilter] = useUrlFilter('measurement_status');
   const [identityFilter, setIdentityFilter] = useUrlFilter('content_identity_id');
+  // The open window is in the URL too: a recommendation's outcome window
+  // links here with ?window_id=.
+  const [windowParam, setWindowParam] = useUrlFilter('window_id');
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -128,6 +131,16 @@ export default function RefreshOutcomePage() {
         setDetail(null);
       })
       .finally(() => setDetailLoading(false));
+  };
+
+  useEffect(() => {
+    if (windowParam && Number(windowParam) !== Number(selectedId)) loadDetail(windowParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowParam]);
+
+  const openWindow = (id) => {
+    setWindowParam(String(id));
+    loadDetail(id);
   };
 
   const handleMeasure = async () => {
@@ -242,11 +255,11 @@ export default function RefreshOutcomePage() {
                     return (
                       <tr
                         key={w.id}
-                        onClick={() => loadDetail(w.id)}
+                        onClick={() => openWindow(w.id)}
                         onKeyDown={(e) => {
                           if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                             e.preventDefault();
-                            loadDetail(w.id);
+                            openWindow(w.id);
                           }
                         }}
                         tabIndex={0}
