@@ -21,6 +21,7 @@ import { LandingListPage } from './pages/landing/LandingListPage';
 import { LandingDetailPage } from './pages/landing/LandingDetailPage';
 
 import SocialAdsLayout from './pages/social/SocialAdsLayout.jsx';
+import AdCampaignDetailPage from './pages/social/ads/AdCampaignDetailPage.jsx';
 import SocialAccountsTab, { SocialHubIndex } from './pages/social/SocialAccountsTab.jsx';
 import SocialCalendarTab from './pages/social/SocialCalendarTab.jsx';
 import SocialPerformanceTab from './pages/social/SocialPerformanceTab.jsx';
@@ -389,6 +390,7 @@ export default function App() {
           <Route path="inbox" element={<SocialInboxPage />} />
           <Route path="performance" element={<SocialPerformanceTab />} />
           <Route path="ads" element={<SocialAdsPage />} />
+          <Route path="ads/:id" element={<AdCampaignDetailPage />} />
         </Route>
 
         <Route path={ROUTES.EMAIL_LIST}      element={<EmailListPage />} />

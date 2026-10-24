@@ -20,10 +20,13 @@ const LIMIT = 25;
 /**
  * URL filters. The first four have controls; the rest come from the "Last 24
  * hours" tiles and match SocialInboxService::stats() predicates (has=ticket /
- * has=lead, since_hours on fetched_at, replied_since_hours on replied_at), so
- * a tile's number and the list it opens agree.
+ * has=lead, since_hours on fetched_at, replied_since_hours on replied_at,
+ * updated_since_hours on updated_at for reply failures, waiting=flow for
+ * complaints with no ticket still deferred / retrying), so a tile's number and
+ * the list it opens agree.
  */
-const FILTER_KEYS = ['status', 'classification', 'network', 'search', 'reply_status', 'has', 'since_hours', 'replied_since_hours'];
+const TILE_KEYS = ['reply_status', 'has', 'waiting', 'since_hours', 'replied_since_hours', 'updated_since_hours'];
+const FILTER_KEYS = ['status', 'classification', 'network', 'search', ...TILE_KEYS];
 const NONE = Object.fromEntries(FILTER_KEYS.map((k) => [k, '']));
 
 /** Lead rows the social inbox bot creates (SocialInboxService). */
@@ -34,6 +37,8 @@ const CHIP_LABELS = {
   has: (v) => (v === 'ticket' ? 'Has a Flow ticket' : v === 'lead' ? 'Created a lead' : `Has ${v}`),
   since_hours: (v) => `Read in the last ${v} h`,
   replied_since_hours: (v) => `Replied in the last ${v} h`,
+  updated_since_hours: (v) => `Changed in the last ${v} h`,
+  waiting: (v) => (v === 'flow' ? 'Complaints waiting for Flow' : `Waiting: ${v}`),
 };
 
 const label = (s) => (s ? String(s).replace(/_/g, ' ') : '—');
@@ -99,7 +104,7 @@ export function SocialInboxPage() {
     setLoading(true);
     setError(null);
     const params = { status, classification, network, search, page, limit: LIMIT };
-    ['reply_status', 'has', 'since_hours', 'replied_since_hours'].forEach((k) => { if (f[k]) params[k] = f[k]; });
+    TILE_KEYS.forEach((k) => { if (f[k]) params[k] = f[k]; });
     Promise.all([
       socialInboxService.summary(),
       socialInboxService.list(params),
@@ -162,7 +167,7 @@ export function SocialInboxPage() {
             Flow {r.ticket_url ? <a href={r.ticket_url} target="_blank" rel="noopener noreferrer">{r.ticket_number}</a> : r.ticket_number}
           </div>
         )}
-        {r.lead_id && <div className="text-xs mt-1"><DrillLink to={drillHref(ROUTES.LEADS, { lead_id: r.lead_id })}>Lead #{r.lead_id}</DrillLink></div>}
+        {r.lead_id && <div className="text-xs mt-1"><DrillLink to={ROUTES.LEAD_DETAIL.replace(':id', r.lead_id)}>Lead #{r.lead_id}</DrillLink></div>}
         {r.status_reason && <div className="text-xs text-muted mt-1">{r.status_reason}</div>}
       </div>
     )},
@@ -229,8 +234,19 @@ export function SocialInboxPage() {
             {day.leads > 0 && (
               <Link className="text-xs" to={drillHref(ROUTES.LEADS, { source_kind: SOCIAL_LEAD_SOURCE })}>All social inbox leads ›</Link>
             )}
-            {day.reply_failures > 0 && <span className="text-xs">reply failures: <strong>{day.reply_failures}</strong></span>}
-            {day.waiting_for_flow > 0 && <span className="text-xs">complaints waiting for Flow: <strong>{day.waiting_for_flow}</strong></span>}
+            {day.reply_failures > 0 && (
+              <span className="text-xs">reply failures: <strong>
+                <DrillLink onClick={() => narrow({ reply_status: 'failed', updated_since_hours: '24' })}
+                           label={`Show ${day.reply_failures} reply failures from the last 24 hours`}>{day.reply_failures}</DrillLink>
+              </strong></span>
+            )}
+            {/* Not a 24 h figure: every complaint still queued without a ticket. */}
+            {day.waiting_for_flow > 0 && (
+              <span className="text-xs">complaints waiting for Flow: <strong>
+                <DrillLink onClick={() => narrow({ waiting: 'flow' })}
+                           label={`Show ${day.waiting_for_flow} complaints waiting for Flow`}>{day.waiting_for_flow}</DrillLink>
+              </strong></span>
+            )}
           </div>
           {lastRun && (
             <div className="text-xs text-muted mt-2" data-testid="last-run">

@@ -15,7 +15,7 @@ use Config\Database;
  * Social → Inbox: what the social inbox bot read and did.
  *
  *   GET  v1/social/inbox               list (status, classification, network, severity, reply_status, has=ticket|lead,
- *                                      since_hours, replied_since_hours, search, page, limit)
+ *                                      waiting=flow, since_hours, replied_since_hours, updated_since_hours, search, page, limit)
  *   GET  v1/social/inbox/summary       24 h / 7 day counts, the last run, configuration state
  *   POST v1/social/inbox/{id}/retry    handle a failed item again (social.dispatch)
  */
@@ -48,7 +48,14 @@ class SocialInboxController extends BaseApiController
         } elseif ($has === 'lead') {
             $q->where('lead_id IS NOT NULL', null, false);
         }
-        foreach (['since_hours' => 'fetched_at', 'replied_since_hours' => 'replied_at'] as $param => $col) {
+        // waiting=flow: complaints not yet lodged in Flow and still queued for
+        // another try — the "complaints waiting for Flow" count (no time window).
+        if ((string) $this->request->getGet('waiting') === 'flow') {
+            $q->where('classification', 'complaint')->where('ticket_number IS NULL', null, false)->whereIn('status', ['deferred', 'retry']);
+        }
+        // updated_since_hours: reply failures are counted by when the row last
+        // changed (the failed attempt), not when it was read.
+        foreach (['since_hours' => 'fetched_at', 'replied_since_hours' => 'replied_at', 'updated_since_hours' => 'updated_at'] as $param => $col) {
             $h = trim((string) $this->request->getGet($param));
             if ($h !== '' && ctype_digit($h) && (int) $h >= 1 && (int) $h <= 24 * 90) {
                 $q->where($col . ' >=', gmdate('Y-m-d H:i:sP', time() - (int) $h * 3600));

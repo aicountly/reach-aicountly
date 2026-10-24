@@ -794,6 +794,8 @@ $routes->group('v1', static function ($routes) {
         $routes->get('community/analytics/engagement',                       'Api\\V1\\Community\\CommunityAnalyticsController::engagement',            ['filter' => 'permission:community_analytics.view']);
         $routes->get('community/analytics/coverage',                         'Api\\V1\\Community\\CommunityAnalyticsController::sourceCoverage',        ['filter' => 'permission:community_analytics.view']);
         $routes->get('community/analytics/cache',                            'Api\\V1\\Community\\CommunityAnalyticsController::cache',                 ['filter' => 'permission:community_analytics.view']);
+        $routes->get('community/analytics/engagement/events',                'Api\\V1\\Community\\CommunityAnalyticsController::engagementEvents',      ['filter' => 'permission:community_analytics.view']);
+        $routes->get('community/analytics/coverage/answers',                 'Api\\V1\\Community\\CommunityAnalyticsController::coverageAnswers',       ['filter' => 'permission:community_analytics.view']);
 
         // ─────────────────────────────────────────────────────────────────────
         // Phase 6 — Video Content Automation

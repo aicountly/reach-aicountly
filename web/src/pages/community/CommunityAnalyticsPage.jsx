@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { DrillLink, useDrillFilters, useUrlFilter } from '../../components/drill';
 import { normalizeCommunityList, normalizeCommunityObject } from './communityListUtils';
+import { EngagementEventsPanel, GroundedAnswersPanel } from './CommunityAnalyticsDrillPanels';
+
+const DAY_CHOICES = [7, 14, 30, 60, 90];
 
 /** A tile's link, only when there is something behind the number. */
 function TileLink({ count, to, children }) {
@@ -12,7 +16,13 @@ export default function CommunityAnalyticsPage() {
   const [overview, setOverview]   = useState(null);
   const [engagement, setEngagement] = useState([]);
   const [coverage, setCoverage]   = useState([]);
-  const [days, setDays]           = useState(30);
+  // The window, the event drill (type › day) and the source drill live in
+  // the URL, so each step is shareable and Back walks up.
+  const [daysParam, setDaysParam] = useUrlFilter('days', '30');
+  const days = DAY_CHOICES.includes(Number(daysParam)) ? Number(daysParam) : 30;
+  const setDays = (d) => setDaysParam(String(d));
+  const eventDrill = useDrillFilters(['event_type', 'day']);
+  const sourceDrill = useDrillFilters(['source_type', 'source_id']);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
 
@@ -52,7 +62,7 @@ export default function CommunityAnalyticsPage() {
             className="form-select form-select--sm"
             aria-label="Analytics date range in days"
           >
-            {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d}d</option>)}
+            {DAY_CHOICES.map(d => <option key={d} value={d}>{d}d</option>)}
           </select>
         </label>
       </div>
@@ -86,12 +96,15 @@ export default function CommunityAnalyticsPage() {
             <table className="data-table data-table--compact">
               <thead><tr><th>Event type</th><th>Count</th></tr></thead>
               <tbody>
-                {Object.entries(eventsByType).map(([type, cnt]) => (
-                  <tr key={type}>
-                    <td>{type}</td>
-                    <td>{cnt}</td>
-                  </tr>
-                ))}
+                {Object.entries(eventsByType).map(([type, cnt]) => {
+                  const open = cnt > 0 ? () => eventDrill.drill({ event_type: type, day: '' }) : undefined;
+                  return (
+                    <tr key={type}>
+                      <td><DrillLink onClick={open} title="The events behind this count">{type}</DrillLink></td>
+                      <td><DrillLink onClick={open} label={`Show ${cnt} ${type} events`}>{cnt}</DrillLink></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -103,20 +116,29 @@ export default function CommunityAnalyticsPage() {
             <p className="muted">No coverage data.</p>
           ) : (
             <table className="data-table data-table--compact">
-              <thead><tr><th>Type</th><th>ID</th><th>Usage</th></tr></thead>
+              <thead><tr><th>Type</th><th>Source</th><th>Answers</th></tr></thead>
               <tbody>
-                {coverage.slice(0, 15).map((c, i) => (
-                  <tr key={i}>
-                    <td>{c.source_type}</td>
-                    <td>{c.source_id}</td>
-                    <td>{c.usage_count}</td>
-                  </tr>
-                ))}
+                {coverage.slice(0, 15).map((c, i) => {
+                  const id = c.source_id ?? 'none';
+                  const open = Number(c.usage_count) > 0
+                    ? () => sourceDrill.drill({ source_type: c.source_type, source_id: id })
+                    : undefined;
+                  return (
+                    <tr key={i}>
+                      <td>{c.source_type}</td>
+                      <td>{c.source_title || (c.source_id ?? '—')}{c.source_title && c.source_id != null && <span className="text-xs text-muted"> #{c.source_id}</span>}</td>
+                      <td><DrillLink onClick={open} label={`Show ${c.usage_count} answers grounded on ${c.source_title || `${c.source_type} ${id}`}`}>{c.usage_count}</DrillLink></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </section>
       </div>
+
+      <EngagementEventsPanel drill={eventDrill} days={days} engagement={engagement} />
+      <GroundedAnswersPanel drill={sourceDrill} />
     </div>
   );
 }

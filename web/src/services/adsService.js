@@ -14,7 +14,8 @@ export const adsService = {
   update:      (id, body)        => api.put(`v1/ads/campaigns/${id}`, body),
   archive:     (id)              => api.delete(`v1/ads/campaigns/${id}`),
   launchPlan:  (body)            => api.post('v1/ads/campaigns/launch-plan', body),
-  results:     (id)              => api.get(`v1/ads/campaigns/${id}/results`),
+  /** params: { from, to } — the summary period; the response adds leads_by_day. */
+  results:     (id, params)      => api.get(`v1/ads/campaigns/${id}/results`, params),
   saveResult:  (id, body)        => api.put(`v1/ads/campaigns/${id}/results`, body),
   deleteResult:(resultId)        => api.delete(`v1/ads/results/${resultId}`),
   utmLink:     (body)            => api.post('v1/ads/utm-link', body),

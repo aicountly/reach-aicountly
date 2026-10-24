@@ -148,7 +148,7 @@ describe('Social inbox drill-down', () => {
   it('opens the lead a message created', async () => {
     socialInboxService.list.mockResolvedValue({ items: [{ id: 9, network: 'linkedin', text: 'Pricing?', status: 'lead_created', lead_id: 55 }], total: 1 });
     at(<SocialInboxPage />, '/social/inbox');
-    expect(await screen.findByRole('link', { name: 'Lead #55' })).toHaveAttribute('href', '/leads?lead_id=55');
+    expect(await screen.findByRole('link', { name: 'Lead #55' })).toHaveAttribute('href', '/leads/55');
   });
 });
 
@@ -166,7 +166,7 @@ describe('Ads drill-down', () => {
     const link = await screen.findByRole('link', { name: '3 leads for Soft launch' });
     expect(link).toHaveAttribute('href',
       '/leads?utm_source=google&utm_medium=cpc&utm_campaign=soft-launch&created_from=2026-10-18&created_to=2026-10-23');
-    expect(screen.getByTestId('tile-leads')).toHaveAttribute('href', '#ads-campaign-register');
+    expect(screen.getByTestId('tile-leads').tagName).toBe('BUTTON');
   });
 
   it('does not link a campaign with no leads', async () => {

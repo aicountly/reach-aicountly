@@ -125,10 +125,17 @@ class AiGenerationOrchestrator
         }
 
         // --- Budget check ---
+        // Product and user are recorded on the ledger row too, so a product or
+        // user budget counts (and the usage page lists) the same spend.
+        $productId = $productSlug ? $this->resolveProductId($productSlug) : null;
         $budgetContext = [
             'provider_key' => $decision->provider->getProviderKey(),
             'model_key'    => $decision->modelKey,
             'content_type' => $request['content_type'] ?? '',
+            'task_type'    => $request['task_type'] ?? '',
+            'product_slug' => $productSlug ?: null,
+            'product_id'   => $productId,
+            'user_id'      => $request['requested_by_user_id'] ?? null,
         ];
         $budgetResult = $this->budget->check($budgetContext);
 
@@ -268,6 +275,7 @@ class AiGenerationOrchestrator
                     'model_id'              => $modelId,
                     'prompt_version_id'     => $promptVersion ? (int) $promptVersion['id'] : null,
                     'content_item_id'       => $request['content_item_id'] ?? null,
+                    'product_id'            => $productId,
                     'content_type'          => $request['content_type'] ?? '',
                     'task_type'             => $request['task_type'],
                     'actor_type'            => $request['requested_actor_type'] ?? 'human',
@@ -381,6 +389,13 @@ class AiGenerationOrchestrator
 
         $params = json_decode($request['request_parameters_json'] ?? '{}', true);
         return $params['product_slug'] ?? null;
+    }
+
+    private function resolveProductId(string $slug): ?int
+    {
+        $row = db_connect()->table('reach_products')->select('id')->where('slug', $slug)->limit(1)->get()->getRowArray();
+
+        return $row ? (int) $row['id'] : null;
     }
 
     private function resolvePromptVersion(array $request): ?array
