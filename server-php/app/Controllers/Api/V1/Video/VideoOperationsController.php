@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Api\V1\Video;
 
 use App\Controllers\BaseApiController;
+use App\Libraries\Database\SchemaGuard;
 use App\Libraries\Video\Automation\VideoPipelineStatus;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -24,7 +25,43 @@ class VideoOperationsController extends BaseApiController
                 ? ($status['youtube']['connected'] ? 'connected' : 'not connected')
                 : ($path['ready'] ? 'social-api.ai' : 'social-api.ai (not ready)'),
             'status'            => $status['ready'] ? 'ready' : 'not_ready',
+            'pipeline_counts'   => $this->pipelineCounts(),
         ]);
+    }
+
+    /**
+     * Items per status × format — each cell opens /video?status=&format=,
+     * which VideoPipelineRepository::list filters on the same columns.
+     *
+     * @return array{by_status: array<string, array{total:int, vlog:int, short:int}>, total:int}
+     */
+    private function pipelineCounts(): array
+    {
+        $out = ['by_status' => [], 'total' => 0];
+        try {
+            $db = \Config\Database::connect();
+            if (! SchemaGuard::hasTable($db, 'reach_video_pipeline_items')) {
+                return $out;
+            }
+            $rows = $db->query(
+                'SELECT status, format, COUNT(*) AS n FROM reach_video_pipeline_items GROUP BY status, format'
+            )->getResultArray();
+        } catch (\Throwable $e) {
+            log_message('error', 'VideoOperationsController::pipelineCounts: ' . $e->getMessage());
+            return $out;
+        }
+        foreach ($rows as $r) {
+            $status = (string) $r['status'];
+            $n      = (int) $r['n'];
+            $out['by_status'][$status] ??= ['total' => 0, 'vlog' => 0, 'short' => 0];
+            $out['by_status'][$status]['total'] += $n;
+            if (in_array($r['format'], ['vlog', 'short'], true)) {
+                $out['by_status'][$status][$r['format']] += $n;
+            }
+            $out['total'] += $n;
+        }
+
+        return $out;
     }
 
     public function auditForProject(string $projectUuid): ResponseInterface

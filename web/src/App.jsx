@@ -194,6 +194,13 @@ import IntelligenceOperationsPage       from './pages/intelligence/IntelligenceO
 
 // Phase 9: Readiness
 import ReadinessLayout                  from './pages/readiness/ReadinessLayout.jsx';
+import RefreshRecommendationsPage      from './pages/readiness/RefreshRecommendationsPage.jsx';
+import RefreshRecommendationDetailPage from './pages/readiness/RefreshRecommendationDetailPage.jsx';
+import RefreshWorkflowsPage            from './pages/readiness/RefreshWorkflowsPage.jsx';
+import MigrationStatusPage             from './pages/readiness/MigrationStatusPage.jsx';
+import VideoPipelineItemPage           from './pages/video/VideoPipelineItemPage.jsx';
+import { JobDetailPage }               from './pages/admin/JobDetailPage';
+import { BlogWorkBlocksPage }          from './pages/blog-command-centre/BlogWorkBlocksPage';
 import ReadinessOverviewPage            from './pages/readiness/ReadinessOverviewPage.jsx';
 import RefreshOutcomePage               from './pages/readiness/RefreshOutcomePage.jsx';
 import AttributionMaturityPage          from './pages/readiness/AttributionMaturityPage.jsx';
@@ -360,6 +367,7 @@ export default function App() {
           <Route path="operations/provider-health" element={<BlogSharedEmbed embed="provider-health" />} />
           <Route path="operations/provider-routing" element={<BlogSharedEmbed embed="provider-routing" />} />
           <Route path="operations/audit" element={<BlogSharedEmbed embed="audit" />} />
+          <Route path="operations/work-blocks" element={<BlogWorkBlocksPage />} />
 
           <Route path="settings" element={<Navigate to="portfolio" replace />} />
           <Route path="settings/portfolio" element={<BlogPortfolioSettingsPage />} />
@@ -556,6 +564,10 @@ export default function App() {
         <Route path="/readiness" element={<ReadinessLayout />}>
           <Route index element={<ReadinessOverviewPage />} />
           <Route path="outcomes" element={<RefreshOutcomePage />} />
+          <Route path="recommendations" element={<RefreshRecommendationsPage />} />
+          <Route path="recommendations/:id" element={<RefreshRecommendationDetailPage />} />
+          <Route path="workflows" element={<RefreshWorkflowsPage />} />
+          <Route path="migrations" element={<MigrationStatusPage />} />
           <Route path="attribution" element={<AttributionMaturityPage />} />
           <Route path="security" element={<SecurityStatusPage />} />
           <Route path="operations" element={<OperationsDashboardPage />} />
@@ -567,6 +579,7 @@ export default function App() {
         {/* Phase 6 — Video Content Automation */}
         <Route path="/video" element={<VideoLayout />}>
           <Route index element={<VideoPipelinePage />} />
+          <Route path="pipeline/:uuid" element={<VideoPipelineItemPage />} />
           <Route path="ideas" element={<VideoIdeaBacklogPage />} />
           <Route path="projects" element={<VideoProjectListPage />} />
           <Route path="projects/:id" element={<VideoProjectWorkspacePage />} />
@@ -608,6 +621,7 @@ export default function App() {
         <Route path={ROUTES.CONSOLE_SYNC}      element={<ConsoleSyncPage />} />
         <Route path={ROUTES.WORKER_STATUS}     element={<WorkerStatusPage />} />
         <Route path={ROUTES.JOBS}              element={<JobMonitorPage />} />
+        <Route path={ROUTES.JOB_DETAIL}        element={<JobDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />

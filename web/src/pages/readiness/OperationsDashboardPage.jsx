@@ -120,8 +120,17 @@ export default function OperationsDashboardPage() {
         <p className="muted">Loading…</p>
       ) : (
         <div className="stat-grid mb-4">
-          <StatCard label="Recommendation Backlog" value={summary?.recommendation_backlog ?? 0} />
-          <StatCard label="Active Workflows" value={summary?.active_workflows ?? 0} />
+          {/* Same scopes as the counts (RefreshOperationsService constants). */}
+          <StatCard
+            label="Recommendation Backlog"
+            value={summary?.recommendation_backlog ?? 0}
+            to={drillHref('/readiness/recommendations', { backlog: 1 })}
+          />
+          <StatCard
+            label="Active Workflows"
+            value={summary?.active_workflows ?? 0}
+            to={drillHref('/readiness/workflows', { active: 1 })}
+          />
           <StatCard
             label="Failed Publications"
             value={summary?.failed_publications ?? 0}

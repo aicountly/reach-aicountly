@@ -57,7 +57,69 @@ class JobController extends BaseApiController
         }
         $includePayload = (string) $this->request->getGet('include') === 'payload'
             && ($this->user()['role'] ?? '') === 'super_admin';
-        return $this->ok($this->summarize($row, $includePayload));
+
+        return $this->ok($this->summarize($row, $includePayload) + [
+            'siblings' => $this->siblings($row),
+            'history'  => $this->history($id),
+        ]);
+    }
+
+    /**
+     * Other jobs enqueued by the same request (one click can fan out several),
+     * newest first. Summaries only — same redaction as the list.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function siblings(array $row): array
+    {
+        $requestId = trim((string) ($row['request_id'] ?? ''));
+        if ($requestId === '') {
+            return [];
+        }
+        $rows = \Config\Database::connect()->table('reach_jobs')
+            ->where('request_id', $requestId)
+            ->where('id !=', (int) $row['id'])
+            ->orderBy('id', 'DESC')->limit(50)
+            ->get()->getResultArray();
+
+        return array_map(fn (array $r): array => $this->summarize($r, false), $rows);
+    }
+
+    /**
+     * Audit events about this job (retries, cancels) and those it produced
+     * (reach_audit_logs.job_id). The queue keeps only the latest attempt's
+     * error on the row, so this is the only per-attempt trail there is.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function history(int $id): array
+    {
+        try {
+            $db = \Config\Database::connect();
+            $hasJobId = \App\Libraries\Database\SchemaGuard::hasColumn($db, 'reach_audit_logs', 'job_id');
+            $builder  = $db->table('reach_audit_logs')
+                ->select('id, action, entity_type, entity_id, user_id, old_value, new_value, created_at' . ($hasJobId ? ', job_id, actor_type, reason' : ''))
+                ->groupStart()
+                    ->groupStart()->where('entity_type', 'job')->where('entity_id', $id)->groupEnd();
+            if ($hasJobId) {
+                $builder->orWhere('job_id', $id);
+            }
+            $rows = $builder->groupEnd()->orderBy('id', 'DESC')->limit(100)->get()->getResultArray();
+        } catch (\Throwable $e) {
+            log_message('error', 'JobController::history: ' . $e->getMessage());
+            return [];
+        }
+
+        return array_map(static function (array $r): array {
+            foreach (['old_value', 'new_value'] as $k) {
+                if (isset($r[$k]) && is_string($r[$k])) {
+                    $r[$k] = json_decode($r[$k], true);
+                }
+            }
+            $r['id'] = (int) $r['id'];
+
+            return $r;
+        }, $rows);
     }
 
     public function retry(int $id)

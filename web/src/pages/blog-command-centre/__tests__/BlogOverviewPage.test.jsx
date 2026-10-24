@@ -181,3 +181,22 @@ describe('BlogOverviewPage — metric drill-down', () => {
     expect(screen.queryByRole('link', { name: /failed/ })).not.toBeInTheDocument();
   });
 });
+
+describe('BlogOverviewPage — AI Ops card', () => {
+  beforeEach(() => getOverview.mockReset());
+
+  it('"work blocks queued" opens the work-block list with the same status; zero is plain', async () => {
+    getOverview.mockResolvedValue(overview({ work_blocks: { queued: 3, pending: 0 } }));
+    render();
+    expect(await screen.findByRole('link', { name: 'AI Ops: 3 work blocks queued' })).toHaveAttribute(
+      'href', '/blog-command-centre/operations/work-blocks?status=queued',
+    );
+  });
+
+  it('no link when nothing is queued', async () => {
+    getOverview.mockResolvedValue(overview({ work_blocks: { queued: 0 } }));
+    render();
+    await waitFor(() => expect(screen.getByText('AI Ops')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: /work blocks queued/ })).not.toBeInTheDocument();
+  });
+});

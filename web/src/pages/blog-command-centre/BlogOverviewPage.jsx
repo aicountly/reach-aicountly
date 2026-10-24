@@ -41,6 +41,9 @@ const blogContent = (status) => drillHref(ROUTES.CONTENT, { content_type: 'blog'
 // Deployment counts are blog-only (BlogCommandCentreController::publishingSummary).
 const blogDeployments = (status) => drillHref(ROUTES.BCC_PUBLISHING_DEPLOYMENTS, { status, content_type: 'blog' });
 
+// Lists reach_work_blocks with the overview's own predicate (eligibility_status).
+const workBlocksHref = (status) => drillHref('/blog-command-centre/operations/work-blocks', { status });
+
 function countProviders(map) {
   const entries = Object.entries(map ?? {});
   const configured = entries.filter(([, state]) => state === 'CONFIGURED').length;
@@ -223,7 +226,7 @@ function buildCards(data) {
       metrics: [
         metric('text providers', `${textProviders.configured}/${textProviders.total}`),
         metric('image providers', `${imageProviders.configured}/${imageProviders.total}`),
-        metric('work blocks queued', workBlocks.queued ?? 0),
+        metric('work blocks queued', workBlocks.queued ?? 0, workBlocksHref('queued')),
       ],
     },
   ];

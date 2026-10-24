@@ -43,6 +43,9 @@ describe('operations dashboard drill links', () => {
       'href', '/readiness/security?severity=critical&resolution_status=open%2Cin_progress',
     );
     expect(screen.queryByRole('link', { name: /Open High/ })).not.toBeInTheDocument();
+    // Same scopes the summary counted (RefreshOperationsService).
+    expect(screen.getByRole('link', { name: /Recommendation Backlog: 2/ })).toHaveAttribute('href', '/readiness/recommendations?backlog=1');
+    expect(screen.getByRole('link', { name: /Active Workflows: 1/ })).toHaveAttribute('href', '/readiness/workflows?active=1');
   });
 
   it('job reliability counts open the job monitor for that type over 7 days', async () => {
@@ -62,6 +65,21 @@ describe('readiness lists read their filters from the URL', () => {
     expect(screen.getByLabelText('Resolution status')).toHaveValue('open,in_progress');
   });
 
+  it('security status narrowed by audit type is that area\'s page', async () => {
+    renderWithAuth(<SecurityStatusPage />, { ...ctx, route: '/readiness/security?audit_type=privacy' });
+    await waitFor(() => expect(readiness.listFindings).toHaveBeenCalledWith({ audit_type: 'privacy' }));
+    expect(screen.getByRole('heading', { name: 'Privacy Status' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Audit type')).toHaveValue('privacy');
+  });
+
+  it('refresh outcomes open the window in ?window_id=', async () => {
+    readiness.listRefreshOutcomes.mockResolvedValue([{ id: 9, content_identity_id: 33, measurement_status: 'complete' }]);
+    readiness.getRefreshOutcome.mockResolvedValue({ window: { id: 9, content_identity_id: 33, measurement_status: 'complete' }, metrics: [] });
+    renderWithAuth(<RefreshOutcomePage />, { ...ctx, route: '/readiness/outcomes?window_id=9' });
+    await waitFor(() => expect(readiness.getRefreshOutcome).toHaveBeenCalledWith('9'));
+    expect(await screen.findByText('No observed metrics recorded yet.', { exact: false })).toBeInTheDocument();
+  });
+
   it('refresh outcomes apply measurement_status and content_identity_id', async () => {
     renderWithAuth(<RefreshOutcomePage />, { ...ctx, route: '/readiness/outcomes?measurement_status=pending&content_identity_id=12' });
     await waitFor(() => expect(readiness.listRefreshOutcomes).toHaveBeenCalledWith({ measurement_status: 'pending', content_identity_id: '12' }));
@@ -77,10 +95,12 @@ describe('readiness lists read their filters from the URL', () => {
 });
 
 describe('readiness overview', () => {
-  it('does not link sections that have no route', () => {
+  it('every section card opens its page', () => {
     renderWithAuth(<ReadinessOverviewPage />);
-    expect(screen.queryByRole('link', { name: /Privacy Status/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Refresh Recommendations/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Refresh Recommendations/ })).toHaveAttribute('href', '/readiness/recommendations');
+    expect(screen.getByRole('link', { name: /Privacy Status/ })).toHaveAttribute('href', '/readiness/security?audit_type=privacy');
+    expect(screen.getByRole('link', { name: /AI Governance/ })).toHaveAttribute('href', '/readiness/security?audit_type=ai_governance');
+    expect(screen.getByRole('link', { name: /Migration Status/ })).toHaveAttribute('href', '/readiness/migrations');
     expect(screen.getByRole('link', { name: /Security Status/ })).toHaveAttribute('href', '/readiness/security');
   });
 });

@@ -223,6 +223,7 @@ $routes->group('v1', static function ($routes) {
 
         // Blog Command Centre
         $routes->get('blog-command-centre/overview',                 'BlogCommandCentreController::overview',        ['filter' => 'permission:blog.view']);
+        $routes->get('blog-command-centre/work-blocks',              'BlogCommandCentreController::workBlocks',      ['filter' => 'permission:blog.view']);
         $routes->get('blog-command-centre/settings/portfolio',     'BlogCommandCentreController::getPortfolio',    ['filter' => 'permission:blog.view']);
         $routes->put('blog-command-centre/settings/portfolio',     'BlogCommandCentreController::updatePortfolio', ['filter' => 'permission:blog.edit']);
         $routes->get('blog-command-centre/settings',               'BlogCommandCentreController::getSettings',   ['filter' => 'permission:blog.view']);
@@ -1072,6 +1073,10 @@ $routes->group('v1', static function ($routes) {
         $routes->post('readiness/attribution/models/(:num)/activate',        'Api\\V1\\Refresh\\AttributionModelController::activate/$1',         ['filter' => 'permission:attribution_model.approve']);
 
         // Phase 9: Refresh outcomes (observational post-refresh changes)
+        $routes->get('readiness/recommendations',                            'Api\\V1\\Refresh\\RefreshRecommendationController::index',         ['filter' => 'permission:refresh.read']);
+        $routes->get('readiness/recommendations/(:num)',                     'Api\\V1\\Refresh\\RefreshRecommendationController::show/$1',       ['filter' => 'permission:refresh.read']);
+        $routes->get('readiness/workflows',                                  'Api\\V1\\Refresh\\RefreshRecommendationController::workflows',     ['filter' => 'permission:refresh.read']);
+        $routes->get('readiness/migrations',                                 'Api\\V1\\Readiness\\MigrationStatusController::index',             ['filter' => 'permission:readiness.read']);
         $routes->get('readiness/outcomes',                                   'Api\\V1\\Refresh\\RefreshOutcomeController::index',                 ['filter' => 'permission:refresh_outcome.read']);
         $routes->get('readiness/outcomes/(:num)',                            'Api\\V1\\Refresh\\RefreshOutcomeController::show/$1',               ['filter' => 'permission:refresh_outcome.read']);
         $routes->post('readiness/outcomes/(:num)/measure',                   'Api\\V1\\Refresh\\RefreshOutcomeController::measure/$1',            ['filter' => 'permission:refresh_outcome.trigger']);

@@ -13,6 +13,9 @@ class FindingsController extends BaseApiController
 {
     private const SEVERITIES          = ['critical', 'high', 'medium', 'low', 'info'];
     private const RESOLUTION_STATUSES = ['open', 'in_progress', 'resolved', 'accepted_risk', 'deferred'];
+    // reach_readiness_audit_runs.audit_type — the readiness overview's Privacy /
+    // AI Governance / Migration cards list the findings of their audit type.
+    private const AUDIT_TYPES         = ['security', 'privacy', 'ai_governance', 'migration', 'performance', 'operational', 'dr'];
 
     public function index(): ResponseInterface
     {
@@ -25,6 +28,7 @@ class FindingsController extends BaseApiController
             $model    = new ReadinessFindingModel();
             $status   = $this->listParam('resolution_status', self::RESOLUTION_STATUSES);
             $severity = $this->listParam('severity', self::SEVERITIES);
+            $types    = $this->listParam('audit_type', self::AUDIT_TYPES);
 
             // Comma lists so the dashboard's "open critical" count (open +
             // in_progress, see getOpenBlockers) links to the same rows.
@@ -33,6 +37,9 @@ class FindingsController extends BaseApiController
             }
             if ($severity !== []) {
                 $model->whereIn('severity', $severity);
+            }
+            if ($types !== []) {
+                $model->whereIn('audit_run_id', static fn ($q) => $q->select('id')->from('reach_readiness_audit_runs')->whereIn('audit_type', $types));
             }
 
             $rows = $model->orderBy('id', 'DESC')->findAll(200);

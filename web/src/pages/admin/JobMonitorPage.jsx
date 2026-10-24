@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RefreshCw, RotateCcw, XCircle } from 'lucide-react';
 import { jobService } from '../../services/jobService';
 import { Card } from '../../components/common/Card';
@@ -11,6 +11,7 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { Pagination } from '../../components/common/Pagination';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDateTime } from '../../utils/formatDate';
+import { ROUTES } from '../../constants/routes';
 
 const STATUS_OPTIONS = ['', 'pending', 'processing', 'completed', 'skipped', 'dead_letter,failed', 'dead_letter', 'failed', 'cancelled'];
 
@@ -59,6 +60,7 @@ export function JobMonitorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [notice, setNotice]   = useState(null);
+  const navigate = useNavigate();
   const { has } = usePermission();
   const canRetry  = has('job.retry');
   const canCancel = has('job.cancel');
@@ -110,8 +112,9 @@ export function JobMonitorPage() {
         {r.error_message.length > 60 ? r.error_message.slice(0, 60) + '…' : r.error_message}
       </span>
     ) : '—' },
+    // The buttons act on the row; they must not also open it.
     { key: 'actions', label: '', render: (r) => (
-      <div className="flex gap-2">
+      <div className="flex gap-2" onClick={(e) => e.stopPropagation()} role="presentation">
         {canRetry && ['failed', 'dead_letter', 'cancelled', 'skipped'].includes(r.status) && (
           <button className="btn btn-secondary btn-sm" onClick={() => retryJob(r.id)}>
             <RotateCcw size={12} /> Retry
@@ -197,7 +200,13 @@ export function JobMonitorPage() {
 
       {loading ? <Loader /> : (
         <Card padding={false}>
-          <DataTable columns={columns} rows={rows} emptyMessage="No jobs match the current filter." />
+          <DataTable
+            columns={columns}
+            rows={rows}
+            onRowClick={(r) => navigate(`${ROUTES.JOBS}/${r.id}`)}
+            rowLabel={(r) => `Open job ${r.id}`}
+            emptyMessage="No jobs match the current filter."
+          />
         </Card>
       )}
       <Pagination page={page} limit={limit} total={total} onPage={setPage} />
