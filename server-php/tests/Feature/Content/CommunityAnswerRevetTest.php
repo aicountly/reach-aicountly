@@ -466,6 +466,16 @@ final class CommunityAnswerRevetTest extends ApiTestCase
         $id   = (int) $this->answerRow($live['answer_id'])['id'];
         $repair = new \App\Libraries\Community\Automation\CommunityRevetRepairService(null, $this->publisher);
 
+        // The Job monitor's Retry on that deployment's retry job names the way out.
+        $deployment = $this->db()->table('reach_community_deployments')->where('answer_id', $id)->orderBy('id', 'DESC')->get()->getRowArray();
+        try {
+            (new OfficialAnswerPublishingService())->retryDeployment($deployment);
+            $this->fail('a dead-lettered deployment was retried');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString("status 'dead_letter' and cannot be retried", $e->getMessage());
+            $this->assertStringContainsString("community:revet-repair --answer-ids={$id} --apply", $e->getMessage());
+        }
+
         $this->assertSame([$id], $repair->affectedAnswerIds());
         $dry = $repair->run([], false);
         $this->assertTrue($dry['dry_run']);
@@ -497,6 +507,15 @@ final class CommunityAnswerRevetTest extends ApiTestCase
         $this->assertSame('corrected', $report['items'][0]['action'], json_encode($report['items'][0]));
         $this->assertStringContainsString('time of supply', (string) $this->publisher->liveBody($live['answer_id']));
         $this->assertStringContainsString('confirm with your CA', (string) $this->publisher->liveBody($other['answer_id']));
+
+        // The old dead-lettered deployment's retry job now says there is nothing left to do.
+        try {
+            (new OfficialAnswerPublishingService())->retryDeployment($deployment);
+            $this->fail('a dead-lettered deployment was retried');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString("Nothing to redo: answer #{$id} was published since by deployment #", $e->getMessage());
+            $this->assertStringNotContainsString('revet-repair', $e->getMessage());
+        }
     }
 
     // ---------------------------------------------------------------- helpers
