@@ -969,6 +969,9 @@ $routes->group('v1', static function ($routes) {
         $routes->get('seo/tracked-keywords/(:num)/history', 'Api\\V1\\Intelligence\\SeoCommandCentreController::keywordHistory/$1', ['filter' => 'permission:seo.view']);
         $routes->get('seo/backlinks',             'Api\\V1\\Intelligence\\SeoCommandCentreController::backlinks',          ['filter' => 'permission:seo.view']);
         $routes->get('seo/indexnow/submissions',  'Api\\V1\\Intelligence\\SeoCommandCentreController::indexnowSubmissions', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/indexnow/submissions/(:num)', 'Api\\V1\\Intelligence\\SeoCommandCentreController::indexnowSubmission/$1', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/backlinks/(:num)',      'Api\\V1\\Intelligence\\SeoCommandCentreController::backlinkSnapshot/$1', ['filter' => 'permission:seo.view']);
+        $routes->get('seo/indexing',              'Api\\V1\\Intelligence\\SeoCommandCentreController::indexing',           ['filter' => 'permission:seo.view']);
         $routes->get('seo/suggestions',           'Api\\V1\\Intelligence\\SeoCommandCentreController::suggestions',        ['filter' => 'permission:seo.view']);
 
         // Phase 8: Search Console
@@ -1026,6 +1029,7 @@ $routes->group('v1', static function ($routes) {
         $routes->post('intelligence/visibility/prompts/(:num)/versions/(:num)/approve', 'Api\\V1\\Intelligence\\VisibilityController::approveVersion/$1/$2', ['filter' => 'permission:visibility.review']);
         $routes->post('intelligence/visibility/runs',                        'Api\\V1\\Intelligence\\VisibilityController::queueRun',              ['filter' => 'permission:visibility.execute']);
         $routes->get('intelligence/visibility/runs',                         'Api\\V1\\Intelligence\\VisibilityController::runs',                  ['filter' => 'permission:visibility.read']);
+        $routes->get('intelligence/visibility/runs/(:num)',                  'Api\\V1\\Intelligence\\VisibilityController::run/$1',                ['filter' => 'permission:visibility.read']);
         $routes->get('intelligence/visibility/observations',                 'Api\\V1\\Intelligence\\VisibilityController::observations',          ['filter' => 'permission:visibility.read']);
         // Stream H: real AI-visibility execution + share of voice, and AI Insights
         $routes->put('intelligence/visibility/prompts/(:num)',               'Api\\V1\\Intelligence\\VisibilityController::updatePrompt/$1',       ['filter' => 'permission:visibility.manage']);

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Eye, Play, CheckCircle, XCircle } from 'lucide-react';
 import { getVisibilitySummary, listVisibilityAnswers, runVisibilityBatch } from '../../services/growthIntelService.js';
 import { usePermission } from '../../hooks/usePermission';
 import { formatDateTime } from '../../utils/formatDate';
 import ShareOfVoiceChart from './ShareOfVoiceChart.jsx';
-import { DrillLink, useDrillFilters } from '../../components/drill';
-
-const pct = (v) => (v == null ? '—' : `${Math.round(Number(v) * 1000) / 10}%`);
-const PROVIDER_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (OpenAI API)', perplexity: 'Perplexity' };
+import { DrillLink, drillHref, useDrillFilters, useUrlFilter } from '../../components/drill';
+import { OBSERVATIONS, PROVIDER_LABEL, RUNS, pct } from './visibilityLabels';
 
 /**
  * AI Visibility (GEO): how often AI assistants name AICOUNTLY for the buyer
@@ -16,7 +15,13 @@ const PROVIDER_LABEL = { gemini: 'Gemini', openai: 'ChatGPT (OpenAI API)', perpl
  */
 export default function VisibilityOverviewPage() {
   const { has } = usePermission();
-  const [days, setDays] = useState(28);
+  // The period is in the URL too, and every count links to the run list
+  // with the same days + facet, so the list shows exactly what was counted.
+  const [daysParam, setDaysParam] = useUrlFilter('days', '28');
+  const days = Number(daysParam) || 28;
+  const runs = (filter) => drillHref(RUNS, { days, ...filter });
+  const answered = (filter) => runs({ status: 'completed', ...filter });
+  const linkIf = (n, href) => (Number(n) > 0 ? href : undefined);
   const [summary, setSummary] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [provider, setProvider] = useState(null);
@@ -90,7 +95,7 @@ export default function VisibilityOverviewPage() {
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-muted" htmlFor="vis-days">Period</label>
-          <select id="vis-days" className="form-select form-select--sm" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          <select id="vis-days" className="form-select form-select--sm" value={days} onChange={(e) => setDaysParam(e.target.value)}>
             <option value={7}>Last 7 days</option>
             <option value={28}>Last 28 days</option>
             <option value={90}>Last 90 days</option>
@@ -140,16 +145,21 @@ export default function VisibilityOverviewPage() {
 
       <div className="grid grid-4 mb-3">
         {[
-          ['Answers analysed', overall ? String(overall.answers) : '—'],
-          [`${brand} mention rate`, overall ? pct(overall.brand_mention_rate) : '—'],
-          ['Average rank when listed', overall?.brand_avg_rank != null ? `#${overall.brand_avg_rank}` : '—'],
-          [`Answers citing ${brand.toLowerCase()}.com`, overall ? String(overall.brand_cited) : '—'],
-        ].map(([label, value]) => (
-          <div key={label} className="stat-tile" style={{ textAlign: 'center' }}>
-            <div className="stat-tile__value">{loading && !summary ? '…' : value}</div>
-            <div className="stat-tile__label">{label}</div>
-          </div>
-        ))}
+          ['Answers analysed', overall ? String(overall.answers) : '—', linkIf(overall?.answers, answered({}))],
+          [`${brand} mention rate`, overall ? pct(overall.brand_mention_rate) : '—', linkIf(overall?.brand_mentions, runs({ brand: 'named' }))],
+          ['Average rank when listed', overall?.brand_avg_rank != null ? `#${overall.brand_avg_rank}` : '—', linkIf(overall?.brand_avg_rank != null ? overall.brand_mentions : 0, runs({ brand: 'named' }))],
+          [`Answers citing ${brand.toLowerCase()}.com`, overall ? String(overall.brand_cited) : '—', linkIf(overall?.brand_cited, runs({ brand: 'cited' }))],
+        ].map(([label, value, to]) => {
+          const body = (
+            <>
+              <div className="stat-tile__value">{loading && !summary ? '…' : value}</div>
+              <div className="stat-tile__label">{label}</div>
+            </>
+          );
+          return to
+            ? <Link key={label} to={to} className="stat-tile" style={{ textAlign: 'center', textDecoration: 'none', color: 'inherit' }} aria-label={`${label}: ${value}`}>{body}</Link>
+            : <div key={label} className="stat-tile" style={{ textAlign: 'center' }}>{body}</div>;
+        })}
       </div>
 
       <div className="card mb-3">
@@ -188,16 +198,30 @@ export default function VisibilityOverviewPage() {
                     const [topName, top] = Object.entries(p.entities ?? {}).find(([n]) => n !== brand) ?? [];
                     return (
                       <tr key={p.provider}>
-                        <td>{PROVIDER_LABEL[p.provider] || p.provider}</td>
                         <td>
                           <DrillLink onClick={p.answers > 0 ? () => showAnswers({ provider: p.provider }) : undefined}
-                                     title="Show these answers">
+                                     title="Show this assistant's latest answers below">
+                            {PROVIDER_LABEL[p.provider] || p.provider}
+                          </DrillLink>
+                        </td>
+                        <td>
+                          <DrillLink to={linkIf(p.answers, answered({ provider: p.provider }))} title="These answers">
                             {p.answers}
                           </DrillLink>
                         </td>
-                        <td>{pct(p.brand_mention_rate)}</td>
+                        <td>
+                          <DrillLink to={linkIf(p.brand_mentions, runs({ provider: p.provider, brand: 'named' }))} title={`Answers naming ${brand}`}>
+                            {pct(p.brand_mention_rate)}
+                          </DrillLink>
+                        </td>
                         <td>{p.brand_avg_rank != null ? `#${p.brand_avg_rank}` : '—'}</td>
-                        <td>{topName ? `${topName} (${pct(top.mention_rate)})` : '—'}</td>
+                        <td>
+                          {topName ? (
+                            <DrillLink to={linkIf(top.mentions, runs({ provider: p.provider, entity: topName }))} title={`Answers naming ${topName}`}>
+                              {`${topName} (${pct(top.mention_rate)})`}
+                            </DrillLink>
+                          ) : '—'}
+                        </td>
                       </tr>
                     );
                   })}
@@ -216,8 +240,13 @@ export default function VisibilityOverviewPage() {
                   {competitors.length === 0 && <tr><td colSpan={5} className="text-sm text-muted">No tracked names mentioned yet.</td></tr>}
                   {competitors.map(([name, e]) => (
                     <tr key={name} style={name === brand ? { fontWeight: 700 } : undefined}>
-                      <td>{name}</td>
-                      <td>{e.mentions}</td>
+                      <td>
+                        <DrillLink to={linkIf(e.mentions, drillHref(OBSERVATIONS, { entity: name, coverage_state: 'mentioned', counted: 1, days }))}
+                                   title="The observations behind this name">
+                          {name}
+                        </DrillLink>
+                      </td>
+                      <td><DrillLink to={linkIf(e.mentions, runs({ entity: name }))} title={`Answers naming ${name}`}>{e.mentions}</DrillLink></td>
                       <td>{pct(e.mention_rate)}</td>
                       <td>{pct(e.share_of_voice)}</td>
                       <td>{e.avg_rank != null ? `#${e.avg_rank}` : '—'}</td>
@@ -240,16 +269,28 @@ export default function VisibilityOverviewPage() {
                 {(summary?.gaps ?? []).length === 0 && <tr><td colSpan={4} className="text-sm text-muted">No gaps recorded in this period.</td></tr>}
                 {(summary?.gaps ?? []).map((g) => (
                   <tr key={g.prompt_id}>
-                    <td>{g.question}</td>
+                    <td>
+                      <DrillLink onClick={() => showAnswers({ prompt_id: g.prompt_id, provider: '' })} title="Show the latest answers for this question below">
+                        {g.question}
+                      </DrillLink>
+                    </td>
                     <td>{g.market || '—'}</td>
                     <td>
-                      <DrillLink onClick={g.answers_without_us > 0 ? () => showAnswers({ prompt_id: g.prompt_id, provider: '' }) : undefined}
-                                 title="Show the answers for this question">
+                      <DrillLink to={linkIf(g.answers_without_us, runs({ gap: 1, prompt_id: g.prompt_id }))} title="The answers that named competitors but not us">
                         {g.answers_without_us}
                       </DrillLink>
                       {' '}({g.providers.map((p) => PROVIDER_LABEL[p] || p).join(', ')})
                     </td>
-                    <td>{g.competitors.slice(0, 4).map((c) => `${c.name} ×${c.answers}`).join(', ')}</td>
+                    <td>
+                      {g.competitors.slice(0, 4).map((c, i) => (
+                        <span key={c.name}>
+                          {i > 0 && ', '}
+                          <DrillLink to={linkIf(c.answers, runs({ gap: 1, prompt_id: g.prompt_id, entity: c.name }))} title={`Gap answers naming ${c.name}`}>
+                            {`${c.name} ×${c.answers}`}
+                          </DrillLink>
+                        </span>
+                      ))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -267,7 +308,17 @@ export default function VisibilityOverviewPage() {
               <tbody>
                 {(summary?.by_market ?? []).length === 0 && <tr><td colSpan={4} className="text-sm text-muted">No answers yet.</td></tr>}
                 {(summary?.by_market ?? []).map((m) => (
-                  <tr key={m.market}><td>{m.market}</td><td>{m.answers}</td><td>{pct(m.brand_mention_rate)}</td><td>{m.top_entities.slice(0, 3).join(', ') || '—'}</td></tr>
+                  <tr key={m.market}>
+                    <td>{m.market}</td>
+                    <td><DrillLink to={linkIf(m.answers, answered({ market: m.market }))} title={`Answers for ${m.market}`}>{m.answers}</DrillLink></td>
+                    <td><DrillLink to={linkIf(m.brand_mentions, runs({ market: m.market, brand: 'named' }))} title={`${m.market} answers naming ${brand}`}>{pct(m.brand_mention_rate)}</DrillLink></td>
+                    <td>
+                      {m.top_entities.slice(0, 3).map((n, i) => (
+                        <span key={n}>{i > 0 && ', '}<DrillLink to={runs({ market: m.market, entity: n })} title={`${m.market} answers naming ${n}`}>{n}</DrillLink></span>
+                      ))}
+                      {m.top_entities.length === 0 && '—'}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -281,7 +332,10 @@ export default function VisibilityOverviewPage() {
               <tbody>
                 {(summary?.top_cited_domains ?? []).length === 0 && <tr><td colSpan={2} className="text-sm text-muted">No cited sources yet.</td></tr>}
                 {(summary?.top_cited_domains ?? []).map((d) => (
-                  <tr key={d.domain}><td>{d.domain}</td><td>{d.answers}</td></tr>
+                  <tr key={d.domain}>
+                    <td><a href={`https://${d.domain}`} target="_blank" rel="noreferrer">{d.domain}</a></td>
+                    <td><DrillLink to={linkIf(d.answers, runs({ cited_domain: d.domain }))} title={`Answers citing ${d.domain}`}>{d.answers}</DrillLink></td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -292,6 +346,7 @@ export default function VisibilityOverviewPage() {
       <div className="card" id="latest-answers">
         <div className="card-header flex items-center gap-2 flex-wrap">
           <span>Latest answers</span>
+          <Link to={drillHref(RUNS, { provider: answerProvider, prompt_id: answerPrompt })} className="text-sm">All matching answers ›</Link>
           {answerProvider && (
             <button type="button" className="badge badge-secondary" onClick={() => answerFilter.clear('provider')}
                     aria-label={`Clear assistant ${answerProvider} filter`}>
@@ -332,7 +387,9 @@ export default function VisibilityOverviewPage() {
                 {a.citations?.length > 0 && (
                   <p className="text-xs text-muted">Sources: {a.citations.slice(0, 8).map((c) => c.domain || c.url).join(', ')}</p>
                 )}
-                <p className="text-xs text-muted">Model: {a.model} · Market: {a.market || '—'}</p>
+                <p className="text-xs text-muted">
+                  Model: {a.model} · Market: {a.market || '—'} · <Link to={`${RUNS}/${a.run_id}`}>Open answer ›</Link>
+                </p>
               </div>
             </details>
           ))}

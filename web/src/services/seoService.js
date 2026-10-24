@@ -15,4 +15,13 @@ export const seoService = {
   runTracker:          (body)   => api.post('v1/seo/tracker/run', body),
   createTrackedKeyword:(body)   => api.post('v1/seo/tracker/keywords', body),
   updateTrackedKeyword:(id, b)  => api.put(`v1/seo/tracker/keywords/${id}`, b),
+  // Records behind the SEO Command Centre counts.
+  getOverview:            ()           => api.get('v1/seo/overview'),
+  listBacklinkSnapshots:  ()           => api.get('v1/seo/backlinks'),
+  getBacklinkSnapshot:    (id, params) => api.get(`v1/seo/backlinks/${id}`, params),
+  listIndexNowSubmissions:(params)     => api.get('v1/seo/indexnow/submissions', params),
+  getIndexNowSubmission:  (id)         => api.get(`v1/seo/indexnow/submissions/${id}`),
+  listBlogIndexing:       (params)     => api.get('v1/seo/indexing', params),
+  // Sitemap entries answer { data, count, meta } — keep the envelope for meta.
+  listSitemapEntries:     (snapshotId, params) => api.getPage(`v1/intelligence/sitemap/${snapshotId}/entries`, params),
 };

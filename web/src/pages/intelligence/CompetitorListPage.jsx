@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users2, Plus, X } from 'lucide-react';
 import { listCompetitors, createCompetitor } from '../../services/intelligenceService.js';
+import { DrillLink, drillHref } from '../../components/drill';
 
 const EMPTY_FORM = {
   name: '',
@@ -16,6 +18,7 @@ function normalizeList(payload) {
 }
 
 export default function CompetitorListPage() {
+  const navigate = useNavigate();
   const [competitors, setCompetitors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -187,7 +190,7 @@ export default function CompetitorListPage() {
                 <th>Competitor</th>
                 <th>Domain</th>
                 <th>Category</th>
-                <th style={{ textAlign: 'right' }}>Sample Mention Rate</th>
+                <th style={{ textAlign: 'right' }}>Sample Mention Rate{competitors[0]?.rate_days ? ` (${competitors[0].rate_days}d)` : ''}</th>
                 <th style={{ textAlign: 'center' }}>Status</th>
               </tr>
             </thead>
@@ -198,14 +201,21 @@ export default function CompetitorListPage() {
                 const domain = c.website_domain || c.domain || '—';
                 const category = (c.category || 'general').replace(/_/g, ' ');
                 return (
-                  <tr key={c.id || c.uuid || c.name}>
+                  <tr key={c.id || c.uuid || c.name} className="is-drillable" tabIndex={0}
+                      aria-label={`Open competitor ${c.name}`}
+                      onClick={() => navigate(`/intelligence/competitors/${c.id}`)}
+                      onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === 'Enter') navigate(`/intelligence/competitors/${c.id}`); }}>
                     <td style={{ fontWeight: 600 }}>{c.name}</td>
                     <td className="text-sm text-muted" style={{ fontFamily: 'var(--font-mono, monospace)' }}>
                       {domain}
                     </td>
                     <td className="text-sm">{category}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {rate == null ? '—' : `${(rate * 100).toFixed(0)}%`}
+                      {/* The answers that named it — the rate's numerator. */}
+                      <DrillLink to={rate != null && c.mentions > 0 ? drillHref(`/intelligence/competitors/${c.id}`, { days: c.rate_days }) : undefined}
+                                 title={rate != null ? `${c.mentions} of ${c.answers} answers` : undefined}>
+                        {rate == null ? '—' : `${(rate * 100).toFixed(0)}%`}
+                      </DrillLink>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`badge ${status === 'active' ? 'badge--success' : 'badge--muted'}`}>

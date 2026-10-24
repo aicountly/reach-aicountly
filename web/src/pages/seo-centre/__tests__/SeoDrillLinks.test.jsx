@@ -76,7 +76,7 @@ describe('SEO centre links', () => {
     api.get.mockResolvedValue({ search_28d: { clicks: 12, impressions: 0 }, visibility_28d: { runs: 4 }, connections: { search_console: true } });
     renderWithAuth(<SeoOverviewPage />);
     expect(await screen.findByRole('link', { name: /Clicks \(28d\): 12/ })).toHaveAttribute('href', '/seo-centre/search?by=query&sort=clicks');
-    expect(screen.getByRole('link', { name: /AI visibility runs \(28d\): 4/ })).toHaveAttribute('href', '/intelligence/visibility');
+    expect(screen.getByRole('link', { name: /AI visibility runs \(28d\): 4/ })).toHaveAttribute('href', '/intelligence/visibility/runs?days=28');
     expect(screen.queryByRole('link', { name: /Impressions/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /All snapshots/ })).toHaveAttribute('href', '/seo-centre/backlinks');
   });

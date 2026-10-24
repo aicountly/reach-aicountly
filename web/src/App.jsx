@@ -173,6 +173,13 @@ import SitemapOverviewPage              from './pages/intelligence/SitemapOvervi
 import IndexNowOperationsPage           from './pages/intelligence/IndexNowOperationsPage.jsx';
 import AttributionOverviewPage          from './pages/intelligence/AttributionOverviewPage.jsx';
 import UtmTemplatesPage                 from './pages/intelligence/UtmTemplatesPage.jsx';
+import { BacklinkSnapshotPage } from './pages/seo-centre/BacklinkSnapshotPage.jsx';
+import { BlogIndexingPage } from './pages/seo-centre/BlogIndexingPage.jsx';
+import { IndexNowSubmissionsPage } from './pages/seo-centre/IndexNowSubmissionsPage.jsx';
+import { IndexNowSubmissionDetailPage } from './pages/seo-centre/IndexNowSubmissionDetailPage.jsx';
+import { SitemapEntriesPage } from './pages/seo-centre/SitemapEntriesPage.jsx';
+import VisibilityRunDetailPage from './pages/intelligence/VisibilityRunDetailPage.jsx';
+import CompetitorDetailPage from './pages/intelligence/CompetitorDetailPage.jsx';
 import UnattributedLeadsPage            from './pages/intelligence/UnattributedLeadsPage.jsx';
 import AttributionConversionsPage       from './pages/intelligence/AttributionConversionsPage.jsx';
 import VisibilityOverviewPage           from './pages/intelligence/VisibilityOverviewPage.jsx';
@@ -534,9 +541,11 @@ export default function App() {
           <Route path="visibility" element={<VisibilityOverviewPage />} />
           <Route path="visibility/prompts" element={<VisibilityPromptLibraryPage />} />
           <Route path="visibility/runs" element={<VisibilityRunHistoryPage />} />
+          <Route path="visibility/runs/:id" element={<VisibilityRunDetailPage />} />
           <Route path="visibility/observations" element={<VisibilityObservationsPage />} />
           <Route path="insights" element={<AiInsightsPage />} />
           <Route path="competitors" element={<CompetitorListPage />} />
+          <Route path="competitors/:id" element={<CompetitorDetailPage />} />
           <Route path="connectors" element={<ConnectorConfigPage />} />
           <Route path="operations" element={<IntelligenceOperationsPage />} />
         </Route>
@@ -577,10 +586,15 @@ export default function App() {
           <Route path="tracker" element={<SeoTrackerPage />} />
           <Route path="keywords" element={<TrackedKeywordsPage />} />
           <Route path="backlinks" element={<BacklinksPage />} />
+          <Route path="backlinks/:id" element={<BacklinkSnapshotPage />} />
+          <Route path="indexing" element={<BlogIndexingPage />} />
           <Route path="suggestions" element={<SeoSuggestionsPage />} />
           <Route path="search" element={<SearchIntelligencePage />} />
           <Route path="indexnow" element={<IndexNowOperationsPage />} />
+          <Route path="indexnow/submissions" element={<IndexNowSubmissionsPage />} />
+          <Route path="indexnow/submissions/:id" element={<IndexNowSubmissionDetailPage />} />
           <Route path="sitemap" element={<SitemapOverviewPage />} />
+          <Route path="sitemap/:snapshotId/entries" element={<SitemapEntriesPage />} />
           <Route path="connections" element={<ConnectorConfigPage />} />
         </Route>
 
