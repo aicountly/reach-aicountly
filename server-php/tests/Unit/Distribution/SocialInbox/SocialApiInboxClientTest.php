@@ -69,10 +69,10 @@ final class SocialApiInboxClientTest extends CIUnitTestCase
     public function testAReplyIsAcceptedOnlyOnA2xxAndNeverRetried(): void
     {
         $http = (new FakeHttpTransport())->on('POST', '#/v1/inbox/comments/cmt%2F1/reply$#', FakeHttpTransport::json(201, ['data' => ['id' => 'rep_9']]));
-        $r = $this->client($http)->replyToInboxItem('cmt/1', 'Thanks! — AICOUNTLY team', SocialApiAiClient::INBOX_REPLY_PATH, 'reach-social-inbox:7');
+        $r = $this->client($http)->replyToInboxItem('cmt/1', 'Thanks! — Aicountly team', SocialApiAiClient::INBOX_REPLY_PATH, 'reach-social-inbox:7');
         $this->assertTrue($r['accepted']);
         $this->assertSame('rep_9', $r['reply_id']);
-        $this->assertSame(['text' => 'Thanks! — AICOUNTLY team'], json_decode((string) $http->requests[0]['body'], true));
+        $this->assertSame(['text' => 'Thanks! — Aicountly team'], json_decode((string) $http->requests[0]['body'], true));
         $this->assertSame(40, strlen($http->requests[0]['headers']['Idempotency-Key']));
 
         $refused = $this->client((new FakeHttpTransport())->on('POST', '#reply#', FakeHttpTransport::json(422, ['error' => ['code' => 'platform.comment_closed', 'message' => 'Comments are closed']])))->replyToInboxItem('c', 't');

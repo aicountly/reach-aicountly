@@ -7,7 +7,7 @@ import {
 } from '../context/AuthContext';
 import { consoleLoginUrl } from '../services/consoleAuth';
 
-const APP_NAME = import.meta.env.VITE_APP_NAME || 'AICOUNTLY Reach';
+const APP_NAME = import.meta.env.VITE_APP_NAME || 'Aicountly Reach';
 
 export default function ControllerGate() {
   const { gateReason, gateMessage, retryAuth, ssoPending } = useAuth();

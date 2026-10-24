@@ -16,7 +16,7 @@ use Config\Database;
  * Cover for a vetted routine blog — CoverSelectionService's rule: a relevant,
  * preferably unused gallery cover first; otherwise a fresh GPT Image cover
  * (`ai.image.model`) drawn from the article's own title, summary and headings,
- * branded with the AICOUNTLY mark and added to the gallery. Either way the
+ * branded with the Aicountly mark and added to the gallery. Either way the
  * profile gets the image and descriptive alt text. Generation is gated by
  * automation.blog.ai_cover (BLOG_IMAGE_GENERATION_ENABLED kill switch).
  */

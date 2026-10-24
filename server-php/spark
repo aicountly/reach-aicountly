@@ -2,7 +2,7 @@
 <?php
 
 /**
- * AICOUNTLY Reach Portal — CodeIgniter 4.6 CLI (spark).
+ * Aicountly Reach Portal — CodeIgniter 4.6 CLI (spark).
  * Layout: project root = api/ on cPanel (no public/ subfolder).
  */
 

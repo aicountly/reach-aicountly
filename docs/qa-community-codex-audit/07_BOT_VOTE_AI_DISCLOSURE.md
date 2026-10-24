@@ -19,7 +19,7 @@ and asserts the guard rejects the former and allows the latter.
 
 `community/question.php` disclosure precedence: identity's own `ai_disclosure`
 column (seeded per-identity in migration `008`) → identity's
-`disclosure_template` → canonical fallback string `AI-assisted AICOUNTLY
+`disclosure_template` → canonical fallback string `AI-assisted Aicountly
 community contributor`. `CommunityRepository::getPublishedOfficialAnswersForPost`
 now selects `ci.ai_disclosure`, `ci.operational_role`, `ci.avatar_url` so the
 page has the real per-identity text instead of only a generic constant.

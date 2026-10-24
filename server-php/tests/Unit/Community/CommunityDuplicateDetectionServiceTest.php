@@ -32,7 +32,7 @@ final class CommunityDuplicateDetectionServiceTest extends TestCase
 
     public function testCompletelyDifferentTitlesAreNotSimilar(): void
     {
-        $this->assertFalse($this->isSimilarTitle('How to file GST return?', 'What is AICOUNTLY pricing?'));
+        $this->assertFalse($this->isSimilarTitle('How to file GST return?', 'What is Aicountly pricing?'));
     }
 
     public function testNearlyIdenticalTitlesAreSimilar(): void

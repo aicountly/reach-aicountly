@@ -766,12 +766,12 @@ class CommunityQaAutomationService
             'country'           => 'India',
             'category'          => $sub['category_slug'],
             'asked_by'          => $member
-                ? 'A member of the AICOUNTLY community. Keep their question in their own words (light grammar fixes and removing personal data only).'
-                : 'The AICOUNTLY desk itself: an official FAQ post written for small businesses and accountants in India.',
-            'answering_desk'    => (string) ($answer['identity_name'] ?? $answer['identity_slug'] ?? 'AICOUNTLY desk'),
+                ? 'A member of the Aicountly community. Keep their question in their own words (light grammar fixes and removing personal data only).'
+                : 'The Aicountly desk itself: an official FAQ post written for small businesses and accountants in India.',
+            'answering_desk'    => (string) ($answer['identity_name'] ?? $answer['identity_slug'] ?? 'Aicountly desk'),
             'risk_tier'         => $tier->value . ' — ' . $tier->label(),
             'product'           => $this->productFacts($sub['product_slug'] ?? null),
-            'publication'       => 'Published on aicountly.com/community under the desk, labelled "AI-assisted · AICOUNTLY Desk". No person reviews it after you.',
+            'publication'       => 'Published on aicountly.com/community under the desk, labelled "AI-assisted · Aicountly Desk". No person reviews it after you.',
             'allowed_html_tags' => config(\Config\ContentSanitization::class)->allowedTags,
         ] + $this->replacesContext($sub);
     }

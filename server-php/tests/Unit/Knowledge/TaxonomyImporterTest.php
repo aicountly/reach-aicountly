@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Knowledge;
 
+use App\Libraries\Automation\Structured\ProductCatalog;
 use App\Libraries\KnowledgeTaxonomyImporter;
 use App\Libraries\SaasProductTaxonomy;
 use App\Models\Knowledge\ProductModel;
@@ -25,7 +26,7 @@ final class TaxonomyImporterTest extends TestCase
         $importer = new KnowledgeTaxonomyImporter($productModel, $aliasModel);
         $result   = $importer->run(null);
 
-        $expectedCount = count(SaasProductTaxonomy::products());
+        $expectedCount = count(SaasProductTaxonomy::products()) + count(ProductCatalog::ACADEMY);
         $this->assertCount($expectedCount, $result['created'],
             'Every product slug should be created on first run');
         // Product errors (not alias errors) must be absent
@@ -166,6 +167,30 @@ final class TaxonomyImporterTest extends TestCase
             'Everything created on first run should be skipped on second run');
     }
 
+    /**
+     * Aicountly Academy, Edge and Aspire are imported from ProductCatalog —
+     * not from the SaaS list — with their public page and a summary, and land
+     * in needs_review like every other import.
+     */
+    public function testAcademyCoursesAreImportedWithTheirPublicPages(): void
+    {
+        $store = [];
+        [$productModel, $aliasModel] = $this->makeStatefulModels($store);
+        (new KnowledgeTaxonomyImporter($productModel, $aliasModel))->run(null);
+
+        $this->assertSame('Aicountly Academy', $store['academy']['name']);
+        $this->assertSame('https://www.aicountly.com/academy', $store['academy']['public_url']);
+        $this->assertSame('https://www.aicountly.com/edge', $store['edge']['public_url']);
+        $this->assertSame('https://www.aicountly.com/aspire', $store['aspire']['public_url']);
+        $this->assertStringContainsString('6–12 month', (string) $store['edge']['short_description']);
+        $this->assertSame('needs_review', $store['aspire']['status']);
+        $this->assertStringContainsString('ProductCatalog::academy()', $store['edge']['legacy_code_path']);
+        $this->assertArrayNotHasKey('edge', SaasProductTaxonomy::products(), 'courses stay out of the SaaS / GA4 list');
+        foreach ($store as $row) {
+            $this->assertDoesNotMatchRegularExpression('/\bAIC(?:OUNTLY|ountly)\b/', $row['name'], 'brand is written Aicountly');
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /**
@@ -216,6 +241,15 @@ final class TaxonomyImporterTest extends TestCase
                 'name'             => $label,
                 'status'           => $status,
                 'legacy_code_path' => 'App\\Libraries\\SaasProductTaxonomy::products()',
+            ];
+        }
+        foreach (ProductCatalog::academy() as $course) {
+            $out[$course['slug']] = [
+                'id'               => $i++,
+                'slug'             => $course['slug'],
+                'name'             => $course['name'],
+                'status'           => $status,
+                'legacy_code_path' => 'App\\Libraries\\Automation\\Structured\\ProductCatalog::academy()',
             ];
         }
         return $out;

@@ -116,7 +116,7 @@ surface, not the environment.
 | `EMAIL_API_URL` | Itwalk `/email/1/send` (last-resort provider) |
 | `EMAIL_API_FORMAT` | `auto` (`/email/1/send` → multipart; other URLs JSON, then multipart) |
 | `EMAIL_PROVIDER_CACHE_DIR` | `writable/cache/email-providers` (encrypted Console answer, 0600) |
-| `SENDER_EMAIL` / `SENDER_NAME` | `support@aicountly.com` / `AICOUNTLY Reach` |
+| `SENDER_EMAIL` / `SENDER_NAME` | `support@aicountly.com` / `Aicountly Reach` |
 | `SMS_PROVIDER` | `digimiles` (`aoc-portal` is an alias) |
 | `SMS_API_URL` | provider default (`https://api.aoc-portal.com/v1/sms`) |
 | `SMS_TYPE` | `TRANS` |

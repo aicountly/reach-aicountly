@@ -129,7 +129,7 @@ final class CommunityQaAutomationTest extends ApiTestCase
         $this->assertTrue($publish['payload']['ai_assisted']);
         $this->assertFalse($publish['payload']['human_reviewed']);
         $this->assertSame(
-            'Prepared with AI assistance and automatically checked for accuracy by the AICOUNTLY desk.',
+            'Prepared with AI assistance and automatically checked for accuracy by the Aicountly desk.',
             $publish['payload']['ai_disclosure']
         );
 
@@ -163,7 +163,7 @@ final class CommunityQaAutomationTest extends ApiTestCase
         $this->assertSame('withdrawn', $body['items'][0]['outcome']);
         $this->assertSame('reject', $body['items'][0]['decision']);
         $this->assertSame($data['reasons'], $body['items'][0]['reasons']);
-        $this->assertSame('AICOUNTLY GST Guide', $body['items'][0]['desk']);
+        $this->assertSame('Aicountly GST Guide', $body['items'][0]['desk']);
     }
 
     public function testRevisionIsAppliedAndReVettedOnceBeforePublishing(): void

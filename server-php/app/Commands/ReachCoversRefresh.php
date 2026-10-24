@@ -14,7 +14,7 @@ use Throwable;
  *
  * Finds live blog posts whose cover is missing (aicountly.com then shows a
  * random stock photo), not a Reach cover, an operator upload / legacy image,
- * or lacks the AICOUNTLY logo, generates a fresh branded cover from each
+ * or lacks the Aicountly logo, generates a fresh branded cover from each
  * post's own title, summary and headings, and re-publishes the post through
  * the normal publisher with the same content version (cover change only).
  *

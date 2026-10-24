@@ -43,7 +43,7 @@ final class VisibilityRecordsTest extends DatabaseTestCase
         ReachConfig::flush();
         ReachConfig::set('visibility.daily_prompt_limit', 4);
 
-        $gemini = static fn (string $q): AssistantAnswer => new AssistantAnswer('gemini', 'gemini-test', "Top picks:\n1. **Zoho Books** – cloud\n2. **AICOUNTLY** – AI-first GST\n3. TallyPrime", [['url' => 'https://aicountly.com/billing', 'title' => 'aicountly.com']], 100);
+        $gemini = static fn (string $q): AssistantAnswer => new AssistantAnswer('gemini', 'gemini-test', "Top picks:\n1. **Zoho Books** – cloud\n2. **Aicountly** – AI-first GST\n3. TallyPrime", [['url' => 'https://aicountly.com/billing', 'title' => 'aicountly.com']], 100);
         $openai = static fn (string $q): AssistantAnswer => new AssistantAnswer('openai', 'gpt-test', "- Tally: the default\n- Vyapar: billing for shops\nSee https://vyaparapp.in", [], 80);
         $broken = static function (string $q): AssistantAnswer {
             throw new AssistantException('HTTP 500 from provider');
@@ -149,7 +149,7 @@ final class VisibilityRecordsTest extends DatabaseTestCase
         $this->assertSame('Tally', $obs['rows'][0]['entity_mentioned']);
         $this->assertFalse($obs['rows'][0]['in_question']);
 
-        $this->assertSame($s['overall']['brand_mentions'], $svc->observations(['entity' => 'AICOUNTLY', 'coverage_state' => 'mentioned', 'counted' => 1, 'days' => 7])['total']);
+        $this->assertSame($s['overall']['brand_mentions'], $svc->observations(['entity' => 'Aicountly', 'coverage_state' => 'mentioned', 'counted' => 1, 'days' => 7])['total']);
     }
 
     public function testControllersHonourTheUrlFilters(): void

@@ -23,7 +23,7 @@ class StructuredDataValidatorTest extends CIUnitTestCase
         $schema = [
             '@context'      => 'https://schema.org',
             '@type'         => 'BlogPosting',
-            'headline'      => 'How AICOUNTLY Simplifies Compliance',
+            'headline'      => 'How Aicountly Simplifies Compliance',
             'datePublished' => '2026-07-13',
             'author'        => ['@type' => 'Person', 'name' => 'Rahul'],
         ];
@@ -55,7 +55,7 @@ class StructuredDataValidatorTest extends CIUnitTestCase
             'mainEntity' => [
                 [
                     '@type'          => 'Question',
-                    'name'           => 'What is AICOUNTLY?',
+                    'name'           => 'What is Aicountly?',
                     'acceptedAnswer' => ['@type' => 'Answer', 'text' => 'An AI accounting platform'],
                 ],
             ],
@@ -139,7 +139,7 @@ class StructuredDataValidatorTest extends CIUnitTestCase
         $schema = [
             '@context'      => 'https://schema.org',
             '@type'         => 'SoftwareApplication',
-            'name'          => 'AICOUNTLY',
+            'name'          => 'Aicountly',
             'applicationCategory' => 'BusinessApplication',
             'price'         => '0',
         ];

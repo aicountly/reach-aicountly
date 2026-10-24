@@ -24,9 +24,9 @@ import VisibilityObservationsPage from '../VisibilityObservationsPage';
 import CompetitorListPage from '../CompetitorListPage';
 import CompetitorDetailPage from '../CompetitorDetailPage';
 
-const entities = { AICOUNTLY: { mentions: 2, mention_rate: 0.5, share_of_voice: 0.4, avg_rank: 2 }, Tally: { mentions: 3, mention_rate: 0.75, share_of_voice: 0.6, avg_rank: 1 } };
+const entities = { Aicountly: { mentions: 2, mention_rate: 0.5, share_of_voice: 0.4, avg_rank: 2 }, Tally: { mentions: 3, mention_rate: 0.75, share_of_voice: 0.6, avg_rank: 1 } };
 const summary = {
-  brand: 'AICOUNTLY', providers: [], series: [], failures: [], top_competitors: ['Tally'],
+  brand: 'Aicountly', providers: [], series: [], failures: [], top_competitors: ['Tally'],
   overall: { answers: 4, brand_mentions: 2, brand_mention_rate: 0.5, brand_avg_rank: 2, brand_cited: 1, entities },
   by_provider: [{ provider: 'gemini', answers: 4, brand_mentions: 2, brand_mention_rate: 0.5, brand_avg_rank: 2, entities }],
   by_market: [{ market: 'India', answers: 4, brand_mentions: 2, brand_mention_rate: 0.5, top_entities: ['Tally'] }],
@@ -50,7 +50,7 @@ describe('AI visibility overview drills to the answers it counted', () => {
     renderWithAuth(<VisibilityOverviewPage />, { route: '/intelligence/visibility?days=7' });
     await waitFor(() => expect(growth.getVisibilitySummary).toHaveBeenCalledWith(7));
     expect(await screen.findByRole('link', { name: 'Answers analysed: 4' })).toHaveAttribute('href', '/intelligence/visibility/runs?days=7&status=completed');
-    expect(screen.getByRole('link', { name: 'AICOUNTLY mention rate: 50%' })).toHaveAttribute('href', '/intelligence/visibility/runs?days=7&brand=named');
+    expect(screen.getByRole('link', { name: 'Aicountly mention rate: 50%' })).toHaveAttribute('href', '/intelligence/visibility/runs?days=7&brand=named');
     const byAssistant = screen.getByRole('button', { name: 'Gemini' }).closest('tr');
     expect(byAssistant.querySelector('a[href="/intelligence/visibility/runs?days=7&status=completed&provider=gemini"]')).not.toBeNull();
     expect(screen.getByRole('link', { name: '3' })).toHaveAttribute('href', '/intelligence/visibility/runs?days=7&entity=Tally');

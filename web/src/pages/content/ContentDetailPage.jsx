@@ -86,7 +86,7 @@ export function ContentDetailPage() {
   };
 
   const handlePublish = async () => {
-    if (!window.confirm('Publish this blog to AICOUNTLY.com now?')) return;
+    if (!window.confirm('Publish this blog to aicountly.com now?')) return;
     setActioning('publish');
     try {
       await contentService.publishItem(id, item?.current_version_id);

@@ -18,7 +18,7 @@ cover both jobs. Each scheduled job is queued once per IST day / Sunday (idempot
 | `visibility.enabled` | on | daily pass on/off (manual Run now works either way) |
 | `visibility.daily_prompt_limit` | 25 | cost cap: prompts asked per IST day, across all passes; prompts not reached run first next day |
 | `visibility.providers` | `gemini,openai,perplexity` | assistants to ask; one without a key is skipped and shown as skipped with the reason |
-| `visibility.brand_aliases` | `AICOUNTLY,aicountly.com,AI Countly` | names that count as an AICOUNTLY mention |
+| `visibility.brand_aliases` | `Aicountly,aicountly.com,AI Countly` | names that count as an Aicountly mention |
 | `visibility.gemini.search_grounding` | on | Gemini answers grounded on Google Search (closer to the Gemini app, returns sources; billed per grounded call) |
 | `ai.openai.chat_model` | env `AI_OPENAI_DEFAULT_MODEL`, else `gpt-5-mini` | OpenAI model; plain chat models answer from training data, not a live search |
 | `ai.perplexity.model` | env `AI_PERPLEXITY_DEFAULT_MODEL`, else `sonar` | Perplexity model |
@@ -31,7 +31,7 @@ model", blank = default vetting model) and the Gemini key.
 ## How the numbers are made
 
 - Every answer is stored verbatim (`reach_ai_visibility_responses`, kept 400 days). `MentionParser`
-  records an AICOUNTLY observation on every answer (mentioned or not), one per competitor named
+  records an Aicountly observation on every answer (mentioned or not), one per competitor named
   (`reach_competitors` + `reach_competitor_aliases`), the rank when the name leads an item in a
   numbered/bulleted list, table or heading, and every cited URL.
 - Mention rate = answers naming the name ÷ answers. Share of voice = that name's mentions ÷ all tracked

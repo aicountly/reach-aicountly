@@ -86,7 +86,7 @@ export function WhatsappListPage() {
           <div><label className="text-xs text-secondary">Template name</label><input value={form.template_name} onChange={(e) => setForm({...form, template_name: e.target.value})} /></div>
           <div>
             <label className="text-xs text-secondary">Template params (JSON)</label>
-            <textarea rows={5} value={form.template_params} onChange={(e) => setForm({...form, template_params: e.target.value})} placeholder='{"1":"Hi","2":"AICOUNTLY"}' style={{ fontFamily: 'monospace', fontSize: '0.8rem' }} />
+            <textarea rows={5} value={form.template_params} onChange={(e) => setForm({...form, template_params: e.target.value})} placeholder='{"1":"Hi","2":"Aicountly"}' style={{ fontFamily: 'monospace', fontSize: '0.8rem' }} />
           </div>
           <div><label className="text-xs text-secondary">Audience segment (label)</label><input value={form.audience_filter} onChange={(e) => setForm({...form, audience_filter: e.target.value})} /></div>
           <div><label className="text-xs text-secondary">Scheduled at ({timeZoneLabel()})</label><input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({...form, scheduled_at: e.target.value})} /></div>

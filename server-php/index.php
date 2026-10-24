@@ -1,7 +1,7 @@
 <?php
 
 /**
- * AICOUNTLY Reach Portal — CodeIgniter 4.6 front controller.
+ * Aicountly Reach Portal — CodeIgniter 4.6 front controller.
  * Deployed to cPanel public_html/api/index.php.
  */
 

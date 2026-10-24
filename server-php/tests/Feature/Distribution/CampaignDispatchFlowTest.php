@@ -41,7 +41,7 @@ final class CampaignDispatchFlowTest extends DatabaseTestCase
         parent::setUp();
         $this->sent = [];
         $this->setEnv('REACH_APP_URL', 'https://reach.example.test');
-        $this->setEnv('DISTRIBUTION_POSTAL_ADDRESS', 'AICOUNTLY, 1 Test Street, Pune 411001');
+        $this->setEnv('DISTRIBUTION_POSTAL_ADDRESS', 'Aicountly, 1 Test Street, Pune 411001');
         ReachConfig::flush();
     }
 
@@ -107,7 +107,7 @@ final class CampaignDispatchFlowTest extends DatabaseTestCase
     {
         $db = \Config\Database::connect();
         $db->table('reach_email_campaigns')->insert([
-            'subject' => 'Launch day', 'body_html' => '<p>Hello from AICOUNTLY</p>', 'body_text' => 'Hello from AICOUNTLY',
+            'subject' => 'Launch day', 'body_html' => '<p>Hello from Aicountly</p>', 'body_text' => 'Hello from Aicountly',
             'audience_filter' => json_encode($audience), 'status' => $status, 'tenant_id' => 0,
         ]);
 
@@ -117,7 +117,7 @@ final class CampaignDispatchFlowTest extends DatabaseTestCase
     private function smsCampaign(array $audience): int
     {
         $db = \Config\Database::connect();
-        $db->table('reach_campaigns')->insert(['name' => 'SMS launch', 'campaign_type' => 'multi', 'status' => 'approved', 'tenant_id' => 0, 'creative_copy' => 'AICOUNTLY is live. Visit aicountly.com']);
+        $db->table('reach_campaigns')->insert(['name' => 'SMS launch', 'campaign_type' => 'multi', 'status' => 'approved', 'tenant_id' => 0, 'creative_copy' => 'Aicountly is live. Visit aicountly.com']);
         $campaignId = (int) $db->insertID();
         $db->table('reach_sms_campaigns')->insert([
             'campaign_id' => $campaignId, 'tenant_id' => 0, 'status' => 'approved',

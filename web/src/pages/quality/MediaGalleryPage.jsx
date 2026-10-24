@@ -303,7 +303,7 @@ export function MediaGalleryPage() {
                 <Alert variant="info">
                   {deficit.deficit} cover image(s) still to come for the next {deficit.lookahead_days} days
                   ({deficit.needed} upcoming entries, {deficit.available} rotation-ready covers).
-                  Reach generates them itself every hour (GPT Image, AICOUNTLY logo added, within the
+                  Reach generates them itself every hour (GPT Image, Aicountly logo added, within the
                   daily cover limit) — nothing to do here. The prompts below are what it uses.
                 </Alert>
                 <ul className="text-sm" style={{ paddingLeft: '1.25rem' }}>

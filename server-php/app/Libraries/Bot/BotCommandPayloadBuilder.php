@@ -173,9 +173,12 @@ final class BotCommandPayloadBuilder
         }
 
         return [
-            'company'  => 'AICOUNTLY — Indian cloud accounting, compliance and business software suite',
+            'company'  => \App\Libraries\Settings\BrandFacts::COMPANY,
+            'academy'  => \App\Libraries\Settings\BrandFacts::academy() + [
+                'note' => 'Aicountly Academy posts link to the course page (url) with the campaign UTM when the owner gives one. Present the courses by name (no "Beta"). Lead forms are on aicountly.com/academy.',
+            ],
             'website'  => rtrim((string) (env('AICOUNTLY_PUBLIC_SITE_BASE_URL') ?: 'https://aicountly.com'), '/'),
-            'audience' => $audience ?? 'Indian SMB owners, founders and their accountants; CA firms and Company Secretaries; HR/payroll operators; finance teams evaluating accounting / compliance software.',
+            'audience' => $audience ?? 'Indian SMB owners, founders and their accountants; CA firms and Company Secretaries; HR/payroll operators; finance teams evaluating accounting / compliance software. Aicountly Academy posts: college students (commerce, accounting and finance) and their colleges.',
             'voice'    => 'Warm, confident, practical Indian English. No hype words, no guarantees, no fear-mongering.',
             'offer'    => \App\Libraries\Settings\BrandOffer::text() !== '' ? \App\Libraries\Settings\BrandOffer::text() : 'No offer claim is supported: say "visit aicountly.com" only.',
             'products' => array_values(array_map(

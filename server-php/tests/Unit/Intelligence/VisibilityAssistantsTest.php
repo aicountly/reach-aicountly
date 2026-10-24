@@ -38,7 +38,7 @@ final class VisibilityAssistantsTest extends CIUnitTestCase
     {
         $g = new GeminiAssistant($this->fake(200, [
             'candidates' => [[
-                'content' => ['parts' => [['text' => 'thinking…', 'thought' => true], ['text' => '1. **Zoho Books**' . "\n" . '2. **AICOUNTLY**']]],
+                'content' => ['parts' => [['text' => 'thinking…', 'thought' => true], ['text' => '1. **Zoho Books**' . "\n" . '2. **Aicountly**']]],
                 'groundingMetadata' => ['groundingChunks' => [['web' => ['uri' => 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/x', 'title' => 'zoho.com']]]],
             ]],
             'usageMetadata' => ['totalTokenCount' => 321],
@@ -47,7 +47,7 @@ final class VisibilityAssistantsTest extends CIUnitTestCase
 
         $a = $g->ask('Best GST billing software in India?');
 
-        $this->assertSame("1. **Zoho Books**\n2. **AICOUNTLY**", $a->text);
+        $this->assertSame("1. **Zoho Books**\n2. **Aicountly**", $a->text);
         $this->assertSame('gemini', $a->provider);
         $this->assertSame(321, $a->tokensUsed);
         $this->assertSame('zoho.com', $a->citations[0]['title']);
@@ -81,13 +81,13 @@ final class VisibilityAssistantsTest extends CIUnitTestCase
     {
         $o = new OpenAiAssistant($this->fake(200, [
             'model'   => 'gpt-5-mini-2025-08-07',
-            'choices' => [['message' => ['content' => 'Try Vyapar or AICOUNTLY.', 'annotations' => [['type' => 'url_citation', 'url_citation' => ['url' => 'https://aicountly.com/', 'title' => 'AICOUNTLY']]]]]],
+            'choices' => [['message' => ['content' => 'Try Vyapar or Aicountly.', 'annotations' => [['type' => 'url_citation', 'url_citation' => ['url' => 'https://aicountly.com/', 'title' => 'Aicountly']]]]]],
             'usage'   => ['total_tokens' => 99],
         ]), 'sk-test', 'gpt-5-mini');
 
         $a = $o->ask('Free invoicing app India?');
 
-        $this->assertSame('Try Vyapar or AICOUNTLY.', $a->text);
+        $this->assertSame('Try Vyapar or Aicountly.', $a->text);
         $this->assertSame('gpt-5-mini-2025-08-07', $a->model);
         $this->assertSame('https://aicountly.com/', $a->citations[0]['url']);
         $this->assertStringEndsWith('/chat/completions', $this->calls[0]['url']);

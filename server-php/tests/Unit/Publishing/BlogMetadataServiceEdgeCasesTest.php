@@ -74,7 +74,7 @@ class BlogMetadataServiceEdgeCasesTest extends CIUnitTestCase
 
     public function testEstimateReadingTimeIgnoresHtmlEntities(): void
     {
-        $html = '<p>AICOUNTLY &amp; partners provide <strong>AI-powered</strong> solutions.</p>';
+        $html = '<p>Aicountly &amp; partners provide <strong>AI-powered</strong> solutions.</p>';
         $time = $this->service->estimateReadingTime($html);
         $this->assertSame(1, $time);
     }

@@ -42,9 +42,9 @@ final class SocialApiAiPublisherTest extends CIUnitTestCase
     private const PUT  = 'https://uploads.social-api.example/m/med_1?X-Amz-Signature=deadbeefsig&X-Amz-Expires=900';
 
     private const ACCOUNTS = [
-        ['id' => 'acc_yt', 'name' => 'AICOUNTLY', 'username' => 'aicountly', 'platform' => 'youtube', 'status' => 'active'],
-        ['id' => 'acc_ig', 'name' => 'AICOUNTLY IG', 'platform' => 'instagram', 'status' => 'connected'],
-        ['id' => 'acc_li', 'name' => 'AICOUNTLY', 'platform' => 'linkedin', 'status' => 'active'],
+        ['id' => 'acc_yt', 'name' => 'Aicountly', 'username' => 'aicountly', 'platform' => 'youtube', 'status' => 'active'],
+        ['id' => 'acc_ig', 'name' => 'Aicountly IG', 'platform' => 'instagram', 'status' => 'connected'],
+        ['id' => 'acc_li', 'name' => 'Aicountly', 'platform' => 'linkedin', 'status' => 'active'],
     ];
 
     private int $now = 1_800_000_000;
@@ -147,8 +147,8 @@ final class SocialApiAiPublisherTest extends CIUnitTestCase
     public function testAmbiguousAccountsFailClosedListingTheIds(): void
     {
         $http = $this->http([
-            ['id' => 'acc_fb_1', 'name' => 'AICOUNTLY', 'platform' => 'facebook', 'status' => 'active'],
-            ['id' => 'acc_fb_2', 'name' => 'AICOUNTLY Test', 'platform' => 'facebook'],
+            ['id' => 'acc_fb_1', 'name' => 'Aicountly', 'platform' => 'facebook', 'status' => 'active'],
+            ['id' => 'acc_fb_2', 'name' => 'Aicountly Test', 'platform' => 'facebook'],
         ]);
         $this->expectException(ProviderNotConfiguredException::class);
         $this->expectExceptionMessageMatches('/2 active Facebook accounts .*acc_fb_1.*acc_fb_2.*Set social\.socialapi\.account\.facebook/');

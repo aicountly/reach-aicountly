@@ -39,7 +39,7 @@ class StructuredDataBuilderTest extends CIUnitTestCase
     public function testBuildFAQPagePassesValidation(): void
     {
         $faqItems = [
-            ['question' => 'What is AICOUNTLY?', 'answer' => 'An AI accounting platform.'],
+            ['question' => 'What is Aicountly?', 'answer' => 'An AI accounting platform.'],
             ['question' => 'Is it cloud-based?', 'answer' => 'Yes, fully SaaS.'],
         ];
 
@@ -90,7 +90,7 @@ class StructuredDataBuilderTest extends CIUnitTestCase
     public function testBuildWebPagePassesValidation(): void
     {
         $schema = $this->builder->buildWebPage(
-            'AICOUNTLY Home',
+            'Aicountly Home',
             'https://aicountly.com',
             'AI-powered accounting for Indian businesses.'
         );

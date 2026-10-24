@@ -93,8 +93,8 @@ final class VideoSocialApiPublishingTest extends ApiTestCase
 
         $this->http = (new FakeHttpTransport())
             ->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, [
-                ['id' => 'acc_yt', 'name' => 'AICOUNTLY', 'platform' => 'youtube', 'status' => 'active'],
-                ['id' => 'acc_ig', 'name' => 'AICOUNTLY', 'platform' => 'instagram', 'status' => 'active'],
+                ['id' => 'acc_yt', 'name' => 'Aicountly', 'platform' => 'youtube', 'status' => 'active'],
+                ['id' => 'acc_ig', 'name' => 'Aicountly', 'platform' => 'instagram', 'status' => 'active'],
             ]))
             ->on('GET', self::MP4, new HttpResponse(200, 'FAKE-MP4-BYTES', ['content-type' => 'video/mp4']))
             ->on('GET', '#/v1/media/upload-url\?#', FakeHttpTransport::json(200, ['media_id' => 'med_yt', 'upload_url' => 'https://uploads.social-api.example/med_yt?X-Amz-Signature=abc']))

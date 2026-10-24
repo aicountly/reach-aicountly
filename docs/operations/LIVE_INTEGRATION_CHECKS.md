@@ -47,7 +47,7 @@ Reach live integration checks — shotstack, youtube, dataforseo, gemini, openai
         environment: stage
         billing: stage — renders are free and watermarked
         templates: 0
-  OK    youtube     Token refresh OK; channel “AICOUNTLY” (UCxxxxxxxx). Long uploads: allowed. Uploads will be requested as public.
+  OK    youtube     Token refresh OK; channel “Aicountly” (UCxxxxxxxx). Long uploads: allowed. Uploads will be requested as public.
         channel_privacy: public
         long_uploads: allowed
         custom_thumbnails: likely allowed — the channel is verified (long uploads allowed); …
@@ -61,8 +61,8 @@ Reach live integration checks — shotstack, youtube, dataforseo, gemini, openai
   OK    social_api  Key accepted; 4 connected account(s): youtube 1, instagram 1, facebook 1, linkedin 1. Ready to post to: youtube, instagram, facebook, linkedin. Nothing was posted.
         base_url: https://api.social-api.ai/v1
         youtube_publisher: social_api
-        accounts.0: youtube “AICOUNTLY” id=acc_… status=active
-        targets.youtube: posts go to acc_… “AICOUNTLY” (auto: the only active account)
+        accounts.0: youtube “Aicountly” id=acc_… status=active
+        targets.youtube: posts go to acc_… “Aicountly” (auto: the only active account)
         targets.x: not available — No active X / Twitter account is connected in social-api.ai. …
 7 passed, 0 failed.
 ```

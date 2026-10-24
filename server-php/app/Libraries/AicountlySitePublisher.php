@@ -6,16 +6,16 @@ use App\Models\BlogPostModel;
 use Config\Services;
 
 /**
- * Blog publisher for AICOUNTLY.com.
+ * Blog publisher for aicountly.com.
  *
- * AICOUNTLY.com has no write API today (blog rows live in a shared
+ * aicountly.com has no write API today (blog rows live in a shared
  * PostgreSQL table written by Flow). Reach uses a **placeholder** HTTP
  * publisher: if `AICOUNTLY_SITE_API_BASE_URL` and `AICOUNTLY_SITE_API_TOKEN`
  * are both set we POST to `{base}/blog/posts`; otherwise we mark the blog
  * post as `publishing_status = pending_publishing` and leave a hint for the
  * superadmin to configure publishing.
  *
- * Callers should never assume the post reached AICOUNTLY.com — inspect the
+ * Callers should never assume the post reached aicountly.com — inspect the
  * returned publishing_status and publishing_error fields on the blog row.
  */
 class AicountlySitePublisher

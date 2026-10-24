@@ -21,8 +21,10 @@ use App\Libraries\Automation\Structured\ProductCatalog;
  *                 The vocabulary is ProductCatalog — the copy Reach already
  *                 keeps of that catalogue — so there is no third product list.
  *                 Live = the launch apps (saas_launch_product_slugs()); every
- *                 other catalogued product is Beta and is always presented as
- *                 Beta.
+ *                 other catalogued app is Beta and is always presented as
+ *                 Beta. Aicountly Academy and its courses (academy, edge,
+ *                 aspire) are status "course": Aicountly-run training, not
+ *                 software, so never Beta and never asked to say "Beta".
  *
  * Product slug mismatches resolved here (PRODUCT_SYNONYMS):
  *   - LaunchApps / reach_products (the KB side) call Drive `drive`; the site
@@ -47,7 +49,7 @@ final class BlogTaxonomy
     public const GROUPS = [
         self::GROUP_COMPLIANCE => 'Compliance',
         self::GROUP_BUSINESS   => 'Business',
-        self::GROUP_AICOUNTLY  => 'AICOUNTLY',
+        self::GROUP_AICOUNTLY  => 'Aicountly',
     ];
 
     /**
@@ -69,8 +71,8 @@ final class BlogTaxonomy
         'sales-crm'                  => ['Sales & CRM', self::GROUP_BUSINESS, 'Leads, customers, pipelines, follow-ups and sales processes.'],
         'productivity-collaboration' => ['Productivity & Collaboration', self::GROUP_BUSINESS, 'Notes, documents and file storage, sharing, team collaboration and getting organised (Notes, Drive).'],
         'business-operations'        => ['Business Operations', self::GROUP_BUSINESS, 'Running the business: cash flow, funding, subsidies and schemes, processes, controls and growth.'],
-        'product-guides'             => ['Product Guides', self::GROUP_AICOUNTLY, 'How to do a specific job in an AICOUNTLY app, step by step (product_slug required in practice).'],
-        'product-updates'            => ['Product Updates', self::GROUP_AICOUNTLY, 'What shipped recently in an AICOUNTLY app, from its git log (product_slug required in practice).'],
+        'product-guides'             => ['Product Guides', self::GROUP_AICOUNTLY, 'How to do a specific job in an Aicountly app, step by step (product_slug required in practice).'],
+        'product-updates'            => ['Product Updates', self::GROUP_AICOUNTLY, 'What shipped recently in an Aicountly app, from its git log (product_slug required in practice).'],
         'ai-for-finance'             => ['AI for Finance', self::GROUP_AICOUNTLY, 'How AI changes accounting, tax and compliance work — practical, no hype.'],
     ];
 
@@ -128,6 +130,9 @@ final class BlogTaxonomy
         'pulse'               => 'buddy',
         'ai-pulse'            => 'buddy',
         'lobby'               => 'receptionist',
+        'aicountly-academy'   => 'academy',
+        'aicountly-edge'      => 'edge',
+        'aicountly-aspire'    => 'aspire',
     ];
 
     /** Owner's mix: share of app-led articles, and of those, the Beta share. */
@@ -273,15 +278,23 @@ final class BlogTaxonomy
     {
         $slug = self::canonicalProduct($slug);
 
-        return $slug !== null && ! ProductCatalog::isLaunch($slug);
+        return $slug !== null && ProductCatalog::isBeta($slug);
     }
 
-    /** "Live" | "Beta" | null */
+    /** Aicountly Academy or one of its courses (Edge, Aspire). */
+    public static function isAcademyProduct(?string $slug): bool
+    {
+        $slug = self::canonicalProduct($slug);
+
+        return $slug !== null && ProductCatalog::isAcademy($slug);
+    }
+
+    /** "live" | "beta" | "course" | null */
     public static function productStatus(?string $slug): ?string
     {
         $slug = self::canonicalProduct($slug);
 
-        return $slug === null ? null : (ProductCatalog::isLaunch($slug) ? 'live' : 'beta');
+        return $slug === null ? null : ProductCatalog::status($slug);
     }
 
     /** @return list<string> live app slugs, launcher order */
@@ -305,20 +318,31 @@ final class BlogTaxonomy
             return null;
         }
 
-        return ['slug' => $slug, 'name' => $p['name'], 'status' => $p['launch'] ? 'live' : 'beta', 'repo' => $p['repo_full_name']];
+        return ['slug' => $slug, 'name' => $p['name'], 'status' => $p['status'], 'repo' => $p['repo_full_name']];
+    }
+
+    /** How an article names the product: "HRMS (Beta)", "Smart Books", "Aicountly Edge". */
+    public static function presentAs(?string $slug): ?string
+    {
+        $p = self::product($slug);
+
+        return $p === null ? null : ($p['status'] === 'beta' ? $p['name'] . ' (Beta)' : $p['name']);
     }
 
     /**
-     * Live apps and Beta apps as the blog routine needs them.
+     * Live apps, Beta apps and the Academy courses as the blog routine needs
+     * them.
      *
-     * @return array{live:list<array<string,string>>, beta:list<array<string,string>>}
+     * @return array{live:list<array<string,?string>>, beta:list<array<string,?string>>, academy:list<array<string,?string>>}
      */
     public static function productsForRoutine(): array
     {
-        $out = ['live' => [], 'beta' => []];
+        $out = ['live' => [], 'beta' => [], 'academy' => []];
         foreach (ProductCatalog::all() as $p) {
             $row = ['product_slug' => $p['slug'], 'name' => $p['name'], 'repo' => $p['repo_full_name']];
-            if ($p['launch']) {
+            if ($p['academy']) {
+                $out['academy'][] = $row + ['present_as' => $p['name'], 'public_url' => $p['public_url'], 'summary' => $p['summary']];
+            } elseif ($p['launch']) {
                 $out['live'][] = $row;
             } else {
                 $out['beta'][] = $row + ['present_as' => $p['name'] . ' (Beta)'];
@@ -330,7 +354,7 @@ final class BlogTaxonomy
 
     /**
      * Product named in a title — Smart Books by name, the other live apps
-     * only as "AICOUNTLY <Name>" or "<Name> app" (billing, notes, drive are
+     * only as "Aicountly <Name>" or "<Name> app" (billing, notes, drive are
      * ordinary words). Live apps only.
      *
      * @return array{slug:string, match:string}|null
@@ -387,7 +411,7 @@ final class BlogTaxonomy
      * What a next-topic queue item means for the taxonomy: the category to
      * file it under (when the topic says), whether it is app-led, and the app.
      * A topic only has a product *affinity* unless its stream is product /
-     * problem_to_product or its category is an AICOUNTLY one — a GST topic
+     * problem_to_product or its category is an Aicountly one — a GST topic
      * that ends on a Smart Books mention stays a topic article.
      *
      * @param array<string, mixed> $details the entry's payload
@@ -409,7 +433,7 @@ final class BlogTaxonomy
             'product_slug'       => $appLed ? $product : null,
             'product_affinity'   => $product,
             'product_status'     => $p['status'] ?? null,
-            'present_product_as' => $p === null ? null : ($p['status'] === 'beta' ? $p['name'] . ' (Beta)' : $p['name']),
+            'present_product_as' => self::presentAs($product),
         ];
     }
 
@@ -427,7 +451,7 @@ final class BlogTaxonomy
         $byGroup    = array_fill_keys(array_keys(self::GROUPS), 0) + ['uncategorised' => 0];
         $byCategory = [];
         $byProduct  = [];
-        $appLed = $beta = 0;
+        $appLed = $beta = $academy = 0;
         foreach ($posts as $p) {
             $cat   = self::canonical($p['category'] ?? null);
             $group = $cat !== null ? self::TOPICS[$cat][1] : 'uncategorised';
@@ -437,8 +461,10 @@ final class BlogTaxonomy
             if ($prod !== null) {
                 $appLed++;
                 $byProduct[$prod] = ($byProduct[$prod] ?? 0) + 1;
-                if (! ProductCatalog::isLaunch($prod)) {
+                if (ProductCatalog::isBeta($prod)) {
                     $beta++;
+                } elseif (ProductCatalog::isAcademy($prod)) {
+                    $academy++;
                 }
             }
         }
@@ -459,8 +485,9 @@ final class BlogTaxonomy
             'posts'          => $total,
             'topic'          => $topic,
             'app_led'        => $appLed,
-            'app_led_live'   => $appLed - $beta,
+            'app_led_live'   => $appLed - $beta - $academy,
             'app_led_beta'   => $beta,
+            'app_led_academy' => $academy,
             'app_led_share'  => $total > 0 ? round($appLed / $total, 2) : null,
             'beta_share_of_app_led' => $appLed > 0 ? round($beta / $appLed, 2) : null,
             'by_group'       => $byGroup,

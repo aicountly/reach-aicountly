@@ -115,8 +115,8 @@ final class RoutineKbContentBaseEndToEndTest extends ApiTestCase
             'summary'          => 'Set up your company, add a customer and send your first invoice in Smart Books.',
             'body_html'        => $body,
             'steps'            => [['title' => 'Open Settings', 'text' => 'Choose Company in Settings.'], ['title' => 'Add a customer', 'text' => 'Open Customers and choose New.']],
-            'prerequisites'    => ['An AICOUNTLY account signed in through my.aicountly.com'],
-            'seo'              => ['slug' => 'smart-books-getting-started', 'meta_title' => 'Get started with Smart Books', 'meta_description' => 'Set up your company, add your first customer and send your first GST invoice in AICOUNTLY Smart Books, step by step.'],
+            'prerequisites'    => ['An Aicountly account signed in through my.aicountly.com'],
+            'seo'              => ['slug' => 'smart-books-getting-started', 'meta_title' => 'Get started with Smart Books', 'meta_description' => 'Set up your company, add your first customer and send your first GST invoice in Aicountly Smart Books, step by step.'],
             'product_facts'    => ['Company settings live under Settings → Company (src/pages/Settings/Company.jsx)'],
             'provenance'       => ['generated_by_model' => 'claude-sonnet', 'routine_run_id' => 'session_e2e'],
         ]);

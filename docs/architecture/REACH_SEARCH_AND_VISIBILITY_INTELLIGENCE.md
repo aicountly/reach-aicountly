@@ -7,7 +7,7 @@
 
 ## Overview
 
-Phase 8 adds a governed intelligence layer on top of the Phases 0–7 content, publishing, distribution, and AI infrastructure. It measures how AICOUNTLY content performs across search engines, owned properties, and AI-answer environments.
+Phase 8 adds a governed intelligence layer on top of the Phases 0–7 content, publishing, distribution, and AI infrastructure. It measures how Aicountly content performs across search engines, owned properties, and AI-answer environments.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

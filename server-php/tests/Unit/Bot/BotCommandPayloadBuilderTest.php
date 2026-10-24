@@ -19,7 +19,7 @@ final class BotCommandPayloadBuilderTest extends CIUnitTestCase
         'uuid'             => '6f1c2d3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f',
         'kind'             => 'command',
         'activity_key'     => null,
-        'instruction'      => "Post a 30-second soft-launch reel announcing AICOUNTLY on all connected social platforms today\n\"quoted\" <tags>",
+        'instruction'      => "Post a 30-second soft-launch reel announcing Aicountly on all connected social platforms today\n\"quoted\" <tags>",
         'channels_json'    => '[]',
         'attachments_json' => '["https://aicountly.com/logo.png"]',
         'created_by_name'  => 'Owner',
@@ -29,7 +29,7 @@ final class BotCommandPayloadBuilderTest extends CIUnitTestCase
     private static function channels(): array
     {
         return [
-            ['channel' => 'youtube', 'label' => 'YouTube', 'ready' => true, 'account' => 'AICOUNTLY', 'reason' => null],
+            ['channel' => 'youtube', 'label' => 'YouTube', 'ready' => true, 'account' => 'Aicountly', 'reason' => null],
             ['channel' => 'instagram', 'label' => 'Instagram', 'ready' => true, 'account' => 'aicountly', 'reason' => null],
             ['channel' => 'twitter', 'label' => 'X / Twitter', 'ready' => false, 'account' => null, 'reason' => 'No active X account is connected in social-api.ai.'],
         ];

@@ -29,10 +29,10 @@ class StructuredDataSchemaTypesIntegrationTest extends CIUnitTestCase
             ['@context' => 'https://schema.org', '@type' => 'HowTo', 'name' => 'N', 'step' => [['@type' => 'HowToStep', 'name' => 'S', 'text' => 'T']]],
             ['@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => [['@type' => 'Question', 'name' => 'Q?', 'acceptedAnswer' => ['@type' => 'Answer', 'text' => 'A.']]]],
             ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => [['@type' => 'ListItem', 'position' => 1, 'name' => 'H']]],
-            ['@context' => 'https://schema.org', '@type' => 'Organization', 'name' => 'AICOUNTLY'],
+            ['@context' => 'https://schema.org', '@type' => 'Organization', 'name' => 'Aicountly'],
             ['@context' => 'https://schema.org', '@type' => 'Person', 'name' => 'John Doe'],
             ['@context' => 'https://schema.org', '@type' => 'WebPage', 'name' => 'Home'],
-            ['@context' => 'https://schema.org', '@type' => 'SoftwareApplication', 'name' => 'AICOUNTLY', 'applicationCategory' => 'BusinessApplication'],
+            ['@context' => 'https://schema.org', '@type' => 'SoftwareApplication', 'name' => 'Aicountly', 'applicationCategory' => 'BusinessApplication'],
         ];
 
         $result = $this->validator->validateAll($schemas);

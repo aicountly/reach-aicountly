@@ -13,7 +13,7 @@ use CodeIgniter\Database\BaseConnection;
 /**
  * Executes one AI-visibility run: puts the run's prompt version to the run's
  * assistant, stores the answer verbatim, and records what MentionParser found
- * — an AICOUNTLY observation on every answer (mentioned or not), one per
+ * — an Aicountly observation on every answer (mentioned or not), one per
  * competitor mentioned, and every cited URL.
  *
  * A provider error marks the run failed with the (redacted) reason; nothing
@@ -181,10 +181,10 @@ class VisibilityExecutionService
     /** @return list<string> */
     public static function brandAliases(): array
     {
-        $raw = (string) ReachConfig::get('visibility.brand_aliases', 'AICOUNTLY,aicountly.com');
+        $raw = (string) ReachConfig::get('visibility.brand_aliases', 'Aicountly,aicountly.com');
         $out = array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $a): bool => $a !== ''));
 
-        return $out !== [] ? $out : ['AICOUNTLY', 'aicountly.com'];
+        return $out !== [] ? $out : ['Aicountly', 'aicountly.com'];
     }
 
     /**

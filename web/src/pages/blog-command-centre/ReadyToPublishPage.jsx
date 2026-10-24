@@ -58,7 +58,7 @@ export function ReadyToPublishPage() {
   useEffect(() => { load(); }, [load]);
 
   const publish = async (item) => {
-    if (!window.confirm(`Publish “${item.title}” to AICOUNTLY.com now?`)) return;
+    if (!window.confirm(`Publish “${item.title}” to aicountly.com now?`)) return;
     setPublishingId(item.id);
     setNotice(null);
     setError(null);

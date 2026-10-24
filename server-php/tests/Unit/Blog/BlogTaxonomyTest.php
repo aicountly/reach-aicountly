@@ -34,7 +34,7 @@ final class BlogTaxonomyTest extends CIUnitTestCase
 
         $groups = array_count_values(array_column(BlogTaxonomy::TOPICS, 1));
         $this->assertSame(['compliance' => 7, 'business' => 5, 'aicountly' => 3], $groups);
-        $this->assertSame(['compliance' => 'Compliance', 'business' => 'Business', 'aicountly' => 'AICOUNTLY'], BlogTaxonomy::GROUPS);
+        $this->assertSame(['compliance' => 'Compliance', 'business' => 'Business', 'aicountly' => 'Aicountly'], BlogTaxonomy::GROUPS);
     }
 
     /** @return array<string, array{0:string, 1:string}> */
@@ -142,7 +142,7 @@ final class BlogTaxonomyTest extends CIUnitTestCase
     public function testTitlesNameLiveAppsOnlyUnambiguously(): void
     {
         $this->assertSame('books', BlogTaxonomy::productInTitle('Bank reconciliation in Smart Books: from import to matching')['slug'] ?? null);
-        $this->assertSame('billing', BlogTaxonomy::productInTitle('Recurring invoices with AICOUNTLY Billing')['slug'] ?? null);
+        $this->assertSame('billing', BlogTaxonomy::productInTitle('Recurring invoices with Aicountly Billing')['slug'] ?? null);
         $this->assertSame('docs', BlogTaxonomy::productInTitle('Sharing files from the Drive app')['slug'] ?? null);
         $this->assertNull(BlogTaxonomy::productInTitle('GST billing mistakes small businesses make'));
         $this->assertNull(BlogTaxonomy::productInTitle('Taking notes in a board meeting'));

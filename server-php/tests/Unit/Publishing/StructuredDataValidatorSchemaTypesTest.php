@@ -56,7 +56,7 @@ class StructuredDataValidatorSchemaTypesTest extends CIUnitTestCase
                 'itemListElement' => [['@type' => 'ListItem', 'position' => 1, 'name' => 'Home']],
             ]],
             'Organization' => [[
-                '@context' => 'https://schema.org', '@type' => 'Organization', 'name' => 'AICOUNTLY',
+                '@context' => 'https://schema.org', '@type' => 'Organization', 'name' => 'Aicountly',
             ]],
             'Person' => [[
                 '@context' => 'https://schema.org', '@type' => 'Person', 'name' => 'John Doe',
@@ -66,7 +66,7 @@ class StructuredDataValidatorSchemaTypesTest extends CIUnitTestCase
             ]],
             'SoftwareApplication' => [[
                 '@context' => 'https://schema.org', '@type' => 'SoftwareApplication',
-                'name' => 'AICOUNTLY', 'applicationCategory' => 'BusinessApplication',
+                'name' => 'Aicountly', 'applicationCategory' => 'BusinessApplication',
             ]],
         ];
     }

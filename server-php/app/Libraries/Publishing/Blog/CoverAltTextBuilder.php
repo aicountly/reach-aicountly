@@ -24,7 +24,7 @@ class CoverAltTextBuilder
         if ($title === '') {
             return $category !== ''
                 ? 'Editorial illustration for an article on ' . mb_strtolower($category)
-                : 'Editorial illustration for an AICOUNTLY blog article';
+                : 'Editorial illustration for an Aicountly blog article';
         }
 
         $alt = 'Editorial illustration for the article “' . $title . '”';

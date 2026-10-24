@@ -20,7 +20,7 @@ use Config\Database;
  * matchable gallery covers. When there is a deficit, Reach generates covers
  * for the entries that have none — earliest target date first — from each
  * entry's own title, brief and scene note (CoverPromptBuilder: flat vector,
- * green/white brand palette, no text), brands them with the AICOUNTLY mark and
+ * green/white brand palette, no text), brands them with the Aicountly mark and
  * stores them as active `ai_gallery` assets tagged to the entry (source_key)
  * and its keywords. The article written from that entry later finds its cover
  * by key.

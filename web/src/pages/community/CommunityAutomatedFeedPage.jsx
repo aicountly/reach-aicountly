@@ -73,7 +73,7 @@ export function CommunityAutomatedFeedPage() {
       <Alert variant={summary.enabled === false ? 'warning' : 'info'}>
         Questions and answers here are written by the <code>reach-community-qa</code> Claude Routine and checked by the
         vetting model, whose decision is final — no person reviews them. Approved posts go live on aicountly.com under the
-        AICOUNTLY desk, labelled AI-assisted.
+        Aicountly desk, labelled AI-assisted.
         {summary.enabled === false && <> Community automation is <strong>switched off</strong> in Settings → AI &amp; Automation.</>}
       </Alert>
 

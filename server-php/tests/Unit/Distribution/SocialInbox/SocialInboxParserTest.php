@@ -22,7 +22,7 @@ final class SocialInboxParserTest extends CIUnitTestCase
     {
         $p = SocialInboxParser::page(['data' => [[
             'id' => 'cmt_1', 'type' => 'comment', 'platform' => 'LinkedIn', 'account_id' => 'acc_li',
-            'text' => "  How do I file GSTR-1\x07 in AICOUNTLY? ", 'author' => ['name' => 'Asha Verma', 'username' => '@asha_v', 'id' => 'u1'],
+            'text' => "  How do I file GSTR-1\x07 in Aicountly? ", 'author' => ['name' => 'Asha Verma', 'username' => '@asha_v', 'id' => 'u1'],
             'post' => ['id' => 'post_9', 'url' => 'https://www.linkedin.com/feed/update/urn:li:activity:9'],
             'created_at' => '2026-10-18T09:15:00+05:30',
         ]], 'next_cursor' => 'abc'], 'linkedin', 'acc_li');
@@ -33,7 +33,7 @@ final class SocialInboxParserTest extends CIUnitTestCase
         $this->assertSame('cmt_1', $i['external_id']);
         $this->assertSame('comment', $i['kind']);
         $this->assertSame('linkedin', $i['platform']);
-        $this->assertSame('How do I file GSTR-1 in AICOUNTLY?', $i['text'], 'control characters stripped, trimmed');
+        $this->assertSame('How do I file GSTR-1 in Aicountly?', $i['text'], 'control characters stripped, trimmed');
         $this->assertSame(['Asha Verma', 'asha_v', 'u1'], [$i['author_name'], $i['author_handle'], $i['author_external_id']]);
         $this->assertSame('post_9', $i['thread_id']);
         $this->assertSame('https://www.linkedin.com/feed/update/urn:li:activity:9', $i['post_url']);

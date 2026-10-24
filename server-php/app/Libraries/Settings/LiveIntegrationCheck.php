@@ -331,7 +331,7 @@ final class LiveIntegrationCheck
                     'clips' => [[
                         'asset' => [
                             'type'      => 'text',
-                            'text'      => 'AICOUNTLY Reach — live render check',
+                            'text'      => 'Aicountly Reach — live render check',
                             'width'     => 1100,
                             'height'    => 300,
                             'font'      => ['family' => TimelineBuilder::FONT_DISPLAY, 'color' => TimelineBuilder::NAVY, 'size' => 56, 'lineHeight' => 1.15],

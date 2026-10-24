@@ -191,7 +191,7 @@ function PlacementTable({ name, rows, depth }) {
     <div className="rk-table-wrap">
       <table className="rk-table rk-table--compact">
         <caption className="sr-only">Keywords where {name} ranks, with their position and ours</caption>
-        <thead><tr><th scope="col">Keyword</th><th scope="col">{name}</th><th scope="col">AICOUNTLY</th></tr></thead>
+        <thead><tr><th scope="col">Keyword</th><th scope="col">{name}</th><th scope="col">Aicountly</th></tr></thead>
         <tbody>
           {rows.map((p) => (
             <tr key={p.keyword}>
@@ -288,7 +288,7 @@ export function Rankings({ section }) {
   );
 
   const compRows = [
-    { key: 'us', name: 'AICOUNTLY', top10: t.top10, avg: null, kws: t.top10_keywords || [], ours: true },
+    { key: 'us', name: 'Aicountly', top10: t.top10, avg: null, kws: t.top10_keywords || [], ours: true },
     ...(t.competitors || []).map((c) => ({ key: c.domain || c.name, name: c.name, domain: c.domain, top10: c.top10, avg: c.avg_rank, over: c.keywords, kws: c.top10_keywords || [] })),
   ];
   const maxBar = Math.max(1, ...compRows.map((r) => r.top10 || 0));
@@ -382,7 +382,7 @@ export function Rankings({ section }) {
                       {isOpen && (
                         <div id={pid(k)} className="rk-panel rk-panel--inline" role="region" aria-label={`${r.name}: keywords and positions`}>
                           {r.ours
-                            ? <PlacementTable name="AICOUNTLY" depth={depth} rows={(t.ranked_keywords || []).map((x) => ({ keyword: x.keyword, rank: x.rank, url: x.url, our_rank: x.rank }))} />
+                            ? <PlacementTable name="Aicountly" depth={depth} rows={(t.ranked_keywords || []).map((x) => ({ keyword: x.keyword, rank: x.rank, url: x.url, our_rank: x.rank }))} />
                             : (
                               <Loading state={kw}>{(data) => {
                                 const c = (data.competitors || []).find((x) => x.name === r.name);
@@ -403,12 +403,12 @@ export function Rankings({ section }) {
 
       {v.available && (
         <div className="cc-kpis mt-2">
-          <Tip content={<TipList title={v.measured ? `${v.brand_mentions} of ${v.brand_answers_counted} counted answers named AICOUNTLY` : 'Not measured yet'}
+          <Tip content={<TipList title={v.measured ? `${v.brand_mentions} of ${v.brand_answers_counted} counted answers named Aicountly` : 'Not measured yet'}
                                  items={[
                                    ...(v.by_provider || []).map((p) => `${p.provider}: ${p.counted > 0 ? `${p.brand_mentions} of ${p.counted}` : 'none counted'} (${plural(p.answers, 'answer')})`),
                                    ...((v.top_competitors || []).length ? [`Most named instead: ${v.top_competitors.join(', ')}`] : []),
                                  ]}
-                                 more={`${v.answers - (v.brand_answers_counted ?? v.answers) > 0 ? `${v.answers - v.brand_answers_counted} answers to questions naming AICOUNTLY are not counted. ` : ''}${v.failed_runs ? `${v.failed_runs} runs failed. ` : ''}${v.note || ''}`} />}>
+                                 more={`${v.answers - (v.brand_answers_counted ?? v.answers) > 0 ? `${v.answers - v.brand_answers_counted} answers to questions naming Aicountly are not counted. ` : ''}${v.failed_runs ? `${v.failed_runs} runs failed. ` : ''}${v.note || ''}`} />}>
             {(d) => (
               <button type="button" className={`cc-kpi rk-tile${open === 'ai' ? ' is-open' : ''}`} aria-expanded={open === 'ai'}
                       aria-controls={pid('ai')} aria-describedby={d} onClick={() => toggle('ai')}>

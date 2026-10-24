@@ -161,7 +161,7 @@ class MediaAssetStore
     }
 
     /**
-     * Composite the AICOUNTLY corner mark onto an existing, unbranded asset
+     * Composite the Aicountly corner mark onto an existing, unbranded asset
      * (an upload from before covers were branded). The unbranded file is kept
      * as original_file_path; the public URL (by uuid) does not change. When
      * branding cannot run the asset is returned untouched.

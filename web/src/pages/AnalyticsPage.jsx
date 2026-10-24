@@ -47,7 +47,7 @@ export function AnalyticsPage() {
         <div>
           <h1>Analytics</h1>
           <p className="text-sm text-muted">
-            Internal Reach marketing metrics plus GA4 traffic for AICountly.com and all SaaS products (ported from Flow).
+            Internal Reach marketing metrics plus GA4 traffic for aicountly.com and all SaaS products (ported from Flow).
           </p>
         </div>
       </div>

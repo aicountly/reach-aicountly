@@ -27,11 +27,11 @@ final class DailyReportRenderer
         if (! empty($search['day'])) {
             $delta = self::deltaPct((float) $search['day']['clicks'], $search['baseline']['clicks'] ?? null);
 
-            return sprintf('AICOUNTLY daily report — %s · %s search clicks%s', $date, number_format((int) $search['day']['clicks']),
+            return sprintf('Aicountly daily report — %s · %s search clicks%s', $date, number_format((int) $search['day']['clicks']),
                 $delta === null ? '' : ' (' . $delta . ' vs 7d)');
         }
 
-        return 'AICOUNTLY daily report — ' . $date;
+        return 'Aicountly daily report — ' . $date;
     }
 
     /** @param array<string, mixed> $summary */
@@ -63,7 +63,7 @@ final class DailyReportRenderer
             . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;"><tr><td align="center" style="padding:24px 12px;">'
             . '<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid ' . self::C_BORDER . ';border-radius:8px;">'
             . '<tr><td style="padding:20px 24px;border-bottom:1px solid ' . self::C_BORDER . ';">'
-            . '<div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:' . self::C_ACCENT . ';font-weight:700;">AICOUNTLY Reach</div>'
+            . '<div style="font-size:12px;letter-spacing:.06em;color:' . self::C_ACCENT . ';font-weight:700;">Aicountly Reach</div>'
             . '<div style="font-size:20px;font-weight:700;margin-top:4px;">' . $title . '</div>'
             . '<div style="font-size:12px;color:' . self::C_MUTED . ';margin-top:4px;">' . $meta . '</div>'
             . '</td></tr>'
@@ -77,7 +77,7 @@ final class DailyReportRenderer
     {
         $s   = $summary['sections'];
         $out = [];
-        $out[] = 'AICOUNTLY daily analytics report — ' . self::longDate((string) $summary['report_date']);
+        $out[] = 'Aicountly daily analytics report — ' . self::longDate((string) $summary['report_date']);
         $out[] = 'Generated ' . self::generatedAt($summary);
         $out[] = '';
         $out[] = '== Today at a glance ==';

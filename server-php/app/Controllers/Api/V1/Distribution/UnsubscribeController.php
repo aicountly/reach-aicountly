@@ -46,7 +46,7 @@ class UnsubscribeController extends Controller
             'source'         => 'unsubscribe_link',
         ], null);
 
-        return $this->page(200, 'You are unsubscribed', 'You will not receive further AICOUNTLY marketing email at ' . ChannelSuppressionModel::maskAddress($verified['email']) . '.');
+        return $this->page(200, 'You are unsubscribed', 'You will not receive further Aicountly marketing email at ' . ChannelSuppressionModel::maskAddress($verified['email']) . '.');
     }
 
     private function page(int $status, string $title, string $body): ResponseInterface

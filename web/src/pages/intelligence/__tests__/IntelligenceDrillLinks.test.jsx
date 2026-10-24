@@ -40,7 +40,7 @@ beforeEach(() => {
   intel.listConnectors.mockResolvedValue(connectors);
   intel.listSearchMetrics.mockResolvedValue({ rows: [] });
   intel.listContentMetrics.mockResolvedValue([]);
-  growth.getVisibilitySummary.mockResolvedValue({ brand: 'AICOUNTLY', by_provider: [{ provider: 'gemini', answers: 3, entities: {} }], gaps: [] });
+  growth.getVisibilitySummary.mockResolvedValue({ brand: 'Aicountly', by_provider: [{ provider: 'gemini', answers: 3, entities: {} }], gaps: [] });
   growth.listVisibilityAnswers.mockResolvedValue([]);
 });
 

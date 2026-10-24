@@ -44,7 +44,9 @@ final class AutomationPlanService
 
         $submissions = new StructuredSubmissionService(null, null, $this->db);
         $products    = [];
-        foreach (ProductCatalog::all() as $p) {
+        // Software only: Aicountly Academy courses are training, not apps, and
+        // get no release notes.
+        foreach (ProductCatalog::software() as $p) {
             $mine      = $byProduct[$p['slug']] ?? [];
             $published = null;
             $inFlight  = [];

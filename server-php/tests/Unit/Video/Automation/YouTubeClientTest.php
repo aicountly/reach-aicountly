@@ -247,7 +247,7 @@ final class YouTubeClientTest extends CIUnitTestCase
         $http = $this->http()
             ->on('POST', '#upload/youtube/v3/thumbnails/set\?videoId=vid123&uploadType=media$#', FakeHttpTransport::json(200, ['items' => []]))
             ->on('POST', '#upload/youtube/v3/captions\?part=snippet&uploadType=multipart$#', FakeHttpTransport::json(200, ['id' => 'cap-1']))
-            ->on('GET', '#youtube/v3/channels\?part=snippet&mine=true$#', FakeHttpTransport::json(200, ['items' => [['id' => 'UC123', 'snippet' => ['title' => 'AICOUNTLY']]]]));
+            ->on('GET', '#youtube/v3/channels\?part=snippet&mine=true$#', FakeHttpTransport::json(200, ['items' => [['id' => 'UC123', 'snippet' => ['title' => 'Aicountly']]]]));
         $client = $this->client($http);
 
         $client->setThumbnail('vid123', 'JPEGBYTES', 'image/jpeg');
@@ -261,7 +261,7 @@ final class YouTubeClientTest extends CIUnitTestCase
         $this->assertStringContainsString('"videoId":"vid123"', (string) $cap['body']);
         $this->assertStringContainsString("00:00:00,000 --> 00:00:01,000\nHi", (string) $cap['body']);
 
-        $this->assertSame(['id' => 'UC123', 'title' => 'AICOUNTLY'], $client->channel());
+        $this->assertSame(['id' => 'UC123', 'title' => 'Aicountly'], $client->channel());
     }
 
     // ── metadata ────────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ final class YouTubeClientTest extends CIUnitTestCase
     {
         $item = ['script_json' => [
             'format' => 'short', 'title' => 'TDS due on the 7th', 'description' => 'What is due and who pays it.', 'tags' => ['TDS', 'India'],
-            'chapters' => [], 'cta_text' => 'Try AICOUNTLY free at aicountly.com',
+            'chapters' => [], 'cta_text' => 'Try Aicountly free at aicountly.com',
         ]];
         $r = YouTubeMetadata::resource($item, ['duration' => 45]);
         $this->assertSame('TDS due on the 7th #Shorts', $r['snippet']['title']);

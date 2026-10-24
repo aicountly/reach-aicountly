@@ -210,7 +210,7 @@ final class CommandCentreRankingsTest extends ApiTestCase
     private function registry(): AssistantRegistry
     {
         return new AssistantRegistry([
-            new RkFakeAssistant('gemini', static fn (string $q): AssistantAnswer => new AssistantAnswer('gemini', 'gemini-test', "Top picks:\n1. **Zoho Books** – cloud\n2. **AICOUNTLY** – AI-first GST\n3. TallyPrime", [], 100)),
+            new RkFakeAssistant('gemini', static fn (string $q): AssistantAnswer => new AssistantAnswer('gemini', 'gemini-test', "Top picks:\n1. **Zoho Books** – cloud\n2. **Aicountly** – AI-first GST\n3. TallyPrime", [], 100)),
             new RkFakeAssistant('openai', static fn (string $q): AssistantAnswer => new AssistantAnswer('openai', 'gpt-test', "- Tally: the default\n- Vyapar: billing for shops", [], 80)),
         ], ['gemini', 'openai']);
     }

@@ -94,7 +94,7 @@ class KbStructureValidatorVersionIntegrationTest extends CIUnitTestCase
     {
         $errors = $this->validator->validateVersionApplicability([
             'type'          => 'planned_version',
-            'preview_label' => 'Available in AICOUNTLY v5.0 (Coming Q3 2026)',
+            'preview_label' => 'Available in Aicountly v5.0 (Coming Q3 2026)',
         ]);
         $this->assertEmpty($errors);
     }

@@ -189,7 +189,7 @@ export function SocialInboxPage() {
         <div>
           <h1>Social inbox</h1>
           <p className="text-sm text-muted">
-            Comments and messages on AICOUNTLY&apos;s social accounts, read every 10 minutes through social-api.ai. The bot answers
+            Comments and messages on Aicountly&apos;s social accounts, read every 10 minutes through social-api.ai. The bot answers
             questions with a vetted reply, lodges complaints in Flow and acknowledges them with the ticket number, records sales
             enquiries as leads, and never answers spam. A reply shows as posted only once social-api.ai accepted it.
           </p>

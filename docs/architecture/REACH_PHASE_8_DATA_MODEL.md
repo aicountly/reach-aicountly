@@ -150,7 +150,7 @@ Key columns: `uuid`, `run_id`, `raw_response` (TEXT, bounded by retention policy
 ### `reach_ai_visibility_observations` (100164)
 Parsed mention/classification per response.
 
-Key columns: `response_id`, `run_id`, `entity_mentioned` (AICOUNTLY|product|competitor), `mention_type` (brand|product|competitor), `mention_order`, `sentiment_classification`, `coverage_state` (mentioned|not_mentioned|uncertain), `confidence` (0.0–1.0), `evidence_excerpt` (safe substring), `parser_finding`
+Key columns: `response_id`, `run_id`, `entity_mentioned` (Aicountly|product|competitor), `mention_type` (brand|product|competitor), `mention_order`, `sentiment_classification`, `coverage_state` (mentioned|not_mentioned|uncertain), `confidence` (0.0–1.0), `evidence_excerpt` (safe substring), `parser_finding`
 
 ### `reach_ai_visibility_citations` (100165)
 Extracted citations and linked domains.

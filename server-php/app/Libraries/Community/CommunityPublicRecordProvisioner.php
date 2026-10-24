@@ -60,7 +60,7 @@ class CommunityPublicRecordProvisioner
      * desk content is AI-assisted and checked automatically — no person
      * reviews it, and nothing sent from here may claim one did.
      */
-    public const DESK_DISCLOSURE = 'Prepared with AI assistance and automatically checked for accuracy by the AICOUNTLY desk.';
+    public const DESK_DISCLOSURE = 'Prepared with AI assistance and automatically checked for accuracy by the Aicountly desk.';
 
     /**
      * Reach category → public category slug.
@@ -170,6 +170,19 @@ class CommunityPublicRecordProvisioner
         return ctype_digit($id) && (int) $id > 0 ? (int) $id : null;
     }
 
+    /**
+     * The brand as aicountly.com writes it: "Aicountly" in mixed case (owner
+     * decision, 23 Oct 2026). Rows are re-cased by migration 2026-10-23-240002;
+     * this keeps a row edited back to "AICOUNTLY" from writing the old casing
+     * to the site. Only the bare word changes: hostnames (aicountly.com) are
+     * already lowercase and the legal name "Aicountly Interactive Services
+     * Private Limited" is already in this casing.
+     */
+    public static function brandCase(string $text): string
+    {
+        return (string) preg_replace('/\bAICOUNTLY\b/', 'Aicountly', $text);
+    }
+
     /** @return string The identity slug the public site knows this identity by. */
     private function ensureIdentity(array $identity): string
     {
@@ -177,11 +190,11 @@ class CommunityPublicRecordProvisioner
 
         $payload = [
             'slug'                 => $slug,
-            'display_name'         => (string) $identity['display_name'],
+            'display_name'         => self::brandCase((string) $identity['display_name']),
             'operational_role'     => self::publicRoleFor($identity['operational_role'] ?? null),
-            'ai_disclosure'        => (string) ($identity['ai_disclosure'] ?? ''),
-            'short_description'    => (string) ($identity['short_description'] ?? $identity['disclosure_template'] ?? ''),
-            'topic_specialisation' => (string) ($identity['topic_specialisation'] ?? $identity['department'] ?? ''),
+            'ai_disclosure'        => self::brandCase((string) ($identity['ai_disclosure'] ?? '')),
+            'short_description'    => self::brandCase((string) ($identity['short_description'] ?? $identity['disclosure_template'] ?? '')),
+            'topic_specialisation' => self::brandCase((string) ($identity['topic_specialisation'] ?? $identity['department'] ?? '')),
             'is_active'            => (bool) $identity['is_active'],
         ];
 

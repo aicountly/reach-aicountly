@@ -30,8 +30,8 @@ class BlogMetadataIntegrationTest extends CIUnitTestCase
 
     public function testExcerptFromRealBlogHtml(): void
     {
-        $html = '<h1>How AICOUNTLY Transforms Accounting</h1>
-            <p>AICOUNTLY is a cloud-based, AI-powered accounting platform designed specifically for Indian businesses.
+        $html = '<h1>How Aicountly Transforms Accounting</h1>
+            <p>Aicountly is a cloud-based, AI-powered accounting platform designed specifically for Indian businesses.
             It automates repetitive bookkeeping tasks so your team can focus on growing your business.</p>
             <h2>Key Features</h2>
             <ul><li>Bank Reconciliation</li><li>GST Filing</li><li>TDS Management</li></ul>';
@@ -39,7 +39,7 @@ class BlogMetadataIntegrationTest extends CIUnitTestCase
         $excerpt = $this->service->deriveExcerpt($html, 160);
 
         $this->assertStringNotContainsString('<', $excerpt);
-        $this->assertStringContainsString('AICOUNTLY', $excerpt);
+        $this->assertStringContainsString('Aicountly', $excerpt);
         $this->assertLessThanOrEqual(163, strlen($excerpt));
     }
 

@@ -47,7 +47,7 @@ final class SocialApiPublishingFlowTest extends DatabaseTestCase
         SocialApiAccounts::forget();
         $this->now  = time();
         $this->http = (new FakeHttpTransport())->on('GET', '#/v1/accounts$#', FakeHttpTransport::json(200, [
-            ['id' => 'acc_li', 'name' => 'AICOUNTLY', 'platform' => 'linkedin', 'status' => 'active'],
+            ['id' => 'acc_li', 'name' => 'Aicountly', 'platform' => 'linkedin', 'status' => 'active'],
         ]));
         VideoProviders::override('http', $this->http);
     }

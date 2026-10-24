@@ -2,12 +2,15 @@
 
 namespace App\Libraries;
 
+use App\Libraries\Automation\Structured\ProductCatalog;
 use App\Models\Knowledge\ProductModel;
 use App\Models\Knowledge\ProductAliasModel;
 
 /**
- * Idempotent importer from the hardcoded SaasProductTaxonomy into the
- * knowledge store (reach_products + reach_product_aliases).
+ * Idempotent importer from the hardcoded SaasProductTaxonomy — and the
+ * Aicountly Academy courses in ProductCatalog::academy() (academy, edge,
+ * aspire: training, kept out of the SaaS list) — into the knowledge store
+ * (reach_products + reach_product_aliases).
  *
  * Safety guarantees:
  *   - Will not overwrite an existing product whose status is 'approved'.
@@ -27,6 +30,7 @@ use App\Models\Knowledge\ProductAliasModel;
 class KnowledgeTaxonomyImporter
 {
     private const LEGACY_CODE_PATH = 'App\\Libraries\\SaasProductTaxonomy::products()';
+    private const ACADEMY_CODE_PATH = 'App\\Libraries\\Automation\\Structured\\ProductCatalog::academy()';
 
     private ProductModel      $productModel;
     private ProductAliasModel $aliasModel;
@@ -69,6 +73,19 @@ class KnowledgeTaxonomyImporter
             }
         }
 
+        // Aicountly Academy and its courses: name, public page and a one-line
+        // summary only — fees, durations and claims are left to the reviewer.
+        foreach (ProductCatalog::academy() as $course) {
+            try {
+                $this->importProduct((string) $course['slug'], (string) $course['name'], $course['public_url'], $actorUserId, self::ACADEMY_CODE_PATH, $course['summary']);
+            } catch (\Throwable $e) {
+                $this->result['errors'][] = [
+                    'slug'    => $course['slug'],
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
         foreach ($aliases as $alias => $canonicalSlug) {
             try {
                 $this->importAlias($alias, $canonicalSlug, $actorUserId);
@@ -86,7 +103,7 @@ class KnowledgeTaxonomyImporter
     /**
      * Import a single product slug. Idempotent.
      */
-    private function importProduct(string $slug, string $label, ?string $url, ?int $actorUserId): void
+    private function importProduct(string $slug, string $label, ?string $url, ?int $actorUserId, string $codePath = self::LEGACY_CODE_PATH, ?string $summary = null): void
     {
         $existing = $this->productModel->findBySlug($slug);
 
@@ -99,7 +116,7 @@ class KnowledgeTaxonomyImporter
             // Update only non-approved records to fill in missing data
             if (empty($existing['legacy_code_path'])) {
                 $this->productModel->update($existing['id'], [
-                    'legacy_code_path' => self::LEGACY_CODE_PATH,
+                    'legacy_code_path' => $codePath,
                     'updated_by'       => $actorUserId,
                 ]);
             }
@@ -110,11 +127,11 @@ class KnowledgeTaxonomyImporter
         $this->productModel->insert([
             'slug'             => $slug,
             'name'             => $label,
-            'short_description'=> null,
+            'short_description'=> $summary,
             'description'      => null,
             'public_url'       => $url,
             'status'           => 'needs_review',
-            'legacy_code_path' => self::LEGACY_CODE_PATH,
+            'legacy_code_path' => $codePath,
             'created_by'       => $actorUserId,
             'created_actor_type' => $actorUserId !== null ? 'human' : 'system',
             'created_by_service' => $actorUserId !== null ? null : 'KnowledgeTaxonomyImporter',

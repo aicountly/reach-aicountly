@@ -53,7 +53,7 @@ final class AiVisibilityTest extends ApiTestCase
 
     private static function geminiAnswer(): callable
     {
-        return static fn (string $q): AssistantAnswer => new AssistantAnswer('gemini', 'gemini-test', "Top picks:\n1. **Zoho Books** – cloud\n2. **AICOUNTLY** – AI-first GST\n3. TallyPrime", [['url' => 'https://aicountly.com/billing', 'title' => 'aicountly.com']], 100);
+        return static fn (string $q): AssistantAnswer => new AssistantAnswer('gemini', 'gemini-test', "Top picks:\n1. **Zoho Books** – cloud\n2. **Aicountly** – AI-first GST\n3. TallyPrime", [['url' => 'https://aicountly.com/billing', 'title' => 'aicountly.com']], 100);
     }
 
     private static function openAiAnswer(): callable
@@ -101,8 +101,8 @@ final class AiVisibilityTest extends ApiTestCase
         $this->assertSame(2.0, $byP['gemini']['brand_avg_rank']);
         $this->assertSame(0.0, $byP['openai']['brand_mention_rate']);
         $this->assertSame(3, $byP['openai']['entities']['Tally']['mentions']);
-        // gemini: AICOUNTLY, Zoho Books, Tally per answer → 1/3 share of voice each.
-        $this->assertSame(0.3333, $byP['gemini']['entities']['AICOUNTLY']['share_of_voice']);
+        // gemini: Aicountly, Zoho Books, Tally per answer → 1/3 share of voice each.
+        $this->assertSame(0.3333, $byP['gemini']['entities']['Aicountly']['share_of_voice']);
         $this->assertSame(3, $s['overall']['brand_cited']);
         $this->assertNotEmpty($s['gaps']);
         $this->assertContains('Tally', array_column($s['gaps'][0]['competitors'], 'name'));

@@ -37,9 +37,9 @@ const READINESS = {
   production: true,
   channels: [
     { channel: 'email', label: 'Email', group: 'messaging', state: 'ready' },
-    { channel: 'linkedin', label: 'LinkedIn', group: 'social', state: 'ready', provider: 'socialapi', reasons: [], checks: [], account: { id: 'acc_li', name: 'AICOUNTLY', username: 'aicountly', source: 'auto' } },
+    { channel: 'linkedin', label: 'LinkedIn', group: 'social', state: 'ready', provider: 'socialapi', reasons: [], checks: [], account: { id: 'acc_li', name: 'Aicountly', username: 'aicountly', source: 'auto' } },
     { channel: 'facebook', label: 'Facebook', group: 'social', state: 'blocked', reasons: ['No active Facebook account in social-api.ai.'], checks: [{ key: 'social.socialapi.account.facebook', ok: false }] },
-    { channel: 'youtube', label: 'YouTube', group: 'social', state: 'ready', account: { id: 'acc_yt', name: 'AICOUNTLY TV', source: 'setting' }, youtube_publisher: 'social_api', reasons: [] },
+    { channel: 'youtube', label: 'YouTube', group: 'social', state: 'ready', account: { id: 'acc_yt', name: 'Aicountly TV', source: 'setting' }, youtube_publisher: 'social_api', reasons: [] },
     { channel: 'google_ads', label: 'Google Ads', group: 'ads', state: 'not_supported' },
   ],
 };
@@ -58,7 +58,7 @@ describe('Social & Ads hub — Accounts', () => {
     const li = await screen.findByTestId('account-linkedin');
     expect(api.get).toHaveBeenCalledWith('v1/distribution/readiness');
     expect(li).toHaveTextContent('Connected');
-    expect(li).toHaveTextContent('AICOUNTLY');
+    expect(li).toHaveTextContent('Aicountly');
     expect(li).toHaveTextContent('acc_li');
     const fb = screen.getByTestId('account-facebook');
     expect(fb).toHaveTextContent('Blocked');
@@ -73,7 +73,7 @@ describe('Social & Ads hub — Accounts', () => {
   it('runs the social-api.ai live check (never posts) and shows what it found', async () => {
     api.get.mockResolvedValue(READINESS);
     adminService.runLiveChecks.mockResolvedValueOnce({
-      results: [{ target: 'social_api', ok: true, message: 'Key accepted; 2 connected account(s). Nothing was posted.', detail: { accounts: ['linkedin “AICOUNTLY” id=acc_li status=active'], targets: { linkedin: 'posts go to acc_li' } } }],
+      results: [{ target: 'social_api', ok: true, message: 'Key accepted; 2 connected account(s). Nothing was posted.', detail: { accounts: ['linkedin “Aicountly” id=acc_li status=active'], targets: { linkedin: 'posts go to acc_li' } } }],
     });
     inHub(null, '/social/accounts');
     await screen.findByTestId('account-linkedin');

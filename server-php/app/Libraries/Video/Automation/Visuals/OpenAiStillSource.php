@@ -14,7 +14,7 @@ use App\Libraries\Video\Automation\VideoProviderException;
  * and the YouTube thumbnail. The prompt comes from StillPromptBuilder (the
  * scene's own words + the video topic); brand guidance is appended to every
  * prompt. The logo is never drawn by the model — the render template overlays
- * the AICOUNTLY corner mark and the thumbnail gets it composited.
+ * the Aicountly corner mark and the thumbnail gets it composited.
  */
 final class OpenAiStillSource implements StillImageSource
 {

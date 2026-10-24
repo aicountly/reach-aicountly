@@ -100,18 +100,18 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
                 'scope' => 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl',
             ]))
             ->on('GET', '#^https://www\.googleapis\.com/youtube/v3/channels\?part=snippet,status&mine=true$#', FakeHttpTransport::json(200, ['items' => [[
-                'id' => 'UC123', 'snippet' => ['title' => 'AICOUNTLY'],
+                'id' => 'UC123', 'snippet' => ['title' => 'Aicountly'],
                 'status' => ['privacyStatus' => 'public', 'longUploadsStatus' => 'allowed', 'madeForKids' => false],
             ]]]))
             ->on('POST', '#^https://api\.openai\.com/v1/audio/speech$#', new HttpResponse(200, Mp3Duration::silentStream(1000), ['content-type' => 'audio/mpeg']))
             ->on('GET', '#^https://api\.social-api\.ai/v1/accounts$#', FakeHttpTransport::json(200, [
-                ['id' => 'acc_yt_1', 'name' => 'AICOUNTLY', 'username' => 'aicountly', 'platform' => 'youtube', 'status' => 'active'],
-                ['id' => 'acc_ig_1', 'name' => 'AICOUNTLY', 'username' => 'aicountly.in', 'platform' => 'instagram', 'status' => 'active'],
-                ['id' => 'acc_li_1', 'name' => 'AICOUNTLY', 'platform' => 'linkedin', 'status' => 'expired'],
+                ['id' => 'acc_yt_1', 'name' => 'Aicountly', 'username' => 'aicountly', 'platform' => 'youtube', 'status' => 'active'],
+                ['id' => 'acc_ig_1', 'name' => 'Aicountly', 'username' => 'aicountly.in', 'platform' => 'instagram', 'status' => 'active'],
+                ['id' => 'acc_li_1', 'name' => 'Aicountly', 'platform' => 'linkedin', 'status' => 'expired'],
             ]))
             // Social inbox bot: the read-only probe of both inbox lists (shapes confirmed live).
             ->on('GET', '#^https://api\.social-api\.ai/v1/inbox/comments\?#', FakeHttpTransport::json(200, ['data' => [
-                ['id' => 'cmt_1', 'type' => 'comment', 'platform' => 'instagram', 'text' => 'Does AICOUNTLY file GSTR-1?', 'author' => ['username' => 'asha'], 'created_at' => '2026-10-18T09:00:00Z'],
+                ['id' => 'cmt_1', 'type' => 'comment', 'platform' => 'instagram', 'text' => 'Does Aicountly file GSTR-1?', 'author' => ['username' => 'asha'], 'created_at' => '2026-10-18T09:00:00Z'],
             ], 'pagination' => ['has_more' => false]]))
             ->on('GET', '#^https://api\.social-api\.ai/v1/inbox/conversations\?#', FakeHttpTransport::json(200, ['data' => null, 'pagination' => ['has_more' => false, 'next_cursor' => ''], 'sync_state' => 'idle', 'last_synced_at' => null]));
     }
@@ -187,7 +187,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
         $this->assertSame('ss-secret-key-abc', $http->to('#shotstack#')[0]['headers']['x-api-key']);
         $this->assertSame([], $http->to('#/render#'), 'no render without --render-test');
 
-        $this->assertStringContainsString('channel “AICOUNTLY” (UC123)', $r['youtube']['message']);
+        $this->assertStringContainsString('channel “Aicountly” (UC123)', $r['youtube']['message']);
         $this->assertSame('allowed', $r['youtube']['detail']['long_uploads']);
         $this->assertStringContainsString('likely allowed', $r['youtube']['detail']['custom_thumbnails']);
         $this->assertSame('public', $r['youtube']['detail']['upload_privacy']);
@@ -205,9 +205,9 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
 
         $this->assertStringContainsString('Key accepted; 3 connected account(s): youtube 1, instagram 1, linkedin 1. Ready to post to: youtube, instagram. Nothing was posted.', $r['social_api']['message']);
         $this->assertSame('https://api.social-api.ai/v1', $r['social_api']['detail']['base_url']);
-        $this->assertSame('youtube “AICOUNTLY” @aicountly id=acc_yt_1 status=active', $r['social_api']['detail']['accounts'][0]);
+        $this->assertSame('youtube “Aicountly” @aicountly id=acc_yt_1 status=active', $r['social_api']['detail']['accounts'][0]);
         $this->assertStringContainsString('(not active)', $r['social_api']['detail']['accounts'][2]);
-        $this->assertStringStartsWith('posts go to acc_yt_1 “AICOUNTLY” (auto', $r['social_api']['detail']['targets']['youtube']);
+        $this->assertStringStartsWith('posts go to acc_yt_1 “Aicountly” (auto', $r['social_api']['detail']['targets']['youtube']);
         $this->assertStringContainsString('not available — No active LinkedIn account', $r['social_api']['detail']['targets']['linkedin']);
         $this->assertSame('Bearer sapi_key_live_secret_xyz', $http->to('#social-api#')[0]['headers']['Authorization']);
         $this->assertCount(3, $http->to('#social-api#'), 'GET /accounts + one GET of each inbox list; never a post');
@@ -343,7 +343,7 @@ final class LiveIntegrationCheckTest extends CIUnitTestCase
     {
         $http = (new FakeHttpTransport())
             ->on('POST', '#oauth2\.googleapis\.com/token#', FakeHttpTransport::json(200, ['access_token' => 'ya29.access-secret-jkl', 'expires_in' => 3599, 'scope' => 'https://www.googleapis.com/auth/youtube.force-ssl']))
-            ->on('GET', '#youtube/v3/channels#', FakeHttpTransport::json(200, ['items' => [['id' => 'UC123', 'snippet' => ['title' => 'AICOUNTLY'], 'status' => ['longUploadsStatus' => 'eligible']]]]));
+            ->on('GET', '#youtube/v3/channels#', FakeHttpTransport::json(200, ['items' => [['id' => 'UC123', 'snippet' => ['title' => 'Aicountly'], 'status' => ['longUploadsStatus' => 'eligible']]]]));
         $r = $this->check($http)->run(['youtube'])['results'][0];
         $this->assertFalse($r['ok']);
         $this->assertStringContainsString('did not grant https://www.googleapis.com/auth/youtube.upload', $r['message']);

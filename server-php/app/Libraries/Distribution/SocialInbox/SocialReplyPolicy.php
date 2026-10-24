@@ -11,7 +11,7 @@ namespace App\Libraries\Distribution\SocialInbox;
  */
 final class SocialReplyPolicy
 {
-    public const SIGN_OFF = '— AICOUNTLY team';
+    public const SIGN_OFF = '— Aicountly team';
 
     /** Character limit per network (X counts 280; the others allow far more, Reach keeps replies short). */
     public static function limit(?string $network): int
@@ -31,7 +31,7 @@ final class SocialReplyPolicy
         if ($t === '') {
             return ['ok' => false, 'text' => '', 'reason' => 'The reply is empty.'];
         }
-        if (! str_contains($t, 'AICOUNTLY team')) {
+        if (stripos($t, 'Aicountly team') === false) { // an older "— AICOUNTLY team" counts too
             $t = rtrim($t) . ' ' . self::SIGN_OFF;
         }
         $limit = self::limit($network);
