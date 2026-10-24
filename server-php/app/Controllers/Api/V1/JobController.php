@@ -151,7 +151,11 @@ class JobController extends BaseApiController
         if (! $row) {
             return $this->fail('Job not found.', 404);
         }
-        if (in_array($row['status'], ['completed', 'dead_letter', 'cancelled', 'skipped'], true)) {
+        // A dead-lettered job can be cancelled too: it will never run again on
+        // its own, but it stays in the failure counts (the daily report counts
+        // every dead letter) until someone closes it. Cancelling records that
+        // it was looked at and needs nothing more.
+        if (in_array($row['status'], ['completed', 'cancelled', 'skipped'], true)) {
             return $this->fail('Job cannot be cancelled in its current state.', 422);
         }
         $reason = trim((string) ($this->input()['reason'] ?? ''));
