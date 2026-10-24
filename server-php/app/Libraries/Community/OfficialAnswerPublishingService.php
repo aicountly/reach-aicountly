@@ -5,6 +5,7 @@ namespace App\Libraries\Community;
 use App\Enums\CommunityAnswerStatus;
 use App\Enums\CommunityRiskTier;
 use App\Libraries\AuditLogger;
+use App\Libraries\Community\Automation\CommunityRevetRepairService;
 use App\Libraries\Support\PgBoolean;
 use App\Models\CommunityAnswerApprovalModel;
 use App\Models\CommunityDeploymentModel;
@@ -225,9 +226,7 @@ class OfficialAnswerPublishingService
         }
 
         if (! in_array($deployment['status'] ?? '', ['failed', 'retrying'], true)) {
-            throw new \RuntimeException(
-                "Deployment #{$deploymentId} is in status '{$deployment['status']}' and cannot be retried."
-            );
+            throw new \RuntimeException($this->notRetryableMessage($deployment));
         }
 
         if ($attempts >= $maxAttempts) {
@@ -428,6 +427,43 @@ class OfficialAnswerPublishingService
         }
 
         return $result;
+    }
+
+    /**
+     * Why a deployment cannot be retried, and what to do instead.
+     *
+     * The Job monitor shows this as the retry job's last error, and its Retry
+     * button only re-runs the status check in retryDeployment() — so for a
+     * dead-lettered deployment the message has to name the way out:
+     *   - the answer was published since by a later deployment: nothing to do;
+     *   - a re-vet correction that gave up at publication (the 23 Oct
+     *     idempotency conflict): community:revet-repair, then re-vet;
+     *   - anything else: fix the recorded cause and publish again.
+     */
+    private function notRetryableMessage(array $deployment): string
+    {
+        $status  = (string) ($deployment['status'] ?? '');
+        $message = "Deployment #{$deployment['id']} is in status '{$status}' and cannot be retried.";
+        if ($status !== 'dead_letter') {
+            return $message;
+        }
+
+        $answerId = (int) $deployment['answer_id'];
+        $later    = $this->deployModel->where('answer_id', $answerId)
+            ->where('id >', (int) $deployment['id'])
+            ->where('status', 'succeeded')
+            ->orderBy('id', 'DESC')
+            ->first();
+        if ($later !== null) {
+            return $message . " Nothing to redo: answer #{$answerId} was published since by deployment #{$later['id']}. This job can be cancelled.";
+        }
+
+        if (in_array($answerId, (new CommunityRevetRepairService())->affectedAnswerIds(), true)) {
+            return $message . " Retrying this job fails the same way. It was a re-vet correction of answer #{$answerId} that gave up at publication:"
+                . " run `php spark community:revet-repair --answer-ids={$answerId} --apply`, then the re-vet command it prints.";
+        }
+
+        return $message . " Retrying this job fails the same way. Fix the cause in the deployment's last error (Community → Deployments), then publish answer #{$answerId} again.";
     }
 
     /**
