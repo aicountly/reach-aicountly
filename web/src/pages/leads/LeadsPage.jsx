@@ -11,6 +11,7 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { Modal } from '../../components/common/Modal';
 import { DrillLink, drillHref, useUrlFilter } from '../../components/drill';
 import { ROUTES } from '../../constants/routes';
+import { leadHref } from './leadLinks';
 
 const EMPTY = {
   name: '', email: '', mobile: '', whatsapp: '', organization: '',
@@ -67,7 +68,7 @@ export function LeadsPage() {
   const columns = [
     { key: 'name', label: 'Name', render: (l) => (
       <div>
-        <div style={{ fontWeight: 600 }}>{l.name}</div>
+        <div style={{ fontWeight: 600 }}><DrillLink to={leadHref(l.id)} title="Open this lead">{l.name || `Lead #${l.id}`}</DrillLink></div>
         {l.organization && <div className="text-xs text-muted">{l.organization}</div>}
       </div>
     )},

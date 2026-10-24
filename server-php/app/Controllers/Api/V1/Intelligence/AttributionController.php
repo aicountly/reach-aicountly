@@ -6,15 +6,22 @@ namespace App\Controllers\Api\V1\Intelligence;
 
 use App\Controllers\BaseApiController;
 use App\Libraries\AuditLogger;
+use App\Libraries\Intelligence\AttributionConversions;
 use App\Models\Intelligence\UtmTemplateModel;
 use App\Models\Intelligence\AttributionTouchpointModel;
 use App\Models\Intelligence\AttributionConversionLinkModel;
 use App\Models\Intelligence\AttributionCalculationVersionModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use InvalidArgumentException;
 use App\Libraries\Database\SchemaGuard;
 
 class AttributionController extends BaseApiController
 {
+    /**
+     * GET intelligence/attribution — the overview tiles and first-touch bars.
+     * Optional model / confidence / type / from / to narrow both, with the same
+     * predicates as conversions() (AttributionConversions), so tile = list total.
+     */
     public function overview(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
@@ -35,85 +42,17 @@ class AttributionController extends BaseApiController
                 return $this->response->setJSON(['data' => $empty]);
             }
 
-            $totals = $db->query(
-                "SELECT
-                    COUNT(*)::int AS total_conversions,
-                    COUNT(*) FILTER (
-                        WHERE confidence_state IS DISTINCT FROM 'unattributed'
-                          AND matching_method IS DISTINCT FROM 'unattributed'
-                          AND (first_touchpoint_id IS NOT NULL OR last_touchpoint_id IS NOT NULL)
-                    )::int AS attributed,
-                    COUNT(*) FILTER (
-                        WHERE confidence_state = 'unattributed'
-                           OR matching_method = 'unattributed'
-                           OR (first_touchpoint_id IS NULL AND last_touchpoint_id IS NULL)
-                    )::int AS unattributed
-                 FROM reach_attribution_conversion_links
-                 WHERE tenant_id = ?",
-                [$tenantId]
-            )->getRowArray() ?: [
-                'total_conversions' => 0,
-                'attributed'        => 0,
-                'unattributed'      => 0,
-            ];
+            $data = AttributionConversions::overview($db, $tenantId, $this->conversionFilters());
 
-            $total        = (int) ($totals['total_conversions'] ?? 0);
-            $attributed   = (int) ($totals['attributed'] ?? 0);
-            $unattributed = (int) ($totals['unattributed'] ?? 0);
-            // Keep counts consistent if filters overlap oddly
-            if ($attributed + $unattributed !== $total && $total > 0) {
-                $unattributed = max(0, $total - $attributed);
-            }
-            $rate = $total > 0 ? round(($attributed / $total) * 100, 1) : 0.0;
-
-            $channelRows = [];
-            if (SchemaGuard::hasTable($db, 'reach_attribution_touchpoints')) {
-                $channelRows = $db->query(
-                    "SELECT
-                        COALESCE(NULLIF(TRIM(reach_attribution_touchpoints.channel), ''), NULLIF(TRIM(reach_attribution_touchpoints.utm_source), ''), 'Unknown') AS channel,
-                        COUNT(*)::int AS conversions
-                     FROM reach_attribution_conversion_links
-                     LEFT JOIN reach_attribution_touchpoints
-                       ON reach_attribution_touchpoints.id = reach_attribution_conversion_links.first_touchpoint_id
-                     WHERE reach_attribution_conversion_links.tenant_id = ?
-                       AND reach_attribution_conversion_links.confidence_state IS DISTINCT FROM 'unattributed'
-                       AND reach_attribution_conversion_links.matching_method IS DISTINCT FROM 'unattributed'
-                       AND reach_attribution_conversion_links.first_touchpoint_id IS NOT NULL
-                     GROUP BY 1
-                     ORDER BY conversions DESC
-                     LIMIT 20",
-                    [$tenantId]
-                )->getResultArray() ?: [];
-            }
-
-            $channelTotal = array_sum(array_map(static fn ($r) => (int) $r['conversions'], $channelRows));
-            $breakdown    = array_map(static function (array $row) use ($channelTotal): array {
-                $count = (int) $row['conversions'];
-                return [
-                    'channel'     => $row['channel'] ?: 'Unknown',
-                    'conversions' => $count,
-                    'pct'         => $channelTotal > 0 ? (int) round(($count / $channelTotal) * 100) : 0,
-                ];
-            }, $channelRows);
-
-            $latest = null;
+            $data['latest_calculation'] = null;
             if (SchemaGuard::hasTable($db, 'reach_attribution_calculation_versions')) {
                 $calcModel = new AttributionCalculationVersionModel();
-                $latest    = $calcModel->where('tenant_id', $tenantId)->orderBy('calculated_at', 'DESC')->first();
+                $data['latest_calculation'] = $calcModel->where('tenant_id', $tenantId)->orderBy('calculated_at', 'DESC')->first();
             }
 
-            return $this->response->setJSON([
-                'data' => [
-                    'stats' => [
-                        'total_conversions' => $total,
-                        'attributed'        => $attributed,
-                        'unattributed'      => $unattributed,
-                        'attribution_rate'  => $rate,
-                    ],
-                    'first_touch_breakdown' => $breakdown,
-                    'latest_calculation'    => $latest,
-                ],
-            ]);
+            return $this->response->setJSON(['data' => $data]);
+        } catch (InvalidArgumentException $e) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
         } catch (\Throwable $e) {
             log_message('error', 'AttributionController::overview: ' . $e->getMessage());
             return $this->response->setJSON(['data' => $empty]);
@@ -146,23 +85,42 @@ class AttributionController extends BaseApiController
         return $this->response->setStatusCode(201)->setJSON(['data' => $model->find($id)]);
     }
 
+    /**
+     * GET intelligence/attribution/conversions — the conversion links behind the
+     * overview: attributed=0|1, channel (first-touch label, as the bars show it),
+     * model (matching_method), confidence, type, lead_id, from / to (YYYY-MM-DD),
+     * page / limit. Returns { items, total, page, limit }.
+     */
     public function conversions(): ResponseInterface
     {
         $tenantId = (int) ($this->request->getGet('tenant_id') ?? 1);
+        [$page, $limit, $offset] = $this->pagination(50, 200);
+        $empty = ['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit];
 
         try {
             $db = \Config\Database::connect();
             if (! SchemaGuard::hasTable($db, 'reach_attribution_conversion_links')) {
-                return $this->response->setJSON(['data' => []]);
+                return $this->response->setJSON(['data' => $empty]);
             }
 
-            $model = new AttributionConversionLinkModel();
-            $data  = $model->where('tenant_id', $tenantId)->orderBy('converted_at', 'DESC')->findAll(50);
-            return $this->response->setJSON(['data' => is_array($data) ? $data : []]);
+            $list = AttributionConversions::list($db, $tenantId, $this->conversionFilters(), $limit, $offset);
+            return $this->response->setJSON(['data' => $list + ['page' => $page, 'limit' => $limit]]);
+        } catch (InvalidArgumentException $e) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => $e->getMessage()]);
         } catch (\Throwable $e) {
             log_message('error', 'AttributionController::conversions: ' . $e->getMessage());
-            return $this->response->setJSON(['data' => []]);
+            return $this->response->setJSON(['data' => $empty]);
         }
+    }
+
+    /** @return array<string,string> */
+    private function conversionFilters(): array
+    {
+        $out = [];
+        foreach (['attributed', 'channel', 'model', 'confidence', 'type', 'lead_id', 'from', 'to'] as $key) {
+            $out[$key] = (string) ($this->request->getGet($key) ?? '');
+        }
+        return $out;
     }
 
     public function correct(int $id): ResponseInterface

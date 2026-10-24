@@ -48,6 +48,8 @@ export const ROUTES = {
   LEADS:        '/leads',
   ENGAGE_PUSH:  '/leads/engage-push',
   LEAD_OUTCOMES: '/leads/outcomes',
+  LEAD_DETAIL:  '/leads/:id',
+  ATTRIBUTION_CONVERSIONS: '/intelligence/attribution/conversions',
 
   // Overview → Bot plan (page owned by the bot-plan stream).
   BOT_PLAN:     '/bot/plan',

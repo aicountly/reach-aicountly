@@ -7,7 +7,8 @@ import { DataTable } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { FilterBar } from '../../components/common/FilterBar';
 import { formatDateTime } from '../../utils/formatDate';
-import { useUrlFilter } from '../../components/drill';
+import { DrillLink, useUrlFilter } from '../../components/drill';
+import { leadHref } from './leadLinks';
 
 const STATES = ['','pending_push','pushed','failed','duplicate','rejected','retry_scheduled'];
 
@@ -37,7 +38,7 @@ export function EngagePushPage() {
   const columns = [
     { key: 'id', label: 'Lead', render: (r) => (
       <div>
-        <div className="font-semibold">#{r.id} · {r.name || '—'}</div>
+        <div className="font-semibold"><DrillLink to={leadHref(r.id)} title="Open this lead and its push attempts">#{r.id} · {r.name || '—'}</DrillLink></div>
         <div className="text-xs text-muted">{r.email || r.mobile || ''}</div>
       </div>
     )},

@@ -27,6 +27,7 @@ import SocialPerformanceTab from './pages/social/SocialPerformanceTab.jsx';
 import SocialAdsPage from './pages/social/ads/SocialAdsPage.jsx';
 import { ComingSoonPage } from './pages/ComingSoonPage.jsx';
 import { LeadsLayout } from './pages/leads/LeadsLayout.jsx';
+import { LeadDetailPage } from './pages/leads/LeadDetailPage';
 import { AnalyticsLayout } from './pages/reports/AnalyticsLayout.jsx';
 import { LEGACY_REDIRECTS, PLANNED_ROUTES } from './constants/navManifest';
 import { SocialInboxPage } from './pages/social/SocialInboxPage';
@@ -170,6 +171,7 @@ import IndexNowOperationsPage           from './pages/intelligence/IndexNowOpera
 import AttributionOverviewPage          from './pages/intelligence/AttributionOverviewPage.jsx';
 import UtmTemplatesPage                 from './pages/intelligence/UtmTemplatesPage.jsx';
 import UnattributedLeadsPage            from './pages/intelligence/UnattributedLeadsPage.jsx';
+import AttributionConversionsPage       from './pages/intelligence/AttributionConversionsPage.jsx';
 import VisibilityOverviewPage           from './pages/intelligence/VisibilityOverviewPage.jsx';
 import VisibilityPromptLibraryPage      from './pages/intelligence/VisibilityPromptLibraryPage.jsx';
 import VisibilityRunHistoryPage         from './pages/intelligence/VisibilityRunHistoryPage.jsx';
@@ -395,6 +397,7 @@ export default function App() {
 
         <Route element={<LeadsLayout />}>
           <Route path={ROUTES.LEADS}       element={<LeadsPage />} />
+          <Route path={ROUTES.LEAD_DETAIL} element={<LeadDetailPage />} />
           <Route path={ROUTES.ENGAGE_PUSH} element={<EngagePushPage />} />
           <Route path={ROUTES.LEAD_OUTCOMES} element={<LeadOutcomesPage />} />
         </Route>
@@ -521,6 +524,7 @@ export default function App() {
           <Route path="attribution" element={<AttributionOverviewPage />} />
           <Route path="attribution/utm" element={<UtmTemplatesPage />} />
           <Route path="attribution/unattributed" element={<UnattributedLeadsPage />} />
+          <Route path="attribution/conversions" element={<AttributionConversionsPage />} />
           <Route path="visibility" element={<VisibilityOverviewPage />} />
           <Route path="visibility/prompts" element={<VisibilityPromptLibraryPage />} />
           <Route path="visibility/runs" element={<VisibilityRunHistoryPage />} />

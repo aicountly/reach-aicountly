@@ -91,7 +91,7 @@ describe('LeadOutcomesPage', () => {
     expect(screen.getByTestId('stage-qualified').querySelector('a')).toHaveAttribute('href', '/leads/outcomes?days=7&stage=qualified');
     expect(screen.getByTestId('stage-demo').querySelector('a')).toBeNull();
     // A matched lead opens the lead list narrowed to it; an unmatched code narrows this list.
-    expect(screen.getByRole('link', { name: '#41 · Asha Rao' })).toHaveAttribute('href', '/leads?lead_id=41');
+    expect(screen.getByRole('link', { name: '#41 · Asha Rao' })).toHaveAttribute('href', '/leads/41');
     expect(screen.getByRole('link', { name: 'LD-0099' })).toHaveAttribute('href', '/leads/outcomes?days=7&search=LD-0099');
     expect(screen.getByRole('link', { name: 'Diwali GST push' })).toHaveAttribute('href', '/campaigns/7');
     expect(screen.getByRole('link', { name: 'SLR-000123' })).toHaveAttribute('href', '/leads/outcomes?days=7&seller_code=SLR-000123');
