@@ -88,7 +88,8 @@ export function JobMonitorPage() {
   };
   const cancelJob = async (id) => {
     setNotice(null);
-    const reason = window.prompt('Cancel reason (optional):') || '';
+    const reason = window.prompt('Cancel reason (optional):');
+    if (reason === null) return; // dismissing the prompt does not cancel the job
     try { await jobService.cancel(id, reason); setNotice(`Job #${id} cancelled.`); load(); }
     catch (e) { setError(e.message); }
   };
@@ -120,7 +121,7 @@ export function JobMonitorPage() {
             <RotateCcw size={12} /> Retry
           </button>
         )}
-        {canCancel && ['pending', 'processing', 'failed'].includes(r.status) && (
+        {canCancel && ['pending', 'processing', 'failed', 'dead_letter'].includes(r.status) && (
           <button className="btn btn-danger btn-sm" onClick={() => cancelJob(r.id)}>
             <XCircle size={12} /> Cancel
           </button>

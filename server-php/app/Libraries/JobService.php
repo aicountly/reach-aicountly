@@ -347,10 +347,20 @@ class JobService
     public function cancel(int $jobId, ?string $reason = null): void
     {
         $now = date('Y-m-d H:i:s');
+
+        // Keep the job's last error: on a failed or dead-lettered job it is the
+        // reason anyone looked at it. The cancel reason goes in front.
+        $row       = $this->db->table('reach_jobs')->select('error_message')->where('id', $jobId)->get()->getRowArray();
+        $lastError = trim((string) ($row['error_message'] ?? ''));
+        $message   = $reason ? 'Cancelled: ' . $reason : null;
+        if ($lastError !== '') {
+            $message = $message !== null ? $message . "\n\nLast error: " . $lastError : $lastError;
+        }
+
         $this->db->table('reach_jobs')->where('id', $jobId)->update([
             'status'           => 'cancelled',
             'completed_at'     => $now,
-            'error_message'    => $reason ? substr($reason, 0, 4000) : null,
+            'error_message'    => $message !== null ? substr($message, 0, 4000) : null,
             'lease_expires_at' => null,
             'updated_at'       => $now,
         ]);

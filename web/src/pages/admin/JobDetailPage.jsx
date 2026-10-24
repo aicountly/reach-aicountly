@@ -15,7 +15,8 @@ import { formatDateTime } from '../../utils/formatDate';
 
 // Same state rules as JobController::retry / ::cancel.
 const RETRYABLE = ['failed', 'dead_letter', 'cancelled', 'skipped'];
-const CANCELLABLE = ['pending', 'processing', 'failed'];
+// dead_letter: closes a job that will never run again, so it leaves the failure counts.
+const CANCELLABLE = ['pending', 'processing', 'failed', 'dead_letter'];
 
 const jobHref = (id) => `${ROUTES.JOBS}/${id}`;
 

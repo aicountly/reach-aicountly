@@ -67,6 +67,19 @@ describe('JobDetailPage', () => {
     expect(screen.queryByRole('button', { name: /Cancel/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show full payload' })).not.toBeInTheDocument();
   });
+
+  it('a dead-lettered job can be cancelled; dismissing the reason prompt does not cancel it', async () => {
+    jobService.get.mockResolvedValue({ ...job, status: 'dead_letter' });
+    jobService.cancel.mockResolvedValue({});
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce(null).mockReturnValueOnce('published since');
+    renderDetail(admin);
+    const cancel = await screen.findByRole('button', { name: /Cancel/ });
+    fireEvent.click(cancel);
+    expect(jobService.cancel).not.toHaveBeenCalled();
+    fireEvent.click(cancel);
+    await waitFor(() => expect(jobService.cancel).toHaveBeenCalledWith(41, 'published since'));
+    prompt.mockRestore();
+  });
 });
 
 describe('JobMonitorPage rows', () => {
@@ -86,5 +99,18 @@ describe('JobMonitorPage rows', () => {
 
     fireEvent.click(await screen.findByRole('row', { name: 'Open job 41' }));
     expect(await screen.findByText('job detail')).toBeInTheDocument();
+  });
+
+  it('a dead-lettered row has Cancel; dismissing the reason prompt does not cancel it', async () => {
+    jobService.list.mockResolvedValue({ total: 1, items: [{ ...job, status: 'dead_letter', siblings: undefined, history: undefined }] });
+    jobService.cancel.mockResolvedValue({});
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce(null).mockReturnValueOnce('');
+    renderWithAuth(<JobMonitorPage />, { ...admin, route: '/admin/jobs' });
+    const cancel = await screen.findByRole('button', { name: /Cancel/ });
+    fireEvent.click(cancel);
+    expect(jobService.cancel).not.toHaveBeenCalled();
+    fireEvent.click(cancel);
+    await waitFor(() => expect(jobService.cancel).toHaveBeenCalledWith(41, ''));
+    prompt.mockRestore();
   });
 });
