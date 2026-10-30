@@ -22,7 +22,14 @@ class StabilityController
         $this->minScoreMovement ??= (float) env('BLOG_ROADMAP_MIN_SCORE_MOVEMENT', 5);
         $this->cooldownDays ??= (int) env('BLOG_ROADMAP_COOLDOWN_DAYS', 14);
         $this->maxDailyCandidates ??= (int) env('BLOG_ROADMAP_MAX_DAILY_CANDIDATES', 10);
-        $this->maxWeeklyPublications ??= (int) env('BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS', 5);
+        // A rolling 7-day ceiling below the daily cap starves the roadmap: one run
+        // spends the whole week's budget and every later run holds all candidates,
+        // which in the panel is indistinguishable from the cron having stopped.
+        // Derive it from the daily cap unless an explicit value is configured.
+        $this->maxWeeklyPublications ??= (int) env(
+            'BLOG_ROADMAP_MAX_WEEKLY_PUBLICATIONS',
+            $this->maxDailyCandidates * 7,
+        );
     }
 
     public function shouldSkipForMovement(float $new, ?float $prev): bool

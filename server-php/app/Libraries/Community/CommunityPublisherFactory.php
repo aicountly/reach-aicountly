@@ -27,7 +27,14 @@ class CommunityPublisherFactory
         }
 
         $env = strtolower($_ENV['APP_ENV'] ?? 'production');
-        if ($env === 'testing' || !empty($_ENV['REACH_PUB_COMMUNITY_MOCK'])) {
+
+        // The mock reports success with a canonical_url that does not exist, so it
+        // must never stand in for the real publisher in production. Two guards:
+        // the flag is parsed as a boolean — !empty() made the string 'false' turn
+        // the mock ON, and that is how the variable is written in the docs — and
+        // production ignores the flag entirely.
+        $mockRequested = filter_var($_ENV['REACH_PUB_COMMUNITY_MOCK'] ?? false, FILTER_VALIDATE_BOOL);
+        if ($env === 'testing' || ($mockRequested && $env !== 'production')) {
             return new MockCommunityPublisher();
         }
 
