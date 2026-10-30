@@ -110,9 +110,13 @@ class OfficialAnswerGenerationService
         $groundingCtx = $this->buildGroundingContext($question, $answer);
         $prompt       = $this->buildPrompt($question, $answer, $answerType, $groundingCtx);
 
-        // Use mock in test/mock env, real orchestrator in production
-        $isTestEnv = ($_ENV['APP_ENV'] ?? 'production') === 'testing'
-                  || !empty($_ENV['REACH_PUB_COMMUNITY_MOCK']);
+        // Use mock in test/mock env, real orchestrator in production. Same two
+        // guards as CommunityPublisherFactory: the flag is a boolean, not a
+        // non-empty string, and production never takes the mock.
+        $appEnv    = strtolower($_ENV['APP_ENV'] ?? 'production');
+        $isTestEnv = $appEnv === 'testing'
+                  || (filter_var($_ENV['REACH_PUB_COMMUNITY_MOCK'] ?? false, FILTER_VALIDATE_BOOL)
+                      && $appEnv !== 'production');
 
         if ($isTestEnv) {
             $aiOutput = $this->mockGenerationOutput($question, $answerType);

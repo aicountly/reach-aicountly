@@ -188,18 +188,21 @@ class WorkBlockService
 
         $blockType = (string) $block['block_type'];
 
-        // PUBLISH_BLOG applies its own hard high-risk-auto-publish ban internally and
-        // does not depend on the general 'automation' flag (it depends on
-        // 'public_publisher' + 'auto_publish' specifically).
-        if ($blockType === self::TYPE_PUBLISH_BLOG) {
-            return $this->executePublishBlog($id, $block);
-        }
-
-        if (! $this->flags->isEnabled('automation')) {
-            return $this->blockOnFlag($id, $blockType, 'automation_disabled');
-        }
-
         try {
+            // PUBLISH_BLOG applies its own hard high-risk-auto-publish ban internally
+            // and does not depend on the general 'automation' flag (it depends on
+            // 'public_publisher' + 'auto_publish' specifically). It stays inside this
+            // try: the row is already 'processing' by now, and 'processing' is
+            // terminal because only 'failed' and 'blocked' are ever reopened — so a
+            // publish that throws past this point wedges the block for good.
+            if ($blockType === self::TYPE_PUBLISH_BLOG) {
+                return $this->executePublishBlog($id, $block);
+            }
+
+            if (! $this->flags->isEnabled('automation')) {
+                return $this->blockOnFlag($id, $blockType, 'automation_disabled');
+            }
+
             return match ($blockType) {
                 self::TYPE_OPTIMIZE_ROADMAP, self::TYPE_ROADMAP_PLAN => $this->executeOptimizeRoadmap($id, $block),
                 self::TYPE_DISCOVER_TOPICS   => $this->executeDiscoverTopics($id, $block),
@@ -229,7 +232,7 @@ class WorkBlockService
                 self::TYPE_SYNC_ANALYTICS    => $this->executeSyncAnalytics($id, $block),
                 default => $this->blockOnFlag($id, $blockType, 'handler_not_implemented'),
             };
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->markFailed($id, $blockType, $e->getMessage());
         }
     }

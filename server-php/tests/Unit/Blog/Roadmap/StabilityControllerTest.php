@@ -30,6 +30,31 @@ final class StabilityControllerTest extends TestCase
         $this->assertSame(3, $controller->weeklyPublicationCap());
     }
 
+    /**
+     * The weekly cap is a rolling 7-day ceiling on CREATE decisions. Defaulted
+     * flat at 5 against a daily cap of 10, one optimiser run spent the whole
+     * week's budget and every later run held all candidates — in the panel,
+     * indistinguishable from the cron having stopped.
+     */
+    public function testWeeklyCapDefaultIsNeverBelowTheDailyCap(): void
+    {
+        $controller = new StabilityController(maxDailyCandidates: 10);
+
+        $this->assertSame(70, $controller->weeklyPublicationCap());
+        $this->assertGreaterThanOrEqual(
+            $controller->dailyCandidateCap(),
+            $controller->weeklyPublicationCap(),
+            'A weekly ceiling below the daily cap starves the roadmap.',
+        );
+    }
+
+    public function testExplicitWeeklyCapStillWins(): void
+    {
+        $controller = new StabilityController(maxDailyCandidates: 10, maxWeeklyPublications: 3);
+
+        $this->assertSame(3, $controller->weeklyPublicationCap());
+    }
+
     public function testPortfolioOverConcentratedWhenActualExceedsTargetPlusMargin(): void
     {
         $controller = new StabilityController();
