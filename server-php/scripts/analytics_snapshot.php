@@ -41,6 +41,14 @@ declare(strict_types=1);
  */
 
 // The shared SDK: the .env reader, the dimension rules and the push. Copy-don't-edit.
+// Operator scripts run from the command line only. Before ANYTHING else, including the require
+// below: a script that loads half an application before deciding it should not have been reached
+// over HTTP has already done the work an attacker wanted.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 require_once __DIR__ . '/../app/ThirdParty/AicountlyAnalytics/analytics-platform-snapshot.php';
 
 const SOURCE = 'reach';

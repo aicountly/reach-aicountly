@@ -29,6 +29,6 @@ console-audit-deliver   | */5 * * * * | {php} spark reach:console-audit-deliver
 # the database reports them (analytics docs/08). Minutes are staggered per product so forty hosts do
 # not all wake together.
 analytics-flush         | * * * * *   | {php} app/ThirdParty/AicountlyAnalytics/analytics-flush.php --env=.env
-analytics-platform      | 51 1 * * *  | {php} app/ThirdParty/AicountlyAnalytics/analytics-platform-snapshot.php --env=.env --push
+analytics-platform      | 51 1 * * *  | {php} app/ThirdParty/AicountlyAnalytics/analytics-platform-collect.php --env=.env --push
 # This product also OWNS facts nothing else can report: marketing figures (campaigns, budgets, leads and the content pipeline).
 analytics-snapshot      | 53 1 * * *  | {php} scripts/analytics_snapshot.php --env=.env --push
