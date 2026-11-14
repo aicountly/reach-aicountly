@@ -105,6 +105,15 @@ final class BotActivityRegistry
                 'cost' => 'Gemini vetting calls only for items waiting on them.',
                 'link' => '/admin/jobs',
             ],
+            'recommendation_autofix' => [
+                'name' => 'Bot fixes for "What to do next"', 'group' => 'Content & publishing', 'kind' => 'job',
+                'description' => 'In AUTO mode: queue a focused article for a search query near page one, a sharper title for a page people do not click, and send AI Insights recommendations to the bot — within the Settings → Bot fixes limits.',
+                'cron' => '0 * * * *', 'schedule' => 'Hourly',
+                'job_type' => 'reach.recommendation_autofix', 'queue' => 'default',
+                'payload' => static fn (): array => [],
+                'cost' => 'No provider calls itself; an insight fix fires one reach-command session.',
+                'link' => '/',
+            ],
             'blog_cover_sweep' => [
                 'name' => 'Blog cover sweep', 'group' => 'Content & publishing', 'kind' => 'job',
                 'description' => 'Releases articles parked for want of a cover image.',

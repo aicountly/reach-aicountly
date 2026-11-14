@@ -96,6 +96,8 @@ class JobHandlerRegistry
         $this->handlers['reach.structured_content_sweep']            = new \App\Jobs\StructuredContentSweepJob();
         // Stream C: Claude-routine blog/KB pipeline (vet → approve → cover → publish → verify)
         $this->handlers['reach.routine_content_sweep']               = new \App\Jobs\RoutineContentSweepJob();
+        // Bot fixes: in AUTO mode the bot acts on "What to do next" cards (hourly).
+        $this->handlers['reach.recommendation_autofix']              = new \App\Jobs\RecommendationAutoFixJob();
         $this->handlers['reach.content_quality_sweep']               = new \App\Jobs\ContentQualitySweepJob();
         $this->handlers['reach.engage_push_retry_sweep']             = new \App\Jobs\EngagePushRetrySweepJob();
         // Automated video (queue `video`) — Stream V: one resumable step per job + hourly sweep.

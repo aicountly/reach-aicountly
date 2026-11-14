@@ -20,6 +20,7 @@ final class RoutineSubmissionView
         RoutineSubmissions::PUBLISHING      => 'Publishing',
         RoutineSubmissions::LIVE            => 'Live',
         RoutineSubmissions::PUBLISH_FAILED  => 'Publish failed',
+        RoutineSubmissions::AWAITING_REWRITE => 'Waiting for the bot\'s rewrite',
     ];
 
     /** Statuses an operator may push forward with "Retry". */
@@ -85,6 +86,8 @@ final class RoutineSubmissionView
             'deployment_id'   => $row['deployment_id'] !== null ? (int) $row['deployment_id'] : null,
             'workflow_status' => $row['workflow_status'] ?? null,
             'last_error'      => $row['last_error'],
+            'block_kind'      => $row['block_kind'] ?? null,
+            'remediation'     => RoutineRemediator::describe($row),
             'published_at'    => $row['published_at'],
             'verified_at'     => $row['verified_at'],
             'created_at'      => $row['created_at'],

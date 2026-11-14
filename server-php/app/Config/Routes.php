@@ -205,6 +205,7 @@ $routes->group('v1', static function ($routes) {
         $routes->get('dashboard/counts',  'Api\\V1\\DashboardController::counts',  ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/command-centre', 'Api\\V1\\DashboardController::commandCentre', ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/command-centre/activity', 'Api\\V1\\DashboardController::commandCentreActivity', ['filter' => 'permission:dashboard.view']);
+        $routes->post('dashboard/command-centre/fix', 'Api\\V1\\DashboardController::commandCentreFix', ['filter' => ['permission:bot.run,settings.manage', 'throttle:bot_run']]);
         $routes->get('dashboard/command-centre/rankings/keywords',   'Api\\V1\\DashboardController::commandCentreKeywords',  ['filter' => 'permission:dashboard.view']);
         $routes->get('dashboard/command-centre/rankings/ai-answers', 'Api\\V1\\DashboardController::commandCentreAiAnswers', ['filter' => 'permission:dashboard.view']);
 
@@ -670,6 +671,8 @@ $routes->group('v1', static function ($routes) {
         // ── Stream C: Claude-routine blog/KB submissions (vetting decision, cover, retry) ──
         $routes->get('routine-submissions',                                 'Api\\V1\\Content\\RoutineSubmissionController::index',      ['filter' => 'permission:content.view']);
         $routes->post('routine-submissions/(:num)/retry',                   'Api\\V1\\Content\\RoutineSubmissionController::retry/$1',   ['filter' => 'permission:publishing.publish']);
+        $routes->post('routine-submissions/(:num)/remedy',                  'Api\\V1\\Content\\RoutineSubmissionController::remedy/$1',  ['filter' => 'permission:publishing.publish']);
+        $routes->post('routine-submissions/fix-blocked',                    'Api\\V1\\Content\\RoutineSubmissionController::fixBlocked', ['filter' => 'permission:publishing.publish']);
         $routes->get('ai/generations',                                      'Api\\V1\\Ai\\AiGenerationController::index',                  ['filter' => 'permission:ai.view']);
         $routes->get('ai/generations/(:segment)',                           'Api\\V1\\Ai\\AiGenerationController::show/$1',                ['filter' => 'permission:ai.view']);
         $routes->post('ai/generations/(:segment)/cancel',                   'Api\\V1\\Ai\\AiGenerationController::cancel/$1',              ['filter' => 'permission:ai.generate']);

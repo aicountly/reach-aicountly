@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Libraries\Dashboard;
 
+use App\Libraries\Automation\Routine\RoutineRemediator;
+use App\Libraries\Automation\Routine\RoutineSubmissions;
+use App\Libraries\Content\Base\RoutineActivity;
 use App\Libraries\Database\SchemaGuard;
 use App\Libraries\Intelligence\SearchSiteAnalyticsService;
 use App\Libraries\Jobs\JobQueueInsights;
@@ -168,8 +171,13 @@ final class CommandCentreService
     }
 
     /**
-     * Last activity per automated content stream, and whether it looks stale
-     * (enabled but nothing received for 36 h).
+     * Last submission per automated content stream, and whether the routine
+     * looks quiet. "Quiet" is RoutineActivity's rule — the one the daily
+     * report and the Content Base page use: nothing (no API call, no
+     * submission) for longer than the routine's cadence allows (daily:
+     * automation.content_base.stale_hours, default 36 h; weekly: 8 days).
+     * A flat 36 h flagged the weekly workflow-guides routine as quiet every
+     * Tuesday-to-Monday.
      *
      * @return list<array<string, mixed>>
      */
@@ -183,7 +191,8 @@ final class CommandCentreService
             ['community', 'Community Q&A', 'reach_community_automation_submissions', '1=1', 'automation.community.enabled'],
             ['video', 'Video', 'reach_video_pipeline_items', '1=1', 'automation.video.enabled'],
         ];
-        $out = [];
+        $activity = (new RoutineActivity($this->db))->health($this->now);
+        $out      = [];
         foreach ($streams as [$id, $label, $table, $where, $flag]) {
             $enabled = (bool) ReachConfig::get($flag, true);
             $row     = SchemaGuard::hasTable($this->db, $table)
@@ -192,14 +201,19 @@ final class CommandCentreService
                         FROM {$table} WHERE {$where}")->getRowArray()
                 : null;
             $last  = $row['last_at'] ?? null;
-            $stale = $enabled && ($last === null || strtotime((string) $last) < $this->now->getTimestamp() - 36 * 3600);
+            $h     = $activity[$id] ?? null;
             $out[] = [
-                'id'       => $id,
-                'label'    => $label,
-                'enabled'  => $enabled,
-                'last_at'  => $last,
-                'last_24h' => (int) ($row['last_24h'] ?? 0),
-                'stale'    => $stale,
+                'id'               => $id,
+                'label'            => $label,
+                'enabled'          => $enabled,
+                'last_at'          => $last,
+                'last_activity_at' => $h['last_activity_at'] ?? $last,
+                'last_24h'         => (int) ($row['last_24h'] ?? 0),
+                'cadence'          => $h['cadence'] ?? 'daily',
+                'threshold_hours'  => (int) ($h['threshold_hours'] ?? 36),
+                'stale'            => $enabled && ($h !== null
+                    ? (bool) $h['stale']
+                    : ($last === null || strtotime((string) $last) < $this->now->getTimestamp() - 36 * 3600)),
             ];
         }
 
@@ -675,12 +689,15 @@ final class CommandCentreService
             $add('stalled', 'medium', "{$queues['stalled']} job(s) stalled", 'A worker died mid-job (lease expired). reach:schedule re-queues them each minute.', null, '/admin/jobs?stalled=1', 'queue');
         }
 
-        // Stalled routines.
+        // Stalled routines: Run now fires it through reach-command.
         foreach (($health['routines'] ?? []) as $r) {
             if ($r['stale']) {
+                $activity = self::ROUTINE_ACTIVITIES[$r['id']] ?? null;
                 $add('routine-' . $r['id'], 'medium', "{$r['label']} routine has been quiet",
-                    $r['last_at'] ? 'Last submission ' . substr((string) $r['last_at'], 0, 16) . ' — check its Claude routine schedule.' : 'No submission received yet — check its Claude routine.',
-                    null, '/admin/ai-automation#automation', 'pipeline');
+                    ($r['last_at'] ? 'Last submission ' . substr((string) $r['last_at'], 0, 16) : 'No submission received yet')
+                        . sprintf(' — it runs %s, so Reach expects to hear from it at least every %d h. Run it now, and check its schedule in claude.ai → Routines.', $r['cadence'], $r['threshold_hours']),
+                    $activity !== null ? ['label' => 'Run it now', 'method' => 'POST', 'endpoint' => "v1/bot/activities/{$activity}/run", 'body' => [], 'permission' => 'bot.run'] : null,
+                    '/bot/activities', 'pipeline');
             }
         }
 
@@ -698,9 +715,10 @@ final class CommandCentreService
             }
         }
         if (SchemaGuard::hasTable($this->db, 'reach_routine_submissions')) {
-            $blocked = (int) $this->db->query("SELECT COUNT(*) AS c FROM reach_routine_submissions WHERE status IN ('publish_blocked','publish_failed')")->getRowArray()['c'];
-            if ($blocked > 0) {
-                $add('routine-blocked', 'medium', "{$blocked} routine article(s) blocked from publishing", 'Open each one for the blocking reason and retry.', null, '/blog-command-centre/verification/routine', 'pipeline');
+            foreach ($this->blockedRoutineArticles() as $type => $b) {
+                $add('routine-blocked-' . $type, 'medium', $b['title'], $b['detail'],
+                    $b['fixable'] > 0 ? ['label' => 'Let the bot fix them', 'method' => 'POST', 'endpoint' => 'v1/routine-submissions/fix-blocked', 'body' => [], 'permission' => 'publishing.publish'] : null,
+                    $b['link'], 'pipeline');
             }
         }
 
@@ -720,6 +738,10 @@ final class CommandCentreService
                 $add('push-' . md5($q['query']), 'low', sprintf('Push "%s" onto page one', $q['query']),
                     sprintf('Average position %.1f with %d impressions and %d clicks in 28 days — a focused article or internal links could lift it.', (float) $q['pos'], (int) $q['imp'], (int) $q['clk']),
                     null, '/intelligence/search', 'search');
+                $cards[array_key_last($cards)]['fix'] = ['kind' => 'search_topic', 'params' => [
+                    'query' => (string) $q['query'], 'impressions' => (int) $q['imp'], 'clicks' => (int) $q['clk'], 'position' => round((float) $q['pos'], 1),
+                    'pages' => $this->pagesForQuery((string) $q['query'], $from, $latest),
+                ]];
             }
             foreach ($this->db->query(
                 "SELECT page_url, SUM(impressions) AS imp, SUM(clicks) AS clk
@@ -728,9 +750,17 @@ final class CommandCentreService
                   ORDER BY SUM(impressions) DESC LIMIT 2",
                 [$from, $latest]
             )->getResultArray() as $p) {
+                $itemId = $this->reachItemForUrl((string) $p['page_url']);
                 $add('retitle-' . md5($p['page_url']), 'low', 'Retitle a page people see but do not click',
-                    sprintf('%s — %d impressions, %d clicks (CTR %.1f%%). A clearer title and description usually help.', $p['page_url'], (int) $p['imp'], (int) $p['clk'], 100 * (int) $p['clk'] / max(1, (int) $p['imp'])),
+                    sprintf('%s — %d impressions, %d clicks (CTR %.1f%%). A clearer title and description usually help.', $p['page_url'], (int) $p['imp'], (int) $p['clk'], 100 * (int) $p['clk'] / max(1, (int) $p['imp']))
+                        . ($itemId === null ? ' Reach did not publish this page, so change its title in the aicountly.com code.' : ''),
                     null, '/intelligence/search/pages', 'search');
+                if ($itemId !== null) {
+                    $cards[array_key_last($cards)]['fix'] = ['kind' => 'retitle', 'params' => [
+                        'page_url' => (string) $p['page_url'], 'item_id' => $itemId, 'impressions' => (int) $p['imp'], 'clicks' => (int) $p['clk'],
+                        'queries' => $this->queriesForPage((string) $p['page_url'], $from, $latest),
+                    ]];
+                }
             }
         }
 
@@ -746,6 +776,9 @@ final class CommandCentreService
                     trim(mb_substr((string) $a['detail'], 0, 240) . ($a['expected_impact'] ? ' · impact ' . $a['expected_impact'] : '') . ($a['effort'] ? ' · effort ' . $a['effort'] : '')),
                     ['label' => 'Mark done', 'method' => 'PATCH', 'endpoint' => 'v1/intelligence/insights/actions/' . $a['id'], 'body' => ['status' => 'done'], 'permission' => 'intelligence.manage'],
                     '/intelligence/insights', 'ai_insights');
+                $cards[array_key_last($cards)]['fix'] = ['kind' => 'insight', 'params' => [
+                    'id' => (int) $a['id'], 'title' => (string) $a['title'], 'detail' => (string) $a['detail'],
+                ]];
             }
         }
 
@@ -759,6 +792,7 @@ final class CommandCentreService
 
         $order = ['high' => 0, 'medium' => 1, 'low' => 2];
         usort($cards, static fn ($a, $b) => $order[$a['severity']] <=> $order[$b['severity']]);
+        $cards = $this->withBotFixes($cards);
 
         return [
             'status' => $cards === [] ? 'empty' : 'ok',
@@ -768,6 +802,140 @@ final class CommandCentreService
     }
 
     // ─────────────────────────────────────────────────────────── helpers
+
+    /** Command centre routine id → Bot activity key (Run now). */
+    private const ROUTINE_ACTIVITIES = [
+        'blog' => 'routine_reach_blog', 'knowledge_base' => 'routine_reach_kb', 'release_note' => 'routine_reach_release_notes',
+        'workflow_guide' => 'routine_reach_workflow_guides', 'community' => 'routine_reach_community_qa', 'video' => 'routine_reach_video',
+    ];
+
+    /**
+     * Blocked routine articles per type: how many, why, what the bot does
+     * next, and the page that lists them (a help article is not on the blog
+     * page, which is where the old single card sent everyone).
+     *
+     * @return array<string, array{title: string, detail: string, link: string, fixable: int}>
+     */
+    private function blockedRoutineArticles(): array
+    {
+        $rows = $this->db->table('reach_routine_submissions')->whereIn('status', RoutineSubmissions::BLOCKED)->get()->getResultArray();
+        $by   = [];
+        foreach ($rows as $row) {
+            $by[(string) $row['content_type']][] = $row;
+        }
+        $filter = '?status=' . implode(',', RoutineSubmissions::BLOCKED);
+        $out    = [];
+        foreach ($by as $type => $list) {
+            $n      = count($list);
+            $why    = [];
+            $steps  = ['retry' => 0, 'revet' => 0, 'rewrite' => 0, 'wait' => 0, 'person' => 0];
+            foreach ($list as $row) {
+                $kind = RoutineRemediator::blockKind($row) ?? 'unknown';
+                $why[$kind] = ($why[$kind] ?? 0) + 1;
+                $step = RoutineRemediator::diagnose($row)['step'];
+                $steps[$step] = ($steps[$step] ?? 0) + 1;
+            }
+            $whyText = implode(', ', array_map(static fn ($k, $c) => $c . '× ' . (self::BLOCK_KIND_LABELS[$k] ?? str_replace('_', ' ', $k)), array_keys($why), $why));
+            $fixable = $steps['retry'] + $steps['revet'] + $steps['rewrite'];
+            $next    = array_filter([
+                $steps['revet'] > 0 ? "re-vet {$steps['revet']}" : null,
+                $steps['rewrite'] > 0 ? "ask the routine to rewrite {$steps['rewrite']}" : null,
+                $steps['retry'] > 0 ? "retry {$steps['retry']}" : null,
+            ]);
+            $label = $type === 'knowledge_base' ? 'help article' : 'blog';
+            $out[$type] = [
+                'title'   => sprintf('%d routine %s%s blocked from publishing', $n, $label, $n === 1 ? '' : 's'),
+                'detail'  => 'Why: ' . $whyText . '.'
+                    . ($next !== [] ? ' The bot will ' . implode(', ', $next) . (RoutineRemediator::autoEnabled() ? ' within minutes — or press the button to do it now.' : ' when you press the button (its automatic fixes are off in Settings → Bot fixes).') : '')
+                    . ($steps['wait'] > 0 ? sprintf(' %d %s retried automatically (the cause is outside the text).', $steps['wait'], $steps['wait'] === 1 ? 'is' : 'are') : '')
+                    . ($steps['person'] > 0 ? " {$steps['person']} need" . ($steps['person'] === 1 ? 's' : '') . ' a person — open the list for why.' : ''),
+                'link'    => ($type === 'knowledge_base' ? '/publishing/knowledge-bases' : '/blog-command-centre/verification/routine') . $filter,
+                'fixable' => $fixable,
+            ];
+        }
+
+        return $out;
+    }
+
+    private const BLOCK_KIND_LABELS = [
+        'vet_refused'         => 'refused by Gemini\'s publication check',
+        'not_approved'        => 'approval does not match the current text',
+        'version_mismatch'    => 'text changed after approval',
+        'approval_revoked'    => 'approval revoked by a person',
+        'site_refused'        => 'refused by aicountly.com',
+        'publish_refused'     => 'publish refused',
+        'vetting_unavailable' => 'vetting unavailable',
+        'auto_publish_off'    => 'auto-publish off',
+        'rewrite_failed'      => 'rewrites did not pass vetting',
+        'unknown'             => 'no reason recorded',
+    ];
+
+    /**
+     * Cards the bot can fix get a "Let the bot fix it" action and, once it
+     * has, a line saying what it did.
+     *
+     * @param list<array<string, mixed>> $cards
+     * @return list<array<string, mixed>>
+     */
+    private function withBotFixes(array $cards): array
+    {
+        $fixable = array_values(array_filter($cards, static fn (array $c): bool => isset($c['fix'])));
+        if ($fixable === [] || ! RecommendationFixer::available($this->db)) {
+            return $cards;
+        }
+        $last = (new RecommendationFixer($this->db, null, $this->now))->lastFixes(array_column($fixable, 'id'));
+        foreach ($cards as &$c) {
+            if (! isset($c['fix'])) {
+                continue;
+            }
+            $c['bot_fix'] = [
+                'label' => RecommendationFixer::LABELS[$c['fix']['kind']] ?? 'Let the bot fix it',
+                'method' => 'POST', 'endpoint' => 'v1/dashboard/command-centre/fix', 'body' => ['card_id' => $c['id']], 'permission' => 'bot.run',
+            ];
+            $c['fix_state'] = $last[$c['id']] ?? null;
+        }
+        unset($c);
+
+        return $cards;
+    }
+
+    /** The Reach blog / help article published at this aicountly.com URL, if any. */
+    private function reachItemForUrl(string $url): ?int
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        if (! preg_match('~^/(blogs?|help)/([^/?#]+)/?$~', $path, $m)) {
+            return null;
+        }
+        $type = $m[1] === 'help' ? 'knowledge_base' : 'blog';
+        $row  = $this->db->table('reach_content_items')->select('id')->where('content_type', $type)
+            ->where('slug', rawurldecode($m[2]))->where('deleted_at IS NULL', null, false)->get()->getRowArray();
+
+        return $row ? (int) $row['id'] : null;
+    }
+
+    /** @return list<string> pages that show for this query, most impressions first */
+    private function pagesForQuery(string $query, string $from, string $to): array
+    {
+        return array_column($this->db->query(
+            "SELECT page_url FROM reach_search_site_facts WHERE metric_date BETWEEN ? AND ? AND query = ? AND page_url <> ''
+              GROUP BY page_url ORDER BY SUM(impressions) DESC LIMIT 3",
+            [$from, $to, $query]
+        )->getResultArray(), 'page_url');
+    }
+
+    /** @return list<string> "query (position 6.2)" for the page, most impressions first */
+    private function queriesForPage(string $url, string $from, string $to): array
+    {
+        return array_map(
+            static fn (array $r): string => sprintf('%s (position %.1f)', $r['query'], (float) $r['pos']),
+            $this->db->query(
+                "SELECT query, SUM(avg_position * impressions) / NULLIF(SUM(impressions),0) AS pos FROM reach_search_site_facts
+                  WHERE metric_date BETWEEN ? AND ? AND page_url = ? AND query <> ''
+                  GROUP BY query ORDER BY SUM(impressions) DESC LIMIT 5",
+                [$from, $to, $url]
+            )->getResultArray(),
+        );
+    }
 
     /** @return array<string, mixed> */
     private function lastLiveCheck(): array

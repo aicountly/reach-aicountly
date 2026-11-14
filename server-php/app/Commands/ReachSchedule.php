@@ -216,6 +216,11 @@ class ReachSchedule extends BaseCommand
             $add('reach.social_inbox_poll', ['limit' => 15], 'social-inbox-poll-' . $utc->format('YmdHi'), ['queue' => 'distribution']);
         }
 
+        // Every hour: in AUTO bot mode the bot acts on the Command centre's
+        // "What to do next" cards itself, within Settings → Bot fixes limits
+        // (RecommendationFixer; a no-op in CONFIRM mode).
+        $add('reach.recommendation_autofix', [], "recommendation-autofix-{$hourKey}");
+
         // Every hour: due-date reminders, overdue escalation, schedule readiness
         $add('reach.content_due_date_reminder', [], "content-due-date-reminder-{$hourKey}", ['queue' => 'notifications']);
         $add('reach.content_overdue_escalation', [], "content-overdue-escalation-{$hourKey}", ['queue' => 'notifications']);

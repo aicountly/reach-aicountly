@@ -24,6 +24,11 @@ class RoutineSubmissions
     public const PUBLISHING      = 'publishing';
     public const LIVE            = 'live';
     public const PUBLISH_FAILED  = 'publish_failed';
+    /** The bot asked the routine for a same-slug rewrite; the old text is not retried. */
+    public const AWAITING_REWRITE = 'awaiting_rewrite';
+
+    /** Stopped on the way to publication — what the bot (or a person) remedies. */
+    public const BLOCKED = [self::PUBLISH_BLOCKED, self::PUBLISH_FAILED];
 
     /** Statuses the sweep keeps working on. */
     public const OPEN = [self::PENDING_VETTING, self::AWAITING_COVER, self::APPROVED, self::PUBLISH_BLOCKED, self::PUBLISHING];

@@ -101,6 +101,11 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
      article returns at the same URL. Skip step 2. A 429 still means stop.
      Reach keeps the rewrite filed where the old article was (its stored category and
      product_slug); send the same category/product_slug you would choose anyway.
+     When item.why starts with "Owner note:", follow that note. When it starts with "Search
+     Console:", the old article was not wrong — people saw it in Google and did not click:
+     keep what is still accurate, refresh out-of-date dates and figures, and write a title
+     (≤ 60 characters), meta description (≤ 155 characters) and opening paragraph that answer
+     the searches item.why lists.
 
 1. PLAN
    GET https://reach.aicountly.org/api/v1/automation/blog-plan
