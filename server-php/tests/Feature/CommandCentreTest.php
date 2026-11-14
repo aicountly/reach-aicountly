@@ -56,6 +56,34 @@ final class CommandCentreTest extends ApiTestCase
         $this->assertContains('integration-gemini', $ids);
     }
 
+    public function testAWeeklyRoutineIsNotQuietBetweenItsRuns(): void
+    {
+        $db  = Database::connect();
+        $add = static function (string $key, string $at) use ($db): void {
+            $db->table('reach_structured_content_submissions')->insert([
+                'content_type' => 'workflow_guide', 'external_key' => $key, 'product_slug' => 'books',
+                'public_slug' => $key, 'title' => 'Guide ' . $key, 'payload_json' => '{}',
+                'payload_sha256' => str_repeat('b', 64), 'created_at' => $at,
+            ]);
+        };
+        $routine = static fn (array $d): array => array_column($d['health']['routines'], null, 'id')['workflow_guide'];
+
+        // Two days after a Monday run: a daily routine would be quiet, a weekly one is not.
+        $add('wg-' . bin2hex(random_bytes(3)), $this->ts('-2 days'));
+        $d = (new CommandCentreService())->build(['health', 'recommendations'], true);
+        $wg = $routine($d);
+        $this->assertSame('weekly', $wg['cadence']);
+        $this->assertSame(192, $wg['threshold_hours']);
+        $this->assertFalse($wg['stale']);
+        $this->assertNotContains('routine-workflow_guide', array_column($d['recommendations']['cards'], 'id'));
+
+        // A week and more: it missed its run.
+        $db->table('reach_structured_content_submissions')->where('content_type', 'workflow_guide')->update(['created_at' => $this->ts('-9 days')]);
+        $d = (new CommandCentreService())->build(['health', 'recommendations'], true);
+        $this->assertTrue($routine($d)['stale']);
+        $this->assertContains('routine-workflow_guide', array_column($d['recommendations']['cards'], 'id'));
+    }
+
     public function testActivityFeedListsWhatTheBotDidWithCounters(): void
     {
         $db = Database::connect();

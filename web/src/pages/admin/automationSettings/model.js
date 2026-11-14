@@ -9,7 +9,7 @@
  * typed into the (empty) field on this page.
  */
 import {
-  Bot, Eye, FileBarChart, Image, KeyRound, MessageCircle, Newspaper, Send, Settings2, Share2, ShieldCheck, TrendingUp, Video,
+  Bot, Eye, FileBarChart, Image, KeyRound, MessageCircle, Newspaper, Send, Settings2, Share2, ShieldCheck, TrendingUp, Video, Wrench,
 } from 'lucide-react';
 import { jsonObjectError } from '../../../utils/jsonObject';
 import { formatDateTime } from '../../../utils/formatDate';
@@ -54,6 +54,10 @@ export const SECTION_META = {
   'Blog & KB routines': {
     id: 'blog-kb', icon: Newspaper,
     description: 'Auto-publishing, covers, author and the compliance floor for routine blogs and help articles.',
+  },
+  'Bot fixes': {
+    id: 'bot-fixes', icon: Wrench,
+    description: 'What the bot fixes by itself: blocked routine articles (retry, re-vet, rewrite) and, in AUTO mode, the "What to do next" cards — with daily limits.',
   },
   Reports: {
     id: 'reports', icon: FileBarChart,

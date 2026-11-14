@@ -171,6 +171,30 @@ describe('CommandCentrePage', () => {
     await waitFor(() => expect(dashboardService.commandCentre).toHaveBeenCalledWith({ fresh: 1 }));
   });
 
+  it('lets the bot fix a card, and says when it already has', async () => {
+    const push = {
+      id: 'push-abc', severity: 'low', title: 'Push "tds on rent" onto page one', detail: 'Average position 6.0', action: null, link: '/intelligence/search', source: 'search',
+      bot_fix: { label: 'Let the bot write a focused article', method: 'POST', endpoint: 'v1/dashboard/command-centre/fix', body: { card_id: 'push-abc' }, permission: 'bot.run' },
+      fix_state: null,
+    };
+    const done = {
+      ...push, id: 'push-def', title: 'Push "gst late fee" onto page one', body: { card_id: 'push-def' },
+      fix_state: { active: true, actor: 'bot', status: 'queued', at: '2026-11-14 09:00:00', message: 'Queued "gst late fee" as the next blog topic.' },
+    };
+    dashboardService.commandCentre.mockResolvedValue({ ...full, recommendations: { status: 'ok', built_at: now, cards: [push, done] } });
+    api.post.mockResolvedValue({ status: 'queued', message: 'Queued "tds on rent" as the next blog topic.' });
+    const user = userEvent.setup();
+    renderWithAuth(<CommandCentrePage />, ctx);
+    await waitFor(() => expect(screen.getByText('Push "tds on rent" onto page one')).toBeInTheDocument());
+
+    expect(screen.getAllByRole('button', { name: 'Let the bot write a focused article' })).toHaveLength(1);
+    expect(screen.getByTestId('fix-state')).toHaveTextContent('The bot did this itself on 2026-11-14 09:00');
+
+    await user.click(screen.getByRole('button', { name: 'Let the bot write a focused article' }));
+    expect(api.post).toHaveBeenCalledWith('v1/dashboard/command-centre/fix', { card_id: 'push-abc' });
+    expect(await screen.findByText('Queued "tds on rent" as the next blog topic.')).toBeInTheDocument();
+  });
+
   it('hides actions the viewer may not perform', async () => {
     dashboardService.commandCentre.mockResolvedValue(full);
     renderWithAuth(<CommandCentrePage />, { auth: { user: { id: 2, email: 'v@x', role: 'viewer' }, permissions: ['dashboard.view'] } });

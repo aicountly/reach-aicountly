@@ -27,6 +27,30 @@ class DashboardController extends BaseApiController
     }
 
     /**
+     * "Let the bot fix it" on a "What to do next" card: POST {card_id}. The
+     * card is looked up again from live data (RecommendationFixer), so the
+     * request carries nothing but its id.
+     */
+    public function commandCentreFix()
+    {
+        $cardId = trim((string) ($this->input()['card_id'] ?? ''));
+        if ($cardId === '' || mb_strlen($cardId) > 80) {
+            return $this->fail('card_id is required.', 422);
+        }
+        $user   = $this->user() ?? [];
+        $result = (new \App\Libraries\Dashboard\RecommendationFixer())->fix($cardId, [
+            'id' => $this->userId(), 'name' => $user['name'] ?? ($user['display_name'] ?? null), 'email' => $user['email'] ?? null,
+        ]);
+        foreach (\App\Libraries\Dashboard\CommandCentreService::SECTIONS as $section) {
+            \Config\Services::cache()->delete('reach_cc_' . $section);
+        }
+        $http = (int) $result['http'];
+        unset($result['http']);
+
+        return $http < 300 ? $this->ok($result + ['message' => $result['message']]) : $this->fail($result['message'], $http, $result);
+    }
+
+    /**
      * Drill-down behind one "What the bot did" counter:
      * `?kind=<counter key>|all&window=24h|7d|30d&page=&per_page=`. Same
      * scope as the counter, so the list holds exactly the rows it counts;

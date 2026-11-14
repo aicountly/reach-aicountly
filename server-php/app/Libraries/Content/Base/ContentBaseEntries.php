@@ -619,6 +619,48 @@ final class ContentBaseEntries
     }
 
     /**
+     * A topic the bot queued from a live signal (a Search Console query close
+     * to page one), first in the routine's queue. Not counted against the
+     * routines' daily proposal limit; the caller caps how many it queues.
+     *
+     * @param array<string,mixed> $payload PAYLOAD_FIELDS only
+     * @return array{status: string, reason?: string, entry?: array<string,mixed>}
+     */
+    public function queueSignalTopic(string $type, string $key, string $title, string $brief, array $payload, int $priority = 100): array
+    {
+        $key = strtolower(trim($key));
+        if (preg_match(self::KEY_PATTERN, $key) !== 1) {
+            return ['status' => 'invalid', 'reason' => 'key: 3–120 chars of a-z, 0-9, ".", "_" or "-"'];
+        }
+        $existing = $this->find($type, $key);
+        if ($existing !== null) {
+            return ['status' => 'exists', 'reason' => "Already queued as topic {$key} ({$existing['status']}).", 'entry' => $this->present($existing)];
+        }
+        $dup = $this->duplicateTitle($type, $title);
+        if ($dup !== null) {
+            return ['status' => 'duplicate', 'reason' => $dup];
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $this->db->table('reach_content_base_entries')->insert([
+            'content_type'  => $type,
+            'entry_key'     => $key,
+            'title'         => mb_substr(trim($title), 0, 500),
+            'brief'         => mb_substr(trim($brief), 0, 4000),
+            'payload_json'  => json_encode(array_intersect_key($payload, array_flip(self::PAYLOAD_FIELDS)), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'target_date'   => date('Y-m-d'),
+            'priority'      => $priority,
+            'origin'        => 'signal',
+            'status'        => 'planned',
+            'evidence_json' => json_encode(array_values((array) ($payload['evidence'] ?? [])), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'created_at'    => $now,
+            'updated_at'    => $now,
+        ]);
+
+        return ['status' => 'accepted', 'entry' => $this->present((array) $this->find($type, $key))];
+    }
+
+    /**
      * @param array<string,mixed> $item
      * @param array<string,true>  $kbEnabled
      */

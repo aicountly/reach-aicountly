@@ -131,6 +131,18 @@ final class ReachConfig
             'automation.vetting.min_compliance_score' => ['group' => 'Blog & KB routines', 'label' => 'Hold for a person below this compliance score (1–10)', 'type' => 'int', 'default' => 5,
                 'help' => 'Gemini scores compliance 1–10. An approved article scored below this — or one Gemini flags HIGH_RISK — is held as high risk instead of auto-publishing. 0 = never hold.'],
 
+            // ── Bot fixes: blocked articles and "What to do next" cards (RoutineRemediator, RecommendationFixer) ──
+            'automation.remediation.auto_fix_blocked' => ['group' => 'Bot fixes', 'label' => 'Let the bot fix blocked routine articles by itself', 'type' => 'bool', 'default' => true,
+                'help' => 'Every 5 minutes the bot takes the next step on a blog or help article that stopped on its way out: retry (site or network trouble), re-vet the current text (it changed after approval, or Gemini\'s publication check refused it), then ask the routine for a same-URL rewrite with Gemini\'s reasons. After 4 steps, or when a person revoked the approval or Gemini held it as high risk, it is left for a person. Off = the buttons on Routine Articles still work.'],
+            'automation.remediation.auto_recommendations' => ['group' => 'Bot fixes', 'label' => 'In AUTO bot mode, act on "What to do next" cards by itself', 'type' => 'bool', 'default' => true,
+                'help' => 'Hourly, while the bot is in AUTO mode: queue a focused blog topic for a search query close to page one, ask for a sharper title and description on a page people see but do not click, and send AI Insights recommendations to the reach-command routine — within the limits below. In CONFIRM mode nothing happens until someone presses "Let the bot fix it".'],
+            'automation.remediation.search_topics_per_day' => ['group' => 'Bot fixes', 'label' => 'Search-opportunity topics the bot may queue per day', 'type' => 'int', 'default' => 1,
+                'help' => 'Each becomes the first content-base topic for the blog routine. 0 = only when someone presses the button.'],
+            'automation.remediation.retitles_per_week' => ['group' => 'Bot fixes', 'label' => 'Low-click pages the bot may rewrite per week', 'type' => 'int', 'default' => 2,
+                'help' => 'A same-URL rewrite by the blog / help routine, aimed at the title and description; Gemini vets it like any article. A page is not rewritten again for 45 days (Search Console needs that long to show the effect).'],
+            'automation.remediation.insight_commands_per_day' => ['group' => 'Bot fixes', 'label' => 'AI Insights recommendations sent to the bot per day', 'type' => 'int', 'default' => 1,
+                'help' => 'Each fires the reach-command routine once (one Claude session) to do what the Reach automation API allows for that recommendation and report back in Bot → Ask the bot.'],
+
             // ── Stream 5: living content base + roadmap hand-off (keep this block contiguous) ──
             'automation.content_base.stale_hours' => ['group' => 'Blog & KB routines', 'label' => 'Flag a daily routine as quiet after (hours)', 'type' => 'int', 'default' => 36,
                 'help' => 'Informational only: the Content Base page and the daily report say when no routine call or submission for a content type arrived for this long. Weekly routines use 8 days.'],

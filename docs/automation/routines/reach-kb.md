@@ -47,6 +47,9 @@ All Reach calls go to https://reach.aicountly.org/api — no auth header of your
      (read item.why for what was wrong with the old text — do not reuse it), research and write
      it exactly as in step 2, and submit it with "regeneration_id": item.regeneration_id added
      to the normal kb-drafts body. The slug is kept by Reach. It counts against your budget.
+     When item.why starts with "Owner note:", follow that note. When it starts with "Search
+     Console:", the old article was not wrong — people did not click it: keep what is still
+     accurate and write a title, meta description and opening that answer the listed searches.
      Repeat step 0 while budget remains and item is not null.
 
 1. PLAN

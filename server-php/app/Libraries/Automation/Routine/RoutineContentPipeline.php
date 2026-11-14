@@ -622,6 +622,7 @@ class RoutineContentPipeline
         if (! $flag['enabled']) {
             $this->submissions->update($id, [
                 'next_attempt_at' => date('Y-m-d H:i:s', time() + 900),
+                'block_kind'      => 'auto_publish_off',
                 'last_error'      => $flag['source'] === 'env_kill_switch'
                     ? "Approved; auto-publish is off because {$flag['kill_switch']}=false in the server .env."
                     : 'Approved; auto-publish is off in Settings → AI & Automation. Publish it by hand or switch auto-publish on.',
@@ -632,7 +633,7 @@ class RoutineContentPipeline
 
         $item = $this->item($itemId);
         if (strtolower((string) $item['approval_status']) !== 'approved') {
-            $this->submissions->update($id, ['status' => RoutineSubmissions::PUBLISH_FAILED, 'last_error' => 'The approval was revoked; not publishing.']);
+            $this->submissions->update($id, ['status' => RoutineSubmissions::PUBLISH_FAILED, 'block_kind' => 'approval_revoked', 'last_error' => 'The approval was revoked; not publishing.']);
 
             return;
         }
@@ -642,7 +643,7 @@ class RoutineContentPipeline
             $this->ensureBlogProfiles($itemId);
             // A checksum-bound approval of exactly this version, or nothing goes out.
             if (! (new BlogContentApprovalService())->verifyForPublication($itemId, $versionId)) {
-                $this->submissions->update($id, ['status' => RoutineSubmissions::PUBLISH_FAILED, 'last_error' => 'The current version no longer matches the vetted, approved text; not publishing.']);
+                $this->submissions->update($id, ['status' => RoutineSubmissions::PUBLISH_FAILED, 'block_kind' => 'version_mismatch', 'last_error' => 'The current version no longer matches the vetted, approved text; not publishing.']);
 
                 return;
             }
@@ -652,11 +653,29 @@ class RoutineContentPipeline
         try {
             $connection   = (new PublicationConnectionService())->resolveBlogConnectionKey();
             $deploymentId = (new PublicationDeploymentService())->enqueuePublication($itemId, $versionId, $connection, 'publish');
+        } catch (\App\Libraries\Blog\BlogVetRefused $e) {
+            // The publish gate re-vets anything not bound to an `approve` run.
+            // An outage is retried as before; a refusal of the text is not
+            // retried on a 30-minute loop (each retry is another Gemini call
+            // on the same words): RoutineRemediator re-vets or asks for a
+            // rewrite instead.
+            $kind = $e->unavailable ? 'vetting_unavailable'
+                : (in_array($e->decision, ['not_approved', 'not_current'], true) ? 'not_approved' : 'vet_refused');
+            $this->submissions->update($id, [
+                'status'           => RoutineSubmissions::PUBLISH_BLOCKED,
+                'block_kind'       => $kind,
+                'publish_attempts' => $attempts,
+                'next_attempt_at'  => date('Y-m-d H:i:s', time() + ($kind === 'vetting_unavailable' ? 1800 : 6 * 3600)),
+                'last_error'       => 'Publish refused: ' . mb_substr($e->getMessage(), 0, 900),
+            ]);
+
+            return;
         } catch (\Throwable $e) {
             $this->submissions->update($id, [
                 'status'           => $attempts >= self::MAX_PUBLISH_ATTEMPTS * 4 ? RoutineSubmissions::PUBLISH_FAILED : RoutineSubmissions::PUBLISH_BLOCKED,
                 'publish_attempts' => $attempts,
                 'next_attempt_at'  => date('Y-m-d H:i:s', time() + 1800),
+                'block_kind'       => str_contains($e->getMessage(), 'must be approved') ? 'not_approved' : 'publish_refused',
                 'last_error'       => 'Publish refused: ' . mb_substr($e->getMessage(), 0, 900),
             ]);
 
@@ -677,6 +696,7 @@ class RoutineContentPipeline
             'deployment_id'    => $deploymentId,
             'publish_attempts' => $attempts,
             'next_attempt_at'  => null,
+            'block_kind'       => null,
             'last_error'       => null,
         ]);
     }
@@ -716,6 +736,7 @@ class RoutineContentPipeline
             $this->submissions->update($id, [
                 'status'          => $attempts >= self::MAX_PUBLISH_ATTEMPTS ? RoutineSubmissions::PUBLISH_FAILED : RoutineSubmissions::PUBLISH_BLOCKED,
                 'next_attempt_at' => date('Y-m-d H:i:s', time() + 900),
+                'block_kind'      => 'site_refused',
                 'last_error'      => 'Public site refused the publish: ' . trim((string) ($deployment['error_category'] ?? '') . ' ' . (string) ($deployment['redacted_error'] ?? '')),
             ]);
             $this->revertBlogToApproved($row);
@@ -756,6 +777,7 @@ class RoutineContentPipeline
             'status'       => RoutineSubmissions::LIVE,
             'published_at' => $deployment['completed_at'] ?? $now,
             'verified_at'  => $now,
+            'block_kind'   => null,
             'last_error'   => null,
         ]);
         (new \App\Libraries\Content\Quality\RegenerationQueue($this->db))->markLiveForItem($itemId);

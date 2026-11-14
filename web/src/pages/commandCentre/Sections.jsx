@@ -139,7 +139,7 @@ export function HealthStrip({ section }) {
         <span className="cc-health__heading">Routines</span>
         {(section.routines || []).map((r) => (
           <Link key={r.id} to={ROUTES.BOT_ACTIVITIES} className={`cc-pill cc-pill--${!r.enabled ? '' : r.stale ? 'warn' : 'ok'}`}
-                title={r.last_at ? `Last submission ${r.last_at}` : 'No submission yet'}>
+                title={`${r.last_at ? `Last submission ${r.last_at}` : 'No submission yet'}${r.cadence ? ` · runs ${r.cadence}, quiet after ${r.threshold_hours} h` : ''}`}>
             {r.label}: {!r.enabled ? 'off' : r.last_at ? ago(r.last_at) : 'never'}
           </Link>
         ))}
@@ -155,12 +155,12 @@ export function Recommendations({ section, onDone }) {
   const [busy, setBusy] = useState(null);
   const [result, setResult] = useState({});
 
-  const run = async (card) => {
-    const a = card.action;
+  const run = async (card, a = card.action) => {
     setBusy(card.id);
     try {
-      await api[a.method.toLowerCase()](a.endpoint, a.body || {});
-      setResult((r) => ({ ...r, [card.id]: { ok: true, text: 'Done.' } }));
+      const res = await api[a.method.toLowerCase()](a.endpoint, a.body || {});
+      const text = res?.message ?? res?.run?.message ?? 'Done.';
+      setResult((r) => ({ ...r, [card.id]: { ok: true, text } }));
       onDone?.();
     } catch (e) {
       setResult((r) => ({ ...r, [card.id]: { ok: false, text: e.message } }));
@@ -182,9 +182,19 @@ export function Recommendations({ section, onDone }) {
             </div>
             <div className="cc-card__title">{c.title}</div>
             <div className="cc-card__detail">{c.detail}</div>
+            {c.fix_state?.active && (
+              <div className="cc-card__detail text-success" data-testid="fix-state">
+                {c.fix_state.actor === 'bot' ? 'The bot did this itself' : 'Sent to the bot'} on {String(c.fix_state.at).slice(0, 16)}: {c.fix_state.message}
+              </div>
+            )}
             <div className="cc-card__actions">
+              {c.bot_fix && !c.fix_state?.active && has(c.bot_fix.permission) && (
+                <button type="button" className="btn btn-sm btn-primary" disabled={busy === c.id} onClick={() => run(c, c.bot_fix)}>
+                  {busy === c.id ? 'Working…' : c.bot_fix.label}
+                </button>
+              )}
               {c.action && has(c.action.permission) && (
-                <button type="button" className="btn btn-sm btn-primary" disabled={busy === c.id} onClick={() => run(c)}>
+                <button type="button" className={`btn btn-sm ${c.bot_fix ? 'btn-secondary' : 'btn-primary'}`} disabled={busy === c.id} onClick={() => run(c)}>
                   {busy === c.id ? 'Working…' : c.action.label}
                 </button>
               )}

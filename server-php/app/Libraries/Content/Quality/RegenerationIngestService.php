@@ -208,8 +208,11 @@ class RegenerationIngestService
         ];
     }
 
-    /** Back to draft so the pipeline walks review → approved → publish again. */
-    private function resetWorkflow(string $contentType, int $itemId): void
+    /**
+     * Back to draft so the pipeline walks review → approved → publish again.
+     * Also used by RoutineRemediator before it re-vets a blocked article.
+     */
+    public function resetWorkflow(string $contentType, int $itemId): void
     {
         $now = date('Y-m-d H:i:s');
         if ($contentType !== 'blog') {

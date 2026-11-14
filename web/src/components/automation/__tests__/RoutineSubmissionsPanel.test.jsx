@@ -5,11 +5,15 @@ import { RoutineSubmissionsPanel } from '../RoutineSubmissionsPanel.jsx';
 
 const list = vi.fn();
 const retry = vi.fn();
+const remedy = vi.fn();
+const fixBlocked = vi.fn();
 
 vi.mock('../../../services/routineSubmissionService', () => ({
   routineSubmissionService: {
     list: (...args) => list(...args),
     retry: (...args) => retry(...args),
+    remedy: (...args) => remedy(...args),
+    fixBlocked: (...args) => fixBlocked(...args),
   },
 }));
 
@@ -67,5 +71,29 @@ describe('RoutineSubmissionsPanel', () => {
     render(['content.view']);
     await screen.findByText('TDS dates');
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it('offers the bot\'s fixes for a blocked article and fixes them all at once', async () => {
+    const blocked = {
+      id: 3, content_item_id: 13, content_key: 'blog-3', title: 'GSTR-1 checklist', status: 'publish_blocked', status_label: 'Approved, publish blocked',
+      retryable: true, decision: 'approved', reasons: [], scores: {}, last_error: 'Publish refused: Not published: the vetting model asks for corrections.',
+      remediation: { next_step: 'revet', reason: 'Gemini’s publication check refused this text; the bot re-vets it.', steps_taken: 0, available: ['retry', 'revet', 'rewrite'] },
+      updated_at: '2026-11-14 09:00:00',
+    };
+    list.mockResolvedValue({ items: [blocked], quota: {}, flags: {}, auto_remediation: true });
+    remedy.mockResolvedValue({ status: 'pending_vetting', status_label: 'Waiting for vetting' });
+    fixBlocked.mockResolvedValue({ message: 'Done: 1× re-vet the current text and publish.' });
+    vi.spyOn(window, 'prompt').mockReturnValue('Keep it to GSTR-1 only');
+    render();
+
+    expect(await screen.findByTestId('remediation')).toHaveTextContent('Bot will re-vet it');
+    fireEvent.click(screen.getByRole('button', { name: 'Re-vet & publish' }));
+    await waitFor(() => expect(remedy).toHaveBeenCalledWith(3, 'revet', undefined));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask bot to rewrite' }));
+    await waitFor(() => expect(remedy).toHaveBeenCalledWith(3, 'rewrite', 'Keep it to GSTR-1 only'));
+
+    fireEvent.click(await screen.findByRole('button', { name: /Let the bot fix 1 blocked/ }));
+    expect(await screen.findByText('Done: 1× re-vet the current text and publish.')).toBeInTheDocument();
   });
 });
