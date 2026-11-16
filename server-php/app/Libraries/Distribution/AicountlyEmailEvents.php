@@ -7,6 +7,7 @@ namespace App\Libraries\Distribution;
 use App\Enums\SuppressionReason;
 use App\Libraries\AuditLogger;
 use App\Libraries\Distribution\Providers\AicountlyEmailSender;
+use App\Models\Distribution\CampaignProviderEventModel;
 use App\Models\Distribution\ChannelConsentModel;
 use App\Models\Distribution\ChannelSuppressionModel;
 use CodeIgniter\Database\BaseConnection;
@@ -131,14 +132,15 @@ final class AicountlyEmailEvents
             $attempt  = $this->findAttempt($deliveryId, $idemKey);
             $tenantId = $this->tenantFor($attempt);
 
-            $this->db->table('reach_campaign_provider_events')->insert([
+            // Through the model: its JSON cast encodes raw_event (never json_encode into a cast field).
+            (new CampaignProviderEventModel())->insert([
                 'tenant_id'         => $tenantId,
                 'dispatch_id'       => $attempt !== null && $attempt['dispatch_id'] !== null ? (int) $attempt['dispatch_id'] : null,
                 'attempt_id'        => $attempt !== null ? (int) $attempt['id'] : null,
                 'provider'          => AicountlyEmailSender::PROVIDER,
                 'connection_id'     => self::CONNECTION_ID,
                 'event_type'        => $type,
-                'raw_event'         => json_encode(self::redacted($event), JSON_UNESCAPED_SLASHES),
+                'raw_event'         => self::redacted($event),
                 'normalised_status' => AicountlyEmailSender::attemptStatusFor($type),
                 'provider_event_id' => $eventId,
                 'received_at'       => date('Y-m-d H:i:s'),
