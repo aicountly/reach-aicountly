@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Libraries\Distribution;
 
+use App\Libraries\Distribution\Providers\AicountlyEmailSender;
 use App\Libraries\Distribution\Providers\ChannelProviderFactory;
 use App\Libraries\Distribution\Providers\MockSocialPublisher;
 use App\Libraries\Distribution\Providers\ProviderGuard;
@@ -63,6 +64,9 @@ class CampaignReadinessService
      */
     private function email(): array
     {
+        if (in_array(strtolower(self::env('EMAIL_PROVIDER')), ChannelProviderFactory::AICOUNTLY_EMAIL, true)) {
+            return $this->aicountlyEmail();
+        }
         $sender    = self::env('SENDER_EMAIL');
         $providers = Mailer::providerSummary();
         $codes     = array_column($providers['providers'], 'code');
@@ -90,6 +94,30 @@ class CampaignReadinessService
         }
 
         return $channel;
+    }
+
+    /**
+     * EMAIL_PROVIDER=aicountly_email: campaign mail goes to AICOUNTLY's Email API (marketing pool),
+     * From reach@news.aicountly.io. Whether each setting is present — never its value.
+     *
+     * @return array<string,mixed>
+     */
+    private function aicountlyEmail(): array
+    {
+        $checks = [
+            self::check('AICOUNTLY_EMAIL_API_URL', 'env', AicountlyEmailSender::deliveriesUrl(self::env('AICOUNTLY_EMAIL_API_URL')) !== null, 'https base URL of the Email API (production https://email.apis.aicountly.com, sandbox https://email.gh.aicountly.com/api).'),
+            self::check('AICOUNTLY_EMAIL_SERVICE_KEY', 'env', self::env('AICOUNTLY_EMAIL_SERVICE_KEY') !== '', "Reach's key in Email's SERVICE_KEYS; Email must list reach:marketing in DELIVERY_PRODUCTS."),
+            self::check('AICOUNTLY_EMAIL_WEBHOOK_SECRET', 'env', self::env('AICOUNTLY_EMAIL_WEBHOOK_SECRET') !== '', 'Secret returned once by PUT /v1/service/delivery-webhook; without it bounces, complaints and unsubscribes are not mirrored.'),
+            self::check('distribution.email.postal_address', 'setting', trim((string) self::setting('distribution.email.postal_address')) !== '', 'Postal address printed in every campaign email footer.'),
+            self::check('unsubscribe links', 'setting', UnsubscribeLinks::isAvailable() && str_starts_with(strtolower(UnsubscribeLinks::baseUrl()), 'https://'), 'https REACH_APP_URL (or distribution.email.unsubscribe_base_url) and REACH_SETTINGS_KEY/JWT_SECRET — the Email API requires an https one-click unsubscribe_url.'),
+        ];
+        $manual = [
+            'Delivery webhook registered: PUT /v1/service/delivery-webhook {"url": "https://reach.aicountly.org/api/v1/inbound/aicountly-email/events"} — store the returned secret as AICOUNTLY_EMAIL_WEBHOOK_SECRET.',
+            'Do one test send (POST v1/distribution/email/test/:id) and confirm it arrives and its delivery events reach Reach.',
+        ];
+
+        return $this->channel('email', 'Email', AicountlyEmailSender::PROVIDER, $checks, $manual, null)
+            + ['provider_source' => 'aicountly_email', 'provider_line' => 'email via AICOUNTLY Email (marketing pool)', 'providers' => []];
     }
 
     /** @return array<string,mixed> */
