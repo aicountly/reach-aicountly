@@ -76,6 +76,7 @@ Endpoints (all JWT + permission gated unless noted):
 | `POST v1/distribution/dispatches/:id/reconcile` | repair from local records (stuck `sending` → failed/unknown, requeue, finalise) |
 | `GET v1/distribution/readiness` | the live readiness report |
 | `GET/POST v1/public/unsubscribe?t&e&s` | **public**, HMAC-signed one-click unsubscribe → email suppression |
+| `POST v1/inbound/aicountly-email/events` | **public**, HMAC-signed delivery events from AICOUNTLY's Email API (only used with `EMAIL_PROVIDER=aicountly_email`) |
 
 ### Queue for the worker cron
 
@@ -124,6 +125,32 @@ States used below and on the readiness page: **ready**, **test_mode**
   carries the body footer only (its header support is not verified). Gmail and
   Yahoo require one-click header unsubscribe for bulk senders (≈5,000+/day to
   their users): above that volume make the SMTP provider the primary for reach.
+- **AICOUNTLY Email (opt-in):** `EMAIL_PROVIDER=aicountly_email` sends campaign
+  mail (email campaigns, channel variants, test sends — not `Mailer`/daily reports)
+  through AICOUNTLY's own mail server via the central Email delivery API
+  (email-aicountly `docs/DELIVERY_API.md`): `POST {AICOUNTLY_EMAIL_API_URL}/v1/service/deliveries`,
+  `X-Service-Key: {AICOUNTLY_EMAIL_SERVICE_KEY}`, category `marketing` (marketing IP
+  pool), one recipient per request, From `reach@news.aicountly.io` (fixed by the API),
+  the https one-click `unsubscribe_url` required (`REACH_APP_URL` must be https).
+  `Idempotency-Key: reach:<attempt key>` (`reach:d<dispatch>:r<recipient>`) is the
+  same for every retry of a recipient. 429/503/timeouts are retried in the request
+  with the same key, then deferred: the recipient goes back and the batch is retried
+  after 60 s, again with the same key (a replay returns the original delivery id).
+  422/409/other 4xx fail that recipient and are not retried; 401/403 stop the dispatch
+  as `not_configured` (key or `DELIVERY_PRODUCTS`). The delivery id is stored as the
+  attempt's `provider_message_id`.
+  **Events:** register `https://reach.aicountly.org/api/v1/inbound/aicountly-email/events`
+  with `PUT /v1/service/delivery-webhook` and store the returned secret as
+  `AICOUNTLY_EMAIL_WEBHOOK_SECRET`. Each event is verified
+  (`X-Aicountly-Signature = sha256=HMAC(secret, timestamp + "." + body)`, timestamp
+  within 5 minutes), deduped on `event_id` (`reach_campaign_provider_events`,
+  provider `aicountly_email`) and moves the attempt forward only (`submitted` → sent,
+  `relayed` → delivered, `bounced`, `complained`, `unsubscribed`, `suppressed`,
+  `expired`/`cancelled` → failed). `bounced` with `bounce_class=hard`, `complained` and
+  `unsubscribed` put the address on the email suppression list (reason bounce /
+  complaint / unsubscribe); complained / unsubscribed also revoke the lead's granted
+  email marketing consent. Dispatch counters (`sent_count`, …) are not recomputed by
+  events. Switch back: unset `EMAIL_PROVIDER`.
 - **Prerequisites outside Reach:** SPF including every provider (Itwalk and the
   Aicountly mail server), DKIM signing for each provider's from domain, DMARC
   record (at least `p=none` with reporting, aligned From); a working reply-to

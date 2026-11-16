@@ -11,6 +11,9 @@ use App\Libraries\Settings\ReachConfig;
 
 class ChannelProviderFactory
 {
+    /** EMAIL_PROVIDER values that select AicountlyEmailSender. */
+    public const AICOUNTLY_EMAIL = ['aicountly_email', 'aicountly-email', 'aicountly'];
+
     /**
      * Social publisher selection:
      *   - SOCIAL_PROVIDER=socialapi (or social_api), or the `social.socialapi.api_key`
@@ -88,6 +91,13 @@ class ChannelProviderFactory
     {
         $provider = self::env('EMAIL_PROVIDER');
 
+        // AICOUNTLY's own mail server via the central Email delivery API (marketing pool). Opt-in
+        // only: selected explicitly, never a fallback. Unconfigured, it fails closed
+        // (ProviderNotConfiguredException on send) instead of falling back to the mock.
+        if (in_array($provider, self::AICOUNTLY_EMAIL, true)) {
+            return AicountlyEmailSender::fromEnv();
+        }
+
         if ($provider === 'mock' || !Mailer::isConfigured()) {
             return new MockEmailSender();
         }
@@ -99,7 +109,7 @@ class ChannelProviderFactory
         }
 
         throw new \LogicException(
-            "Email provider '{$provider}' is not configured. Leave EMAIL_PROVIDER empty (or itwalk/gateway) to use Console's email providers for reach."
+            "Email provider '{$provider}' is not configured. Leave EMAIL_PROVIDER empty (or itwalk/gateway) to use Console's email providers for reach, or set EMAIL_PROVIDER=aicountly_email for AICOUNTLY's Email API."
         );
     }
 

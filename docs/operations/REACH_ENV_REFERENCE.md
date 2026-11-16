@@ -111,7 +111,12 @@ surface, not the environment.
 
 | Variable | Default |
 |---|---|
-| `EMAIL_PROVIDER` | empty → Console's email providers (`EmailDispatcher`) |
+| `EMAIL_PROVIDER` | empty → Console's email providers (`EmailDispatcher`); `aicountly_email` → campaign mail via AICOUNTLY's Email API (`AicountlyEmailSender`, see CAMPAIGN_READINESS.md § Email) |
+| `AICOUNTLY_EMAIL_API_URL` | empty — https base of the Email API (production `https://email.apis.aicountly.com`, sandbox `https://email.gh.aicountly.com/api`); `/v1/service/deliveries` is appended. Read only with `EMAIL_PROVIDER=aicountly_email` |
+| `AICOUNTLY_EMAIL_SERVICE_KEY` | empty — Reach's key in Email's `SERVICE_KEYS` (sent as `X-Service-Key`) |
+| `AICOUNTLY_EMAIL_WEBHOOK_SECRET` | empty — secret from `PUT /v1/service/delivery-webhook`; without it `POST v1/inbound/aicountly-email/events` answers 503 |
+| `AICOUNTLY_EMAIL_FROM_NAME` / `AICOUNTLY_EMAIL_REPLY_TO` | `SENDER_NAME` / `REPLY_TO_EMAIL`, then `SENDER_EMAIL` |
+| `AICOUNTLY_EMAIL_TIMEOUT` / `AICOUNTLY_EMAIL_MAX_RETRIES` | `15` s / `2` (in-request retries on 429/503/timeout with the same `Idempotency-Key`, `Retry-After` capped at 10 s) |
 | `EMAIL_API_KEY` | empty — last-resort provider only (Console → Email providers is the source; `CONSOLE_API_TOKEN` needs `email.credentials`) |
 | `EMAIL_API_URL` | Itwalk `/email/1/send` (last-resort provider) |
 | `EMAIL_API_FORMAT` | `auto` (`/email/1/send` → multipart; other URLs JSON, then multipart) |

@@ -191,6 +191,14 @@ $routes->group('v1', static function ($routes) {
     });
 
     // ---------------------------------------------------------------------
+    // Inbound from AICOUNTLY's Email API — delivery events for campaign mail sent with
+    // EMAIL_PROVIDER=aicountly_email. Guarded by the HMAC signature in the controller
+    // (X-Aicountly-Signature, AICOUNTLY_EMAIL_WEBHOOK_SECRET); dedupe by event_id.
+    // email-aicountly docs/DELIVERY_API.md § Events
+    // ---------------------------------------------------------------------
+    $routes->post('inbound/aicountly-email/events', 'Api\\V1\\Inbound\\AicountlyEmailWebhookController::store');
+
+    // ---------------------------------------------------------------------
     // Authenticated V1 API — every route is permission-gated individually.
     // ---------------------------------------------------------------------
     $routes->group('', ['filter' => 'jwt'], static function ($routes) {
