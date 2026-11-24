@@ -14,19 +14,36 @@ if ! cd "$API_DIR"; then
   exit 1
 fi
 
-resolve_php() {
-  local bin ver major
-  for bin in ea-php82 ea-php81 php82 php81 php; do
-    if command -v "$bin" >/dev/null 2>&1; then
-      ver="$("$bin" -r 'echo PHP_MAJOR_VERSION;' 2>/dev/null || echo 0)"
-      major="${ver%%.*}"
-      if [ "${major:-0}" -ge 8 ] 2>/dev/null; then
-        echo "$bin"
-        return 0
-      fi
+# S01 (moved off cPanel 2026-11): the deploy identity's sandbox has no `php` on
+# PATH; the CLI is Remi's /opt/remi/php84/root/usr/bin/php. Take the first PHP
+# that is >= 8.2 (composer.json) with pgsql (CodeIgniter's Postgre driver), so
+# the deploy neither guesses one path nor migrates with a PHP that cannot reach
+# the DB. PHP_BIN, when set, is used only if it passes the same check.
+# Same search as console-react-app server-php/bin/ops/find-php.sh.
+php_ok() {
+  [ -n "$1" ] && [ -x "$1" ] || return 1
+  "$1" -r 'exit(PHP_VERSION_ID >= 80200 && extension_loaded("pgsql") ? 0 : 1);' >/dev/null 2>&1
+}
+
+find_php() {
+  if [ -n "${PHP_BIN:-}" ]; then
+    php_ok "$PHP_BIN" && { echo "$PHP_BIN"; return 0; }
+    echo "ERROR: PHP_BIN=$PHP_BIN is not PHP >= 8.2 with pgsql" >&2
+    return 1
+  fi
+  local c
+  for c in \
+    "$(command -v php 2>/dev/null || true)" \
+    /opt/remi/php84/root/usr/bin/php /opt/remi/php83/root/usr/bin/php /opt/remi/php82/root/usr/bin/php \
+    /usr/bin/php84 /usr/bin/php83 /usr/bin/php82 \
+    /usr/local/bin/php /usr/bin/php \
+    /opt/cpanel/ea-php84/root/usr/bin/php /opt/cpanel/ea-php83/root/usr/bin/php /opt/cpanel/ea-php82/root/usr/bin/php; do
+    if php_ok "$c"; then
+      echo "$c"
+      return 0
     fi
   done
-  echo "ERROR: PHP 8.1+ CLI required (tried ea-php81, ea-php82, php81, php82, php)" >&2
+  echo "ERROR: no PHP CLI >= 8.2 with pgsql found (looked on PATH, in /opt/remi/php8x, /usr/bin/php8x, /usr/local/bin, /usr/bin and /opt/cpanel)" >&2
   return 1
 }
 
@@ -69,8 +86,8 @@ validate_dotenv_format() {
   fi
 }
 
-PHP_BIN="$(resolve_php)"
-echo "Using PHP: ${PHP_BIN} ($("${PHP_BIN}" -v | head -1))"
+PHP_BIN="$(find_php)" || exit 1
+echo "Using PHP: ${PHP_BIN} ($("${PHP_BIN}" -r 'echo PHP_VERSION;'))"
 echo "API directory: $(pwd)"
 
 if [ -f .env ]; then
